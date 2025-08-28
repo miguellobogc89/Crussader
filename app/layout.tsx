@@ -1,15 +1,16 @@
+// app/layout.tsx
 import "./globals.css";
-import Providers from "./providers";
-import "bootstrap/dist/css/bootstrap.min.css";
 
-export const metadata = { title: "ReputationKit", description: "Login test" };
+export const metadata = {
+  title: "App",
+  description: "Sanity check",
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
-      <body>
-        <Providers>{children}</Providers>
-      </body>
+      <head />
+      <body>{children}</body>
     </html>
   );
 }
