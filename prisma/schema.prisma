@@ -18,6 +18,10 @@ model User {
   ExternalConnection ExternalConnection[]
   Session            Session[]
   UserCompany        UserCompany[]
+
+  // Relaciones inversas
+  responsesCreated Response[] @relation("ResponseCreatedBy")
+  responsesEdited  Response[] @relation("ResponseEditedBy")
 }
 
 model Account {
@@ -305,9 +309,70 @@ model Review {
   Company  Company  @relation("CompanyReviews", fields: [companyId], references: [id], onDelete: Cascade)
   Location Location @relation("LocationReviews", fields: [locationId], references: [id], onDelete: Cascade)
 
+  // Relaciones
+  responses Response[]
+
   @@unique([provider, externalId])
   @@index([companyId])
   @@index([locationId])
   @@index([rating])
   @@index([createdAtG])
+}
+
+enum ResponseStatus {
+  PENDING // generado, pendiente de revisión
+  APPROVED // validada internamente
+  PUBLISHED // visible en la web
+  REJECTED // descartada
+  DISABLED // desactivada (no usar)
+}
+
+enum ResponseSource {
+  AI
+  HUMAN
+}
+
+model Response {
+  id String @id @default(cuid())
+
+  // Relación con la review
+  reviewId String
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  // Contenido y metadatos
+  content   String         @db.Text
+  status    ResponseStatus @default(PENDING)
+  active    Boolean        @default(true) // candidata vigente (útil para “marcar actual” sin publicar)
+  published Boolean        @default(false) // publicada (visible)
+  edited    Boolean        @default(false) // fue editada manualmente tras la IA
+
+  // Trazabilidad / lifecycle
+  generationCount Int       @default(1) // nº de veces que se ha regenerado esta respuesta
+  lastGeneratedAt DateTime? // última fecha de regeneración de ESTE registro
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  publishedAt     DateTime?
+
+  // Auditoría opcional
+  createdById String?
+  createdBy   User?   @relation("ResponseCreatedBy", fields: [createdById], references: [id])
+  editedById  String?
+  editedBy    User?   @relation("ResponseEditedBy", fields: [editedById], references: [id])
+
+  // Contexto de generación
+  source        ResponseSource @default(AI) // AI o HUMANO
+  model         String? // p.ej. "gpt-4.1" o el que uses
+  temperature   Float? // si quieres loguear el sampling
+  promptVersion String? // versión del prompt usado
+  language      String? // "es", "en", etc.
+  tone          String? // "formal", "cercano", etc.
+  businessType  String? // “Cafetería”, “Restaurante”, etc.
+
+  // Moderación / errores
+  moderationFlag  Boolean @default(false)
+  moderationNotes String? @db.Text
+  lastError       String? @db.Text
+
+  @@index([reviewId])
+  @@index([status, published, active])
 }
