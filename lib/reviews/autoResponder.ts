@@ -14,13 +14,26 @@ export async function autoRespondForReview(reviewId: string) {
 
   const businessType = review.Company?.activity ?? undefined;
 
-  const content = await generateReviewResponse({
-    comment: review.comment ?? "",
-    rating: review.rating,
-    businessType,
-    language: "es",
-    tone: "cordial",
-  });
+  // Construimos nombres seguros
+  const businessName = review.Company?.name ?? null;
+  const locationName =
+    [review.Location?.address, review.Location?.city].filter(Boolean).join(", ") || null;
+
+  const content = await generateReviewResponse(
+    {
+      rating: review.rating,
+      comment: review.comment ?? "",
+      reviewerName: (review as any).reviewerName ?? null, // si no existe, queda null
+      businessName,
+      locationName,
+    },
+    {
+      lang: "es",
+      tone: "cordial",
+      // Si quieres usar businessType para elegir plantilla:
+      // templateId: businessType === "restaurant" ? "breve-v1" : "default-v1",
+    }
+  );
 
   const created = await prisma.response.create({
     data: {

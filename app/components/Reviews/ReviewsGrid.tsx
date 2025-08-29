@@ -16,9 +16,16 @@ export default function ReviewsGrid({ items }: { items: ReviewItem[] }) {
       <div className="row">
         {items.map((r) => (
           <div key={r.id} className="col-md-6 col-lg-4 mb-4">
-            <ReviewCard {...r} />
+            <ReviewCard
+              reviewId={r.id}
+              author={r.author}
+              rating={r.rating}
+              comment={r.comment}
+              createdAt={r.createdAt}
+            />
           </div>
         ))}
+
       </div>
     </div>
   );
