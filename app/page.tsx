@@ -22,7 +22,7 @@ export default function Home() {
     <main className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
       <div className="bg-white p-10 rounded-xl shadow-lg text-center">
         <h1 className="text-3xl font-bold text-purple-600 mb-4">
-          Bienvenido a ReputationKit
+          Bienvenido a Crussader
         </h1>
         <p className="text-gray-500 mb-6">
           Centraliza y gestiona tus reseñas fácilmente

@@ -33,7 +33,7 @@ export default function CompanyPage() {
   }
   useEffect(() => { load(); }, []);
 
-  // Abrir modales desde el menú
+  // Abrir modales desde el listado
   function handleAddLocation(companyId: string) {
     setLocCompanyId(companyId);
     setOpenLoc(true);
@@ -42,13 +42,12 @@ export default function CompanyPage() {
     setEditingCompanyId(row.id);
     setCompanyInitial({
       name: row.name,
-      // si guardas más campos en la API, precárgalos aquí
+      // precargar más campos si los tienes en la API
     });
     setCompanyModalMode("edit");
     setCompanyModalOpen(true);
   }
   function handleAddUser(companyId: string) {
-    // placeholder → implementaremos el flujo para invitar usuario
     alert(`Añadir usuario a empresa ${companyId}`);
   }
   async function handleDeleteCompany(companyId: string) {
@@ -80,12 +79,21 @@ export default function CompanyPage() {
       const res = await fetch("/api/companies", {
         method: "POST",
         headers: { "Content-Type":"application/json" },
-        body: JSON.stringify({ name: values.name }), // amplía cuando persistas más campos
+        body: JSON.stringify({
+          name: values.name,
+          activity: values.activity,
+          employeesBand: values.employeesBand,
+        }),
       });
       const data = await res.json();
       if (res.ok && data.ok && data.company) {
         setCompanies(prev => [
-          { id: data.company.id, name: data.company.name, role: "OWNER", createdAt: data.company.createdAt },
+          {
+            id: data.company.id,
+            name: data.company.name,
+            activity: data.company.activity ?? values.activity,
+            employees: data.company.employeesBand ?? values.employeesBand,
+          },
           ...prev,
         ]);
       } else {
@@ -96,11 +104,29 @@ export default function CompanyPage() {
       const res = await fetch(`/api/companies/${editingCompanyId}`, {
         method: "PATCH",
         headers: { "Content-Type":"application/json" },
-        body: JSON.stringify({ name: values.name }), // amplía cuando persistas más campos
+        body: JSON.stringify({
+          name: values.name,
+          activity: values.activity,
+          employeesBand: values.employeesBand,
+          cif: values.cif,
+          logoDataUrl: values.logoDataUrl,
+          website: values.website,
+          phone: values.phone,
+          description: values.description,
+          address: values.address,
+          city: values.city,
+          postalCode: values.postalCode,
+        }),
       });
       const data = await res.json();
       if (res.ok && data.ok) {
-        setCompanies(prev => prev.map(c => c.id === editingCompanyId ? { ...c, name: values.name } : c));
+        setCompanies(prev =>
+          prev.map(c =>
+            c.id === editingCompanyId
+              ? { ...c, name: values.name, activity: values.activity, employees: values.employeesBand }
+              : c
+          )
+        );
       } else {
         throw new Error(data?.error ?? "update_company_error");
       }
@@ -110,7 +136,7 @@ export default function CompanyPage() {
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-8 bg-gray-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Empresas</h1>
+        <h1 className="text-2xl font-bold">Mi empresa</h1>
         <button
           onClick={() => { setCompanyModalMode("create"); setCompanyInitial({}); setCompanyModalOpen(true); }}
           className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700"

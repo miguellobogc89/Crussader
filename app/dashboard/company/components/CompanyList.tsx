@@ -19,7 +19,7 @@ export function CompanyList({
   return (
     <div className="rounded-2xl border bg-white shadow-sm">
       <div className="px-4 py-3 border-b flex items-center justify-between">
-        <h3 className="font-semibold">Tus empresas</h3>
+        <h3 className="font-semibold">Mi empresa</h3>
         {loading && <span className="text-xs text-gray-500">Cargando…</span>}
       </div>
       <div className="divide-y">
