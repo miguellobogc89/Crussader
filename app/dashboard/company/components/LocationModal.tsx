@@ -74,7 +74,6 @@ export function LocationModal({
                   onChange={(e)=>setValues(v=>({ ...v, email: e.target.value }))}
                   placeholder="contacto@tienda.com"
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  required
                 />
               </div>
               <div>

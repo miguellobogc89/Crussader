@@ -25,8 +25,12 @@ export default function GenerateReviewResponseButton({
       const res = await fetch(`/api/reviews/${reviewId}/responses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Si quisieras pasar opciones:
-        // body: JSON.stringify({ language: "es", tone: "cordial" })
+        body: JSON.stringify({
+          action: "generate",
+          tone: "cordial",        // configurable
+          lang: "es",             // configurable
+          templateId: "default-v1"
+        }),
       });
 
       const data = await res.json();

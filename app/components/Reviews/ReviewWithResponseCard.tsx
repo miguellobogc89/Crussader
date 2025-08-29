@@ -61,13 +61,14 @@ export default function ReviewWithResponseCard({ review, responses }: Props) {
       const res = await fetch(`/api/reviews/${review.id}/responses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "generate" }), // 👈 cuerpo JSON
       });
       const data = await res.json();
       if (!res.ok || !data?.ok || !data?.response) {
         throw new Error(data?.error || "No se pudo generar la respuesta");
       }
       const r = data.response as ResponseRow;
-      setList((prev) => [r, ...prev]);
+      setList((prev) => [r, ...prev]); // 👈 fix del spread
       setIdx(0);
       setMsg("Generada ✔");
     } catch (e: any) {
@@ -77,6 +78,7 @@ export default function ReviewWithResponseCard({ review, responses }: Props) {
       setTimeout(() => setMsg(null), 2500);
     }
   }
+
 
   async function handlePublish() {
     if (!current) return;

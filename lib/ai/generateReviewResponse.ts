@@ -1,47 +1,35 @@
-// lib/ai/generateReviewResponse.ts
-import OpenAI from "openai";
+import { generateReviewReply } from "./engine";
+import type { Tone, Language, TemplateId } from "./types";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-type Input = {
-  comment: string;
+export type GenerateReviewResponseInput = {
   rating: number;
-  businessType?: string | null;
-  language?: string;   // "es" por defecto
-  tone?: string;       // "cordial", "profesional", etc.
+  comment?: string | null;
+  reviewerName?: string | null;
+  businessName?: string | null;
+  locationName?: string | null;
+};
+export type GenerateReviewResponseOptions = {
+  tone?: Tone;
+  lang?: Language;
+  templateId?: TemplateId;
 };
 
-export async function generateReviewResponse(input: Input): Promise<string> {
-  const lang = input.language ?? "es";
-  const tone = input.tone ?? "cordial";
-  const bt = input.businessType ?? "Negocio";
-
-  const system = `
-Eres el encargado de responder reseñas de un ${bt}.
-Responde en ${lang}, tono ${tone}, breve (2-4 frases), sin emojis, sin repetir la reseña.
-Si la reseña es negativa, pide disculpas y ofrece ayuda concreta (contacto o próxima visita).
-Si es positiva, agradece y refuerza un punto fuerte mencionado.
-Nunca inventes datos ni promociones agresivas.
-`.trim();
-
-  const user = `
-Reseña:
-- Rating: ${input.rating} estrellas
-- Comentario: """${input.comment}"""
-`.trim();
-
-  const resp = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    temperature: 0.4,
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ],
-  });
-
-  const content = resp.choices?.[0]?.message?.content?.trim();
-  if (!content) {
-    throw new Error("No se pudo generar contenido");
-  }
-  return content;
+export async function generateReviewResponse(
+  input: GenerateReviewResponseInput,
+  options: GenerateReviewResponseOptions = {}
+) {
+  const { rating, comment, reviewerName, businessName, locationName } = input;
+  const aiText = await generateReviewReply(
+    {
+      rating,
+      comment: comment ?? "",
+      reviewerName: reviewerName ?? null,
+      businessName: businessName ?? null,
+      locationName: locationName ?? null,
+      tone: options.tone ?? "cordial",
+      lang: options.lang ?? "es",
+    },
+    { templateId: options.templateId ?? "default-v1" }
+  );
+  return aiText;
 }

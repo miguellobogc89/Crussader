@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { PrismaClient, Prisma } from "@prisma/client";
-// ❌ import { PrismaAdapter } from "@next-auth/prisma-adapter"; // <- eliminado
-import { errorMessage } from "@/lib/error-message";
+import { prisma } from "@/lib/prisma";
+import { CompanyRole } from "@prisma/client";
 
-const prisma = new PrismaClient();
+export const dynamic = "force-dynamic";
 
 export async function GET(_req: NextRequest) {
   try {
@@ -14,23 +13,23 @@ export async function GET(_req: NextRequest) {
       return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
+    const me = await prisma.user.findUnique({
       where: { email: session.user.email },
       select: { id: true },
     });
-    if (!user) {
-      return NextResponse.json({ ok: true, companies: [] });
-    }
+
+    if (!me) return NextResponse.json({ ok: true, companies: [] });
 
     const companies = await prisma.company.findMany({
-      where: { UserCompany: { some: { userId: user.id } } },
+      where: { UserCompany: { some: { userId: me.id } } },
       select: {
         id: true,
         name: true,
         createdAt: true,
         UserCompany: {
-          where: { userId: user.id },
+          where: { userId: me.id },
           select: { role: true },
+          take: 1,
         },
       },
       orderBy: { createdAt: "desc" },
@@ -39,17 +38,14 @@ export async function GET(_req: NextRequest) {
     const rows = companies.map((c) => ({
       id: c.id,
       name: c.name,
-      role: c.UserCompany[0]?.role ?? "MEMBER",
+      role: c.UserCompany[0]?.role ?? CompanyRole.MEMBER,
       createdAt: c.createdAt,
     }));
 
     return NextResponse.json({ ok: true, companies: rows });
-  } catch (e: unknown) {
-    console.error("[GET /api/companies] error:", e);
-    return NextResponse.json(
-      { ok: false, error: "internal_error", message: errorMessage(e) },
-      { status: 500 },
-    );
+  } catch (e) {
+    console.error("[GET /api/companies]", e);
+    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
   }
 }
 
@@ -60,45 +56,49 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const name = typeof body?.name === "string" ? body.name.trim() : "";
-    if (!name) {
+    const { name } = await req.json().catch(() => ({} as { name?: string }));
+    const cleanName = (name ?? "").trim();
+    if (!cleanName) {
       return NextResponse.json({ ok: false, error: "missing_name" }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({
+    const me = await prisma.user.findUnique({
       where: { email: session.user.email },
       select: { id: true },
     });
-    if (!user) {
+    if (!me) {
       return NextResponse.json({ ok: false, error: "no_user" }, { status: 400 });
     }
 
-    const company = await prisma.company.create({
-      data: {
-        name,
-        createdById: user.id,
-      },
-      select: { id: true, name: true, createdAt: true },
+    // Transacción: crea Company + UserCompany (OWNER)
+    const result = await prisma.$transaction(async (tx) => {
+      const company = await tx.company.create({
+        data: {
+          name: cleanName,
+          createdById: me.id,
+        },
+        select: { id: true, name: true, createdAt: true },
+      });
+
+      await tx.userCompany.create({
+        data: {
+          userId: me.id,
+          companyId: company.id,
+          role: CompanyRole.OWNER, // enum, no cast
+        },
+      });
+
+      return company;
     });
 
-    // ⚠️ Mantén la lógica actual pero silencia SOLO esta regla en esta línea.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await prisma.userCompany.create({
-      data: {
-        userId: user.id,
-        companyId: company.id,
-        role: "OWNER" as Prisma.UserCompanyCreateInput["role"],
-      },
-    });
-
-
-    return NextResponse.json({ ok: true, company });
-  } catch (e: unknown) {
-    console.error("[GET /companies/:id] ", e);
-    return NextResponse.json(
-      { ok: false, error: "internal_error", message: errorMessage(e) },
-      { status: 500 },
-    );
-}
+    return NextResponse.json({ ok: true, company: result }, { status: 201 });
+  } catch (e: any) {
+    // Prisma errors útiles
+    if (e?.code === "P2002") {
+      // unique constraint
+      return NextResponse.json({ ok: false, error: "duplicate" }, { status: 409 });
+    }
+    console.error("[POST /api/companies]", e);
+    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
+  }
 }
