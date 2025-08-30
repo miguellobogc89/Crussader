@@ -6,17 +6,41 @@ import { CompanyRole } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const email = session?.user?.email ?? null;
+    const role = (session?.user as any)?.role ?? "user";
+    const isSystemAdmin = role === "system_admin";
+
+    if (!email && !isSystemAdmin) {
       return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
     }
 
-    const me = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true },
-    });
+    const all = req.nextUrl.searchParams.get("all") === "1";
+
+    // ✅ Admin global + ?all=1 ⇒ devolver TODAS las companies
+    if (isSystemAdmin && all) {
+      const companies = await prisma.company.findMany({
+        select: { id: true, name: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const rows = companies.map((c) => ({
+        id: c.id,
+        name: c.name,
+        // Devolvemos algún rol válido para no romper tipos en el cliente
+        role: CompanyRole.ADMIN,
+        createdAt: c.createdAt,
+      }));
+
+      return NextResponse.json({ ok: true, companies: rows });
+    }
+
+    // 👇 Resto de usuarios: solo companies donde es miembro
+    const me = email
+      ? await prisma.user.findUnique({ where: { email }, select: { id: true } })
+      : null;
 
     if (!me) return NextResponse.json({ ok: true, companies: [] });
 
@@ -56,7 +80,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
     }
 
-    const { name } = await req.json().catch(() => ({} as { name?: string }));
+    const { name } = (await req.json().catch(() => ({}))) as { name?: string };
     const cleanName = (name ?? "").trim();
     if (!cleanName) {
       return NextResponse.json({ ok: false, error: "missing_name" }, { status: 400 });
@@ -70,22 +94,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "no_user" }, { status: 400 });
     }
 
-    // Transacción: crea Company + UserCompany (OWNER)
     const result = await prisma.$transaction(async (tx) => {
       const company = await tx.company.create({
-        data: {
-          name: cleanName,
-          createdById: me.id,
-        },
+        data: { name: cleanName, createdById: me.id },
         select: { id: true, name: true, createdAt: true },
       });
 
       await tx.userCompany.create({
-        data: {
-          userId: me.id,
-          companyId: company.id,
-          role: CompanyRole.OWNER, // enum, no cast
-        },
+        data: { userId: me.id, companyId: company.id, role: CompanyRole.OWNER },
       });
 
       return company;
@@ -93,9 +109,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, company: result }, { status: 201 });
   } catch (e: any) {
-    // Prisma errors útiles
     if (e?.code === "P2002") {
-      // unique constraint
       return NextResponse.json({ ok: false, error: "duplicate" }, { status: 409 });
     }
     console.error("[POST /api/companies]", e);

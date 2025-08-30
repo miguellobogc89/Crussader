@@ -3,7 +3,7 @@ import { useState } from "react";
 
 export type LocationForm = {
   title: string;
-  email: string;
+  email?: string | null;          // 🔧 ahora opcional
   phone?: string;
   address?: string;
   city?: string;
@@ -29,13 +29,22 @@ export function LocationModal({
   async function handle(e: React.FormEvent) {
     e.preventDefault();
     setErr("");
-    if (!values.title.trim() || !values.email.trim()) {
-      setErr("missing_title_or_email");
+
+    // 🔧 solo validamos título
+    if (!values.title.trim()) {
+      setErr("missing_title");
       return;
     }
+
     setLoading(true);
     try {
-      await onSubmit(values);
+      // 🔧 normalizamos email a null si está vacío
+      const payload: LocationForm = {
+        ...values,
+        email: values.email?.trim() ? values.email.trim() : null,
+      };
+
+      await onSubmit(payload);
       onClose();
       setValues({ title: "", email: "" });
     } catch (e) {
@@ -57,7 +66,9 @@ export function LocationModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Nombre de la ubicación *</label>
+                <label className="block text-sm font-medium mb-1">
+                  Nombre de la ubicación *
+                </label>
                 <input
                   value={values.title}
                   onChange={(e)=>setValues(v=>({ ...v, title: e.target.value }))}
@@ -66,16 +77,21 @@ export function LocationModal({
                   required
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-medium mb-1">Email de reseñas *</label>
+                {/* 🔧 quitamos el asterisco y no es required */}
+                <label className="block text-sm font-medium mb-1">
+                  Email de reseñas (opcional)
+                </label>
                 <input
                   type="email"
-                  value={values.email}
+                  value={values.email || ""}
                   onChange={(e)=>setValues(v=>({ ...v, email: e.target.value }))}
                   placeholder="contacto@tienda.com"
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Teléfono</label>
                 <input
@@ -97,6 +113,7 @@ export function LocationModal({
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium mb-1">Ciudad</label>
@@ -117,6 +134,7 @@ export function LocationModal({
                   />
                 </div>
               </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1">Website</label>
                 <input
@@ -132,12 +150,16 @@ export function LocationModal({
           {err && <div className="mt-3 text-sm text-red-600">Error: {err}</div>}
 
           <div className="mt-6 flex items-center justify-end gap-3">
-            <button type="button" className="px-4 py-2 rounded-lg border hover:bg-gray-50" onClick={onClose}>
+            <button
+              type="button"
+              className="px-4 py-2 rounded-lg border hover:bg-gray-50"
+              onClick={onClose}
+            >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={loading || !values.title.trim() || !values.email.trim()}
+              disabled={loading || !values.title.trim()}  
               className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
             >
               {loading ? "Creando..." : "Crear ubicación"}
