@@ -64,14 +64,31 @@ export default function CompanyPage() {
   // Submit de LocationModal
   async function handleCreateLocation(values: LocationForm) {
     if (!locCompanyId) return;
-    const res = await fetch(`/api/companies/${locCompanyId}/locations`, {
-      method: "POST",
-      headers: { "Content-Type":"application/json" },
-      body: JSON.stringify(values),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data?.error || "create_location_error");
+    setErr("");
+    try {
+      const res = await fetch(`/api/companies/${locCompanyId}/locations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || "create_location_error");
+      }
+
+      // ✅ Recargar listado para que aparezca la nueva location
+      await load();
+
+      // ✅ Cerrar modal y limpiar estado
+      setOpenLoc(false);
+      setLocCompanyId(null);
+    } catch (e: any) {
+      setErr(e?.message || "create_location_error");
+      alert(e?.message || "No se pudo crear la ubicación");
+    }
   }
+
 
   // Submit de CompanyModal (create/edit)
   async function handleSaveCompany(values: CompanyFormValues) {
