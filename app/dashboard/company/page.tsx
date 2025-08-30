@@ -4,6 +4,7 @@ import { CompanyList } from "./components/CompanyList";
 import type { CompanyRow } from "./components/CompanyRowItem";
 import { LocationModal, type LocationForm } from "./components/LocationModal";
 import CompanyModal, { type CompanyFormValues } from "./components/CompanyModal";
+import { triggerLocationsRefresh } from "@/app/hooks/locationEvents";
 
 export default function CompanyPage() {
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
@@ -24,12 +25,44 @@ export default function CompanyPage() {
     setErr("");
     setLoadingList(true);
     try {
+      // 1) Empresas
       const res = await fetch("/api/companies", { cache: "no-store" });
       const data = await res.json();
-      if (res.ok && data.ok) setCompanies(data.companies ?? []);
-      else setErr(data?.error ?? "fetch_error");
-    } catch { setErr("network_error"); }
-    finally { setLoadingList(false); }
+      if (!res.ok || !data?.ok) throw new Error(data?.error ?? "fetch_error");
+      const companiesBase: CompanyRow[] = data.companies ?? [];
+
+      // 2) Locations por empresa
+      const enriched = await Promise.all(
+        companiesBase.map(async (c) => {
+          try {
+            const lr = await fetch(`/api/companies/${c.id}/locations`, { cache: "no-store" });
+            if (!lr.ok) return { ...c, locations: [] as any[] };
+            const lj = await lr.json();
+            const locsRaw: any[] = Array.isArray(lj) ? lj : (lj.locations ?? []);
+
+            const locations = locsRaw.map((l) => ({
+              id: String(l.id),
+              title: String(l.title ?? l.name ?? "Sin nombre"),
+              city: l.city ?? l.address?.city ?? null,
+              country: l.country ?? l.address?.country ?? null,
+              reviewsCount: Number(l.reviewsCount ?? 0),
+              reviewsAvg: l.reviewsAvg != null ? Number(l.reviewsAvg) : null,
+              createdAt: l.createdAt ?? null,
+            }));
+
+            return { ...c, locations };
+          } catch {
+            return { ...c, locations: [] as any[] };
+          }
+        })
+      );
+
+      setCompanies(enriched);
+    } catch (e: any) {
+      setErr(e?.message || "fetch_error");
+    } finally {
+      setLoadingList(false);
+    }
   }
   useEffect(() => { load(); }, []);
 
@@ -62,32 +95,38 @@ export default function CompanyPage() {
   }
 
   // Submit de LocationModal
-  async function handleCreateLocation(values: LocationForm) {
-    if (!locCompanyId) return;
-    setErr("");
-    try {
-      const res = await fetch(`/api/companies/${locCompanyId}/locations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
-      const data = await res.json();
+// Submit de LocationModal
+async function handleCreateLocation(values: LocationForm) {
+  if (!locCompanyId) return;
+  setErr("");
+  try {
+    const res = await fetch(`/api/companies/${locCompanyId}/locations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(values),
+    });
+    const data = await res.json();
 
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || "create_location_error");
-      }
-
-      // ✅ Recargar listado para que aparezca la nueva location
-      await load();
-
-      // ✅ Cerrar modal y limpiar estado
-      setOpenLoc(false);
-      setLocCompanyId(null);
-    } catch (e: any) {
-      setErr(e?.message || "create_location_error");
-      alert(e?.message || "No se pudo crear la ubicación");
+    if (!res.ok || !data?.ok) {
+      throw new Error(data?.error || "create_location_error");
     }
+
+    // 🔔 avisa a la lista de ubicaciones de esa empresa para que refetchee
+    triggerLocationsRefresh(locCompanyId);
+
+    // (opcional) si tu cabecera de empresa muestra contadores/otros datos:
+    // await load();
+
+    // ✅ cerrar modal y limpiar estado
+    setOpenLoc(false);
+    setLocCompanyId(null);
+  } catch (e: any) {
+    setErr(e?.message || "create_location_error");
+    alert(e?.message || "No se pudo crear la ubicación");
   }
+}
+
+
 
 
   // Submit de CompanyModal (create/edit)

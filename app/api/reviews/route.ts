@@ -1,86 +1,56 @@
 // app/api/reviews/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getUserAuth, assertCompanyMember } from "@/lib/authz";
-
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const { userId, isAdmin } = await getUserAuth();
+    const url = new URL(req.url);
+    const locationId = url.searchParams.get("locationId");
+    const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
+    const size = Math.min(50, Math.max(1, parseInt(url.searchParams.get("size") ?? "9", 10) || 9)); // tu grid 3x3
 
-    const { searchParams } = new URL(req.url);
-    const page = Math.max(1, Number(searchParams.get("page") ?? 1) || 1);
-    const take = Math.min(50, Math.max(1, Number(searchParams.get("take") ?? 20) || 20));
-    const skip = (page - 1) * take;
-
-    const q = (searchParams.get("q") ?? "").trim();
-    const companyId = (searchParams.get("companyId") ?? "").trim();
-    const locationId = (searchParams.get("locationId") ?? "").trim();
-
-    // Si viene locationId y no eres admin, valida pertenencia a la empresa de esa location
-    if (locationId && !isAdmin) {
-      const loc = await prisma.location.findUnique({
-        where: { id: locationId },
-        select: { companyId: true },
-      });
-      if (!loc) {
-        return NextResponse.json({ ok: false, error: "location_not_found" }, { status: 404 });
-      }
-      await assertCompanyMember(loc.companyId, userId, isAdmin);
+    if (!locationId) {
+      return NextResponse.json({ ok: false, error: "missing_locationId" }, { status: 400 });
     }
 
-    const where = {
-      ...(q
-        ? {
-            OR: [
-              { reviewerName: { contains: q, mode: "insensitive" as const } },
-              { comment: { contains: q, mode: "insensitive" as const } },
-              { Company: { name: { contains: q, mode: "insensitive" as const } } },
-              { Location: { title: { contains: q, mode: "insensitive" as const } } },
-            ],
-          }
-        : {}),
-      ...(companyId ? { companyId } : {}),
-      ...(locationId ? { locationId } : {}),
-      // Privacidad: si no eres admin, solo reviews de compañías donde perteneces
-      ...(isAdmin
-        ? {}
-        : {
-            Company: {
-              UserCompany: { some: { userId } },
-            },
-          }),
-    };
+    const total = await prisma.review.count({ where: { locationId } });
+    const totalPages = Math.max(1, Math.ceil(total / size));
+    const clampedPage = Math.min(page, totalPages);
+    const skip = (clampedPage - 1) * size;
 
-    const [total, reviews] = await Promise.all([
-      prisma.review.count({ where }),
-      prisma.review.findMany({
-        where,
-        orderBy: [{ createdAtG: "desc" as const }, { ingestedAt: "desc" as const }],
-        select: {
-          id: true,
-          companyId: true,
-          locationId: true,
-          provider: true,
-          externalId: true,
-          reviewerName: true,
-          reviewerAnon: true,
-          rating: true,
-          comment: true,
-          createdAtG: true,
-          Location: { select: { title: true } },
-          Company: { select: { name: true } },
-        },
-        skip,
-        take,
-      }),
-    ]);
+    const reviews = await prisma.review.findMany({
+      where: { locationId },
+      orderBy: [{ createdAtG: "desc" }, { ingestedAt: "desc" }],
+      skip,
+      take: size,
+      select: {
+        id: true,
+        rating: true,
+        reviewerName: true,
+        comment: true,
+        createdAtG: true,
+      },
+    });
 
-    return NextResponse.json({ ok: true, page, take, total, reviews });
-  } catch (e: any) {
-    const status = e?.status ?? 500;
-    return NextResponse.json({ ok: false, error: e?.message ?? "internal_error" }, { status });
+    // 🔧 mapeo al shape que espera ReviewCard (date siempre string)
+    const rows = reviews.map((r) => ({
+      id: r.id,
+      author: r.reviewerName ?? "Anónimo",
+      content: r.comment ?? "",
+      rating: r.rating ?? 0,
+      date: r.createdAtG ? new Date(r.createdAtG).toISOString() : "",
+    }));
+
+    return NextResponse.json({
+      ok: true,
+      page: clampedPage,
+      size,
+      total,
+      totalPages,
+      reviews: rows,
+    });
+  } catch (e) {
+    console.error("[GET /api/reviews]", e);
+    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
   }
 }

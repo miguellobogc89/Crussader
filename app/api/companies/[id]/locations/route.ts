@@ -6,7 +6,14 @@ import { errorMessage } from "@/lib/error-message";
 
 const prisma = new PrismaClient();
 
-async function ensureMember(email: string | null, companyId: string) {
+async function ensureMember(
+  email: string | null,
+  companyId: string,
+  isSystemAdmin = false
+) {
+  // Bypass total si es system_admin
+  if (isSystemAdmin) return { ok: true as const, userId: null };
+
   if (!email) return { ok: false as const, status: 401, error: "unauth" };
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
   if (!user) return { ok: false as const, status: 401, error: "no_user" };
@@ -25,13 +32,18 @@ async function ensureMember(email: string | null, companyId: string) {
   return { ok: true as const, userId: user.id };
 }
 
-// GET /api/companies/:id/locations  → lista ubicaciones de la empresa
+// GET /api/companies/:id/locations
 export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = await context.params; // Next 15: params es Promise
+    const { id } = await context.params;
     const session = await getServerSession(authOptions);
-    const guard = await ensureMember(session?.user?.email ?? null, id);
-    if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
+    const role = (session?.user as any)?.role ?? "user";
+    const isSystemAdmin = role === "system_admin";
+
+    const guard = await ensureMember(session?.user?.email ?? null, id, isSystemAdmin);
+    if (!guard.ok) {
+      return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
+    }
 
     const locations = await prisma.location.findMany({
       where: { companyId: id },
@@ -49,7 +61,7 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
         googlePlaceId: true,
         googleName: true,
         reviewsCount: true,
-        reviewsAvg: true, // Prisma.Decimal | number | null
+        reviewsAvg: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -62,23 +74,28 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
     }));
 
     return NextResponse.json({ ok: true, locations: rows });
-  } catch (e: unknown) {
-    console.error("[GET /companies/:id/locations] ", e);
+  } catch (e) {
+    console.error("[GET /companies/:id/locations]", e);
     return NextResponse.json(
       { ok: false, error: "internal_error", message: errorMessage(e) },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
 
-// POST /api/companies/:id/locations  → crea una ubicación básica
+// POST /api/companies/:id/locations
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id: companyId } = await context.params;
 
     const session = await getServerSession(authOptions);
-    const guard = await ensureMember(session?.user?.email ?? null, companyId);
-    if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
+    const role = (session?.user as any)?.role ?? "user";
+    const isSystemAdmin = role === "system_admin";
+
+    const guard = await ensureMember(session?.user?.email ?? null, companyId, isSystemAdmin);
+    if (!guard.ok) {
+      return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
+    }
 
     type CreateLocationBody = {
       title?: string;
@@ -93,8 +110,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       googleName?: string | null;
       reviewsCount?: number;
       reviewsAvg?: number;
-      type?: string | null;   // llega como string; se mapea al enum
-      // status?: string;     // si tienes enum para status, lo mapeamos después
+      type?: string | null;
     };
 
     const body = (await req.json().catch(() => ({}))) as Partial<CreateLocationBody>;
@@ -104,7 +120,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       return NextResponse.json({ ok: false, error: "missing_title" }, { status: 400 });
     }
 
-    // mapear string -> enum LocationType (o null si no coincide)
     const typeValue: LocationType | null =
       body.type && Object.values(LocationType).includes(body.type as LocationType)
         ? (body.type as LocationType)
@@ -125,7 +140,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       reviewsCount: typeof body.reviewsCount === "number" ? body.reviewsCount : undefined,
       reviewsAvg: typeof body.reviewsAvg === "number" ? body.reviewsAvg : undefined,
       type: typeValue,
-      // status: ... (si es enum en tu schema, añadir mapeo similar al de type)
     };
 
     const loc = await prisma.location.create({
@@ -147,11 +161,11 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     });
 
     return NextResponse.json({ ok: true, location: loc });
-  } catch (e: unknown) {
-    console.error("[POST /companies/:id/locations] ", e);
+  } catch (e) {
+    console.error("[POST /companies/:id/locations]", e);
     return NextResponse.json(
       { ok: false, error: "internal_error", message: errorMessage(e) },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
