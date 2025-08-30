@@ -41,10 +41,15 @@ async function ensureAccess(email: string | null, locationId: string) {
   return { ok: true as const, userId: user.id };
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> } // 👈 Next 15: params es Promise
+) {
   try {
+    const { id } = await context.params; // 👈 await del params
+
     const session = await getServerSession(authOptions);
-    const guard = await ensureAccess(session?.user?.email ?? null, params.id);
+    const guard = await ensureAccess(session?.user?.email ?? null, id);
     if (!guard.ok) {
       return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
     }
@@ -59,7 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (mode === "flash") {
       // ✅ sincronización inicial inmediata (ventana corta)
       const result = await runFlashSync({
-        locationId: params.id,
+        locationId: id,
         windowMonths: 12,
         maxReviews: 200,
       });
