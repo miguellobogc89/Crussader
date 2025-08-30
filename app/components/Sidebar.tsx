@@ -106,7 +106,7 @@ export default function Sidebar() {
       <nav className="h-[calc(100%-3.25rem)] flex flex-col justify-between overflow-y-auto pb-4">
         {/* lista de navegación */}
         <div className={["px-2", collapsed ? "" : "px-4"].join(" ")}>
-          <ul className="space-y-2.5 list-none p-0 m-0">
+          <ul className=" list-none p-0 m-0">
             {items.map(({ href, label, desc, icon: Icon }) => {
               const active = pathname === href || pathname?.startsWith(href + "/");
               const isCompany = href === "/dashboard/company";
@@ -135,7 +135,7 @@ export default function Sidebar() {
                     {/* contenedor del icono */}
                     <span
                       className={[
-                        "rounded-md p-2 transition",
+                        "rounded-md p-2 transition bg-white",
                         active ? "bg-violet-100" : "bg-neutral-100 group-hover:bg-violet-100",
                       ].join(" ")}
                       aria-hidden

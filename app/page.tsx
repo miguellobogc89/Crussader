@@ -18,7 +18,8 @@ export default function Home() {
     return null; // Evita renderizar landing mientras redirige
   }
 
-  return (
+return (
+  <>
     <main className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
       <div className="bg-white p-10 rounded-xl shadow-lg text-center">
         <h1 className="text-3xl font-bold text-purple-600 mb-4">
@@ -44,5 +45,21 @@ export default function Home() {
         </div>
       </div>
     </main>
-  );
+
+    <footer className="container my-5">
+      <div className="tw-flex tw-items-center tw-justify-between tw-border-t tw-pt-4">
+        <span className="text-muted">© {new Date().getFullYear()} Crussader</span>
+        <div>
+          <button className="btn btn-sm btn-primary me-2">Bootstrap</button>
+          <button className="bg-violet-600 text-white rounded-lg px-3 py-1">
+            Tailwind
+          </button>
+
+        </div>
+      </div>
+    </footer>
+  </>
+);
+
+
 }
