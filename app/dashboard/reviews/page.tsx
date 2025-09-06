@@ -13,9 +13,15 @@ type PageProps = {
   searchParams?: { locationId?: string; page?: string };
 };
 
-const PAGE_SIZE = 9; // 3 columnas x 3 filas
+// Mantiene 9 por página (independiente del nº de columnas visibles)
+const PAGE_SIZE = 9;
 
-type BaseLoc = { id: string; title: string; _count: { Reviews: number }; company: { name: string | null } | null };
+type BaseLoc = {
+  id: string;
+  title: string;
+  _count: { Reviews: number };
+  company: { name: string | null } | null;
+};
 type LocationRow = BaseLoc & { reviewsAvg: number };
 
 export default async function ReviewsPage({ searchParams }: PageProps) {
@@ -70,22 +76,22 @@ export default async function ReviewsPage({ searchParams }: PageProps) {
   }
 
   // 2) Media por ubicación (groupBy)
-  const locationIds = baseLocations.map(l => l.id);
+  const locationIds = baseLocations.map((l) => l.id);
   const avgByLoc = await prisma.review.groupBy({
     by: ["locationId"],
     where: { locationId: { in: locationIds } },
     _avg: { rating: true },
   });
-  const avgMap = new Map(avgByLoc.map(a => [a.locationId, Number(a._avg.rating ?? 0)]));
+  const avgMap = new Map(avgByLoc.map((a) => [a.locationId, Number(a._avg.rating ?? 0)]));
 
-  const locations: LocationRow[] = baseLocations.map(l => ({
+  const locations: LocationRow[] = baseLocations.map((l) => ({
     ...l,
     reviewsAvg: avgMap.get(l.id) ?? 0,
   }));
 
   // 3) Pestaña activa + paginación
   const activeLocationId =
-    searchParams?.locationId && locations.some(l => l.id === searchParams.locationId)
+    searchParams?.locationId && locations.some((l) => l.id === searchParams.locationId)
       ? searchParams.locationId!
       : locations[0].id;
 
@@ -96,7 +102,7 @@ export default async function ReviewsPage({ searchParams }: PageProps) {
   const clampedPage = Math.min(page, totalPages);
   const skip = (clampedPage - 1) * PAGE_SIZE;
 
-  // 4) Reviews (3x3) con responses
+  // 4) Reviews (paginadas) con responses
   const reviews = await prisma.review.findMany({
     where: { locationId: activeLocationId },
     include: {
@@ -109,9 +115,9 @@ export default async function ReviewsPage({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto max-w-6xl p-6 space-y-6">
-      {/* Tabs de ubicaciones (cliente: solo cambia query) */}
+      {/* Tabs de ubicaciones */}
       <LocationTabs
-        locations={locations.map(l => ({
+        locations={locations.map((l) => ({
           id: l.id,
           title: l.title,
           company: l.company,
@@ -120,8 +126,8 @@ export default async function ReviewsPage({ searchParams }: PageProps) {
         activeLocationId={activeLocationId}
       />
 
-      {/* Grid de reviews */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Grid responsive: 1 col (móvil), 2 col (md), 3 col (xl) */}
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
         {reviews.map((r) => (
           <div key={r.id} className="min-h-[260px]">
             <ReviewWithResponseCard
@@ -144,8 +150,9 @@ export default async function ReviewsPage({ searchParams }: PageProps) {
             />
           </div>
         ))}
+
         {reviews.length === 0 && (
-          <div className="col-span-3 text-neutral-600">
+          <div className="col-span-1 md:col-span-2 xl:col-span-3 text-neutral-600">
             No hay reseñas en esta página.
           </div>
         )}

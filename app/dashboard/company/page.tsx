@@ -1,229 +1,434 @@
+// app/dashboard/company/page.tsx
 "use client";
-import { useEffect, useState } from "react";
-import { CompanyList } from "./components/CompanyList";
-import type { CompanyRow } from "./components/CompanyRowItem";
-import { LocationModal, type LocationForm } from "./components/LocationModal";
-import CompanyModal, { type CompanyFormValues } from "./components/CompanyModal";
-import { triggerLocationsRefresh } from "@/app/hooks/locationEvents";
 
-export default function CompanyPage() {
-  const [companies, setCompanies] = useState<CompanyRow[]>([]);
-  const [loadingList, setLoadingList] = useState(false);
-  const [err, setErr] = useState("");
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/app/components/ui/button";
+import { Plus } from "lucide-react";
 
-  // Company modal
-  const [companyModalOpen, setCompanyModalOpen] = useState(false);
-  const [companyModalMode, setCompanyModalMode] = useState<"create" | "edit">("create");
-  const [companyInitial, setCompanyInitial] = useState<Partial<CompanyFormValues>>({});
-  const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
+import {
+  CompanyModal,
+  type CompanyForm, // { name, email, phone, address, employeesBand }
+} from "@/app/components/company/CompanyModal";
 
-  // Location modal
-  const [openLoc, setOpenLoc] = useState(false);
-  const [locCompanyId, setLocCompanyId] = useState<string | null>(null);
+import { CompanyInfoCard } from "@/app/components/company/cards/CompanyInfoCard";
+import { EstablishmentsCard } from "@/app/components/company/cards/EstablishmentsCard";
+import { AverageRatingCard } from "@/app/components/company/cards/AverageRatingCard";
+import { GrowthCard } from "@/app/components/company/cards/GrowthCard";
 
-  async function load() {
-    setErr("");
-    setLoadingList(true);
-    try {
-      // 1) Empresas
-      const res = await fetch("/api/companies", { cache: "no-store" });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error ?? "fetch_error");
-      const companiesBase: CompanyRow[] = data.companies ?? [];
+import { AddLocationsModal, type NewLocation } from "@/app/components/company/AddLocationsModal";
+import { EstablishmentCard } from "@/app/components/company/EstablishmentCard";
+import type { LocationRow } from "@/hooks/useCompanyLocations";
 
-      // 2) Locations por empresa
-      const enriched = await Promise.all(
-        companiesBase.map(async (c) => {
-          try {
-            const lr = await fetch(`/api/companies/${c.id}/locations`, { cache: "no-store" });
-            if (!lr.ok) return { ...c, locations: [] as any[] };
-            const lj = await lr.json();
-            const locsRaw: any[] = Array.isArray(lj) ? lj : (lj.locations ?? []);
+// ----------------------- helpers (fetchers) -----------------------
 
-            const locations = locsRaw.map((l) => ({
-              id: String(l.id),
-              title: String(l.title ?? l.name ?? "Sin nombre"),
-              city: l.city ?? l.address?.city ?? null,
-              country: l.country ?? l.address?.country ?? null,
-              reviewsCount: Number(l.reviewsCount ?? 0),
-              reviewsAvg: l.reviewsAvg != null ? Number(l.reviewsAvg) : null,
-              createdAt: l.createdAt ?? null,
-            }));
+type CompanyRow = { id: string; name: string; role: string; createdAt: string };
 
-            return { ...c, locations };
-          } catch {
-            return { ...c, locations: [] as any[] };
-          }
-        })
-      );
+async function fetchMyCompanies(): Promise<CompanyRow[]> {
+  const r = await fetch("/api/companies", { cache: "no-store" });
+  if (!r.ok) return [];
+  const j = await r.json();
+  return Array.isArray(j?.companies) ? j.companies : [];
+}
 
-      setCompanies(enriched);
-    } catch (e: any) {
-      setErr(e?.message || "fetch_error");
-    } finally {
-      setLoadingList(false);
-    }
-  }
-  useEffect(() => { load(); }, []);
+type Metrics = {
+  totalEstablishments: number;
+  totalReviews: number;
+  averageRating: number;
+  monthlyGrowthPct: number;
+};
 
-  // Abrir modales desde el listado
-  function handleAddLocation(companyId: string) {
-    setLocCompanyId(companyId);
-    setOpenLoc(true);
-  }
-  function handleEditCompany(row: CompanyRow) {
-    setEditingCompanyId(row.id);
-    setCompanyInitial({
-      name: row.name,
-      // precargar más campos si los tienes en la API
-    });
-    setCompanyModalMode("edit");
-    setCompanyModalOpen(true);
-  }
-  function handleAddUser(companyId: string) {
-    alert(`Añadir usuario a empresa ${companyId}`);
-  }
-  async function handleDeleteCompany(companyId: string) {
-    if (!confirm("¿Seguro que quieres borrar esta empresa? Esta acción no se puede deshacer.")) return;
-    const res = await fetch(`/api/companies/${companyId}`, { method: "DELETE" });
-    const data = await res.json();
-    if (res.ok && data.ok) {
-      setCompanies(prev => prev.filter(c => c.id !== companyId));
-    } else {
-      alert(data?.error ?? "delete_error");
-    }
-  }
+async function fetchSummary(companyId: string): Promise<Metrics | null> {
+  const r = await fetch(`/api/companies/${companyId}/summary`, { cache: "no-store" });
+  if (!r.ok) return null;
+  const j = await r.json();
+  return j?.metrics ?? null;
+}
 
-  // Submit de LocationModal
-// Submit de LocationModal
-async function handleCreateLocation(values: LocationForm) {
-  if (!locCompanyId) return;
-  setErr("");
+type CompanyDetails = {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  employeesBand?: string | null; // banda, no número
+};
+
+async function fetchCompanyDetails(companyId: string): Promise<CompanyDetails | null> {
   try {
-    const res = await fetch(`/api/companies/${locCompanyId}/locations`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values),
-    });
-    const data = await res.json();
-
-    if (!res.ok || !data?.ok) {
-      throw new Error(data?.error || "create_location_error");
-    }
-
-    // 🔔 avisa a la lista de ubicaciones de esa empresa para que refetchee
-    triggerLocationsRefresh(locCompanyId);
-
-    // (opcional) si tu cabecera de empresa muestra contadores/otros datos:
-    // await load();
-
-    // ✅ cerrar modal y limpiar estado
-    setOpenLoc(false);
-    setLocCompanyId(null);
-  } catch (e: any) {
-    setErr(e?.message || "create_location_error");
-    alert(e?.message || "No se pudo crear la ubicación");
+    const r = await fetch(`/api/companies/${companyId}`, { cache: "no-store" });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j?.company ?? null;
+  } catch {
+    return null;
   }
 }
 
+// ----------------------- page -----------------------
 
+export default function CompanyPage() {
+  const router = useRouter();
 
+  const [loading, setLoading] = React.useState(true);
+  const [hasCompany, setHasCompany] = React.useState(false);
+  const [companyId, setCompanyId] = React.useState<string | null>(null);
+  const [companyName, setCompanyName] = React.useState("Empresa");
+  const [details, setDetails] = React.useState<CompanyDetails | null>(null);
+  const [metrics, setMetrics] = React.useState<Metrics | null>(null);
 
-  // Submit de CompanyModal (create/edit)
-  async function handleSaveCompany(values: CompanyFormValues) {
-    if (companyModalMode === "create") {
+  // Modal (crear/editar empresa)
+  const [modalOpen, setModalOpen] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [form, setForm] = React.useState<CompanyForm>({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    employeesBand: "",
+  });
+  function modalChange(patch: Partial<CompanyForm>) {
+    setForm((prev) => ({ ...prev, ...patch }));
+  }
+
+  // ----- locations panel state -----
+  const [locs, setLocs] = React.useState<LocationRow[]>([]);
+  const [locsLoading, setLocsLoading] = React.useState(false);
+  const [locsError, setLocsError] = React.useState<string | null>(null);
+
+  // modal añadir locations
+  const [addOpen, setAddOpen] = React.useState(false);
+  const [adding, setAdding] = React.useState(false);
+
+  // Carga inicial: detectar empresa y traer datos
+  React.useEffect(() => {
+    let abort = false;
+    (async () => {
+      setLoading(true);
+      const list = await fetchMyCompanies();
+      if (abort) return;
+
+      if (list.length > 0) {
+        const c = list[0]; // si soportas multi-empresa, ajusta selección
+        setHasCompany(true);
+        setCompanyId(c.id);
+        setCompanyName(c.name ?? "Empresa");
+
+        const [m, d] = await Promise.all([fetchSummary(c.id), fetchCompanyDetails(c.id)]);
+        if (abort) return;
+        setMetrics(m);
+        setDetails(d);
+      } else {
+        setHasCompany(false);
+        setCompanyId(null);
+        setCompanyName("Tu empresa");
+      }
+      setLoading(false);
+    })();
+    return () => {
+      abort = true;
+    };
+  }, []);
+
+  // cargar locations
+  const loadLocations = React.useCallback(async () => {
+    if (!companyId) return;
+    setLocsLoading(true);
+    setLocsError(null);
+    try {
+      const r = await fetch(`/api/companies/${companyId}/locations`, { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+      setLocs(Array.isArray(j?.locations) ? j.locations : []);
+    } catch (e: any) {
+      setLocsError(e?.message || String(e));
+    } finally {
+      setLocsLoading(false);
+    }
+  }, [companyId]);
+
+  React.useEffect(() => {
+    if (hasCompany && companyId) loadLocations();
+  }, [hasCompany, companyId, loadLocations]);
+
+  // --------- acciones modal empresa ---------
+
+  function openCreate() {
+    setForm({ name: "", email: "", phone: "", address: "", employeesBand: "" });
+    setModalOpen(true);
+  }
+
+  function openEdit() {
+    setForm({
+      name: details?.name ?? companyName ?? "",
+      email: details?.email ?? "",
+      phone: details?.phone ?? "",
+      address: details?.address ?? "",
+      employeesBand: details?.employeesBand ?? "",
+    });
+    setModalOpen(true);
+  }
+
+  async function onSubmitCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    setSubmitting(true);
+    try {
       const res = await fetch("/api/companies", {
         method: "POST",
-        headers: { "Content-Type":"application/json" },
-        body: JSON.stringify({
-          name: values.name,
-          activity: values.activity,
-          employeesBand: values.employeesBand,
-        }),
+        headers: { "Content-Type": "application/json" },
+        // tu POST actual solo requiere name
+        body: JSON.stringify({ name: form.name.trim() }),
       });
-      const data = await res.json();
-      if (res.ok && data.ok && data.company) {
-        setCompanies(prev => [
-          {
-            id: data.company.id,
-            name: data.company.name,
-            activity: data.company.activity ?? values.activity,
-            employees: data.company.employeesBand ?? values.employeesBand,
-          },
-          ...prev,
-        ]);
-      } else {
-        throw new Error(data?.error ?? "create_company_error");
-      }
-    } else {
-      if (!editingCompanyId) return;
-      const res = await fetch(`/api/companies/${editingCompanyId}`, {
-        method: "PATCH",
-        headers: { "Content-Type":"application/json" },
-        body: JSON.stringify({
-          name: values.name,
-          activity: values.activity,
-          employeesBand: values.employeesBand,
-          cif: values.cif,
-          logoDataUrl: values.logoDataUrl,
-          website: values.website,
-          phone: values.phone,
-          description: values.description,
-          address: values.address,
-          city: values.city,
-          postalCode: values.postalCode,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ok) {
-        setCompanies(prev =>
-          prev.map(c =>
-            c.id === editingCompanyId
-              ? { ...c, name: values.name, activity: values.activity, employees: values.employeesBand }
-              : c
-          )
-        );
-      } else {
-        throw new Error(data?.error ?? "update_company_error");
-      }
+      const j = await res.json();
+      if (!res.ok || !j?.company?.id) throw new Error(j?.error || `HTTP ${res.status}`);
+      setModalOpen(false);
+      router.push(`/dashboard/company/${j.company.id}`);
+    } catch (err: any) {
+      alert(err?.message || String(err));
+    } finally {
+      setSubmitting(false);
     }
   }
 
+  async function onSubmitEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!companyId) return;
+    setSubmitting(true);
+    try {
+      const payload: any = {
+        name: form.name.trim(),
+        email: form.email.trim() || null,
+        phone: form.phone.trim() || null,
+        address: form.address.trim() || null,
+        employeesBand: form.employeesBand || null,
+      };
+      const res = await fetch(`/api/companies/${companyId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
+      setModalOpen(false);
+      setDetails(j.company);
+      if (j.company?.name) setCompanyName(j.company.name);
+    } catch (err: any) {
+      alert(err?.message || String(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // --------- acciones locations ---------
+
+  function handleConnect(locationId: string) {
+    const returnTo = encodeURIComponent("/dashboard/company");
+    window.location.href = `/api/connect/google-business/start?locationId=${encodeURIComponent(
+      locationId
+    )}&returnTo=${returnTo}`;
+  }
+
+  async function handleSync(locationId: string) {
+    try {
+      const res = await fetch(`/api/locations/${locationId}/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "manual" }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        alert(j?.error || `Sync falló (${res.status})`);
+        return;
+      }
+      await loadLocations();
+    } catch (e: any) {
+      alert(e?.message || String(e));
+    }
+  }
+
+  async function onSubmitSingle(loc: NewLocation) {
+    if (!companyId) return;
+    setAdding(true);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/locations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(loc),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
+      setAddOpen(false);
+      await loadLocations();
+    } catch (e: any) {
+      alert(e?.message || String(e));
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function onSubmitBulk(locsInput: NewLocation[]) {
+    if (!companyId) return;
+    setAdding(true);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/locations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locations: locsInput }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
+      setAddOpen(false);
+      await loadLocations();
+    } catch (e: any) {
+      alert(e?.message || String(e));
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  // --------- formatos para cards ---------
+
+  const avgText = loading || !metrics ? "—" : metrics.averageRating.toFixed(1);
+  const totRevText = loading || !metrics ? "—" : String(metrics.totalReviews);
+  const totLocText = loading || !metrics ? "—" : String(metrics.totalEstablishments);
+  const growthText =
+    loading || !metrics
+      ? "—"
+      : `${metrics.monthlyGrowthPct >= 0 ? "+" : ""}${metrics.monthlyGrowthPct.toFixed(0)}%`;
+
+  const infoEmail = details?.email ?? "—";
+  const infoPhone = details?.phone ?? "—";
+  const infoAddress = details?.address ?? "—";
+  const infoEmployees = details?.employeesBand ? `${details.employeesBand} empleados` : "—";
+
+  // ----------------------- render -----------------------
+
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8 bg-gray-50 min-h-screen">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Mi empresa</h1>
-        <button
-          onClick={() => { setCompanyModalMode("create"); setCompanyInitial({}); setCompanyModalOpen(true); }}
-          className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700"
-        >
-          Crear empresa
-        </button>
-      </div>
+    <div className="min-h-screen bg-muted/20">
+      <header className="border-b bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/40">
+        <div className="container mx-auto px-6 py-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">{companyName}</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Gestiona tu empresa y todos sus establecimientos
+            </p>
+          </div>
 
-      {err && <div className="text-sm text-red-600">Error: {err}</div>}
+          <div className="flex items-center gap-2">
+            {hasCompany && companyId ? (
+              <Button variant="secondary" onClick={openEdit}>
+                Gestionar empresa
+              </Button>
+            ) : (
+              <Button
+                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                onClick={openCreate}
+              >
+                <Plus size={16} className="mr-2" />
+                Crear empresa
+              </Button>
+            )}
+          </div>
+        </div>
+      </header>
 
-      <CompanyList
-        companies={companies}
-        loading={loadingList}
-        onAddLocation={handleAddLocation}
-        onEditCompany={handleEditCompany}
-        onAddUser={handleAddUser}
-        onDeleteCompany={handleDeleteCompany}
-      />
+      {/* Cards si hay empresa */}
+      {hasCompany && (
+        <main>
+          <div className="container mx-auto px-6 py-6 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+              <CompanyInfoCard
+                name={companyName}
+                email={infoEmail}
+                phone={infoPhone}
+                address={infoAddress}
+                employeesText={infoEmployees}
+              />
 
-      <LocationModal
-        open={openLoc}
-        onClose={() => setOpenLoc(false)}
-        onSubmit={handleCreateLocation}
-      />
+              <EstablishmentsCard count={totLocText} />
 
+              <AverageRatingCard average={avgText} totalReviews={totRevText} />
+
+              <GrowthCard growthText={growthText} />
+            </div>
+
+            {/* Panel de establecimientos */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Establecimientos</h2>
+                {companyId && (
+                  <Button
+                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                    onClick={() => setAddOpen(true)}
+                  >
+                    <Plus size={16} className="mr-2" />
+                    Añadir Ubicación
+                  </Button>
+                )}
+              </div>
+
+              {locsError && <div className="text-sm text-red-600">{locsError}</div>}
+
+              {locsLoading ? (
+                <div className="grid gap-4">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="h-24 rounded border bg-gray-50 animate-pulse" />
+                  ))}
+                </div>
+              ) : locs.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-6 text-center">
+                  No hay ubicaciones todavía.
+                </div>
+              ) : (
+                <div className="grid gap-6">
+                  {locs.map((loc) => (
+                    <EstablishmentCard
+                      key={loc.id}
+                      location={loc}
+                      onSync={() => handleSync(loc.id)}
+                      onConnect={() => handleConnect(loc.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
+      )}
+
+      {/* Estado vacío (sin empresa) */}
+      {!hasCompany && (
+        <main>
+          <div className="container mx-auto px-6 py-16 text-center space-y-4">
+            <h2 className="text-xl font-semibold">Aún no tienes ninguna empresa</h2>
+            <p className="text-sm text-muted-foreground">Crea tu empresa para empezar a gestionarla.</p>
+            <Button onClick={openCreate} className="bg-primary hover:bg-primary/90">
+              <Plus size={16} className="mr-2" />
+              Crear empresa
+            </Button>
+          </div>
+        </main>
+      )}
+
+      {/* Modal reutilizable (crear/editar empresa) */}
       <CompanyModal
-        open={companyModalOpen}
-        mode={companyModalMode}
-        initial={companyInitial}
-        onClose={() => setCompanyModalOpen(false)}
-        onSubmit={handleSaveCompany}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        mode={hasCompany ? "edit" : "create"}
+        values={form}
+        onChange={modalChange}
+        onSubmit={hasCompany ? onSubmitEdit : onSubmitCreate}
+        submitting={submitting}
+      />
+
+      {/* Modal añadir locations */}
+      <AddLocationsModal
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onSubmitSingle={onSubmitSingle}
+        onSubmitBulk={onSubmitBulk}
+        submitting={adding}
       />
     </div>
   );

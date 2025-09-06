@@ -1,3 +1,4 @@
+// app/reviews/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -20,7 +21,7 @@ export default function ReviewsPage() {
   const [reviews, setReviews] = useState<ReviewForCard[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
-  const size = 9; // grid 3x3
+  const size = 9; // grid 3x3 (paginación independiente del layout responsive)
   const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
@@ -30,9 +31,10 @@ export default function ReviewsPage() {
     (async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/reviews?locationId=${activeEst.id}&page=${page}&size=${size}`, {
-          cache: "no-store",
-        });
+        const res = await fetch(
+          `/api/reviews?locationId=${activeEst.id}&page=${page}&size=${size}`,
+          { cache: "no-store" }
+        );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         if (cancelled) return;
@@ -67,7 +69,7 @@ export default function ReviewsPage() {
       {/* KPIs */}
       {activeEst && <EstablishmentKpis establishment={activeEst} />}
 
-      {/* Grid de reviews */}
+      {/* Header de reviews */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Reseñas</h2>
         <div className="text-sm text-neutral-500">
@@ -75,12 +77,16 @@ export default function ReviewsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      {/* Grid responsive: 1 col (móvil y tablet vertical), 2 col (md: portátiles/tablets), 3 col (xl) */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
         {reviews.map((r) => (
           <ReviewCard key={r.id} review={r} />
         ))}
+
         {!loading && reviews.length === 0 && (
-          <div className="col-span-3 text-neutral-600">No hay reseñas.</div>
+          <div className="col-span-1 md:col-span-2 xl:col-span-3 text-neutral-600">
+            No hay reseñas.
+          </div>
         )}
       </div>
 

@@ -1,3 +1,4 @@
+// hooks/useCompanyLocations.ts
 "use client";
 
 import { useState } from "react";
@@ -8,9 +9,11 @@ export type LocationRow = {
   address?: string | null;
   city?: string | null;
   postalCode?: string | null;
-  reviewsCount?: number | null;
   reviewsAvg?: number | null;
+  reviewsCount: number;
   googlePlaceId?: string | null;
+  externalConnectionId?: string | null;
+  ExternalConnection?: { id: string; accountEmail: string | null } | null; // 👈
 };
 
 export function useCompanyLocations(companyId: string) {

@@ -1,171 +1,157 @@
+// app/api/companies/[id]/locations/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { PrismaClient, CompanyRole, LocationType } from "@prisma/client";
-import { errorMessage } from "@/lib/error-message";
+import { prisma } from "@/lib/prisma";
+import { CompanyRole, LocationStatus } from "@prisma/client";
 
-const prisma = new PrismaClient();
+export const dynamic = "force-dynamic";
 
-async function ensureMember(
-  email: string | null,
-  companyId: string,
-  isSystemAdmin = false
-) {
-  // Bypass total si es system_admin
-  if (isSystemAdmin) return { ok: true as const, userId: null };
-
+async function ensureMember(email: string | null, companyId: string) {
   if (!email) return { ok: false as const, status: 401, error: "unauth" };
-  const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-  if (!user) return { ok: false as const, status: 401, error: "no_user" };
-
-  // Permite OWNER / ADMIN / MEMBER
-  const membership = await prisma.userCompany.findFirst({
-    where: {
-      userId: user.id,
-      companyId,
-      role: { in: [CompanyRole.OWNER, CompanyRole.ADMIN, CompanyRole.MEMBER] },
-    },
-    select: { id: true },
+  const me = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+  if (!me) return { ok: false as const, status: 401, error: "no_user" };
+  const member = await prisma.userCompany.findFirst({
+    where: { userId: me.id, companyId },
+    select: { role: true },
   });
-  if (!membership) return { ok: false as const, status: 403, error: "forbidden" };
-
-  return { ok: true as const, userId: user.id };
+  if (!member) return { ok: false as const, status: 403, error: "forbidden" };
+  return { ok: true as const, userId: me.id, role: member.role };
 }
 
-// GET /api/companies/:id/locations
-export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
-  try {
-    const { id } = await context.params;
-    const session = await getServerSession(authOptions);
-    const role = (session?.user as any)?.role ?? "user";
-    const isSystemAdmin = role === "system_admin";
-
-    const guard = await ensureMember(session?.user?.email ?? null, id, isSystemAdmin);
-    if (!guard.ok) {
-      return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
-    }
-
-    const locations = await prisma.location.findMany({
-      where: { companyId: id },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        title: true,
-        address: true,
-        city: true,
-        region: true,
-        country: true,
-        postalCode: true,
-        phone: true,
-        website: true,
-        googlePlaceId: true,
-        googleName: true,
-        reviewsCount: true,
-        reviewsAvg: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    const rows = locations.map((l) => ({
-      ...l,
-      reviewsCount: l.reviewsCount ?? 0,
-      reviewsAvg: l.reviewsAvg != null ? Number(l.reviewsAvg as unknown as number) : null,
-    }));
-
-    return NextResponse.json({ ok: true, locations: rows });
-  } catch (e) {
-    console.error("[GET /companies/:id/locations]", e);
-    return NextResponse.json(
-      { ok: false, error: "internal_error", message: errorMessage(e) },
-      { status: 500 }
-    );
-  }
+function canEdit(role: CompanyRole) {
+  return role === CompanyRole.OWNER || role === CompanyRole.ADMIN;
 }
 
-// POST /api/companies/:id/locations
-export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
-  try {
-    const { id: companyId } = await context.params;
+/** GET - devuelve ubicaciones de la compañía (ya lo tenías similar) */
+export async function GET(
+  _req: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  const { id: companyId } = await ctx.params;
 
-    const session = await getServerSession(authOptions);
-    const role = (session?.user as any)?.role ?? "user";
-    const isSystemAdmin = role === "system_admin";
-
-    const guard = await ensureMember(session?.user?.email ?? null, companyId, isSystemAdmin);
-    if (!guard.ok) {
-      return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
-    }
-
-    type CreateLocationBody = {
-      title?: string;
-      address?: string | null;
-      city?: string | null;
-      region?: string | null;
-      country?: string | null;
-      postalCode?: string | null;
-      phone?: string | null;
-      website?: string | null;
-      googlePlaceId?: string | null;
-      googleName?: string | null;
-      reviewsCount?: number;
-      reviewsAvg?: number;
-      type?: string | null;
-    };
-
-    const body = (await req.json().catch(() => ({}))) as Partial<CreateLocationBody>;
-
-    const title = (body.title ?? "").trim();
-    if (!title) {
-      return NextResponse.json({ ok: false, error: "missing_title" }, { status: 400 });
-    }
-
-    const typeValue: LocationType | null =
-      body.type && Object.values(LocationType).includes(body.type as LocationType)
-        ? (body.type as LocationType)
-        : null;
-
-    const data = {
-      companyId,
-      title,
-      address: body.address ?? null,
-      city: body.city ?? null,
-      region: body.region ?? null,
-      country: body.country ?? null,
-      postalCode: body.postalCode ?? null,
-      phone: body.phone ?? null,
-      website: body.website ?? null,
-      googlePlaceId: body.googlePlaceId ?? null,
-      googleName: body.googleName ?? null,
-      reviewsCount: typeof body.reviewsCount === "number" ? body.reviewsCount : undefined,
-      reviewsAvg: typeof body.reviewsAvg === "number" ? body.reviewsAvg : undefined,
-      type: typeValue,
-    };
-
-    const loc = await prisma.location.create({
-      data,
-      select: {
-        id: true,
-        title: true,
-        address: true,
-        city: true,
-        region: true,
-        country: true,
-        postalCode: true,
-        phone: true,
-        website: true,
-        googlePlaceId: true,
-        googleName: true,
-        createdAt: true,
+  const locations = await prisma.location.findMany({
+    where: { companyId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      companyId: true,
+      title: true,
+      address: true,
+      city: true,
+      region: true,
+      country: true,
+      postalCode: true,
+      phone: true,
+      website: true,
+      googleName: true,
+      googlePlaceId: true,
+      googleAccountId: true,
+      googleLocationId: true,
+      lastSyncAt: true,
+      reviewsAvg: true,
+      reviewsCount: true,
+      ExternalConnection: {
+        select: { id: true, provider: true, accountEmail: true },
       },
-    });
+    },
+  });
 
-    return NextResponse.json({ ok: true, location: loc });
-  } catch (e) {
-    console.error("[POST /companies/:id/locations]", e);
-    return NextResponse.json(
-      { ok: false, error: "internal_error", message: errorMessage(e) },
-      { status: 500 }
-    );
+  return NextResponse.json({ ok: true, locations });
+}
+
+/** POST - crea 1..N ubicaciones */
+export async function POST(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  const { id: companyId } = await ctx.params;
+  const session = await getServerSession(authOptions);
+  const guard = await ensureMember(session?.user?.email ?? null, companyId);
+  if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
+  if (!canEdit(guard.role)) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
+
+  const body = await req.json().catch(() => ({} as any));
+
+  type NewLoc = {
+    title: string;
+    address?: string | null;
+    city?: string | null;
+    postalCode?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    website?: string | null;
+    region?: string | null;
+    country?: string | null;
+  };
+
+  const asArray: NewLoc[] = Array.isArray(body?.locations)
+    ? body.locations
+    : body && body.title
+      ? [body as NewLoc]
+      : [];
+
+  if (asArray.length === 0) {
+    return NextResponse.json({ ok: false, error: "missing_payload" }, { status: 400 });
+  }
+
+  // sanea entradas
+  const inputs = asArray
+    .map((l) => ({
+      title: String(l.title ?? "").trim(),
+      address: l.address ? String(l.address).trim() : null,
+      city: l.city ? String(l.city).trim() : null,
+      postalCode: l.postalCode ? String(l.postalCode).trim() : null,
+      phone: l.phone ? String(l.phone).trim() : null,
+      website: l.website ? String(l.website).trim() : null,
+      region: l.region ? String(l.region).trim() : null,
+      country: l.country ? String(l.country).trim() : null,
+    }))
+    .filter((x) => x.title.length > 0);
+
+  if (inputs.length === 0) {
+    return NextResponse.json({ ok: false, error: "missing_title" }, { status: 400 });
+  }
+
+  const created = await prisma.$transaction(async (tx) => {
+    const out = [];
+    for (const l of inputs) {
+      const row = await tx.location.create({
+        data: {
+          companyId,
+          title: l.title,
+          address: l.address,
+          city: l.city,
+          postalCode: l.postalCode,
+          phone: l.phone,
+          website: l.website,
+          region: l.region,
+          country: l.country,
+          status: LocationStatus.DRAFT,
+        },
+        select: {
+          id: true,
+          title: true,
+          address: true,
+          city: true,
+          postalCode: true,
+          phone: true,
+          website: true,
+          lastSyncAt: true,
+          reviewsAvg: true,
+          reviewsCount: true,
+          googlePlaceId: true,
+          ExternalConnection: {
+            select: { id: true, provider: true, accountEmail: true },
+          },
+        },
+      });
+      out.push(row);
+    }
+    return out;
+  });
+
+  return NextResponse.json({ ok: true, created, count: created.length }, { status: 201 });
 }

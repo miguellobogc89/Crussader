@@ -1,14 +1,29 @@
+// app/components/AppHeader.tsx
 "use client";
 
+import * as React from "react";
 import { useSession, signOut } from "next-auth/react";
-import { useEffect, useRef, useState } from "react";
 import { Settings, User, Bell, LogOut } from "lucide-react";
 
 import { SidebarTrigger } from "@/app/components/ui/sidebar";
 import { Button } from "@/app/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
 
-export default function Header() {
+export type AppHeaderProps = {
+  title: string;
+  subtitle?: string;
+  showCreateButton?: boolean;
+  createButtonText?: string;
+  onCreateClick?: () => void;
+};
+
+export function AppHeader({
+  title,
+  subtitle,
+  showCreateButton,
+  createButtonText = "Crear",
+  onCreateClick,
+}: AppHeaderProps) {
   const { data } = useSession();
   const name = data?.user?.name ?? "Usuario";
   const initials =
@@ -21,15 +36,13 @@ export default function Header() {
 
   const image =
     data?.user?.image ||
-    `https://ui-avatars.com/api/?background=EEE&color=7C3AED&name=${encodeURIComponent(
-      name
-    )}`;
+    `https://ui-avatars.com/api/?background=EEE&color=7C3AED&name=${encodeURIComponent(name)}`;
 
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement | null>(null);
 
   // cerrar menú al clicar fuera
-  useEffect(() => {
+  React.useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
       if (!menuRef.current) return;
       if (!menuRef.current.contains(e.target as Node)) setOpen(false);
@@ -41,17 +54,28 @@ export default function Header() {
   return (
     <header className="w-full h-16 border-b border-border/50 bg-card/30 backdrop-blur-sm sticky top-0 z-50">
       <div className="h-full w-full px-6 md:px-8 flex items-center justify-between">
-        {/* Izquierda: trigger + título */}
-        <div className="flex items-center gap-4">
+        {/* Izquierda: trigger + títulos */}
+        <div className="flex items-center gap-4 min-w-0">
           <SidebarTrigger className="h-8 w-8" />
-          <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Panel de Controllll
-          </h1>
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold truncate bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              {title}
+            </h1>
+            {subtitle ? (
+              <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
+            ) : null}
+          </div>
         </div>
 
-        {/* Derecha: settings + avatar + nombre + menú */}
+        {/* Derecha: botón acción, settings, avatar */}
         <div className="flex items-center gap-3 relative" ref={menuRef}>
-          <Button variant="ghost" size="icon" onClick={() => setOpen((v) => !v)}>
+          {showCreateButton ? (
+            <Button onClick={onCreateClick} className="hidden sm:inline-flex">
+              {createButtonText}
+            </Button>
+          ) : null}
+
+          <Button variant="ghost" size="icon" onClick={() => setOpen((v) => !v)} aria-label="Ajustes">
             <Settings size={18} />
           </Button>
 
@@ -62,11 +86,13 @@ export default function Header() {
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium hidden sm:block">{name}</span>
+            <span className="text-sm font-medium hidden sm:block max-w-[160px] truncate">
+              {name}
+            </span>
           </div>
 
           {open && (
-            <div className="absolute right-0 top-14 w-52 rounded-lg border border-border/60 bg-card/95 shadow-xl py-2 z-50">
+            <div className="absolute right-0 top-14 w-56 rounded-lg border border-border/60 bg-card/95 shadow-xl py-2 z-50">
               <button className="flex w-full items-center gap-2 px-4 py-2 text-sm hover:bg-muted/60">
                 <User className="h-4 w-4" /> Perfil
               </button>
@@ -90,3 +116,6 @@ export default function Header() {
     </header>
   );
 }
+
+// Export default por si en algún sitio lo importas como default.
+export default AppHeader;
