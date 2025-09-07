@@ -126,7 +126,7 @@ export default async function ReviewsPage({ searchParams }: PageProps) {
         activeLocationId={activeLocationId}
       />
 
-      {/* Grid responsive: 1 col (móvil), 2 col (md), 3 col (xl) */}
+      {/* Grid responsive: 1 (móvil), 2 (md), 3 (xl) */}
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
         {reviews.map((r) => (
           <div key={r.id} className="min-h-[260px]">
