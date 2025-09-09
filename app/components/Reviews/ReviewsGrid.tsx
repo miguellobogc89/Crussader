@@ -1,5 +1,5 @@
 // components/reviews/ReviewsGrid.tsx
-import ReviewCard from "./ReviewCard";
+import { ReviewCard } from "./ReviewCard";
 
 export type ReviewItem = {
   id: string;
@@ -17,12 +17,20 @@ export default function ReviewsGrid({ items }: { items: ReviewItem[] }) {
         {items.map((r) => (
           <div key={r.id} className="col-md-6 col-lg-4 mb-4">
             <ReviewCard
-              reviewId={r.id}
-              author={r.author}
-              rating={r.rating}
-              comment={r.comment}
-              createdAt={r.createdAt}
+              review={{
+                id: r.id,
+                author: r.author,
+                rating: r.rating,
+                content: r.comment, // comment → content
+                date:
+                  typeof r.createdAt === "string"
+                    ? r.createdAt
+                    : r.createdAt.toISOString(), // Date → string
+              }}
             />
+
+
+
           </div>
         ))}
 

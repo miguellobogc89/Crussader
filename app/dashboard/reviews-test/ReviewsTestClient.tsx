@@ -2,9 +2,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { EstablishmentTabs, type Establishment } from "@/app/components/EstablishmentTabs";
-import EstablishmentKpis from "@/app/components/EstablishmentKpis";
-import { ReviewCard } from "@/app/components/ReviewCard";
+import { EstablishmentTabs, type Establishment } from "@/app/components/establishments/EstablishmentTabs";
+import EstablishmentKpis from "@/app/components/establishments/EstablishmentKpis";
+import { ReviewCard } from "@/app/components/reviews/ReviewCard";
 
 type ReviewForCard = {
   id: string;

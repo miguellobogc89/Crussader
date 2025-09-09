@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ReviewCard } from "@/app/components/ReviewCard";
-import { EstablishmentTabs } from "@/app/components/EstablishmentTabs";
+import { ReviewCard } from "@/app/components/reviews/ReviewCard";
+import { EstablishmentTabs } from "@/app/components/establishments/EstablishmentTabs";
 import { Search, Filter, Download } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";

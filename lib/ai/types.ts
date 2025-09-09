@@ -12,8 +12,10 @@ export type TemplateInput = {
   lang: Language;
 };
 
-export type AIOptions = {
-  templateId?: TemplateId;
-  provider?: "openai";
+export interface AIOptions {
+  templateId?: string;
+  model?: string;
+  temperature?: number;
   maxTokens?: number;
-};
+}
+

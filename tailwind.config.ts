@@ -1,7 +1,7 @@
+// tailwind.config.ts
 import type { Config } from "tailwindcss";
 import animate from "tailwindcss-animate";
 import lineClamp from "@tailwindcss/line-clamp";
-
 
 const config: Config = {
   darkMode: "class",
@@ -11,11 +11,22 @@ const config: Config = {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
+    // Breakpoints exactos
+    screens: {
+      sm: "640px",   // móviles grandes
+      md: "768px",   // tablets
+      lg: "1024px",  // portátiles
+      xl: "1240px",  // escritorios
+      xl2: "1600px", // pantallas grandes → 3 columnas
+    },
+
     container: {
       center: true,
       padding: "2rem",
+      // este screens solo afecta al contenedor `.container`, no a las utilities
       screens: { "2xl": "1400px" },
     },
+
     extend: {
       // === Tokens HSL (Lovable) ===
       colors: {
@@ -63,7 +74,7 @@ const config: Config = {
           ring: "hsl(var(--sidebar-ring))",
         },
 
-        // === Tu paleta custom ===
+        // === Paleta custom ===
         crussader: {
           DEFAULT: "#7c3aed",
           light: "#a78bfa",
@@ -71,7 +82,7 @@ const config: Config = {
         },
       },
 
-      // === Tu sombra + radios ===
+      // === Sombra + radios ===
       boxShadow: {
         glow: "0 10px 30px rgba(124,58,237,0.25)",
       },
@@ -81,7 +92,7 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
 
-      // === Animaciones usadas ===
+      // === Animaciones ===
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

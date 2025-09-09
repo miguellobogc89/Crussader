@@ -1,8 +1,10 @@
+// ReviewWithResponseCard.tsx
 "use client";
 
 import { useMemo, useState } from "react";
 import { Stars } from "./Stars";
 import ActionButton from "./ActionButton";
+import { ChevronLeft, ChevronRight } from "lucide-react"; 
 
 type Review = {
   id: string;
@@ -30,11 +32,14 @@ type Props = {
 function fmt(d: string | Date | null | undefined) {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;
-  return date.toLocaleDateString();
+  return new Intl.DateTimeFormat("es-ES", {
+    dateStyle: "medium",
+    timeZone: "Europe/Madrid",
+  }).format(date);
 }
 
 export default function ReviewWithResponseCard({ review, responses }: Props) {
-  // ---- estado existente (déjalo tal cual) ----
+  // ---- estado existente ----
   const initialList = useMemo<ResponseRow[]>(() => responses ?? [], [responses]);
   const initialIndex = useMemo(() => {
     const i = initialList.findIndex((r) => r.published);
@@ -52,7 +57,7 @@ export default function ReviewWithResponseCard({ review, responses }: Props) {
   const [draft, setDraft] = useState<string>("");
   const canCycle = list.length > 1;
 
-  // ---- AQUI pega estas funciones (handlers) ----
+  // ---- Handlers ----
   async function handleGenerateOrRegenerate() {
     if (isEditing) return;
     setBusy(true);
@@ -61,54 +66,62 @@ export default function ReviewWithResponseCard({ review, responses }: Props) {
       const res = await fetch(`/api/reviews/${review.id}/responses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "generate" }), // 👈 cuerpo JSON
+        body: JSON.stringify({ action: "generate" }),
+        cache: "no-store",
       });
       const data = await res.json();
       if (!res.ok || !data?.ok || !data?.response) {
         throw new Error(data?.error || "No se pudo generar la respuesta");
       }
       const r = data.response as ResponseRow;
-      setList((prev) => [r, ...prev]); // 👈 fix del spread
+      setList((prev) => [r, ...prev]);
       setIdx(0);
       setMsg("Generada ✔");
     } catch (e: any) {
       setMsg(`Error: ${String(e.message || e)}`);
     } finally {
       setBusy(false);
-      setTimeout(() => setMsg(null), 2500);
+      const t = setTimeout(() => setMsg(null), 2500);
+      // opcional: clearTimeout(t) si desmonta
     }
   }
-
 
   async function handlePublish() {
     if (!current) return;
     setBusy(true);
     setMsg(null);
-    // Optimista: marcamos publicada en UI
+
+    // Optimista con reversión precisa
+    const prevStatus: ResponseRow["status"] = current.status;
     setList((prev) =>
       prev.map((r, i) =>
         i === idx ? { ...r, published: true, status: "PUBLISHED" } : r
       )
     );
+
     try {
-      await fetch(`/api/responses/${current.id}/publish`, { method: "POST" });
+      const res = await fetch(`/api/responses/${current.id}/publish`, {
+        method: "POST",
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        throw new Error("No se pudo publicar");
+      }
       setMsg("Publicado ✔");
     } catch (e: any) {
       // Revertir si falla
       setList((prev) =>
         prev.map((r, i) =>
-          i === idx ? { ...r, published: false, status: "APPROVED" } : r
+          i === idx ? { ...r, published: false, status: prevStatus } : r
         )
       );
       setMsg(`Error: ${String(e.message || e)}`);
     } finally {
       setBusy(false);
-      setTimeout(() => setMsg(null), 2500);
+      const t = setTimeout(() => setMsg(null), 2500);
+      // opcional: clearTimeout(t)
     }
   }
-
-
-
 
   function goPrev() {
     if (isEditing || list.length === 0) return;
@@ -141,16 +154,19 @@ export default function ReviewWithResponseCard({ review, responses }: Props) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: draft }),
+        cache: "no-store",
       });
       const data = await res.json();
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || "No se pudo guardar la respuesta");
       }
 
-      // Actualiza la respuesta en la lista
+      const updated = data?.response as ResponseRow | undefined;
       setList((prev) =>
         prev.map((r, i) =>
-          i === idx ? { ...r, content: draft, edited: true } : r
+          i === idx
+            ? { ...r, ...(updated ?? { content: draft, edited: true }) }
+            : r
         )
       );
       setIsEditing(false);
@@ -159,7 +175,8 @@ export default function ReviewWithResponseCard({ review, responses }: Props) {
       setMsg(`Error: ${String(e.message || e)}`);
     } finally {
       setBusy(false);
-      setTimeout(() => setMsg(null), 2500);
+      const t = setTimeout(() => setMsg(null), 2500);
+      // opcional: clearTimeout(t)
     }
   }
 
@@ -235,11 +252,12 @@ export default function ReviewWithResponseCard({ review, responses }: Props) {
 
         {/* Footer con acciones */}
         <div className="mt-4 items-center gap-3 border-t pt-3">
-          {/* Botones expansivos en una sola fila (mismo ancho) */}
           <div className="grid grid-flow-col auto-cols-fr gap-2 flex-1">
             <ActionButton
               variant="regen"
-              label={busy ? "Generando..." : list.length > 0 ? "Regenerar" : "Generar"}
+              label={
+                busy ? "Generando..." : list.length > 0 ? "Regenerar" : "Generar"
+              }
               onClick={handleGenerateOrRegenerate}
               disabled={busy || isEditing}
               title="Generar o regenerar respuesta"
@@ -277,7 +295,13 @@ export default function ReviewWithResponseCard({ review, responses }: Props) {
             {current && (
               <ActionButton
                 variant="publish"
-                label={busy ? "Publicando..." : current.published ? "Publicado" : "Publicar"}
+                label={
+                  busy
+                    ? "Publicando..."
+                    : current.published
+                    ? "Publicado"
+                    : "Publicar"
+                }
                 onClick={handlePublish}
                 disabled={busy || isEditing || current.published}
                 title="Publicar"
@@ -285,14 +309,10 @@ export default function ReviewWithResponseCard({ review, responses }: Props) {
             )}
           </div>
 
-          {/* Mensaje a la izq + paginación a la derecha */}
+          {/* Mensaje + paginación */}
           <div className="flex w-full items-center justify-between gap-3 shrink-0">
-            {/* mensaje */}
-            <div>
-              {msg && <span className="text-sm text-neutral-600">{msg}</span>}
-            </div>
+            <div>{msg && <span className="text-sm text-neutral-600">{msg}</span>}</div>
 
-            {/* paginación */}
             <div className="pt-2 flex items-center gap-3">
               <button
                 className="rounded-full border px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
@@ -317,7 +337,6 @@ export default function ReviewWithResponseCard({ review, responses }: Props) {
               </button>
             </div>
           </div>
-
         </div>
       </div>
     </div>

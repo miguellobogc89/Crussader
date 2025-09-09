@@ -1,7 +1,7 @@
+// app/api/reviews/[id]/responses/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createAIResponseForReview } from "@/lib/ai/createAIResponseForReview";
-import type { Tone, Language, TemplateId } from "@/lib/ai/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,11 +11,14 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: { id: string } }
 ) {
-  const { id } = await params;
+  const { id } = context.params;
   if (!id) {
-    return NextResponse.json({ ok: false, error: "id requerido" }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "id requerido" },
+      { status: 400 }
+    );
   }
 
   const responses = await prisma.response.findMany({
@@ -23,7 +26,7 @@ export async function GET(
     orderBy: [
       { published: "desc" },
       { status: "asc" },
-      { createdAt: "desc" },
+      { createdAt: "desc" }
     ],
   });
 
@@ -38,11 +41,14 @@ export async function GET(
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: { id: string } }
 ) {
-  const { id } = await params;
+  const { id } = context.params;
   if (!id) {
-    return NextResponse.json({ ok: false, error: "id requerido" }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "id requerido" },
+      { status: 400 }
+    );
   }
 
   // Parse tolerante (acepta body vacío)
@@ -60,10 +66,7 @@ export async function POST(
   const content: string | undefined =
     typeof body?.content === "string" ? body.content.trim() : undefined;
   const source: "AI" | "HUMAN" = body?.source === "HUMAN" ? "HUMAN" : "AI";
-  const action = body?.action ?? "generate";
-  const tone: Tone = body?.tone ?? "cordial";
-  const lang: Language = body?.lang ?? "es";
-  const templateId: TemplateId = body?.templateId ?? "default-v1";
+  const action: string = body?.action ?? "generate";
 
   try {
     // 1) Guardar manual (HUMAN)
@@ -81,11 +84,7 @@ export async function POST(
 
     // 2) Generar IA
     if (action === "generate" || !content) {
-      const created = await createAIResponseForReview(id, {
-        tone,
-        lang,
-        templateId,
-      });
+      const created = await createAIResponseForReview(id);
       return NextResponse.json({ ok: true, response: created }, { status: 201 });
     }
 

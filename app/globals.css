@@ -108,3 +108,24 @@
   /* (opcional) por si algún estilo externo pinta links del sidebar */
   [data-sidebar] a { text-decoration: none; color: inherit; }
 }
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(100%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(100%) scale(0.95);
+  }
+}

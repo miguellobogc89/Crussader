@@ -16,6 +16,7 @@ import {
   FileText,
   BarChart3,
   LogOut,
+  Settings, // ✅ NUEVO
 } from "lucide-react";
 
 import Dot from "@/app/components/ui/Dot"; // si no existe, comenta esta línea y los usos
@@ -44,7 +45,6 @@ export function AppSidebar() {
   // Empresa (nombre/logo)
   const [brandSrc, setBrandSrc] = useState("/public/img/logo_crussader.png");
 
-
   // Estado: si el usuario tiene empresa (para Dot)
   const [hasCompany, setHasCompany] = useState<boolean | null>(null);
   useEffect(() => {
@@ -59,18 +59,13 @@ export function AppSidebar() {
   }, []);
 
   const baseItems = [
-    { title: "Perfil de Usuario", url: "/dashboard/profile", icon: User, description: "Gestiona tu información personal" },
-    { title: "Reviews",           url: "/dashboard/reviews", icon: MessageSquare, description: "Reseñas de Google" },
-    { title: "Empresa",           url: "/dashboard/company", icon: Building2, description: "Información de la empresa" },
-    { title: "Empresa (test)",           url: "/dashboard/company-test", icon: Building2, description: "Información de la empresa" },
-    { title: "Integraciones",     url: "/dashboard/integrations", icon: Plug, description: "Conecta servicios" },
-    { title: "Seguridad",         url: "/dashboard/security", icon: Shield, description: "Seguridad y privacidad" },
-    { title: "Reviews (test)", url: "/dashboard/reviews-test", icon: MessageSquare, description: "Sandbox de reseñas" },
-    { title: "Base de Datos",     url: "/dashboard/database", icon: Database, description: "Conexiones y datos" },
-    { title: "Notificaciones",    url: "/dashboard/notifications", icon: Bell, description: "Preferencias" },
-    { title: "Facturación",       url: "/dashboard/billing", icon: FileText, description: "Pagos y suscripciones" },
-    { title: "Análisis",          url: "/dashboard/analytics", icon: BarChart3, description: "Métricas y estadísticas" },
-    { title: "Reportes",          url: "/dashboard/reports", icon: FileText, description: "Generación de informes" },
+    { title: "Inicio", url: "/dashboard/home", icon: User, description: "Inicio" },
+    { title: "Reviews", url: "/dashboard/reviews", icon: MessageSquare, description: "Reseñas de Google" },
+    { title: "Empresa", url: "/dashboard/company", icon: Building2, description: "Información de la empresa" },
+    { title: "Integraciones", url: "/dashboard/integrations", icon: Plug, description: "Conecta servicios" },
+    { title: "Base de Datos", url: "/dashboard/database", icon: Database, description: "Conexiones y datos" },
+    { title: "Reportes", url: "/dashboard/reports", icon: FileText, description: "Generación de informes" },
+    // ❌ Quitamos Configuración de aquí para situarla abajo del todo
   ];
   const items =
     role === "system_admin"
@@ -102,7 +97,6 @@ export function AppSidebar() {
             )}
           </Link>
         </SidebarHeader>
-
 
         {/* Menú */}
         <SidebarGroup className="px-2">
@@ -156,7 +150,37 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* 🔹 Separador + Settings abajo del todo */}
         <SidebarSeparator />
+
+        <div className="px-2">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive("/dashboard/settings")}
+                className={`h-11 ${
+                  isActive("/dashboard/settings")
+                    ? "bg-primary/10 text-primary font-medium border-r-2 border-primary"
+                    : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Link
+                  href="/dashboard/settings"
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200"
+                >
+                  <Settings className="h-5 w-5 flex-shrink-0" />
+                  {!isCollapsed && (
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium block truncate">Configuración</span>
+                      <span className="text-xs text-muted-foreground block truncate">Ajustes de usuario</span>
+                    </div>
+                  )}
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </div>
 
         {/* Logout al fondo */}
         <div className="px-2 pb-3 mt-auto">
@@ -170,9 +194,7 @@ export function AppSidebar() {
                   <span className="grid place-items-center rounded-md p-2 bg-red-100">
                     <LogOut className="h-4 w-4" />
                   </span>
-                  {!isCollapsed && (
-                    <span className="text-sm font-semibold truncate">Cerrar sesión</span>
-                  )}
+                  {!isCollapsed && <span className="text-sm font-semibold truncate">Cerrar sesión</span>}
                 </button>
               </SidebarMenuButton>
             </SidebarMenuItem>

@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/app/components/ui/button"
 import { Input } from "@/app/components/ui/input"
 import { Separator } from "@/app/components/ui/separator"
-import { Sheet, SheetContent } from "@/app/components/ui/sheet"
+import { Sheet, SheetContent,  SheetHeader, SheetTitle } from "@/app/components/ui/sheet"
 import { Skeleton } from "@/app/components/ui/skeleton"
 import {
   Tooltip,
@@ -205,11 +205,17 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
+            {/* 🔽 Título accesible oculto */}
+            <SheetHeader className="sr-only">
+              <SheetTitle>Menú lateral</SheetTitle>
+            </SheetHeader>
+
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
         </Sheet>
       )
     }
+
 
     return (
       <div
@@ -321,8 +327,11 @@ const SidebarInset = React.forwardRef<
     <main
       ref={ref}
       className={cn(
+        // base: ocupa todo, sin márgenes externos
         "relative flex min-h-svh flex-1 flex-col bg-background",
-        "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow",
+        // ❌ quitamos los m-2, ml-2, rounded y shadow
+        // ✅ mantenemos solo la altura mínima si hace falta
+        "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))]",
         className
       )}
       {...props}
@@ -330,6 +339,7 @@ const SidebarInset = React.forwardRef<
   )
 })
 SidebarInset.displayName = "SidebarInset"
+
 
 const SidebarInput = React.forwardRef<
   React.ElementRef<typeof Input>,

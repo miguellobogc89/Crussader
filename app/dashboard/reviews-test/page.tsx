@@ -1,4 +1,4 @@
-// app/reviews-test/page.tsx
+// app/reviews/page.tsx
 import { Suspense } from "react";
 import ReviewsTestClient from "./ReviewsTestClient";
 

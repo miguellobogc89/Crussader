@@ -2,7 +2,6 @@
 "use client";
 
 import * as React from "react";
-import { Layout } from "@/app/components/Layout";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
 import {
@@ -189,13 +188,7 @@ export default function DatabasePage() {
   const totalReviews = rows.reduce((acc, l) => acc + l.totalReviews, 0);
 
   return (
-    <Layout
-      title="Base de Datos"
-      subtitle="Gestiona y monitorea todas las ubicaciones registradas"
-      showCreateButton={true}
-      createButtonText="Nueva Ubicación"
-      onCreateClick={() => console.log("Crear nueva ubicación")}
-    >
+
       <div className="p-6 space-y-6">
         {/* Errores */}
         {error && (
@@ -401,6 +394,5 @@ export default function DatabasePage() {
           </div>
         </Card>
       </div>
-    </Layout>
   );
 }

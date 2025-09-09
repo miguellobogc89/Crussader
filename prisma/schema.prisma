@@ -4,13 +4,15 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
 }
 
-/* =========================
-   Enums
-   ========================= */
+/**
+ * =========================
+ * Enums
+ * =========================
+ */
 enum CompanyRole {
   OWNER
   ADMIN
@@ -80,34 +82,36 @@ enum UserStatusEventType {
   DEACTIVATED
 }
 
-/* =========================
-   Core Auth
-   ========================= */
+/**
+ * =========================
+ * Core Auth
+ * =========================
+ */
 model User {
-  id                 String               @id @default(cuid())
-  name               String?
-  email              String?              @unique
-  emailVerified      DateTime?
-  image              String?
-  role               Role                 @default(user)
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          Role      @default(user)
 
   // ---- Campos de negocio / estado
-  isActive           Boolean              @default(true)             // activo en la plataforma
-  isSuspended        Boolean              @default(false)            // suspendido (no puede acceder)
-  suspendedAt        DateTime?
-  suspendedReason    String?
-  deactivatedAt      DateTime?                                         // baja voluntaria o soft-delete
-  lastLoginAt        DateTime?
-  lastSeenAt         DateTime?                                         // última actividad
-  loginCount         Int                  @default(0)
-  failedLoginCount   Int                  @default(0)
-  locale             String?              @default("es-ES")
-  timezone           String?              @default("Europe/Madrid")
-  phone              String?
-  marketingOptIn     Boolean              @default(false)
-  termsAcceptedAt    DateTime?
-  privacyAcceptedAt  DateTime?
-  notes              String?                                           // notas internas
+  isActive          Boolean   @default(true) // activo en la plataforma
+  isSuspended       Boolean   @default(false) // suspendido (no puede acceder)
+  suspendedAt       DateTime?
+  suspendedReason   String?
+  deactivatedAt     DateTime? // baja voluntaria o soft-delete
+  lastLoginAt       DateTime?
+  lastSeenAt        DateTime? // última actividad
+  loginCount        Int       @default(0)
+  failedLoginCount  Int       @default(0)
+  locale            String?   @default("es-ES")
+  timezone          String?   @default("Europe/Madrid")
+  phone             String?
+  marketingOptIn    Boolean   @default(false)
+  termsAcceptedAt   DateTime?
+  privacyAcceptedAt DateTime?
+  notes             String? // notas internas
 
   // Relaciones
   Account            Account[]
@@ -116,12 +120,12 @@ model User {
   responsesEdited    Response[]           @relation("ResponseEditedBy")
   Session            Session[]
   UserCompany        UserCompany[]
-  UserLogin          UserLogin[]          // auditoría de logins
-  UserStatusEvent    UserStatusEvent[]    // histórico de estado
-  passwordHash      String?
+  UserLogin          UserLogin[] // auditoría de logins
+  UserStatusEvent    UserStatusEvent[] // histórico de estado
+  passwordHash       String?
 
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([role])
   @@index([isActive, isSuspended])
@@ -163,21 +167,23 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-/* =========================
-   Auditoría y eventos
-   ========================= */
+/**
+ * =========================
+ * Auditoría y eventos
+ * =========================
+ */
 
 // Cada intento de login exitoso/erróneo
 model UserLogin {
-  id         String   @id @default(cuid())
-  userId     String?
-  provider   String?
-  success    Boolean  @default(false)
-  ip         String?
-  userAgent  String?
-  error      String?
-  createdAt  DateTime @default(now())
-  User       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id        String   @id @default(cuid())
+  userId    String?
+  provider  String?
+  success   Boolean  @default(false)
+  ip        String?
+  userAgent String?
+  error     String?
+  createdAt DateTime @default(now())
+  User      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
 }
@@ -194,77 +200,81 @@ model UserStatusEvent {
   @@index([userId, createdAt])
 }
 
-/* =========================
-   Negocio
-   ========================= */
+/**
+ * =========================
+ * Negocio
+ * =========================
+ */
 
 model ExternalConnection {
-  id            String     @id @default(cuid())
-  userId        String
-  provider      String
-  providerUserId String?   // id en el proveedor
-  accountName   String?
-  accountEmail  String?
-  scope         String?
-  access_token  String
-  refresh_token String?
-  expires_at    Int?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  companyId     String?
-  User          User       @relation(fields: [userId], references: [id])
-  Location      Location[]
+  id             String     @id @default(cuid())
+  userId         String
+  provider       String
+  providerUserId String? // id en el proveedor
+  accountName    String?
+  accountEmail   String?
+  scope          String?
+  access_token   String
+  refresh_token  String?
+  expires_at     Int?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  companyId      String?
+  User           User       @relation(fields: [userId], references: [id])
+  Location       Location[]
 
   @@unique([userId, provider])
   @@index([companyId])
 }
 
 model Company {
-  id            String        @id @default(cuid())
+  id            String   @id @default(cuid())
   name          String
   createdById   String
-  createdAt     DateTime      @default(now())
-  activity      String?       @db.VarChar(64)
-  cif           String?       @db.VarChar(32)
-  employeesBand String?       @db.VarChar(32)
+  createdAt     DateTime @default(now())
+  activity      String?  @db.VarChar(64)
+  cif           String?  @db.VarChar(32)
+  employeesBand String?  @db.VarChar(32)
   logoUrl       String?
   address       String?
-  brandColor    String?       @db.VarChar(16)
+  brandColor    String?  @db.VarChar(16)
   city          String?
   country       String?
-  countryCode   String?       @db.VarChar(2)
+  countryCode   String?  @db.VarChar(2)
   description   String?
   email         String?
   phone         String?
   website       String?
 
   // Métricas y estado
-  reviewsAvg    Decimal?      @db.Decimal(3, 2)
-  reviewsCount  Int           @default(0)
-  lastSyncAt    DateTime?
-  updatedAt     DateTime      @default(now()) @updatedAt
+  reviewsAvg       Decimal?           @db.Decimal(3, 2)
+  reviewsCount     Int                @default(0)
+  lastSyncAt       DateTime?
+  updatedAt        DateTime           @default(now()) @updatedAt
+  LocationKpiDaily LocationKpiDaily[] @relation("CompanyToKpiDaily")
 
   // Facturación (básico)
-  plan               String?    @default("free")
-  planRenewsAt       DateTime?
-  stripeCustomerId   String?
+  plan                 String?   @default("free")
+  planRenewsAt         DateTime?
+  stripeCustomerId     String?
   stripeSubscriptionId String?
 
   // Redes
-  facebookUrl   String?
-  instagramUrl  String?
-  linkedinUrl   String?
-  twitterUrl    String?
-  matrix        String?       @db.VarChar(128)
-  registryId    String?       @db.VarChar(64)
-  region        String?
-  postalCode    String?
-  vatNumber     String?       @db.VarChar(32)
+  facebookUrl  String?
+  instagramUrl String?
+  linkedinUrl  String?
+  twitterUrl   String?
+  matrix       String? @db.VarChar(128)
+  registryId   String? @db.VarChar(64)
+  region       String?
+  postalCode   String?
+  vatNumber    String? @db.VarChar(32)
 
-  Lead          Lead[]
-  Location      Location[]
-  Reviews       Review[]      @relation("CompanyReviews")
-  UserCompany   UserCompany[]
+  Lead             Lead[]
+  Location         Location[]
+  Reviews          Review[]          @relation("CompanyReviews")
+  UserCompany      UserCompany[]
+  responseSettings ResponseSettings?
 
   @@index([name])
   @@index([activity])
@@ -304,7 +314,7 @@ model Lead {
 }
 
 model Location {
-  id                   String              @id @default(cuid())
+  id                   String          @id @default(cuid())
   companyId            String
   title                String
   address              String?
@@ -315,11 +325,11 @@ model Location {
   phone                String?
   website              String?
   googleName           String?
-  googlePlaceId        String?             @unique
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @default(now()) @updatedAt
+  googlePlaceId        String?         @unique
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @default(now()) @updatedAt
   address2             String?
-  countryCode          String?             @db.VarChar(2)
+  countryCode          String?         @db.VarChar(2)
   email                String?
   externalConnectionId String?
   facebookUrl          String?
@@ -328,20 +338,21 @@ model Location {
   googleLocationId     String?
   instagramUrl         String?
   lastSyncAt           DateTime?
-  latitude             Decimal?            @db.Decimal(10, 7)
-  longitude            Decimal?            @db.Decimal(10, 7)
+  latitude             Decimal?        @db.Decimal(10, 7)
+  longitude            Decimal?        @db.Decimal(10, 7)
   openingHours         Json?
-  reviewsAvg           Decimal?            @db.Decimal(3, 2)
-  reviewsCount         Int                 @default(0)
-  slug                 String?             @unique
-  status               LocationStatus?     @default(DRAFT)
+  reviewsAvg           Decimal?        @db.Decimal(3, 2)
+  reviewsCount         Int             @default(0)
+  slug                 String?         @unique
+  status               LocationStatus? @default(DRAFT)
   timezone             String?
   type                 LocationType?
-  isFeatured           Boolean             @default(false)
+  isFeatured           Boolean         @default(false)
 
-  company              Company             @relation(fields: [companyId], references: [id])
-  ExternalConnection   ExternalConnection? @relation(fields: [externalConnectionId], references: [id])
-  Reviews              Review[]            @relation("LocationReviews")
+  company            Company             @relation(fields: [companyId], references: [id])
+  ExternalConnection ExternalConnection? @relation(fields: [externalConnectionId], references: [id])
+  Reviews            Review[]            @relation("LocationReviews")
+  KpiDaily           LocationKpiDaily[]  @relation("LocationToKpiDaily")
 
   @@index([companyId])
   @@index([googleAccountId])
@@ -408,4 +419,47 @@ model Response {
 
   @@index([reviewId])
   @@index([status, published, active])
+}
+
+model LocationKpiDaily {
+  id           String   @id @default(cuid())
+  companyId    String
+  locationId   String
+  snapshotDate DateTime
+
+  // Métricas base
+  totalReviews    Int
+  newReviews7d    Int
+  newReviews30d   Int
+  unansweredCount Int
+  answeredRate    Int
+  avgAll          Decimal? @db.Decimal(3, 2)
+  avg30d          Decimal? @db.Decimal(3, 2)
+  prev30dAvg      Decimal? @db.Decimal(3, 2)
+  responses7d     Int
+  responseAvgSec  Int?
+  lastComputedAt  DateTime @default(now())
+
+  // Relaciones explícitas + nombres (para evitar ambigüedades)
+  company  Company  @relation(name: "CompanyToKpiDaily", fields: [companyId], references: [id], onDelete: Cascade)
+  location Location @relation(name: "LocationToKpiDaily", fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, snapshotDate])
+  @@index([companyId, snapshotDate])
+  @@index([snapshotDate])
+}
+
+model ResponseSettings {
+  id        String  @id @default(cuid())
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  config Json
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdByUserId String?
+  updatedByUserId String?
+
+  @@index([updatedAt])
 }

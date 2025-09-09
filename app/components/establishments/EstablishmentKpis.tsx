@@ -1,6 +1,6 @@
 "use client";
 
-import { type Establishment } from "@/app/components/EstablishmentTabs";
+import { type Establishment } from "@/app/components/establishments/EstablishmentTabs";
 import { MessageSquare, Clock, MessageCircleReply } from "lucide-react";
 
 type Props = {
