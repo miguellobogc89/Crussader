@@ -13,7 +13,7 @@ export default function PageContainer({
     <div
       className={cn(
         // sin margen en eje X, full width
-        "w-full h-full border border-gray-200 bg-white overflow-y-auto",
+        "w-full h-full bg-white overflow-y-auto",
         className
       )}
     >

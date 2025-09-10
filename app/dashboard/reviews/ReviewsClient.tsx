@@ -1,4 +1,4 @@
-// app/reviews-test/ReviewsTestClient.tsx
+// app/reviews/ReviewsClient.tsx
 "use client";
 
 import { useEffect, useState } from "react";

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Prisma, Role } from "@prisma/client";
+import UsersActionsMenu from "@/app/components/admin/UsersActionsMenu";
 
 function formatDate(d: Date | null | undefined) {
   if (!d) return "—";
@@ -61,6 +62,46 @@ function StateBadge({
     <span className="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium bg-neutral-100 text-neutral-700 border-neutral-200">
       Inactivo
     </span>
+  );
+}
+
+/** Menú de acciones (3 puntitos) sin JS: usa <details> */
+function ActionsMenu({ userId }: { userId: string }) {
+  return (
+    <details className="relative">
+      <summary
+        className="list-none h-8 w-8 grid place-items-center rounded-md text-neutral-600 hover:bg-neutral-100 cursor-pointer ml-auto"
+        aria-label="Abrir menú"
+      >
+        {/* Kebab icon */}
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <circle cx="10" cy="4" r="1.8" />
+          <circle cx="10" cy="10" r="1.8" />
+          <circle cx="10" cy="16" r="1.8" />
+        </svg>
+      </summary>
+
+      <div className="absolute right-0 z-10 mt-2 w-40 rounded-md border border-neutral-200 bg-white shadow-md">
+        <ul className="py-1 text-sm">
+          <li>
+            <Link
+              href={`/admin/users/${userId}/edit`}
+              className="block px-3 py-2 hover:bg-neutral-50"
+            >
+              Editar usuario
+            </Link>
+          </li>
+          <li>
+            <Link
+              href={`/admin/users/${userId}/delete`}
+              className="block px-3 py-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+            >
+              Borrar usuario
+            </Link>
+          </li>
+        </ul>
+      </div>
+    </details>
   );
 }
 
@@ -156,17 +197,21 @@ export default async function UsersTable({
       </div>
 
       <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
+        {/* Cabecera centrada */}
         <div className="grid grid-cols-12 gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-          <div className="col-span-3">Usuario</div>
-          <div className="col-span-3">Email</div>
-          <div className="col-span-2">Rol</div>
-          <div className="col-span-2">Estado</div>
-          <div className="col-span-2 text-right">Creado</div>
+          <div className="col-span-3 text-center">Usuario</div>
+          <div className="col-span-3 text-center">Email</div>
+          <div className="col-span-2 text-center">Rol</div>
+          <div className="col-span-2 text-center">Estado</div>
+          <div className="col-span-1 text-center">Creado</div>
+          <div className="col-span-1 text-right"> {/* vacío: acciones */}</div>
         </div>
         <hr className="border-neutral-200" />
+
         <ul className="divide-y divide-neutral-200">
           {users.map((u) => (
             <li key={u.id} className="grid grid-cols-12 gap-2 px-4 py-4 items-center">
+              {/* Usuario (left) */}
               <div className="col-span-3 flex items-center gap-3 min-w-0">
                 <img
                   src={
@@ -183,6 +228,7 @@ export default async function UsersTable({
                 </div>
               </div>
 
+              {/* Email (left) */}
               <div className="col-span-3 min-w-0">
                 <div className="truncate text-sm text-neutral-800">{u.email ?? "—"}</div>
                 <div className="mt-0.5 text-xs text-neutral-500">
@@ -190,19 +236,27 @@ export default async function UsersTable({
                 </div>
               </div>
 
-              <div className="col-span-2">
+              {/* Rol centrado */}
+              <div className="col-span-2 flex justify-center">
                 <RoleBadge role={u.role} />
               </div>
 
-              <div className="col-span-2 flex flex-col gap-1">
+              {/* Estado centrado (badge compacto) */}
+              <div className="col-span-2 flex flex-col items-center gap-1">
                 <StateBadge active={u.isActive} suspended={u.isSuspended} />
                 <div className="text-xs text-neutral-500">
                   Logins: {u.loginCount} · Fallidos: {u.failedLoginCount}
                 </div>
               </div>
 
-              <div className="col-span-2 text-right">
+              {/* Creado (right) */}
+              <div className="col-span-1 text-right">
                 <div className="text-sm text-neutral-700">{formatDate(u.createdAt)}</div>
+              </div>
+
+              {/* Acciones (al final, 3 puntitos) */}
+              <div className="col-span-1 flex justify-end">
+                <UsersActionsMenu userId={u.id} editHref={`/admin/users/${u.id}/edit`} />
               </div>
             </li>
           ))}
@@ -215,6 +269,7 @@ export default async function UsersTable({
         </ul>
       </div>
 
+      {/* Paginación */}
       <div className="mt-4 flex items-center justify-between text-sm text-neutral-600">
         <div>
           Página {upage} de {pages} · Mostrando {users.length} / {total}

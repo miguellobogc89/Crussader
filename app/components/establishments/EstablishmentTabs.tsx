@@ -177,7 +177,7 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
   };
 
   return (
-    <div className="bg-gradient-to-r from-card via-card/95 to-muted/30 border-b border-border/50 backdrop-blur-sm">
+    <div className="border-b border-border/50 backdrop-blur-sm">
       <div className="container mx-auto px-6 py-6">
         {/* Tabs MULTIFILA */}
         <div className="flex flex-wrap items-center gap-3 mb-4">
