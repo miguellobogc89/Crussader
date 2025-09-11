@@ -1,8 +1,14 @@
-// app/reviews/page.tsx
+// app/dashboard/reviews/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
-import { EstablishmentTabs, type Establishment } from "@/app/components/establishments/EstablishmentTabs";
+import { MessageSquare } from "lucide-react";
+import SectionLayout from "@/app/components/layouts/SectionLayout";
+import ReviewsToolbar from "@/app/components/reviews/ReviewsToolbar";
+import {
+  EstablishmentTabs,
+  type Establishment,
+} from "@/app/components/establishments/EstablishmentTabs";
 import EstablishmentKpis from "@/app/components/establishments/EstablishmentKpis";
 import { ReviewCard } from "@/app/components/reviews/ReviewCard";
 
@@ -16,7 +22,6 @@ type ReviewForCard = {
 
 export default function ReviewsPage() {
   const [activeEst, setActiveEst] = useState<Establishment | null>(null);
-
   const [reviews, setReviews] = useState<ReviewForCard[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -26,7 +31,6 @@ export default function ReviewsPage() {
   useEffect(() => {
     if (!activeEst?.id) return;
     let cancelled = false;
-
     (async () => {
       try {
         setLoading(true);
@@ -37,7 +41,6 @@ export default function ReviewsPage() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         if (cancelled) return;
-
         const rows: ReviewForCard[] = Array.isArray(json?.reviews) ? json.reviews : [];
         setReviews(rows);
         setTotalPages(json?.totalPages ?? 1);
@@ -49,91 +52,60 @@ export default function ReviewsPage() {
         if (!cancelled) setLoading(false);
       }
     })();
-
     return () => {
       cancelled = true;
     };
   }, [activeEst?.id, page]);
 
-  // reset página al cambiar establecimiento
   useEffect(() => {
     setPage(1);
   }, [activeEst?.id]);
 
   return (
-    <div className="min-h-screen">
-      {/* Header arriba: igual que /company */}
-      <div className="border-b bg-gradient-to-r from-card via-card/95 to-muted/30">
-        <header className="border-b bg-gradient-to-r from-card via-card/95 to-muted/30">
-          <div className="container mx-auto px-6 py-6 space-y-6">
-            {/* Título arriba */}
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Reseñas</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Lee y responde a las reseñas de tus establecimientos
-              </p>
-            </div>
+    <SectionLayout
+      icon={MessageSquare}
+      title="Reseñas"
+      subtitle="Lee y responde a las reseñas de tus establecimientos"
+      // 👇 Todo lo previo a la toolbar va aquí (dentro de la cabecera blanca)
+      headerContent={
+        <>
+          <EstablishmentTabs onEstablishmentChange={setActiveEst} />
+          {activeEst && <EstablishmentKpis establishment={activeEst} />}
+        </>
+      }
+    >
+      {/* Barra de filtros/busqueda/orden: FUERA de la cabecera */}
+      <div className="mb-8">
+        <ReviewsToolbar />
+      </div>
 
-            {/* Tabs + KPIs debajo del título */}
-            <div className="space-y-6">
-              <EstablishmentTabs onEstablishmentChange={setActiveEst} />
-              {activeEst && <EstablishmentKpis establishment={activeEst} />}
-            </div>
+      {/* Grid de reseñas */}
+      <div className="grid gap-6 grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3">
+        {reviews.map((r) => (
+          <ReviewCard key={r.id} review={r} />
+        ))}
+        {!loading && reviews.length === 0 && (
+          <div className="col-span-full text-muted-foreground">No hay reseñas.</div>
+        )}
+      </div>
 
-            {/* Si quieres acciones a la derecha, añádelas aquí:
-            <div className="flex justify-end">
-              <Button variant="secondary">Exportar</Button>
-            </div>
-            */}
-          </div>
-        </header>
-
-        {/* Bloque inferior (contenido) con el fondo diagonal solicitado */}
-
-
-        <main className="border-b bg-gradient-to-br from-background via-background to-muted/20">
-          <div className="container mx-auto px-6 py-6 space-y-8">
-            {/* Título del listado + estado de página */}
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Todas las reseñas</h2>
-              <div className="text-sm text-muted-foreground">
-                {loading ? "Cargando…" : `Página ${page} de ${totalPages}`}
-              </div>
-            </div>
-
-            {/* ABAJO del contenido: grid de reseñas */}
-            <div className="grid gap-6 grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3">
-              {reviews.map((r) => (
-                <ReviewCard key={r.id} review={r} />
-              ))}
-
-              {!loading && reviews.length === 0 && (
-                <div className="col-span-1 xl:col-span-2 2xl:col-span-3 text-muted-foreground">
-                  No hay reseñas.
-                </div>
-              )}
-            </div>
-
-            {/* Paginación */}
-            <div className="flex items-center justify-end gap-2 pt-3">
-              <button
-                className="rounded-md border px-3 py-1.5 text-sm text-neutral-700 disabled:opacity-50"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={loading || page <= 1}
-              >
-                Anterior
-              </button>
-              <button
-                className="rounded-md border px-3 py-1.5 text-sm text-neutral-700 disabled:opacity-50"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={loading || page >= totalPages}
-              >
-                Siguiente
-              </button>
-            </div>
-          </div>
-        </main>
-        </div>
-    </div>
+      {/* Paginación */}
+      <div className="flex items-center justify-end gap-2 pt-6">
+        <button
+          className="rounded-md border px-3 py-1.5 text-sm text-foreground disabled:opacity-50"
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={loading || page <= 1}
+        >
+          Anterior
+        </button>
+        <button
+          className="rounded-md border px-3 py-1.5 text-sm text-foreground disabled:opacity-50"
+          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          disabled={loading || page >= totalPages}
+        >
+          Siguiente
+        </button>
+      </div>
+    </SectionLayout>
   );
 }

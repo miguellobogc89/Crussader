@@ -4,7 +4,9 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/app/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Building2 } from "lucide-react";
+
+import SectionLayout from "@/app/components/layouts/SectionLayout";
 
 import {
   CompanyModal,
@@ -20,7 +22,7 @@ import { AddLocationsModal, type NewLocation } from "@/app/components/company/Ad
 import { EstablishmentCard } from "@/app/components/company/EstablishmentCard";
 import type { LocationRow } from "@/hooks/useCompanyLocations";
 
-// ----------------------- helpers (fetchers) -----------------------
+/* ----------------------- helpers (fetchers) ----------------------- */
 
 type CompanyRow = { id: string; name: string; role: string; createdAt: string };
 
@@ -65,7 +67,7 @@ async function fetchCompanyDetails(companyId: string): Promise<CompanyDetails | 
   }
 }
 
-// ----------------------- page -----------------------
+/* ----------------------- page ----------------------- */
 
 export default function CompanyPage() {
   const router = useRouter();
@@ -100,7 +102,7 @@ export default function CompanyPage() {
   const [addOpen, setAddOpen] = React.useState(false);
   const [adding, setAdding] = React.useState(false);
 
-  // Carga inicial: detectar empresa y traer datos
+  // Carga inicial
   React.useEffect(() => {
     let abort = false;
     (async () => {
@@ -151,7 +153,7 @@ export default function CompanyPage() {
     if (hasCompany && companyId) loadLocations();
   }, [hasCompany, companyId, loadLocations]);
 
-  // --------- acciones modal empresa ---------
+  /* --------- acciones modal empresa --------- */
 
   function openCreate() {
     setForm({ name: "", email: "", phone: "", address: "", employeesBand: "" });
@@ -220,7 +222,7 @@ export default function CompanyPage() {
     }
   }
 
-  // --------- acciones locations ---------
+  /* --------- acciones locations --------- */
 
   function handleConnect(locationId: string) {
     const returnTo = encodeURIComponent("/dashboard/company");
@@ -287,7 +289,7 @@ export default function CompanyPage() {
     }
   }
 
-  // --------- formatos para cards ---------
+  /* --------- formatos para cards --------- */
 
   const avgText = loading || !metrics ? "—" : metrics.averageRating.toFixed(1);
   const totRevText = loading || !metrics ? "—" : String(metrics.totalReviews);
@@ -302,42 +304,31 @@ export default function CompanyPage() {
   const infoAddress = details?.address ?? "—";
   const infoEmployees = details?.employeesBand ? `${details.employeesBand} empleados` : "—";
 
-  // ----------------------- render -----------------------
+  /* ----------------------- render (compacto) ----------------------- */
 
   return (
-    <div className="min-h-screen bg-muted/20">
-      <header className="border-b bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/40">
-        <div className="container mx-auto px-6 py-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{companyName}</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Gestiona tu empresa y todos sus establecimientos
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
+    <SectionLayout
+      icon={Building2}
+      title={companyName}
+      subtitle="Gestiona tu empresa y todos sus establecimientos"
+      // Acción a la derecha del header
+      headerContent={
+        <>
+          {/* acciones en la franja superior del header, alineadas a la derecha */}
+          <div className="flex items-center justify-end">
             {hasCompany && companyId ? (
-              <Button variant="secondary" onClick={openEdit}>
-                Gestionar empresa
-              </Button>
+              <Button variant="secondary" onClick={openEdit}>Gestionar empresa</Button>
             ) : (
-              <Button
-                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-                onClick={openCreate}
-              >
+              <Button onClick={openCreate}>
                 <Plus size={16} className="mr-2" />
                 Crear empresa
               </Button>
             )}
           </div>
-        </div>
-      </header>
 
-      {/* Cards si hay empresa */}
-      {hasCompany && (
-        <main>
-          <div className="container mx-auto px-6 py-6 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {/* KPIs: ahora dentro del header, igual que en reviews */}
+          {hasCompany && (
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               <CompanyInfoCard
                 name={companyName}
                 email={infoEmail}
@@ -345,73 +336,71 @@ export default function CompanyPage() {
                 address={infoAddress}
                 employeesText={infoEmployees}
               />
-
               <EstablishmentsCard count={totLocText} />
-
               <AverageRatingCard average={avgText} totalReviews={totRevText} />
-
               <GrowthCard growthText={growthText} />
             </div>
+          )}
+        </>
+      }
+    >
+      {/* Estado vacío (sin empresa) */}
+      {!hasCompany ? (
+        <div className="py-12 text-center space-y-3">
+          <h2 className="text-base font-semibold">Aún no tienes ninguna empresa</h2>
+          <p className="text-sm text-muted-foreground">
+            Crea tu empresa para empezar a gestionarla.
+          </p>
+          <Button onClick={openCreate}>
+            <Plus size={16} className="mr-2" />
+            Crear empresa
+          </Button>
+        </div>
+      ) : (
+        <>
 
-            {/* Panel de establecimientos */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Establecimientos</h2>
-                {companyId && (
-                  <Button
-                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-                    onClick={() => setAddOpen(true)}
-                  >
-                    <Plus size={16} className="mr-2" />
-                    Añadir Ubicación
-                  </Button>
-                )}
-              </div>
 
-              {locsError && <div className="text-sm text-red-600">{locsError}</div>}
-
-              {locsLoading ? (
-                <div className="grid gap-4">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="h-24 rounded border bg-gray-50 animate-pulse" />
-                  ))}
-                </div>
-              ) : locs.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-6 text-center">
-                  No hay ubicaciones todavía.
-                </div>
-              ) : (
-                <div className="grid gap-6">
-                  {locs.map((loc) => (
-                    <EstablishmentCard
-                      key={loc.id}
-                      location={loc}
-                      onSync={() => handleSync(loc.id)}
-                      onConnect={() => handleConnect(loc.id)}
-                    />
-                  ))}
-                </div>
+          {/* Establecimientos (más ceñido) */}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">Establecimientos</h2>
+              {companyId && (
+                <Button onClick={() => setAddOpen(true)}>
+                  <Plus size={16} className="mr-2" />
+                  Añadir ubicación
+                </Button>
               )}
             </div>
-          </div>
-        </main>
+
+            {locsError && <div className="text-sm text-red-600">{locsError}</div>}
+
+            {locsLoading ? (
+              <div className="grid gap-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-20 rounded border bg-gray-50 animate-pulse" />
+                ))}
+              </div>
+            ) : locs.length === 0 ? (
+              <div className="text-sm text-muted-foreground py-8 text-center">
+                No hay ubicaciones todavía.
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {locs.map((loc) => (
+                  <EstablishmentCard
+                    key={loc.id}
+                    location={loc}
+                    onSync={() => handleSync(loc.id)}
+                    onConnect={() => handleConnect(loc.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
       )}
 
-      {/* Estado vacío (sin empresa) */}
-      {!hasCompany && (
-        <main>
-          <div className="container mx-auto px-6 py-16 text-center space-y-4">
-            <h2 className="text-xl font-semibold">Aún no tienes ninguna empresa</h2>
-            <p className="text-sm text-muted-foreground">Crea tu empresa para empezar a gestionarla.</p>
-            <Button onClick={openCreate} className="bg-primary hover:bg-primary/90">
-              <Plus size={16} className="mr-2" />
-              Crear empresa
-            </Button>
-          </div>
-        </main>
-      )}
-
-      {/* Modal reutilizable (crear/editar empresa) */}
+      {/* Modales */}
       <CompanyModal
         open={modalOpen}
         onOpenChange={setModalOpen}
@@ -422,7 +411,6 @@ export default function CompanyPage() {
         submitting={submitting}
       />
 
-      {/* Modal añadir locations */}
       <AddLocationsModal
         open={addOpen}
         onOpenChange={setAddOpen}
@@ -430,6 +418,6 @@ export default function CompanyPage() {
         onSubmitBulk={onSubmitBulk}
         submitting={adding}
       />
-    </div>
+    </SectionLayout>
   );
 }

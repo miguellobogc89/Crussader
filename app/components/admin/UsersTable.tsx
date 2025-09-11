@@ -161,7 +161,7 @@ export default async function UsersTable({
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-neutral-900 tracking-tight">
-            Administración · Usuarios
+            Usuarios
           </h2>
           <p className="text-sm text-neutral-500">
             {total} usuario{total === 1 ? "" : "s"} en total

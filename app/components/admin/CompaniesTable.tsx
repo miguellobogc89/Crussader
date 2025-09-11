@@ -58,7 +58,7 @@ export default async function CompaniesTable({
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-neutral-900 tracking-tight">
-            Administración · Empresas
+            Empresas
           </h2>
           <p className="text-sm text-neutral-500">
             {total} empresa{total === 1 ? "" : "s"} en total

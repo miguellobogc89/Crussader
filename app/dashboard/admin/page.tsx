@@ -38,15 +38,17 @@ export default async function AdminPage({
   const lpage = Math.max(1, Number(searchParams?.lpage ?? 1) || 1);
 
   return (
-    <main className="p-6 space-y-10">
-      {/* 1) Ubicaciones primero */}
-      <LocationsTable lq={lq} lpage={lpage} uq={uq} upage={upage} cq={cq} cpage={cpage} />
+    <div className="p-6">
+      <div className="mx-auto max-w-7xl space-y-10">
+        {/* 1) Ubicaciones primero */}
+        <LocationsTable lq={lq} lpage={lpage} uq={uq} upage={upage} cq={cq} cpage={cpage} />
 
-      {/* 2) Usuarios */}
-      <UsersTable uq={uq} upage={upage} cq={cq} cpage={cpage} />
+        {/* 2) Usuarios */}
+        <UsersTable uq={uq} upage={upage} cq={cq} cpage={cpage} />
 
-      {/* 3) Empresas */}
-      <CompaniesTable cq={cq} cpage={cpage} uq={uq} upage={upage} />
-    </main>
+        {/* 3) Empresas */}
+        <CompaniesTable cq={cq} cpage={cpage} uq={uq} upage={upage} />
+      </div>
+    </div>
   );
 }
