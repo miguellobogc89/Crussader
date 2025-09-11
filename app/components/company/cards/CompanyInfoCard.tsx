@@ -23,8 +23,8 @@ export function CompanyInfoCard({ name, email = "—", phone = "—", address = 
           <h3 className="font-semibold text-lg">{name}</h3>
           <div className="space-y-1 text-sm text-muted-foreground">
             <div className="flex items-center gap-2"><Mail size={14} /><span>{email}</span></div>
-            <div className="flex items-center gap-2"><Phone size={14} /><span>{phone}</span></div>
-            <div className="flex items-center gap-2"><MapPin size={14} /><span>{address}</span></div>
+            {/*<div className="flex items-center gap-2"><Phone size={14} /><span>{phone}</span></div>
+            <div className="flex items-center gap-2"><MapPin size={14} /><span>{address}</span></div>*/}
             <div className="flex items-center gap-2"><Users size={14} /><span>{employeesText}</span></div>
           </div>
         </div>

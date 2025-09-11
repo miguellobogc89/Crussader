@@ -1,26 +1,13 @@
-// app/dashboard/reviews/page.tsx
+// app/dashboard/database/page.tsx
 "use client";
 
 import * as React from "react";
-import { Badge } from "@/app/components/ui/badge";
-import { Button } from "@/app/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/app/components/ui/table";
+import SectionScaffold from "@/app/components/SectionScaffold";
 import { Card } from "@/app/components/ui/card";
-import {
-  MapPin,
-  Star,
-  MessageCircle,
-  Calendar,
-  Settings,
-  Trash2,
-} from "lucide-react";
+import { MapPin, Star, MessageCircle, Database } from "lucide-react";
+import LocationsTable, {
+  type UiLocationRow,
+} from "@/app/components/database/LocationsTable";
 
 // ---------------- Helpers ----------------
 
@@ -40,29 +27,14 @@ type ApiLocation = {
   address?: string | null;
   city?: string | null;
   postalCode?: string | null;
-  type?: string | null; // si en tu schema usas LocationType
-  createdAt?: string;   // asegúrate de incluirlo en el select del endpoint
+  type?: string | null;
+  createdAt?: string;
   lastSyncAt?: string | null;
   googlePlaceId?: string | null;
   reviewsAvg?: number | string | null;
   reviewsCount?: number | null;
   status?: string | null;
   ExternalConnection?: { id: string; provider: string; accountEmail?: string | null } | null;
-};
-
-type UiLocationRow = {
-  id: string | number;
-  name: string;
-  address: string;
-  category: string;
-  createdAt: string; // ISO
-  connected: boolean;
-  avgRating: number;
-  totalReviews: number;
-  monthlyReviews: number; // si no lo tienes en BD lo dejamos en 0
-  lastSync: string; // string humanizado o “—”
-  status: string;   // "active" | "pending" | "disconnected" | etc.
-  responseRate: number; // si no lo tienes, 0
 };
 
 function joinAddress(address?: string | null, city?: string | null, postal?: string | null) {
@@ -88,25 +60,6 @@ function timeAgoOrDash(iso?: string | null) {
   const d = Math.floor(h / 24);
   return `Hace ${d} d`;
 }
-
-const getStatusBadge = (status: string, connected: boolean) => {
-  if (!connected) return <Badge variant="destructive">Desconectado</Badge>;
-
-  switch (status) {
-    case "active":
-      return <Badge variant="default" className="bg-green-500 hover:bg-green-600">Activo</Badge>;
-    case "pending":
-      return <Badge variant="secondary">Pendiente</Badge>;
-    default:
-      return <Badge variant="outline">Desconocido</Badge>;
-  }
-};
-
-const getRatingColor = (rating: number) => {
-  if (rating >= 4.5) return "text-green-600";
-  if (rating >= 4.0) return "text-yellow-600";
-  return "text-red-600";
-};
 
 // ---------------- Page ----------------
 
@@ -136,20 +89,20 @@ export default function DatabasePage() {
 
       const list: ApiLocation[] = Array.isArray(j?.locations) ? j.locations : [];
 
-      // 3) map a UI (misma forma que tu mock)
+      // 3) map a UI
       const mapped: UiLocationRow[] = list.map((loc) => {
         const id = loc.id;
         const name = (loc.title ?? (loc as any).name ?? "Ubicación") as string;
         const address = joinAddress(loc.address ?? null, loc.city ?? null, loc.postalCode ?? null);
-        const category = (loc.type as string | null) ?? "—"; // si no tienes, queda "—"
+        const category = (loc.type as string | null) ?? "—";
         const createdAt = (loc.createdAt as string) ?? new Date().toISOString();
         const connected = Boolean(loc.googlePlaceId || loc.ExternalConnection?.id);
         const avgRating = parseNumber(loc.reviewsAvg, 0);
         const totalReviews = parseNumber(loc.reviewsCount, 0);
-        const monthlyReviews = 0; // si quieres, expón en el endpoint un campo con el conteo del mes
+        const monthlyReviews = 0;
         const lastSync = timeAgoOrDash(loc.lastSyncAt ?? null);
         const status = (loc.status as string | null) ?? (connected ? "active" : "disconnected");
-        const responseRate = 0; // idem, exponer métrica o calcular en API
+        const responseRate = 0;
 
         return {
           id,
@@ -180,7 +133,7 @@ export default function DatabasePage() {
     load();
   }, [load]);
 
-  // Stats top (idénticos a tu mock pero desde rows)
+  // Stats top
   const totalLocations = rows.length;
   const totalConnected = rows.filter((l) => l.connected).length;
   const averageRating =
@@ -188,17 +141,18 @@ export default function DatabasePage() {
   const totalReviews = rows.reduce((acc, l) => acc + l.totalReviews, 0);
 
   return (
-
-      <div className="p-6 space-y-6">
-        {/* Errores */}
-        {error && (
-          <Card className="p-4 text-sm text-red-600">
-            {error}
-          </Card>
-        )}
+    <SectionScaffold
+      title="Base de datos"
+      subtitle="Gestiona ubicaciones, conexiones y sincronizaciones."
+      icon={Database}
+      /* tabs opcionales más adelante */
+    >
+      <div className="space-y-6">
+        {/* Error */}
+        {error && <Card className="p-4 text-sm text-red-600">{error}</Card>}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <Card className="p-4">
             <div className="flex items-center space-x-2">
               <MapPin className="h-5 w-5 text-primary" />
@@ -211,7 +165,7 @@ export default function DatabasePage() {
 
           <Card className="p-4">
             <div className="flex items-center space-x-2">
-              <div className="h-3 w-3 bg-green-500 rounded-full" />
+              <div className="h-3 w-3 rounded-full bg-green-500" />
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Conectadas</p>
                 <p className="text-2xl font-bold text-green-600">
@@ -226,9 +180,7 @@ export default function DatabasePage() {
               <Star className="h-5 w-5 text-yellow-500" />
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Rating Promedio</p>
-                <p className="text-2xl font-bold">
-                  {loading ? "—" : averageRating}
-                </p>
+                <p className="text-2xl font-bold">{loading ? "—" : averageRating}</p>
               </div>
             </div>
           </Card>
@@ -238,161 +190,20 @@ export default function DatabasePage() {
               <MessageCircle className="h-5 w-5 text-blue-500" />
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Reviews Totales</p>
-                <p className="text-2xl font-bold">
-                  {loading ? "—" : totalReviews}
-                </p>
+                <p className="text-2xl font-bold">{loading ? "—" : totalReviews}</p>
               </div>
             </div>
           </Card>
         </div>
 
-        {/* Locations Table */}
-        <Card>
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Ubicaciones Registradas</h3>
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <div className="h-2 w-2 bg-green-500 rounded-full" />
-                <span>Conectado</span>
-                <div className="h-2 w-2 bg-red-500 rounded-full ml-4" />
-                <span>Desconectado</span>
-              </div>
-            </div>
-
-            <div className="rounded-md border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[250px]">Ubicación</TableHead>
-                    <TableHead>Categoría</TableHead>
-                    <TableHead>Creada</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-center">Rating</TableHead>
-                    <TableHead className="text-center">Reviews</TableHead>
-                    <TableHead className="text-center">Este Mes</TableHead>
-                    <TableHead className="text-center">% Respuestas</TableHead>
-                    <TableHead>Última Sync</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={`s-${i}`}>
-                        <TableCell colSpan={10}>
-                          <div className="h-10 w-full animate-pulse bg-muted/40 rounded" />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : rows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={10} className="text-center text-sm text-muted-foreground py-6">
-                        No hay ubicaciones todavía.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    rows.map((location) => (
-                      <TableRow
-                        key={location.id}
-                        className={`cursor-pointer transition-colors ${
-                          selectedLocation === location.id ? "bg-muted/50" : "hover:bg-muted/30"
-                        }`}
-                        onClick={() => setSelectedLocation(location.id)}
-                      >
-                        <TableCell>
-                          <div className="flex items-center space-x-3">
-                            <div
-                              className={`h-2 w-2 rounded-full ${
-                                location.connected ? "bg-green-500" : "bg-red-500"
-                              }`}
-                            />
-                            <div>
-                              <p className="font-medium">{location.name}</p>
-                              <p className="text-sm text-muted-foreground">{location.address}</p>
-                            </div>
-                          </div>
-                        </TableCell>
-
-                        <TableCell>
-                          <Badge variant="outline">{location.category}</Badge>
-                        </TableCell>
-
-                        <TableCell>
-                          <div className="flex items-center space-x-1">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">
-                              {new Date(location.createdAt).toLocaleDateString("es-ES")}
-                            </span>
-                          </div>
-                        </TableCell>
-
-                        <TableCell>
-                          {getStatusBadge(location.status, location.connected)}
-                        </TableCell>
-
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center space-x-1">
-                            <Star
-                              className={`h-4 w-4 ${getRatingColor(location.avgRating)}`}
-                            />
-                            <span
-                              className={`font-medium ${getRatingColor(location.avgRating)}`}
-                            >
-                              {location.avgRating.toFixed(1)}
-                            </span>
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="text-center font-medium">
-                          {location.totalReviews}
-                        </TableCell>
-
-                        <TableCell className="text-center">
-                          <Badge variant={location.monthlyReviews > 0 ? "default" : "secondary"}>
-                            {location.monthlyReviews > 0 ? `+${location.monthlyReviews}` : "0"}
-                          </Badge>
-                        </TableCell>
-
-                        <TableCell className="text-center">
-                          <div
-                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              location.responseRate >= 90
-                                ? "bg-green-100 text-green-700"
-                                : location.responseRate >= 70
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-red-100 text-red-700"
-                            }`}
-                          >
-                            {location.responseRate}%
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="text-sm text-muted-foreground">
-                          {location.lastSync}
-                        </TableCell>
-
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end space-x-1">
-                            <Button variant="ghost" size="sm">
-                              <Settings className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </Card>
+        {/* Tabla (componente) */}
+        <LocationsTable
+          rows={rows}
+          loading={loading}
+          selectedId={selectedLocation}
+          onSelect={setSelectedLocation}
+        />
       </div>
+    </SectionScaffold>
   );
 }
