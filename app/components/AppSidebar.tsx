@@ -62,7 +62,8 @@ export function AppSidebar() {
     { title: "Inicio", url: "/dashboard/home", icon: User, description: "Inicio" },
     { title: "Reviews", url: "/dashboard/reviews", icon: MessageSquare, description: "Reseñas de Google" },
     { title: "Empresa", url: "/dashboard/company", icon: Building2, description: "Información de la empresa" },
-    { title: "Integraciones", url: "/dashboard/integrations", icon: Plug, description: "Conecta servicios" },
+    //{ title: "Integraciones", url: "/dashboard/integrations", icon: Plug, description: "Conecta servicios" },
+    { title: "Integraciones", url: "/dashboard/integrations-test", icon: Plug, description: "Conecta servicios" },
     { title: "Base de Datos", url: "/dashboard/database", icon: Database, description: "Conexiones y datos" },
     { title: "Reportes", url: "/dashboard/reports", icon: FileText, description: "Generación de informes" },
     // ❌ Quitamos Configuración de aquí para situarla abajo del todo
