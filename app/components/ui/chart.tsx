@@ -84,11 +84,13 @@ ${colorConfig
 
 /* ===================== TOOLTIP ===================== */
 
+// Mantén este alias tal cual
 export const ChartTooltip = RechartsPrimitive.Tooltip;
 
 type LegendItem = { value?: string; color?: string; dataKey?: string; payload?: any };
 
-type ChartTooltipContentProps = React.HTMLAttributes<HTMLDivElement> & {
+// 👇 Props “whitelist” (sin div props arbitrarios)
+type ChartTooltipContentProps = {
   active?: boolean;
   payload?: any[]; // array de puntos del tooltip
   label?: React.ReactNode;
@@ -101,6 +103,7 @@ type ChartTooltipContentProps = React.HTMLAttributes<HTMLDivElement> & {
   labelFormatter?: (value: any, payload: any[]) => React.ReactNode;
   color?: string;
   labelClassName?: string;
+  className?: string;
 };
 
 export const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltipContentProps>(
@@ -119,7 +122,6 @@ export const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltip
       color,
       nameKey,
       labelKey,
-      ...divProps
     },
     ref
   ) => {
@@ -131,7 +133,9 @@ export const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltip
       const key = `${labelKey || item?.dataKey || item?.name || "value"}`;
       const itemConfig = getPayloadConfigFromPayload(config, item, key);
       const value =
-        !labelKey && typeof label === "string" ? (config[label as keyof typeof config]?.label || label) : itemConfig?.label;
+        !labelKey && typeof label === "string"
+          ? (config[label as keyof typeof config]?.label || label)
+          : itemConfig?.label;
 
       if (labelFormatter) {
         return <div className={cn("font-medium", labelClassName)}>{labelFormatter(value, payload)}</div>;
@@ -151,7 +155,6 @@ export const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltip
           "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
           className
         )}
-        {...divProps}
       >
         {!nestLabel ? tooltipLabel : null}
         <div className="grid gap-1.5">
@@ -212,6 +215,7 @@ export const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltip
   }
 );
 ChartTooltipContent.displayName = "ChartTooltip";
+
 
 /* ===================== LEGEND ===================== */
 
