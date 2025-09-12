@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { MapPin, Plus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
@@ -35,7 +35,7 @@ function safeUuid() {
 }
 
 export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
-  const { data } = useSession();
+  const { data, status } = useSession();
   const role = (data?.user as any)?.role ?? "user";
 
   const router = useRouter();
@@ -46,6 +46,7 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
   const [items, setItems] = useState<Establishment[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [needsAuth, setNeedsAuth] = useState<boolean>(false);
 
   useEffect(() => {
     let mounted = true;
@@ -53,10 +54,51 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
     async function load() {
       try {
         setLoading(true);
+        setNeedsAuth(false);
+
+        // Espera a que la sesión esté lista
+        if (status === "loading") return;
+
+        // Si no hay sesión, no sigas
+        if (status === "unauthenticated") {
+          if (mounted) {
+            setNeedsAuth(true);
+            setItems([]);
+            setActiveId(null);
+            onEstablishmentChange(null);
+          }
+          return;
+        }
+
+        // Token opcional desde la sesión (ajusta si lo guardas en otra propiedad)
+        const token =
+          (data as any)?.accessToken ??
+          (data?.user as any)?.accessToken ??
+          undefined;
+
+        const baseInit: RequestInit = {
+          method: "GET",
+          cache: "no-store",
+          credentials: "include", // asegura envío de cookies de sesión
+          headers: {
+            accept: "application/json",
+            ...(token ? { authorization: `Bearer ${token}` } : {}),
+          },
+        };
 
         // 1) Companies
-        const companiesRes = await fetch(`/api/companies?all=1`, { cache: "no-store" });
+        const companiesRes = await fetch(`/api/companies?all=1`, baseInit);
+        if (companiesRes.status === 401) {
+          if (mounted) {
+            setNeedsAuth(true);
+            setItems([]);
+            setActiveId(null);
+            onEstablishmentChange(null);
+          }
+          return;
+        }
         if (!companiesRes.ok) throw new Error(`Companies HTTP ${companiesRes.status}`);
+
         const companiesJson = await companiesRes.json();
         const companies: any[] = Array.isArray(companiesJson)
           ? companiesJson
@@ -68,7 +110,7 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
           companies.map(async (c) => {
             const cid = c?.id ?? c?.companyId ?? c?._id;
             if (!cid) return;
-            const locRes = await fetch(`/api/companies/${cid}/locations`, { cache: "no-store" });
+            const locRes = await fetch(`/api/companies/${cid}/locations`, baseInit);
             if (!locRes.ok) return;
             const locData = await locRes.json();
             const locs: any[] = Array.isArray(locData)
@@ -78,42 +120,40 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
           })
         );
 
-        // 3) Map a Establishment  ✅ FIX: usar reviewsAvg y reviewsCount
+        // 3) Map a Establishment
         const mapped: Establishment[] = allLocations.map(({ company, location }) => {
-        const city =
+          const city =
             location?.city ?? location?.address?.city ?? location?.address?.locality ?? "";
-        const country =
+          const country =
             location?.country ?? location?.address?.country ?? location?.address?.countryCode ?? "";
 
-        // prefiero title sobre name (suele venir así en tu API)
-        const name = String(location?.title ?? location?.name ?? "Sin nombre");
-        const avatar = name.slice(0, 1).toUpperCase();
+          const name = String(location?.title ?? location?.name ?? "Sin nombre");
+          const avatar = name.slice(0, 1).toUpperCase();
 
-        return {
+          return {
             id: String(location?.id ?? location?.locationId ?? location?._id ?? safeUuid()),
             name,
             location: [city, country].filter(Boolean).join(", ") || "—",
             avatar,
-
-            // 👇 CAMBIO CLAVE
             rating: Number(
-            location?.reviewsAvg ?? // <- tu API
-            location?.avgRating ??  // <- por si acaso
-            location?.rating ?? 0
+              location?.reviewsAvg ?? // <- tu API principal
+              location?.avgRating ??  // <- fallback
+              location?.rating ?? 0
             ),
             totalReviews: Number(
-            location?.reviewsCount ?? // <- tu API
-            location?.reviewCount ?? 0
+              location?.reviewsCount ?? // <- tu API principal
+              location?.reviewCount ?? 0
             ),
-
             pendingResponses: Number(location?.pendingResponses ?? 0),
             lastReviewDate: location?.lastReviewDate ? String(location.lastReviewDate) : "—",
             status: (location?.active ?? true) ? "active" : "inactive",
             category: String(location?.category ?? company?.industry ?? "General"),
             weeklyTrend: Number(location?.weeklyTrend ?? 0),
-        };
+          };
         });
+
         if (!mounted) return;
+
         setItems(mapped);
 
         // 4) Selección inicial
@@ -147,8 +187,8 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
     return () => {
       mounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role]); // recarga si cambia el rol
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, status]); // recarga cuando haya sesión lista o cambie el rol
 
   // Si cambia ?locationId externamente, sincroniza
   useEffect(() => {
@@ -176,11 +216,28 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
+  if (needsAuth) {
+    return (
+      <div className="border-b border-border/50">
+        <div className="container mx-auto px-6 py-6">
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <p className="text-sm text-muted-foreground">
+              Necesitas iniciar sesión para listar compañías y ubicaciones.
+            </p>
+            <Button onClick={() => signIn()} size="sm">
+              Iniciar sesión
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="border-b border-border/50 backdrop-blur-sm">
       <div className="container mx-auto px-6 py-6">
         {/* Tabs MULTIFILA */}
-        <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
           {loading && (
             <div className="text-sm text-muted-foreground">Cargando ubicaciones…</div>
           )}
@@ -193,33 +250,33 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
                   key={est.id}
                   onClick={() => onTabClick(est)}
                   className={[
-                    "relative group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300",
+                    "relative group flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-300",
                     "whitespace-nowrap",
                     isActive
-                      ? "bg-gradient-to-r from-primary/20 to-accent/20 border-2 border-primary/30 shadow-lg"
-                      : "bg-card/60 border border-border/30 hover:bg-card/80 hover:border-primary/20 hover:shadow-md",
+                      ? "border-2 border-primary/30 bg-gradient-to-r from-primary/20 to-accent/20 shadow-lg"
+                      : "border border-border/30 bg-card/60 hover:border-primary/20 hover:bg-card/80 hover:shadow-md",
                   ].join(" ")}
                 >
-                  <div className="text-base font-semibold h-7 w-7 rounded-full bg-primary/15 text-primary grid place-items-center">
+                  <div className="grid h-7 w-7 place-items-center rounded-full bg-primary/15 text-base font-semibold text-primary">
                     {est.avatar}
                   </div>
                   <div className="text-left">
                     <div
                       className={[
-                        "font-semibold text-sm",
+                        "text-sm font-semibold",
                         isActive ? "text-primary" : "text-foreground",
                       ].join(" ")}
                     >
                       {est.name}
                     </div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <MapPin size={10} />
                       {(est.location ?? "").split(",")[0] || "—"}
                     </div>
                   </div>
 
                   {est.pendingResponses > 0 && (
-                    <Badge className="bg-warning text-warning-foreground text-xs px-2 py-0">
+                    <Badge className="text-warning-foreground bg-warning px-2 py-0 text-xs">
                       {est.pendingResponses}
                     </Badge>
                   )}
