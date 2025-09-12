@@ -34,15 +34,19 @@
     --input: 214 32% 91%;
     --ring: 239 84% 67%;
 
-    /* Extra */
+    /* ========= Extra semánticos ========= */
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
+
     --warning: 45 93% 58%;
     --warning-foreground: 224 71% 4%;
+
     --pending: 262 83% 58%;
     --pending-foreground: 0 0% 100%;
+
     --published: 142 71% 45%;
     --published-foreground: 0 0% 100%;
+
     --draft: 220 9% 46%;
     --draft-foreground: 0 0% 100%;
 
@@ -103,29 +107,44 @@
 
   /* Base */
   * { @apply border-border; }
-  body { @apply bg-background text-foreground; }
+  body { @apply bg-background text-foreground antialiased; }
 
-  /* (opcional) por si algún estilo externo pinta links del sidebar */
   [data-sidebar] a { text-decoration: none; color: inherit; }
 }
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(100%) scale(0.95);
+
+/* ====== Utilidades estéticas (chips, fondos soft, estrellas…) ====== */
+@layer utilities {
+  /* Fondos "soft" semitransparentes para badges, pills, etc. */
+  .bg-soft-primary   { background-color: hsl(var(--primary) / .15); color: hsl(var(--primary)); }
+  .bg-soft-accent    { background-color: hsl(var(--accent) / .15);  color: hsl(var(--accent)); }
+  .bg-soft-success   { background-color: hsl(var(--success) / .15); color: hsl(var(--success)); }
+  .bg-soft-warning   { background-color: hsl(var(--warning) / .20); color: hsl(var(--warning)); }
+  .bg-soft-destructive { background-color: hsl(var(--destructive) / .15); color: hsl(var(--destructive)); }
+  .bg-soft-secondary { background-color: hsl(var(--secondary) / .6); color: hsl(var(--foreground)); }
+
+  /* Estrellas */
+  .text-star-filled { color: hsl(var(--star-filled)); }
+  .text-star-empty  { color: hsl(var(--star-empty)); }
+
+  /* Sombras elegantes */
+  .shadow-elegant { box-shadow:
+      0 1px 2px hsl(var(--foreground) / .06),
+      0 8px 24px hsl(var(--foreground) / .06);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+
+  /* Ring de foco accesible */
+  .focus-ring { @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background; }
+
+  /* Tarjeta sutil */
+  .card-soft { @apply rounded-xl border border-border/60 bg-card/80 backdrop-blur; }
 }
 
+/* Animaciones toast (dejas tus keyframes tal cual) */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(100%) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
 @keyframes toast-out {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(100%) scale(0.95);
-  }
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(100%) scale(0.95); }
 }

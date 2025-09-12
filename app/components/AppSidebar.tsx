@@ -68,6 +68,7 @@ export function AppSidebar() {
     { title: "Reportes", url: "/dashboard/reports", icon: FileText, description: "Generación de informes" },
     { title: "Reportes-test", url: "/dashboard/reports-test", icon: FileText, description: "Generación de informes" },
     { title: "Gráficos de prueba", url: "/dashboard/charts-test", icon: FileText, description: "Pruebas de gráficos" },
+    { title: "TabMenu de prueba", url: "/dashboard/tabsmenu-test", icon: FileText, description: "TabMenu de gráficos" },
     // ❌ Quitamos Configuración de aquí para situarla abajo del todo
   ];
   const items =

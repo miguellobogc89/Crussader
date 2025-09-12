@@ -5,72 +5,97 @@ import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
 import { ChartContainer, ChartTooltipContent } from "@/app/components/ui/chart";
-import {
-  LineChart, Line, XAxis, YAxis, ResponsiveContainer,
-  BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
-  Tooltip
+import { Tooltip } from "recharts";import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  AreaChart,
+  Area,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
 } from "recharts";
 import {
-  TrendingUp, TrendingDown, Star, MessageSquare, Clock, Users, BarChart3,
-  Activity, Zap, Target, Award, Hash, Timer, MapPin, Smartphone, Monitor, Globe
+  TrendingUp,
+  TrendingDown,
+  Star,
+  MessageSquare,
+  Clock,
+  Users,
+  BarChart3,
+  Activity,
+  Zap,
+  Target,
+  Award,
+  Hash,
+  Timer,
+  MapPin,
+  Smartphone,
+  Monitor,
+  Globe,
 } from "lucide-react";
 import type { ComponentType } from "react";
 
-/* ================= Tipos ================= */
+/* =============== Tipos pequeños =============== */
 type Trend = "up" | "down";
 type IconType = ComponentType<{ className?: string }>;
 
-type RatingTrendRow = { month: string; rating: number; reviews: number };
-type StarDistributionRow = { stars: string; count: number; percentage: number };
-type SentimentRow = { name: string; value: number; color: string };
-type ReviewSourceRow = { platform: string; count: number; percentage: number; color: string };
-type LocationCompareRow = { location: string; rating: number; reviews: number; responses: number };
-type PeakHourRow = { hour: string; reviews: number };
-type ResponseTimeRow = { location: string; avgTime: number; target: number };
-
-/* ================= Mock data ================= */
+/* =============== Mock data =============== */
 const overviewMetrics: {
-  title: string; value: string; change: string; trend: Trend; icon: IconType; color: string;
+  title: string;
+  value: string;
+  change: string;
+  trend: Trend;
+  icon: IconType;
+  color: string; // tailwind token (ej: text-warning)
 }[] = [
-  { title: "Rating Promedio", value: "4.6", change: "+0.3", trend: "up", icon: Star,          color: "text-warning" },
-  { title: "Total Reseñas",   value: "1,247", change: "+127", trend: "up", icon: MessageSquare, color: "text-primary" },
-  { title: "Tasa Respuesta",  value: "87%",  change: "+12%", trend: "up", icon: Activity,      color: "text-success" },
-  { title: "Tiempo Respuesta",value: "2.4h", change: "-0.8h",trend: "up", icon: Timer,         color: "text-accent" },
+  { title: "Rating Promedio", value: "4.6", change: "+0.3", trend: "up", icon: Star, color: "text-warning" },
+  { title: "Total Reseñas", value: "1,247", change: "+127", trend: "up", icon: MessageSquare, color: "text-primary" },
+  { title: "Tasa Respuesta", value: "87%", change: "+12%", trend: "up", icon: Activity, color: "text-success" },
+  { title: "Tiempo Respuesta", value: "2.4h", change: "-0.8h", trend: "up", icon: Timer, color: "text-accent" },
 ];
 
-const ratingTrend: RatingTrendRow[] = [
-  { month: "Ene", rating: 4.2, reviews: 89  },
+const ratingTrend = [
+  { month: "Ene", rating: 4.2, reviews: 89 },
   { month: "Feb", rating: 4.3, reviews: 112 },
   { month: "Mar", rating: 4.1, reviews: 134 },
-  { month: "Abr", rating: 4.4, reviews: 98  },
+  { month: "Abr", rating: 4.4, reviews: 98 },
   { month: "May", rating: 4.6, reviews: 156 },
   { month: "Jun", rating: 4.5, reviews: 178 },
   { month: "Jul", rating: 4.6, reviews: 203 },
 ];
 
-const starDistribution: StarDistributionRow[] = [
+const starDistribution = [
   { stars: "5⭐", count: 687, percentage: 55 },
   { stars: "4⭐", count: 312, percentage: 25 },
   { stars: "3⭐", count: 149, percentage: 12 },
-  { stars: "2⭐", count: 62,  percentage: 5  },
-  { stars: "1⭐", count: 37,  percentage: 3  },
+  { stars: "2⭐", count: 62, percentage: 5 },
+  { stars: "1⭐", count: 37, percentage: 3 },
 ];
 
-const sentimentAnalysis: SentimentRow[] = [
+const sentimentAnalysis = [
   { name: "Positivo", value: 68, color: "hsl(var(--success))" },
-  { name: "Neutral",  value: 22, color: "hsl(var(--muted-foreground))" },
+  { name: "Neutral", value: 22, color: "hsl(var(--muted-foreground))" },
   { name: "Negativo", value: 10, color: "hsl(var(--destructive))" },
 ];
 
-const locationComparison: LocationCompareRow[] = [
+const locationComparison = [
   { location: "Restaurante Centro", rating: 4.7, reviews: 456, responses: 89 },
-  { location: "Restaurante Norte",  rating: 4.5, reviews: 378, responses: 85 },
-  { location: "Café Plaza",         rating: 4.6, reviews: 413, responses: 91 },
+  { location: "Restaurante Norte", rating: 4.5, reviews: 378, responses: 85 },
+  { location: "Café Plaza", rating: 4.6, reviews: 413, responses: 91 },
 ];
 
-const peakHours: PeakHourRow[] = [
-  { hour: "9:00",  reviews: 12 },
+const peakHours = [
+  { hour: "9:00", reviews: 12 },
   { hour: "12:00", reviews: 28 },
   { hour: "14:00", reviews: 34 },
   { hour: "19:00", reviews: 45 },
@@ -78,49 +103,49 @@ const peakHours: PeakHourRow[] = [
   { hour: "22:00", reviews: 22 },
 ];
 
-const reviewSources: ReviewSourceRow[] = [
-  { platform: "Google",      count: 487, percentage: 39, color: "hsl(45, 93%, 58%)"  },
+const reviewSources = [
+  { platform: "Google", count: 487, percentage: 39, color: "hsl(45, 93%, 58%)" },
   { platform: "TripAdvisor", count: 312, percentage: 25, color: "hsl(142, 71%, 45%)" },
-  { platform: "Facebook",    count: 248, percentage: 20, color: "hsl(217, 91%, 60%)" },
-  { platform: "Yelp",        count: 200, percentage: 16, color: "hsl(0, 84%, 60%)"   },
+  { platform: "Facebook", count: 248, percentage: 20, color: "hsl(217, 91%, 60%)" },
+  { platform: "Yelp", count: 200, percentage: 16, color: "hsl(0, 84%, 60%)" },
 ];
 
-const topKeywords: { word: string; count: number; sentiment: "positive" | "negative" }[] = [
-  { word: "Excelente", count: 234, sentiment: "positive" },
-  { word: "Delicioso", count: 189, sentiment: "positive" },
-  { word: "Rápido",    count: 156, sentiment: "positive" },
-  { word: "Amable",    count: 145, sentiment: "positive" },
-  { word: "Lento",     count: 67,  sentiment: "negative" },
-  { word: "Frío",      count: 45,  sentiment: "negative" },
-  { word: "Caro",      count: 38,  sentiment: "negative" },
+const topKeywords = [
+  { word: "Excelente", count: 234, sentiment: "positive" as const },
+  { word: "Delicioso", count: 189, sentiment: "positive" as const },
+  { word: "Rápido", count: 156, sentiment: "positive" as const },
+  { word: "Amable", count: 145, sentiment: "positive" as const },
+  { word: "Lento", count: 67, sentiment: "negative" as const },
+  { word: "Frío", count: 45, sentiment: "negative" as const },
+  { word: "Caro", count: 38, sentiment: "negative" as const },
 ];
 
-const responseTimeByLocation: ResponseTimeRow[] = [
+const responseTimeByLocation = [
   { location: "Centro", avgTime: 1.8, target: 2.0 },
-  { location: "Norte",  avgTime: 2.4, target: 2.0 },
-  { location: "Plaza",  avgTime: 2.1, target: 2.0 },
+  { location: "Norte", avgTime: 2.4, target: 2.0 },
+  { location: "Plaza", avgTime: 2.1, target: 2.0 },
 ];
 
-/* ============ Helper Tailwind fijo (sin bg-${var}) ============ */
+/* =============== Helper: clase fija para Tailwind (evitar bg-${var}) =============== */
 function alertDotClass(color: "destructive" | "warning" | "secondary") {
   if (color === "destructive") return "bg-destructive";
-  if (color === "warning")     return "bg-warning";
+  if (color === "warning") return "bg-warning";
   return "bg-secondary";
 }
 
-/* ================= Page ================= */
+/* =============== Página =============== */
 export default function ReportsPage() {
   return (
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
+      {/* Header simple (sin Layout) */}
       <header className="space-y-1">
         <h1 className="text-3xl font-bold tracking-tight">Reportes y Análisis</h1>
         <p className="text-muted-foreground">Métricas completas de rendimiento y tendencias</p>
       </header>
 
-      {/* Métricas */}
+      {/* Métricas Principales */}
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {overviewMetrics.map((metric, index: number) => {
+        {overviewMetrics.map((metric, index) => {
           const Icon = metric.icon;
           const isPositive = metric.trend === "up";
           return (
@@ -155,7 +180,7 @@ export default function ReportsPage() {
           <TabsTrigger value="performance">Rendimiento</TabsTrigger>
         </TabsList>
 
-        {/* Tendencias */}
+        {/* Tab: Tendencias */}
         <TabsContent value="trends" className="space-y-6">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Evolución del Rating */}
@@ -168,14 +193,24 @@ export default function ReportsPage() {
                 <CardDescription>Rating promedio mensual</CardDescription>
               </CardHeader>
               <CardContent>
-                <ChartContainer config={{ rating: { label: "Rating", color: "hsl(var(--primary))" } }} className="h-[300px]">
+                <ChartContainer
+                  config={{
+                    rating: { label: "Rating", color: "hsl(var(--primary))" },
+                  }}
+                  className="h-[300px]"
+                >
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={ratingTrend}>
                       <XAxis dataKey="month" />
                       <YAxis domain={[3.5, 5]} />
                       <Tooltip content={<ChartTooltipContent />} />
-                      <Line type="monotone" dataKey="rating" stroke="hsl(var(--primary))" strokeWidth={3}
-                            dot={{ fill: "hsl(var(--primary))", r: 6 }} />
+                      <Line
+                        type="monotone"
+                        dataKey="rating"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={3}
+                        dot={{ fill: "hsl(var(--primary))", r: 6 }}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </ChartContainer>
@@ -193,7 +228,7 @@ export default function ReportsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {starDistribution.map((item: StarDistributionRow, index: number) => (
+                  {starDistribution.map((item, index) => (
                     <div key={index} className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <span className="w-8 text-sm font-medium">{item.stars}</span>
@@ -220,7 +255,12 @@ export default function ReportsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ChartContainer config={{ reviews: { label: "Reseñas", color: "hsl(var(--accent))" } }} className="h-[250px]">
+                <ChartContainer
+                  config={{
+                    reviews: { label: "Reseñas", color: "hsl(var(--accent))" },
+                  }}
+                  className="h-[250px]"
+                >
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={peakHours}>
                       <XAxis dataKey="hour" />
@@ -247,8 +287,8 @@ export default function ReportsPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={reviewSources} cx="50%" cy="50%" outerRadius={80} dataKey="count">
-                        {reviewSources.map((entry: ReviewSourceRow, i: number) => (
-                          <Cell key={`cell-${i}`} fill={entry.color} />
+                        {reviewSources.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
                       <Tooltip content={<ChartTooltipContent />} />
@@ -256,7 +296,7 @@ export default function ReportsPage() {
                   </ResponsiveContainer>
                 </ChartContainer>
                 <div className="mt-4 grid grid-cols-2 gap-2">
-                  {reviewSources.map((source: ReviewSourceRow, index: number) => (
+                  {reviewSources.map((source, index) => (
                     <div key={index} className="flex items-center space-x-2">
                       <div className="h-3 w-3 rounded-full" style={{ backgroundColor: source.color }} />
                       <span className="text-sm font-medium">{source.platform}</span>
@@ -269,10 +309,10 @@ export default function ReportsPage() {
           </div>
         </TabsContent>
 
-        {/* Análisis */}
+        {/* Tab: Análisis */}
         <TabsContent value="analysis" className="space-y-6">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* Sentimientos */}
+            {/* Análisis de Sentimientos */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -286,8 +326,8 @@ export default function ReportsPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={sentimentAnalysis} cx="50%" cy="50%" innerRadius={40} outerRadius={80} dataKey="value">
-                        {sentimentAnalysis.map((e: SentimentRow, i: number) => (
-                          <Cell key={`cell-sent-${i}`} fill={e.color} />
+                        {sentimentAnalysis.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
                       <Tooltip content={<ChartTooltipContent />} />
@@ -295,7 +335,7 @@ export default function ReportsPage() {
                   </ResponsiveContainer>
                 </ChartContainer>
                 <div className="mt-4 flex justify-center space-x-6">
-                  {sentimentAnalysis.map((item: SentimentRow, index: number) => (
+                  {sentimentAnalysis.map((item, index) => (
                     <div key={index} className="text-center">
                       <div className="flex items-center justify-center space-x-2">
                         <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
@@ -319,7 +359,7 @@ export default function ReportsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {topKeywords.map((keyword, index: number) => (
+                  {topKeywords.map((keyword, index) => (
                     <div key={index} className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <Badge variant={keyword.sentiment === "positive" ? "default" : "destructive"} className="text-xs">
@@ -327,7 +367,9 @@ export default function ReportsPage() {
                         </Badge>
                         <div className="h-2 w-24 rounded-full bg-muted">
                           <div
-                            className={`h-2 rounded-full ${keyword.sentiment === "positive" ? "bg-success" : "bg-destructive"}`}
+                            className={`h-2 rounded-full ${
+                              keyword.sentiment === "positive" ? "bg-success" : "bg-destructive"
+                            }`}
                             style={{ width: `${Math.min((keyword.count / 250) * 100, 100)}%` }}
                           />
                         </div>
@@ -355,7 +397,13 @@ export default function ReportsPage() {
                       <XAxis dataKey="month" />
                       <YAxis />
                       <Tooltip content={<ChartTooltipContent />} />
-                      <Area type="monotone" dataKey="reviews" stroke="hsl(var(--accent))" fill="hsl(var(--accent))" fillOpacity={0.2} />
+                      <Area
+                        type="monotone"
+                        dataKey="reviews"
+                        stroke="hsl(var(--accent))"
+                        fill="hsl(var(--accent))"
+                        fillOpacity={0.2}
+                      />
                     </AreaChart>
                   </ResponsiveContainer>
                 </ChartContainer>
@@ -364,7 +412,7 @@ export default function ReportsPage() {
           </div>
         </TabsContent>
 
-        {/* Ubicaciones */}
+        {/* Tab: Ubicaciones */}
         <TabsContent value="locations" className="space-y-6">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Comparativa */}
@@ -378,7 +426,7 @@ export default function ReportsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {locationComparison.map((loc: LocationCompareRow, index: number) => (
+                  {locationComparison.map((loc, index) => (
                     <div key={index} className="space-y-4 rounded-lg border p-4">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold">{loc.location}</h3>
@@ -424,7 +472,7 @@ export default function ReportsPage() {
                 <ChartContainer
                   config={{
                     avgTime: { label: "Promedio", color: "hsl(var(--accent))" },
-                    target:  { label: "Objetivo", color: "hsl(var(--muted-foreground))" },
+                    target: { label: "Objetivo", color: "hsl(var(--muted-foreground))" },
                   }}
                   className="h-[250px]"
                 >
@@ -434,7 +482,7 @@ export default function ReportsPage() {
                       <YAxis />
                       <Tooltip content={<ChartTooltipContent />} />
                       <Bar dataKey="avgTime" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="target"  fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} opacity={0.5} />
+                      <Bar dataKey="target" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} opacity={0.5} />
                     </BarChart>
                   </ResponsiveContainer>
                 </ChartContainer>
@@ -453,10 +501,10 @@ export default function ReportsPage() {
               <CardContent>
                 <div className="space-y-4">
                   {[
-                    { device: "Móvil",   percentage: 68, icon: Smartphone },
-                    { device: "Desktop", percentage: 25, icon: Monitor   },
-                    { device: "Tablet",  percentage: 7,  icon: Users     },
-                  ].map((item: { device: string; percentage: number; icon: IconType }, index: number) => {
+                    { device: "Móvil", percentage: 68, icon: Smartphone },
+                    { device: "Desktop", percentage: 25, icon: Monitor },
+                    { device: "Tablet", percentage: 7, icon: Users },
+                  ].map((item, index) => {
                     const Icon = item.icon;
                     return (
                       <div key={index} className="flex items-center justify-between">
@@ -479,10 +527,10 @@ export default function ReportsPage() {
           </div>
         </TabsContent>
 
-        {/* Rendimiento */}
+        {/* Tab: Rendimiento */}
         <TabsContent value="performance" className="space-y-6">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* KPIs */}
+            {/* KPIs Objetivo */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -494,9 +542,9 @@ export default function ReportsPage() {
               <CardContent className="space-y-4">
                 {[
                   { metric: "Rating Objetivo", current: 4.6, target: 4.5, unit: "⭐" },
-                  { metric: "Respuesta <2h",   current: 87,  target: 85,  unit: "%" },
-                  { metric: "Reseñas/Mes",     current: 203, target: 180, unit: ""  },
-                ].map((kpi: { metric: string; current: number; target: number; unit: string }, index: number) => {
+                  { metric: "Respuesta <2h", current: 87, target: 85, unit: "%" },
+                  { metric: "Reseñas/Mes", current: 203, target: 180, unit: "" },
+                ].map((kpi, index) => {
                   const achieved = kpi.current >= kpi.target;
                   return (
                     <div key={index} className="space-y-2">
@@ -505,12 +553,20 @@ export default function ReportsPage() {
                         <Badge variant={achieved ? "default" : "destructive"}>{achieved ? "✓ Logrado" : "⚠ Pendiente"}</Badge>
                       </div>
                       <div className="flex items-end space-x-2">
-                        <span className="text-2xl font-bold">{kpi.current}{kpi.unit}</span>
-                        <span className="text-sm text-muted-foreground">/ {kpi.target}{kpi.unit}</span>
+                        <span className="text-2xl font-bold">
+                          {kpi.current}
+                          {kpi.unit}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          / {kpi.target}
+                          {kpi.unit}
+                        </span>
                       </div>
                       <div className="h-2 w-full rounded-full bg-muted">
-                        <div className={`h-2 rounded-full ${achieved ? "bg-success" : "bg-warning"}`}
-                             style={{ width: `${Math.min((kpi.current / kpi.target) * 100, 100)}%` }} />
+                        <div
+                          className={`h-2 rounded-full ${achieved ? "bg-success" : "bg-warning"}`}
+                          style={{ width: `${Math.min((kpi.current / kpi.target) * 100, 100)}%` }}
+                        />
                       </div>
                     </div>
                   );
@@ -518,7 +574,7 @@ export default function ReportsPage() {
               </CardContent>
             </Card>
 
-            {/* Alertas */}
+            {/* Alertas Activas */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
@@ -529,10 +585,10 @@ export default function ReportsPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
-                  { type: "Crítico",     message: "3 reseñas 1⭐ sin responder", color: "destructive" as const },
-                  { type: "Advertencia", message: "Rating bajó 0.1 esta semana", color: "warning"     as const },
-                  { type: "Info",        message: "12 reseñas nuevas pendientes",color: "secondary"   as const },
-                ].map((alert: { type: string; message: string; color: "destructive" | "warning" | "secondary" }, index: number) => (
+                  { type: "Crítico", message: "3 reseñas 1⭐ sin responder", color: "destructive" as const },
+                  { type: "Advertencia", message: "Rating bajó 0.1 esta semana", color: "warning" as const },
+                  { type: "Info", message: "12 reseñas nuevas pendientes", color: "secondary" as const },
+                ].map((alert, index) => (
                   <div key={index} className="flex items-start space-x-3 rounded-lg border p-3">
                     <div className={`mt-2 h-2 w-2 rounded-full ${alertDotClass(alert.color)}`} />
                     <div>
@@ -556,9 +612,9 @@ export default function ReportsPage() {
               <CardContent className="space-y-4">
                 {[
                   { achievement: "Mejor rating histórico", value: "4.6⭐", change: "+0.3" },
-                  { achievement: "Record de reseñas",      value: "203",  change: "+47"  },
-                  { achievement: "Respuesta más rápida",   value: "2.4h", change: "-0.8h"},
-                ].map((item: { achievement: string; value: string; change: string }, index: number) => (
+                  { achievement: "Record de reseñas", value: "203", change: "+47" },
+                  { achievement: "Respuesta más rápida", value: "2.4h", change: "-0.8h" },
+                ].map((item, index) => (
                   <div key={index} className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
                     <div>
                       <p className="text-sm font-medium">{item.achievement}</p>
@@ -576,7 +632,7 @@ export default function ReportsPage() {
             </Card>
           </div>
 
-          {/* Radar: Competitivo */}
+          {/* Radar: Análisis Competitivo */}
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -588,19 +644,21 @@ export default function ReportsPage() {
             <CardContent>
               <ChartContainer
                 config={{
-                  tuNegocio:   { label: "Tu Negocio",  color: "hsl(var(--primary))" },
+                  tuNegocio: { label: "Tu Negocio", color: "hsl(var(--primary))" },
                   competencia: { label: "Competencia", color: "hsl(var(--muted-foreground))" },
                 }}
                 className="h-[400px]"
               >
                 <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart data={[
-                    { subject: "Rating",     tuNegocio: 4.6, competencia: 4.2, fullMark: 5 },
-                    { subject: "Volumen",    tuNegocio: 4.1, competencia: 3.8, fullMark: 5 },
-                    { subject: "Respuesta",  tuNegocio: 4.4, competencia: 3.5, fullMark: 5 },
-                    { subject: "Velocidad",  tuNegocio: 4.2, competencia: 3.2, fullMark: 5 },
-                    { subject: "Engagement", tuNegocio: 3.9, competencia: 3.6, fullMark: 5 },
-                  ]}>
+                  <RadarChart
+                    data={[
+                      { subject: "Rating", tuNegocio: 4.6, competencia: 4.2, fullMark: 5 },
+                      { subject: "Volumen", tuNegocio: 4.1, competencia: 3.8, fullMark: 5 },
+                      { subject: "Respuesta", tuNegocio: 4.4, competencia: 3.5, fullMark: 5 },
+                      { subject: "Velocidad", tuNegocio: 4.2, competencia: 3.2, fullMark: 5 },
+                      { subject: "Engagement", tuNegocio: 3.9, competencia: 3.6, fullMark: 5 },
+                    ]}
+                  >
                     <PolarGrid />
                     <PolarAngleAxis dataKey="subject" />
                     <PolarRadiusAxis domain={[0, 5]} />
