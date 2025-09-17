@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+import ChartCard from "@/app/components/charts/ChartCard";
 import { ChartContainer, ChartTooltipContent } from "@/app/components/ui/chart";
 import {
   ResponsiveContainer,
@@ -34,17 +36,40 @@ export type LineComboProps<T extends Record<string, unknown>> = {
     key: keyof T;
     type: "area" | "bar";
     label?: string;
-    color?: string;         // default: hsl(var(--accent))
+    color?: string;          // default: hsl(var(--accent))
     axis?: "left" | "right"; // default: right
     yDomain?: AxisDomainLike;
     opacity?: number;        // area fill opacity (default 0.2)
     radius?: number | [number, number, number, number]; // bar border radius
   };
 
-  height?: number;           // default: 300
+  /** Altura del área del gráfico (se aplica en la Card). Default 300 */
+  height?: number;
+
   xTickFormatter?: (v: any) => string;
   leftTickFormatter?: (v: number) => string;
   rightTickFormatter?: (v: number) => string;
+
+  /** Opciones de la Card contenedora */
+  card?: {
+    title?: ReactNode;
+    description?: ReactNode;
+    /** Altura del área de contenido; tiene prioridad sobre `height` */
+    height?: number | string;
+    defaultFavorite?: boolean;
+    onFavoriteChange?: (isFav: boolean) => void;
+    onRemove?: () => void;
+    className?: string;
+    contentClassName?: string;
+  };
+
+  /* (deprecado) — ya no se usa, la Card maneja los botones */
+  withActions?: boolean;
+  actionsProps?: {
+    defaultFavorite?: boolean;
+    onFavoriteChange?: (isFav: boolean) => void;
+    onRemove?: () => void;
+  };
 };
 
 export function LineCombo<T extends Record<string, unknown>>({
@@ -56,27 +81,44 @@ export function LineCombo<T extends Record<string, unknown>>({
   xTickFormatter,
   leftTickFormatter,
   rightTickFormatter,
+  card,
 }: LineComboProps<T>) {
   const xKeyStr = String(xKey);
   const lineKey = String(line.key);
   const lineColor = line.color ?? "hsl(var(--primary))";
+
   const secKey = secondary ? String(secondary.key) : undefined;
   const secType = secondary?.type ?? "area";
   const secAxis = secondary?.axis ?? "right";
   const secColor = secondary?.color ?? "hsl(var(--accent))";
   const secOpacity = secondary?.opacity ?? 0.2;
-
   const showRightAxis = Boolean(secondary && secAxis === "right");
+
+  const effectiveHeight = card?.height ?? height;
 
   const config: SeriesConfig = {
     [lineKey]: { label: line.label ?? "Línea", color: lineColor },
     ...(secondary
-      ? { [secKey as string]: { label: secondary.label ?? (secType === "bar" ? "Barras" : "Área"), color: secColor } }
+      ? {
+          [secKey as string]: {
+            label: secondary.label ?? (secType === "bar" ? "Barras" : "Área"),
+            color: secColor,
+          },
+        }
       : {}),
   };
 
   return (
-    <div className="w-full min-w-0 overflow-hidden" style={{ height }}>
+    <ChartCard
+      title={card?.title}
+      description={card?.description}
+      height={effectiveHeight}
+      defaultFavorite={card?.defaultFavorite}
+      onFavoriteChange={card?.onFavoriteChange}
+      onRemove={card?.onRemove}
+      className={card?.className}
+      contentClassName={card?.contentClassName}
+    >
       <ChartContainer config={config} className="h-full">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data}>
@@ -132,6 +174,6 @@ export function LineCombo<T extends Record<string, unknown>>({
           </ComposedChart>
         </ResponsiveContainer>
       </ChartContainer>
-    </div>
+    </ChartCard>
   );
 }

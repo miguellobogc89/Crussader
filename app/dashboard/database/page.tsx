@@ -2,14 +2,12 @@
 "use client";
 
 import * as React from "react";
-import SectionScaffold from "@/app/components/SectionScaffold";
+import SectionLayout from "@/app/components/layouts/SectionLayout";
 import { Card } from "@/app/components/ui/card";
 import { MapPin, Star, MessageCircle, Database } from "lucide-react";
-import LocationsTable, {
-  type UiLocationRow,
-} from "@/app/components/database/LocationsTable";
+import LocationsTable, { type UiLocationRow } from "@/app/components/database/LocationsTable";
 
-// ---------------- Helpers ----------------
+/* ---------------- Helpers ---------------- */
 
 type CompanyRow = { id: string; name: string; role: string; createdAt: string };
 
@@ -61,7 +59,7 @@ function timeAgoOrDash(iso?: string | null) {
   return `Hace ${d} d`;
 }
 
-// ---------------- Page ----------------
+/* ---------------- Page ---------------- */
 
 export default function DatabasePage() {
   const [rows, setRows] = React.useState<UiLocationRow[]>([]);
@@ -133,26 +131,19 @@ export default function DatabasePage() {
     load();
   }, [load]);
 
-  // Stats top
+  // Stats top (se usan en el header del SectionLayout)
   const totalLocations = rows.length;
   const totalConnected = rows.filter((l) => l.connected).length;
-  const averageRating =
-    rows.length > 0 ? (rows.reduce((acc, l) => acc + l.avgRating, 0) / rows.length).toFixed(1) : "—";
+  const averageRating = rows.length > 0 ? (rows.reduce((acc, l) => acc + l.avgRating, 0) / rows.length).toFixed(1) : "—";
   const totalReviews = rows.reduce((acc, l) => acc + l.totalReviews, 0);
 
   return (
-    <SectionScaffold
-      title="Base de datos"
-      subtitle="Gestiona ubicaciones, conexiones y sincronizaciones."
+    <SectionLayout
       icon={Database}
-      /* tabs opcionales más adelante */
-    >
-      <div className="space-y-6">
-        {/* Error */}
-        {error && <Card className="p-4 text-sm text-red-600">{error}</Card>}
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      title="Base de Datos"
+      subtitle="Gestiona ubicaciones, conexiones y sincronizaciones"
+      headerContent={
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4 w-full">
           <Card className="p-4">
             <div className="flex items-center space-x-2">
               <MapPin className="h-5 w-5 text-primary" />
@@ -168,9 +159,7 @@ export default function DatabasePage() {
               <div className="h-3 w-3 rounded-full bg-green-500" />
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Conectadas</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {loading ? "—" : totalConnected}
-                </p>
+                <p className="text-2xl font-bold text-green-600">{loading ? "—" : totalConnected}</p>
               </div>
             </div>
           </Card>
@@ -195,8 +184,13 @@ export default function DatabasePage() {
             </div>
           </Card>
         </div>
+      }
+    >
+      <div className="space-y-6">
+        {/* Error */}
+        {error && <Card className="p-4 text-sm text-red-600">{error}</Card>}
 
-        {/* Tabla (componente) */}
+        {/* Tabla */}
         <LocationsTable
           rows={rows}
           loading={loading}
@@ -204,6 +198,6 @@ export default function DatabasePage() {
           onSelect={setSelectedLocation}
         />
       </div>
-    </SectionScaffold>
+    </SectionLayout>
   );
 }

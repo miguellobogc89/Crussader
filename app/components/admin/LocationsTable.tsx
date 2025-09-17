@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { Badge } from "@/app/components/ui/badge";
 import { Calendar, Star } from "lucide-react";
-import LocationRowActions from "@/app/components/admin/LocationRowActions"; // ⬅️ nuevo
+import LocationRowActions from "@/app/components/admin/LocationRowActions";
 
 function formatTime(d: Date | null | undefined) {
   if (!d) return "—";
@@ -29,9 +29,12 @@ function timeAgoOrDash(d: Date | null | undefined) {
 const getStatusBadge = (status: string, connected: boolean) => {
   if (!connected) return <Badge variant="destructive">Desconectado</Badge>;
   switch (status) {
-    case "active":   return <Badge variant="default" className="bg-green-500 hover:bg-green-600">Activo</Badge>;
-    case "pending":  return <Badge variant="secondary">Pendiente</Badge>;
-    default:         return <Badge variant="outline">Desconocido</Badge>;
+    case "active":
+      return <Badge variant="default" className="bg-green-500 hover:bg-green-600">Activo</Badge>;
+    case "pending":
+      return <Badge variant="secondary">Pendiente</Badge>;
+    default:
+      return <Badge variant="outline">Desconocido</Badge>;
   }
 };
 const getRatingColor = (rating: number) => {
@@ -44,15 +47,20 @@ export default async function LocationsTable({
   lq, lpage, uq, upage, cq, cpage,
 }: { lq: string; lpage: number; uq: string; upage: number; cq: string; cpage: number; }) {
   const take = 20;
-  const skip = (lpage - 1) * take;
+  const page = Math.max(1, lpage || 1);
+  const skip = (page - 1) * take;
 
   const where: Prisma.LocationWhereInput = lq
-    ? { OR: [
-        { title: { contains: lq, mode: "insensitive" } },
-        { company: { name: { contains: lq, mode: "insensitive" } } },
-        { city: { contains: lq, mode: "insensitive" } },
-        { country: { contains: lq, mode: "insensitive" } },
-      ] }
+    ? {
+        OR: [
+          { title: { contains: lq, mode: "insensitive" } },
+          { company: { name: { contains: lq, mode: "insensitive" } } },
+          { city: { contains: lq, mode: "insensitive" } },
+          { country: { contains: lq, mode: "insensitive" } },
+          { type: { name: { contains: lq, mode: "insensitive" } } },
+          { activity: { name: { contains: lq, mode: "insensitive" } } },
+        ],
+      }
     : {};
 
   const [total, locations] = await Promise.all([
@@ -61,13 +69,25 @@ export default async function LocationsTable({
       where,
       orderBy: { createdAt: "desc" },
       select: {
-        id: true, title: true, address: true, city: true, postalCode: true, type: true,
-        status: true, createdAt: true, lastSyncAt: true, googlePlaceId: true,
-        reviewsAvg: true, reviewsCount: true,
+        id: true,
+        title: true,
+        address: true,
+        city: true,
+        postalCode: true,
+        // 👇 Traemos SOLO el nombre para no renderizar objetos
+        type: { select: { name: true } },
+        activity: { select: { name: true } },
+        status: true,
+        createdAt: true,
+        lastSyncAt: true,
+        googlePlaceId: true,
+        reviewsAvg: true,
+        reviewsCount: true,
         company: { select: { id: true, name: true } },
         ExternalConnection: { select: { id: true } },
       },
-      skip, take,
+      skip,
+      take,
     }),
   ]);
 
@@ -76,7 +96,6 @@ export default async function LocationsTable({
   return (
     <section>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      {/* header buscador omitido para brevedad... */}
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-neutral-900 tracking-tight">
             Ubicaciones
@@ -85,10 +104,43 @@ export default async function LocationsTable({
             {total} ubicacione{total === 1 ? "" : "s"} en total
           </p>
         </div>
-      </div>
-      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
 
-        {/* cabeceras */}
+        <form method="get" className="flex items-center gap-2">
+          <input
+            type="text"
+            name="lq"
+            defaultValue={lq}
+            placeholder="Buscar por nombre, empresa, ciudad, categoría…"
+            className="w-80 rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-violet-400"
+          />
+          {/* preserva estado de otras tablas */}
+          <input type="hidden" name="cq" value={cq} />
+          <input type="hidden" name="cpage" value={String(cpage)} />
+          <input type="hidden" name="uq" value={uq} />
+          <input type="hidden" name="upage" value={String(upage)} />
+          <button
+            type="submit"
+            className="rounded-md border px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
+          >
+            Buscar
+          </button>
+          {lq && (
+            <Link
+              href={`/admin?${new URLSearchParams({
+                cq,
+                cpage: String(cpage),
+                uq,
+                upage: String(upage),
+              }).toString()}`}
+              className="text-sm text-violet-700 hover:underline"
+            >
+              Limpiar
+            </Link>
+          )}
+        </form>
+      </div>
+
+      <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
         <div className="grid grid-cols-12 gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-neutral-700 text-center">
           <div className="col-span-3 text-left">Ubicación</div>
           <div className="col-span-1">Categoría</div>
@@ -103,24 +155,35 @@ export default async function LocationsTable({
         </div>
         <hr className="border-neutral-200" />
 
-        {/* filas */}
         <ul className="divide-y divide-neutral-200">
           {locations.map((loc) => {
             const connected = Boolean(loc.googlePlaceId || loc.ExternalConnection?.id);
             const companyName = loc.company?.name || "—";
             const city = loc.city || "—";
             const street = loc.address || "—";
-            const category = (loc.type as string | null) ?? "—";
+
+            const activityName = loc.activity?.name ?? null;
+            const typeName = loc.type?.name ?? null;
+            const category = typeName ?? activityName ?? "—";
+
             const createdTime = formatTime(loc.createdAt);
             const createdDate = formatDate(loc.createdAt);
+
             const rating = typeof loc.reviewsAvg === "number"
               ? loc.reviewsAvg
               : Number(loc.reviewsAvg ?? 0) || 0;
+
             const reviews = loc.reviewsCount ?? 0;
             const monthlyReviews = 0;
             const responseRate = 0;
             const lastSync = timeAgoOrDash(loc.lastSyncAt);
-            const status = (loc.status as string | null) ?? (connected ? "active" : "disconnected");
+
+            // Mapear enum a etiquetas usadas por getStatusBadge
+            const status =
+              loc.status === "ACTIVE" ? "active"
+              : loc.status === "PENDING_VERIFICATION" ? "pending"
+              : connected ? "active"
+              : "disconnected";
 
             return (
               <li key={loc.id} className="grid grid-cols-12 gap-2 px-4 py-4 items-center">
@@ -168,13 +231,15 @@ export default async function LocationsTable({
                 </div>
 
                 <div className="col-span-1 text-center whitespace-nowrap">
-                  <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                    responseRate >= 90
-                      ? "bg-green-100 text-green-700"
-                      : responseRate >= 70
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-red-100 text-red-700"
-                  }`}>
+                  <div
+                    className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      responseRate >= 90
+                        ? "bg-green-100 text-green-700"
+                        : responseRate >= 70
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
                     {responseRate}%
                   </div>
                 </div>
@@ -183,7 +248,6 @@ export default async function LocationsTable({
                   {lastSync}
                 </div>
 
-                {/* Acciones (tres puntitos) */}
                 <div className="col-span-1 flex items-center justify-end">
                   <LocationRowActions locationId={loc.id} />
                 </div>
@@ -199,25 +263,24 @@ export default async function LocationsTable({
         </ul>
       </div>
 
-      {/* paginación omitida para brevedad… */}
       <div className="mt-4 flex items-center justify-between text-sm text-neutral-600">
-        <div> Página {lpage} de {pages} · Mostrando {locations.length} / {total} </div>
+        <div> Página {page} de {pages} · Mostrando {locations.length} / {total} </div>
         <div className="flex items-center gap-2">
           <Link
             href={`/admin?${new URLSearchParams({
-              lq, lpage: String(Math.max(1, lpage - 1)), uq, upage: String(upage), cq, cpage: String(cpage),
+              lq, lpage: String(Math.max(1, page - 1)), uq, upage: String(upage), cq, cpage: String(cpage),
             }).toString()}`}
             className="rounded-full border px-3 py-1.5 hover:bg-neutral-50 aria-disabled:opacity-50"
-            aria-disabled={lpage <= 1}
+            aria-disabled={page <= 1}
           >
             ‹ Anterior
           </Link>
           <Link
             href={`/admin?${new URLSearchParams({
-              lq, lpage: String(Math.min(pages, lpage + 1)), uq, upage: String(upage), cq, cpage: String(cpage),
+              lq, lpage: String(Math.min(pages, page + 1)), uq, upage: String(upage), cq, cpage: String(cpage),
             }).toString()}`}
             className="rounded-full border px-3 py-1.5 hover:bg-neutral-50 aria-disabled:opacity-50"
-            aria-disabled={lpage >= pages}
+            aria-disabled={page >= pages}
           >
             Siguiente ›
           </Link>

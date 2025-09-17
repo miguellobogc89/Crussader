@@ -1,6 +1,7 @@
-// billing/page.tsx
+// app/components/settings/UserTab.tsx
 "use client";
 
+import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
@@ -9,9 +10,8 @@ import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
 import { Separator } from "@/app/components/ui/separator";
 import { CreditCard, Check, AlertTriangle, Calendar } from "lucide-react";
-import { useMemo } from "react";
 
-export default function BillingPage() {
+export default function UserTab() {
   const currentPlan = useMemo(
     () => ({
       name: "Pro",
@@ -108,10 +108,7 @@ export default function BillingPage() {
                 {currentPlan.establishments.current} / {currentPlan.establishments.limit}
               </span>
             </div>
-            <Progress
-              value={(currentPlan.establishments.current / currentPlan.establishments.limit) * 100}
-              className="h-2"
-            />
+            <Progress value={(currentPlan.establishments.current / currentPlan.establishments.limit) * 100} className="h-2" />
           </div>
 
           {/* Aviso de límite */}

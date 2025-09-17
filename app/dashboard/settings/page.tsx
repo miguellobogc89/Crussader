@@ -1,28 +1,68 @@
-"use client";
+// app/dashboard/settings/page.tsx
+import { TabsMenu, type TabItem } from "@/app/components/TabsMenu";
 
-import { Settings, MessageCircle, CreditCard, Bell, User, Beaker } from "lucide-react";
-import SectionLayout, { type SectionTab } from "@/app/components/layouts/SectionLayout";
+// Importa directamente tus componentes (pueden ser Client Components con "use client")
+import ResponsesTab from "@/app/components/settings/ResponsesTab";
+import BillingTab   from "@/app/components/settings/BillingTab";
+import NotifsTab    from "@/app/components/settings/NotificationsTab";
+import UserTab      from "@/app/components/settings/UserTab";
+import LabsTab      from "@/app/components/settings/LabsTab";
 
-const TABS: SectionTab[] = [
-  { href: "/dashboard/settings/responses", label: "Respuestas", icon: MessageCircle },
-  { href: "/dashboard/settings/billing", label: "Facturación y planes", icon: CreditCard },
-  { href: "/dashboard/settings/notifications", label: "Notificaciones", icon: Bell },
-  { href: "/dashboard/settings/user", label: "Usuario", icon: User },
-  { href: "/dashboard/settings/labs", label: "Labs", icon: Beaker, beta: true },
+export const dynamic = "force-dynamic";
+
+const SETTINGS_TABS: TabItem[] = [
+  { href: "?tab=responses",     label: "Respuestas",            icon: "message-circle" },
+  { href: "?tab=billing",       label: "Facturación y planes",  icon: "credit-card"    },
+  { href: "?tab=notifications", label: "Notificaciones",        icon: "bell"           },
+  { href: "?tab=user",          label: "Usuario",               icon: "user"           },
+  { href: "?tab=labs",          label: "Labs",                  icon: "beaker", beta: true },
 ];
 
-export default function SettingsPage() {
+type TabKey = "responses" | "billing" | "notifications" | "user" | "labs";
+
+export default function SettingsPage({
+  searchParams,
+}: {
+  searchParams?: { tab?: TabKey };
+}) {
+  const tab = (searchParams?.tab ?? "responses") as TabKey;
+
   return (
-    <SectionLayout
-      icon={Settings}
+    <TabsMenu
       title="Ajustes"
-      subtitle="Configura tu dashboard y preferencias"
-      tabs={TABS}
+      description="Configura tu dashboard y preferencias"
+      mainIcon="settings"
+      tabs={SETTINGS_TABS}
     >
-      {/* Contenido inicial (puedes sustituir por TabsContent si quieres render dentro) */}
-      <div className="text-sm text-muted-foreground">
-        Selecciona una pestaña para configurar las distintas opciones.
-      </div>
-    </SectionLayout>
+      {tab === "responses" && (
+        <section id="responses">
+          <ResponsesTab />
+        </section>
+      )}
+
+      {tab === "billing" && (
+        <section id="billing">
+          <BillingTab />
+        </section>
+      )}
+
+      {tab === "notifications" && (
+        <section id="notifications">
+          <NotifsTab />
+        </section>
+      )}
+
+      {tab === "user" && (
+        <section id="user">
+          <UserTab />
+        </section>
+      )}
+
+      {tab === "labs" && (
+        <section id="labs">
+          <LabsTab />
+        </section>
+      )}
+    </TabsMenu>
   );
 }

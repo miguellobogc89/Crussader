@@ -14,6 +14,11 @@ import { KpiTargetsProgress } from "@/app/components/charts/KpiTargetsProgress";
 import { AlertsList } from "@/app/components/charts/AlertsList";
 import { MonthlyHighlights } from "@/app/components/charts/MonthlyHighlights";
 import { CompetitiveRadar } from "@/app/components/charts/CompetitiveRadar";
+import { Tooltip } from "recharts";import {  LineChart,Line,XAxis,YAxis,ResponsiveContainer,BarChart,Bar,PieChart,Pie,Cell,AreaChart,Area,RadarChart,
+  PolarGrid,PolarAngleAxis,PolarRadiusAxis,Radar,} from "recharts";
+import {  TrendingUp,TrendingDown,Star,MessageSquare,Clock,Users,BarChart3,Activity,Zap,Target,Award,Hash,Timer,MapPin,Smartphone,Monitor,Globe,
+} from "lucide-react";
+import type { ComponentType } from "react";
 
 
 /* ---------------- Mock data ---------------- */
@@ -22,25 +27,25 @@ type Row = { month: string; rating: number; reviews: number };
 
 const kpis = [
   { label: "Rating Objetivo", current: 4.6, target: 4.5, unit: "⭐" },
-  { label: "Respuesta <2h",   current: 87,  target: 85,  unit: "%"  },
-  { label: "Tiempo Resp.",    current: 2.4, target: 2.0, unit: "h", invert: true }, // menor es mejor
+  { label: "Respuesta <2h", current: 87,target: 85,unit: "%"  },
+  { label: "Tiempo Resp.",  current: 2.4, target: 2.0, unit: "h", invert: true }, // menor es mejor
 ];
 
 const alerts = [
-  { severity: "critical" as const, title: "Crítico",    message: "3 reseñas 1⭐ sin responder" },
+  { severity: "critical" as const, title: "Crítico",  message: "3 reseñas 1⭐ sin responder" },
   { severity: "warning"  as const, title: "Advertencia",message: "Rating bajó 0.1 esta semana" },
-  { severity: "info"     as const, title: "Info",       message: "12 reseñas nuevas pendientes" },
+  { severity: "info"     as const, title: "Info",     message: "12 reseñas nuevas pendientes" },
 ];
 
 const highlights = [
   { title: "Mejor rating histórico", value: "4.6⭐", change: "+0.3", trend: "up" as const },
-  { title: "Record de reseñas",      value: "203",  change: "+47",  trend: "up" as const },
-  { title: "Respuesta más rápida",   value: "2.4h", change: "-0.8h",trend: "up" as const },
+  { title: "Record de reseñas",    value: "203",change: "+47",trend: "up" as const },
+  { title: "Respuesta más rápida", value: "2.4h", change: "-0.8h",trend: "up" as const },
 ];
 
 const radarData = [
-  { subject: "Rating",    seriesA: 4.6, seriesB: 4.2, fullMark: 5 },
-  { subject: "Volumen",   seriesA: 4.1, seriesB: 3.8, fullMark: 5 },
+  { subject: "Rating",  seriesA: 4.6, seriesB: 4.2, fullMark: 5 },
+  { subject: "Volumen", seriesA: 4.1, seriesB: 3.8, fullMark: 5 },
   { subject: "Respuesta", seriesA: 4.4, seriesB: 3.5, fullMark: 5 },
   { subject: "Velocidad", seriesA: 4.2, seriesB: 3.2, fullMark: 5 },
   { subject: "Engagement",seriesA: 3.9, seriesB: 3.6, fullMark: 5 },
@@ -48,24 +53,24 @@ const radarData = [
 
 const responseTimeByLocation = [
   { location: "Centro", avgTime: 1.8, target: 2.0 },
-  { location: "Norte",  avgTime: 2.4, target: 2.0 },
-  { location: "Plaza",  avgTime: 2.1, target: 2.0 },
+  { location: "Norte",avgTime: 2.4, target: 2.0 },
+  { location: "Plaza",avgTime: 2.1, target: 2.0 },
 ];
 
 const devices = [
-  { label: "Móvil",   percentage: 68 },
+  { label: "Móvil", percentage: 68 },
   { label: "Desktop", percentage: 25 },
-  { label: "Tablet",  percentage: 7  },
+  { label: "Tablet",percentage: 7  },
 ];
 
 const topKeywords = [
   { word: "Excelente", count: 234, sentiment: "positive" as const },
   { word: "Delicioso", count: 189, sentiment: "positive" as const },
-  { word: "Rápido",    count: 156, sentiment: "positive" as const },
-  { word: "Amable",    count: 145, sentiment: "positive" as const },
-  { word: "Lento",     count: 67,  sentiment: "negative" as const },
-  { word: "Frío",      count: 45,  sentiment: "negative" as const },
-  { word: "Caro",      count: 38,  sentiment: "negative" as const },
+  { word: "Rápido",  count: 156, sentiment: "positive" as const },
+  { word: "Amable",  count: 145, sentiment: "positive" as const },
+  { word: "Lento",   count: 67,sentiment: "negative" as const },
+  { word: "Frío",    count: 45,sentiment: "negative" as const },
+  { word: "Caro",    count: 38,sentiment: "negative" as const },
 ];
 
 const ratingTrend: Row[] = [
@@ -113,7 +118,10 @@ export default function ChartsTestPage() {
         {/* 1) Línea simple (Rating) */}
         <Card className="min-w-0 overflow-hidden">
           <CardHeader>
-            <CardTitle>Evolución del Rating</CardTitle>
+            <CardTitle className="flex items-center space-x-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              <span>Evolución del Rating</span>
+            </CardTitle>
             <CardDescription>Rating mensual · dominio [3.5, 5]</CardDescription>
           </CardHeader>
           <CardContent>
@@ -133,7 +141,10 @@ export default function ChartsTestPage() {
         {/* 2) Combo Línea + Área (eje derecho) */}
         <Card className="min-w-0 overflow-hidden">
           <CardHeader>
-            <CardTitle>Combo: Línea + Área</CardTitle>
+            <CardTitle className="flex items-center space-x-2">
+              <Clock className="h-5 w-5 text-accent" />
+              <span>Reseñas según la hora</span>
+            </CardTitle>
             <CardDescription>Rating (izq) + Reseñas (der)</CardDescription>
           </CardHeader>
           <CardContent>
@@ -189,7 +200,10 @@ export default function ChartsTestPage() {
         {/* 4) Fuentes de Reseñas */}
         <Card className="min-w-0 overflow-hidden">
           <CardHeader>
-            <CardTitle>Fuentes de Reseñas</CardTitle>
+            <CardTitle className="flex items-center space-x-2">
+              <Globe className="h-5 w-5 text-secondary" />
+              <span>Fuentes de Reseñas</span>
+            </CardTitle>
             <CardDescription>Distribución por plataforma</CardDescription>
           </CardHeader>
           <CardContent>
@@ -205,7 +219,10 @@ export default function ChartsTestPage() {
         {/* 5) Análisis de Sentimientos */}
         <Card className="min-w-0 overflow-hidden">
           <CardHeader>
-            <CardTitle>Análisis de Sentimientos</CardTitle>
+            <CardTitle className="flex items-center space-x-2">
+              <Activity className="h-5 w-5 text-success" />
+              <span>Análisis de Sentimientos</span>
+            </CardTitle>
             <CardDescription>Distribución emocional de reseñas</CardDescription>
           </CardHeader>
           <CardContent>
@@ -222,7 +239,10 @@ export default function ChartsTestPage() {
         {/* 6) Distribución de Estrellas */}
         <Card className="min-w-0 overflow-hidden">
           <CardHeader>
-            <CardTitle>Distribución de Estrellas</CardTitle>
+            <CardTitle className="flex items-center space-x-2">
+              <Star className="h-5 w-5 text-warning" />
+              <span>Distribución de Estrellas</span>
+            </CardTitle>
             <CardDescription>Fondo gris, relleno amarillo, barras más gruesas</CardDescription>
           </CardHeader>
           <CardContent>
@@ -241,8 +261,11 @@ export default function ChartsTestPage() {
         {/* Palabras Más Repetidas */}
         <Card className="min-w-0 overflow-hidden">
         <CardHeader>
-            <CardTitle>Palabras Más Repetidas</CardTitle>
-            <CardDescription>Términos frecuentes en reseñas</CardDescription>
+          <CardTitle className="flex items-center space-x-2">
+            <Hash className="h-5 w-5 text-primary" />
+            <span>Palabras Más Repetidas</span>
+          </CardTitle>
+          <CardDescription>Términos frecuentes en reseñas</CardDescription>
         </CardHeader>
         <CardContent>
             <TopKeywordsBars
@@ -263,8 +286,11 @@ export default function ChartsTestPage() {
         {/* Volumen de Reseñas por Mes */}
         <Card className="min-w-0 overflow-hidden">
         <CardHeader>
-            <CardTitle>Volumen de Reseñas por Mes</CardTitle>
-            <CardDescription>Tendencia de actividad mensual</CardDescription>
+          <CardTitle className="flex items-center space-x-2">
+            <BarChart3 className="h-5 w-5 text-accent" />
+            <span>Volumen de Reseñas por Mes</span>
+          </CardTitle>            
+          <CardDescription>Tendencia de actividad mensual</CardDescription>
         </CardHeader>
         <CardContent>
             <ReviewsAreaChart
@@ -283,8 +309,11 @@ export default function ChartsTestPage() {
         {/* Tiempo de Respuesta por Ubicación */}
         <Card className="min-w-0 overflow-hidden">
         <CardHeader>
-            <CardTitle>Tiempo de Respuesta</CardTitle>
-            <CardDescription>Promedio vs. objetivo</CardDescription>
+          <CardTitle className="flex items-center space-x-2">
+            <Timer className="h-5 w-5 text-accent" />
+            <span>Tiempo de Respuesta</span>
+          </CardTitle>
+          <CardDescription>Promedio vs. objetivo</CardDescription>
         </CardHeader>
         <CardContent>
             <ResponseTimeCompare
@@ -304,8 +333,11 @@ export default function ChartsTestPage() {
         {/* Dispositivos de Origen */}
         <Card className="min-w-0 overflow-hidden">
         <CardHeader>
-            <CardTitle>Dispositivos de Origen</CardTitle>
-            <CardDescription>Desde dónde escriben las reseñas</CardDescription>
+          <CardTitle className="flex items-center space-x-2">
+            <Smartphone className="h-5 w-5 text-secondary" />
+            <span>Dispositivos de Origen</span>
+          </CardTitle>
+          <CardDescription>Desde dónde escriben las reseñas</CardDescription>
         </CardHeader>
         <CardContent>
             <DeviceOriginList
@@ -322,8 +354,11 @@ export default function ChartsTestPage() {
 
         <Card className="min-w-0 overflow-hidden">
             <CardHeader>
-            <CardTitle>KPIs Objetivo</CardTitle>
-            <CardDescription>Metas vs. resultados</CardDescription>
+              <CardTitle className="flex items-center space-x-2">
+                <Target className="h-5 w-5 text-success" />
+                <span>KPIs Objetivo</span>
+              </CardTitle>
+              <CardDescription>Metas vs. resultados</CardDescription>
             </CardHeader>
             <CardContent>
             <KpiTargetsProgress items={kpis} barHeight={10} />
@@ -333,8 +368,11 @@ export default function ChartsTestPage() {
         {/* Alertas Activas */}
         <Card className="min-w-0 overflow-hidden">
             <CardHeader>
-            <CardTitle>Alertas Activas</CardTitle>
-            <CardDescription>Situaciones que requieren atención</CardDescription>
+              <CardTitle className="flex items-center space-x-2">
+                <Zap className="h-5 w-5 text-warning" />
+                <span>Alertas Activas</span>
+              </CardTitle>
+              <CardDescription>Situaciones que requieren atención</CardDescription>
             </CardHeader>
             <CardContent>
             <AlertsList items={alerts} />
@@ -344,8 +382,11 @@ export default function ChartsTestPage() {
         {/* Resumen del Mes */}
         <Card className="min-w-0 overflow-hidden">
             <CardHeader>
-            <CardTitle>Resumen del Mes</CardTitle>
-            <CardDescription>Logros y estadísticas destacadas</CardDescription>
+              <CardTitle className="flex items-center space-x-2">
+                <Award className="h-5 w-5 text-primary" />
+                <span>Resumen del Mes</span>
+              </CardTitle>
+              <CardDescription>Logros y estadísticas destacadas</CardDescription>
             </CardHeader>
             <CardContent>
             <MonthlyHighlights items={highlights} />
@@ -355,8 +396,11 @@ export default function ChartsTestPage() {
         {/* Radar: Análisis Competitivo (ocupa 2-3 cols si quieres) */}
         <Card className="min-w-0 overflow-hidden lg:col-span-2">
             <CardHeader>
-            <CardTitle>Análisis Competitivo</CardTitle>
-            <CardDescription>Tu rendimiento vs. competencia promedio</CardDescription>
+              <CardTitle className="flex items-center space-x-2">
+                <MapPin className="h-5 w-5 text-primary" />
+                <span>Comparativa entre Ubicaciones</span>
+              </CardTitle>            
+              <CardDescription>Tu rendimiento vs. competencia promedio</CardDescription>
             </CardHeader>
             <CardContent>
             <CompetitiveRadar data={radarData} height={380} yDomain={[0, 5]} />

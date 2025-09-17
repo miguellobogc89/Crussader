@@ -21,7 +21,7 @@ export const metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Crussader — Respuestas de IA para reseñas",
+    title: "Crussader - Respuestas de IA para reseñas",
     description: "Voz de marca, notificaciones y reportes. Webchat próximamente.",
     images: ["/og.jpg"],
   },

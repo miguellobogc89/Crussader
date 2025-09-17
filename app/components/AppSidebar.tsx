@@ -16,7 +16,7 @@ import {
   FileText,
   BarChart3,
   LogOut,
-  Settings, // ✅ NUEVO
+  Settings,
 } from "lucide-react";
 
 import Dot from "@/app/components/ui/Dot"; // si no existe, comenta esta línea y los usos
@@ -42,10 +42,8 @@ export function AppSidebar() {
   const { data } = useSession();
   const role = (data?.user as any)?.role ?? "user";
 
-  // Empresa (nombre/logo)
   const [brandSrc, setBrandSrc] = useState("/img/logo_crussader.png");
 
-  // Estado: si el usuario tiene empresa (para Dot)
   const [hasCompany, setHasCompany] = useState<boolean | null>(null);
   useEffect(() => {
     let mounted = true;
@@ -61,15 +59,12 @@ export function AppSidebar() {
   const baseItems = [
     { title: "Inicio", url: "/dashboard/home", icon: User, description: "Inicio" },
     { title: "Reviews", url: "/dashboard/reviews", icon: MessageSquare, description: "Reseñas de Google" },
-    { title: "Empresa", url: "/dashboard/company", icon: Building2, description: "Información de la empresa" },
-    //{ title: "Integraciones", url: "/dashboard/integrations", icon: Plug, description: "Conecta servicios" },
+    { title: "Empresas", url: "/dashboard/company", icon: Building2, description: "Información de la empresa" },
     { title: "Integraciones", url: "/dashboard/integrations-test", icon: Plug, description: "Conecta servicios" },
     { title: "Base de Datos", url: "/dashboard/database", icon: Database, description: "Conexiones y datos" },
     { title: "Reportes", url: "/dashboard/reports", icon: FileText, description: "Generación de informes" },
-    { title: "Reportes-test", url: "/dashboard/reports-test", icon: FileText, description: "Generación de informes" },
+    { title: "Reportes de prueba", url: "/dashboard/reports-test", icon: FileText, description: "Generación de informes" },
     { title: "Gráficos de prueba", url: "/dashboard/charts-test", icon: FileText, description: "Pruebas de gráficos" },
-    { title: "TabMenu de prueba", url: "/dashboard/tabsmenu-test", icon: FileText, description: "TabMenu de gráficos" },
-    // ❌ Quitamos Configuración de aquí para situarla abajo del todo
   ];
   const items =
     role === "system_admin"
@@ -81,7 +76,6 @@ export function AppSidebar() {
   return (
     <Sidebar className={isCollapsed ? "w-16" : "w-64"} collapsible="icon">
       <SidebarContent className="bg-card/50 backdrop-blur-sm border-r border-border/50">
-        {/* BRAND BAR — altura igual al header */}
         <SidebarHeader className="h-16 border-b border-border/50 px-2">
           <Link
             href="/dashboard"
@@ -102,7 +96,6 @@ export function AppSidebar() {
           </Link>
         </SidebarHeader>
 
-        {/* Menú */}
         <SidebarGroup className="px-2">
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
@@ -127,7 +120,6 @@ export function AppSidebar() {
                       >
                         <item.icon className="h-5 w-5 flex-shrink-0" />
 
-                        {/* Dot sobre el icono cuando está colapsado */}
                         {isCollapsed && isCompany && hasCompany === false && (
                           <span className="absolute right-2 top-2">
                             <Dot size="xs" color="emerald" title="Crea tu empresa" />
@@ -154,7 +146,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* 🔹 Separador + Settings abajo del todo */}
         <SidebarSeparator />
 
         <div className="px-2">
@@ -186,7 +177,6 @@ export function AppSidebar() {
           </SidebarMenu>
         </div>
 
-        {/* Logout al fondo */}
         <div className="px-2 pb-3 mt-auto">
           <SidebarMenu>
             <SidebarMenuItem>
@@ -206,7 +196,6 @@ export function AppSidebar() {
         </div>
       </SidebarContent>
 
-      {/* Rail para colapsar/expandir con clic en el borde */}
       <SidebarRail />
     </Sidebar>
   );

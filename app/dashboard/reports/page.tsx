@@ -1,183 +1,328 @@
 // app/dashboard/reports/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { useBootstrapData, useBootstrapStatus } from "@/app/providers/bootstrap-store";
-import { useCompanyKpis, type CompanyKpis } from "@/hooks/useCompanyKpis";
-import KpiCards from "@/app/components/kpis/KpiCards";
-import { TabsMenu, type TabItem } from "@/app/components/TabsMenu";
+import { useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  BarChart3,
+  Star,
+  MapPin,
+  Activity,
+  MessageSquare,
+  Timer,
+  TrendingUp,
+  TrendingDown,
+  type LucideIcon,
+} from "lucide-react";
 
-type LocationRow = {
-  locationId: string;
-  title: string | null;
-  slug: string | null;
-  status: "ACTIVE" | "INACTIVE" | "DRAFT" | "PENDING_VERIFICATION" | null;
-  totals: {
-    totalReviews: number;
-    newReviews7d: number;
-    newReviews30d: number;
-    unansweredCount: number;
-    responses7d: number;
-  };
-  rates: {
-    answeredRate: number;        // 0-100
-    avgAll: number | null;       // 0-5
-    avg30d: number | null;       // 0-5
-    prev30dAvg: number | null;   // 0-5
-    responseAvgSec: number | null;
-  };
+import SectionLayout from "@/app/components/layouts/SectionLayout";
+import { TabsMenu, type TabItem } from "@/app/components/TabsMenu";
+import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
+
+/* ── Tus charts (exports con nombre) ── */
+import { RatingLineChart } from "@/app/components/charts/RatingLineChart";
+import { ReviewsAreaChart } from "@/app/components/charts/ReviewsAreaChart";
+import { StarDistribution } from "@/app/components/charts/StarDistribution";
+import { TopKeywordsBars } from "@/app/components/charts/TopKeywordsBars";
+import { ReviewSourcesPie } from "@/app/components/charts/ReviewSourcesPie";
+import { SentimentDonut } from "@/app/components/charts/SentimentDonut";
+import { DeviceOriginList } from "@/app/components/charts/DeviceOriginList";
+import { ResponseTimeCompare } from "@/app/components/charts/ResponseTimeCompare";
+import { CompetitiveRadar } from "@/app/components/charts/CompetitiveRadar";
+import { KpiTargetsProgress } from "@/app/components/charts/KpiTargetsProgress";
+import { AlertsList, type AlertItem } from "@/app/components/charts/AlertsList";
+import { MonthlyHighlights } from "@/app/components/charts/MonthlyHighlights";
+
+const TAB_KEY = "tab";
+
+/* ── KPIs header (mock) ── */
+type Metric = {
+  title: string;
+  value: string;
+  change: string;
+  trend: "up" | "down";
+  icon: LucideIcon;
+  color: string;
 };
 
-function useLocationsKpisToday() {
-  const [rows, setRows] = useState<LocationRow[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const res = await fetch("/api/kpis/locations-today", { cache: "no-store" });
-        if (!res.ok) throw new Error(`http_${res.status}`);
-        const json = await res.json();
-        if (!cancelled) {
-          if (json?.ok) setRows(json.data as LocationRow[]);
-          else setError(json?.error ?? "kpis_locations_error");
-        }
-      } catch (e: any) {
-        if (!cancelled) {
-          if (e?.message === "http_404") {
-            setRows([]);
-            setError(null);
-          } else {
-            setError(e?.message ?? "kpis_locations_fetch_failed");
-          }
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
-  return { rows, loading, error };
-}
-
-function Stars(n: number | null) {
-  return <span>{n === null ? "—" : n.toFixed(2)}</span>;
-}
-function Pct(n: number | null) {
-  if (n === null) return <span>—</span>;
-  return <span>{n}%</span>;
-}
-function TimeHHMM(s: number | null) {
-  if (s === null) return <span>—</span>;
-  const m = Math.floor(s / 60);
-  const h = Math.floor(m / 60);
-  return <span>{h >= 1 ? `${h}h ${m % 60}m` : `${m}m`}</span>;
-}
-
-const REPORTS_TABS: TabItem[] = [
-  { href: "/dashboard/reports", label: "Informes", icon: "bar-chart-3" }, // ← requiere ICONS["bar-chart-3"]
-  // Ejemplo futuro:
-  // { href: "/dashboard/reports/trends", label: "Tendencias", icon: "sparkles" },
+const overviewMetrics: Metric[] = [
+  { title: "Rating Promedio",       value: "4.6",     change: "+0.3", trend: "up",   icon: Star,          color: "text-warning" },
+  { title: "Nuevas reseñas",        value: "128",     change: "+12%", trend: "up",   icon: MessageSquare, color: "text-primary" },
+  { title: "Tiempo resp. medio",    value: "2h 14m",  change: "-8%",  trend: "down", icon: Timer,         color: "text-accent" },
+  { title: "Sentimiento positivo",  value: "76%",     change: "+3%",  trend: "up",   icon: Activity,      color: "text-success" },
+  { title: "Ubicaciones activas",   value: "12",      change: "0%",   trend: "up",   icon: MapPin,        color: "text-orange-600" },
 ];
 
-export default function ReportsPage() {
-  const status = useBootstrapStatus();
-  const data = useBootstrapData();
-  const { data: kpis, loading: loadingKpis, error: errorKpis } = useCompanyKpis();
-  const { rows, loading: loadingLocs, error: errorLocs } = useLocationsKpisToday();
+/* ── Datasets “mínimos” para props requeridas (ajusta a tu API) ── */
+const monthlySeries = [
+  { month: "Ene", reviews: 80, rating: 4.2 },
+  { month: "Feb", reviews: 95, rating: 4.1 },
+  { month: "Mar", reviews: 110, rating: 4.3 },
+  { month: "Abr", reviews: 120, rating: 4.4 },
+  { month: "May", reviews: 136, rating: 4.5 },
+  { month: "Jun", reviews: 128, rating: 4.6 },
+];
 
-  if (status !== "ready" || !data) {
-    return <div className="p-6 text-sm text-neutral-500">Cargando…</div>;
-  }
+const starsData = [
+  { label: "5★", value: 210 },
+  { label: "4★", value: 120 },
+  { label: "3★", value: 60 },
+  { label: "2★", value: 25 },
+  { label: "1★", value: 18 },
+];
 
-  const company = data.activeCompany;
-  const hasKpis = !loadingKpis && !errorKpis && !!kpis;
+const sourcesData = [
+  { label: "Google", value: 487 },
+  { label: "TripAdvisor", value: 312 },
+  { label: "Facebook", value: 248 },
+  { label: "Yelp", value: 200 },
+];
+
+const keywordsData = [
+  { label: "servicio", value: 64 },
+  { label: "calidad", value: 52 },
+  { label: "precio", value: 41 },
+  { label: "limpieza", value: 33 },
+  { label: "ubicación", value: 28 },
+];
+
+const sentimentData = [
+  { label: "Positivo", value: 68 },
+  { label: "Neutral", value: 22 },
+  { label: "Negativo", value: 10 },
+];
+
+const deviceData = [
+  { label: "Móvil", value: 68 },
+  { label: "Desktop", value: 25 },
+  { label: "Tablet", value: 7 },
+];
+
+const responseCompareData = [
+  { label: "Centro", avg: 2.1, target: 2.0 },
+  { label: "Norte",  avg: 2.6, target: 2.0 },
+  { label: "Plaza",  avg: 2.3, target: 2.0 },
+];
+
+const competitiveData = [
+  { label: "Servicio", value: 82 },
+  { label: "Precio", value: 68 },
+  { label: "Limpieza", value: 75 },
+  { label: "Ubicación", value: 88 },
+  { label: "Calidad", value: 80 },
+];
+
+const alertItems: AlertItem[] = [
+  { severity: "critical", title: "Crítico",  message: "3 reseñas 1⭐ sin responder" },
+  { severity: "warning",  title: "Aviso",    message: "Tiempo medio de respuesta > 2h" },
+  { severity: "info",     title: "Info",     message: "Pico de reseñas esta semana" },
+];
+
+const kpiTargets = [
+  { key: "resp_rate",  label: "Ratio de respuesta",  current: 78,  target: 90, unit: "%" },
+  { key: "resp_time",  label: "Tiempo de respuesta", current: 2.4, target: 2.0, unit: "h" },
+  { key: "avg_rating", label: "Rating medio",        current: 4.6, target: 4.7, unit: ""  },
+];
+
+const monthlyHighlightsItems: any[] = []; // ajusta al tipo real si lo exporta tu componente
+
+export default function ReportsAndAnalyticsPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const search = useSearchParams();
+  const activeTab = search.get(TAB_KEY) ?? "favorites";
+
+  const TABS: TabItem[] = useMemo(() => {
+    const makeHref = (v: string) => {
+      const sp = new URLSearchParams(search.toString());
+      sp.set(TAB_KEY, v);
+      return `${pathname}?${sp.toString()}`;
+    };
+    return [
+      { href: makeHref("favorites"),   label: "Mis Favoritos", icon: "bell" },
+      { href: makeHref("trends"),      label: "Tendencias",    icon: "database" },
+      { href: makeHref("analysis"),    label: "Análisis",      icon: "beaker" },
+      { href: makeHref("locations"),   label: "Ubicaciones",   icon: "map-pin" },
+      { href: makeHref("performance"), label: "Rendimiento",   icon: "bar-chart-3" },
+    ];
+  }, [pathname, search]);
+
+  const activeHref = useMemo(() => {
+    const current = TABS.find((t) => t.href.includes(`${TAB_KEY}=${activeTab}`));
+    return current?.href;
+  }, [TABS, activeTab]);
 
   return (
-    <TabsMenu
-      title="Informes"
-      description="Resumen diario y detalle por ubicación. Datos basados en snapshots de hoy."
-      mainIcon="bar-chart-3"   // cambia a "settings" si no mapeas bar-chart-3
-      tabs={REPORTS_TABS}
+    <SectionLayout
+      icon={BarChart3}
+      title="Métricas completas de rendimiento y tendencias"
+      headerContent={
+        <>
+          {/* KPIs en la cabecera */}
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+            {overviewMetrics.map((metric, index) => {
+              const Icon = metric.icon;
+              const isPositive = metric.trend === "up";
+              return (
+                <Card key={index} className="relative overflow-hidden">
+                  <CardContent className="h-full p-6">
+                    <div
+                      aria-hidden="true"
+                      className={`pointer-events-none absolute right-3 top-3 rounded-full bg-muted/60 p-2 ${metric.color}`}
+                    >
+                      <Icon className="h-5 w-5 opacity-90" />
+                    </div>
+                    <div className="flex h-full flex-col">
+                      <p className="text-sm font-medium text-muted-foreground pr-12">
+                        {metric.title}
+                      </p>
+                      <div className="mt-auto flex items-baseline gap-2">
+                        <p className="text-2xl font-bold leading-none">{metric.value}</p>
+                        <div
+                          className={`flex items-center gap-1 text-sm font-medium ${
+                            isPositive ? "text-success" : "text-destructive"
+                          }`}
+                        >
+                          {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                          <span>{metric.change}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </section>
+
+          {/* Tabs del panel */}
+          <TabsMenu
+            items={TABS}
+            activeHref={activeHref}
+            renderMode="nav-only"
+            onItemClick={(item) => router.replace(item.href, { scroll: false })}
+          />
+        </>
+      }
     >
-      <div className="space-y-6">
-        {/* KPIs empresa (tarjetas) */}
-        <section className="rounded-xl border p-5">
-          <h3 className="mb-3 text-lg font-semibold">Indicadores — Empresa</h3>
-          {loadingKpis && <div className="text-sm text-muted-foreground">Calculando…</div>}
-          {errorKpis && <div className="text-sm text-red-600">Error al cargar KPIs: {errorKpis}</div>}
-          {hasKpis && <KpiCards kpis={kpis as CompanyKpis} />}
-          {!loadingKpis && !errorKpis && !kpis && (
-            <div className="text-sm text-muted-foreground">Sin datos de KPIs aún.</div>
-          )}
-        </section>
+      {/* FAVORITOS: vacío */}
+      {activeTab === "favorites" && (
+        <div className="py-16 text-center text-muted-foreground">
+          (Vacío) Aquí podrás fijar tus paneles favoritos.
+        </div>
+      )}
 
-        {/* Tabla por ubicación */}
-        <section className="rounded-xl border p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Detalle por ubicación (hoy)</h3>
-            <div className="text-xs text-muted-foreground">
-              {company?.city ? `${company.city}${company.country ? `, ${company.country}` : ""}` : ""}
-            </div>
-          </div>
+      {/* TENDENCIAS */}
+      {activeTab === "trends" && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader><CardTitle>Evolución del Rating</CardTitle></CardHeader>
+            <CardContent className="h-80">
+              <RatingLineChart {...({ data: monthlySeries, xKey: "month", yKey: "rating" } as any)} />
+            </CardContent>
+          </Card>
 
-          {loadingLocs && <div className="text-sm text-muted-foreground">Cargando ubicaciones…</div>}
-          {errorLocs && <div className="text-sm text-red-600">Error: {errorLocs}</div>}
+          <Card>
+            <CardHeader><CardTitle>Distribución de Estrellas</CardTitle></CardHeader>
+            <CardContent className="h-80">
+              <StarDistribution {...({ data: starsData } as any)} />
+            </CardContent>
+          </Card>
 
-          {!loadingLocs && rows && rows.length === 0 && (
-            <div className="text-sm text-muted-foreground">
-              Sin datos de ubicaciones todavía. (Si no existe el endpoint <code>/api/kpis/locations-today</code>, dímelo y te lo paso).
-            </div>
-          )}
+          <Card>
+            <CardHeader><CardTitle>Tendencia de Reseñas</CardTitle></CardHeader>
+            <CardContent className="h-80">
+              <ReviewsAreaChart {...({ data: monthlySeries, xKey: "month", yKey: "reviews" } as any)} />
+            </CardContent>
+          </Card>
 
-          {!loadingLocs && rows && rows.length > 0 && (
-            <div className="overflow-x-auto rounded-lg border">
-              <table className="min-w-full text-sm">
-                <thead className="bg-muted/50">
-                  <tr className="text-left">
-                    <th className="px-3 py-2 font-medium">Ubicación</th>
-                    <th className="px-3 py-2 font-medium">Estado</th>
-                    <th className="px-3 py-2 font-medium">Total</th>
-                    <th className="px-3 py-2 font-medium">Nuevas 7d</th>
-                    <th className="px-3 py-2 font-medium">Nuevas 30d</th>
-                    <th className="px-3 py-2 font-medium">Pend. resp.</th>
-                    <th className="px-3 py-2 font-medium">Resp. 7d</th>
-                    <th className="px-3 py-2 font-medium">Tasa resp.</th>
-                    <th className="px-3 py-2 font-medium">Media global</th>
-                    <th className="px-3 py-2 font-medium">Media 30d</th>
-                    <th className="px-3 py-2 font-medium">Media 30d prev.</th>
-                    <th className="px-3 py-2 font-medium">T. medio resp.</th>
-                  </tr>
-                </thead>
-                <tbody className="[&_tr:nth-child(even)]:bg-muted/20">
-                  {rows.map((r) => (
-                    <tr key={r.locationId} className="align-middle">
-                      <td className="px-3 py-2">
-                        <div className="font-medium">{r.title ?? "—"}</div>
-                        <div className="text-xs text-muted-foreground">{r.slug ?? r.locationId}</div>
-                      </td>
-                      <td className="px-3 py-2">{r.status ?? "—"}</td>
-                      <td className="px-3 py-2">{r.totals.totalReviews.toLocaleString()}</td>
-                      <td className="px-3 py-2">{r.totals.newReviews7d.toLocaleString()}</td>
-                      <td className="px-3 py-2">{r.totals.newReviews30d.toLocaleString()}</td>
-                      <td className="px-3 py-2">{r.totals.unansweredCount.toLocaleString()}</td>
-                      <td className="px-3 py-2">{r.totals.responses7d.toLocaleString()}</td>
-                      <td className="px-3 py-2">{Pct(r.rates.answeredRate)}</td>
-                      <td className="px-3 py-2">{Stars(r.rates.avgAll)}</td>
-                      <td className="px-3 py-2">{Stars(r.rates.avg30d)}</td>
-                      <td className="px-3 py-2">{Stars(r.rates.prev30dAvg)}</td>
-                      <td className="px-3 py-2">{TimeHHMM(r.rates.responseAvgSec)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      </div>
-    </TabsMenu>
+          <Card>
+            <CardHeader><CardTitle>Fuentes de Reseñas</CardTitle></CardHeader>
+            <CardContent className="h-80">
+              <ReviewSourcesPie {...({ data: sourcesData } as any)} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ANÁLISIS */}
+      {activeTab === "analysis" && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader><CardTitle>Análisis de Sentimientos</CardTitle></CardHeader>
+            <CardContent className="h-80">
+              <SentimentDonut {...({ data: sentimentData } as any)} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Palabras Más Repetidas</CardTitle></CardHeader>
+            <CardContent className="h-80">
+              <TopKeywordsBars {...({ data: keywordsData } as any)} />
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-2">
+            <CardHeader><CardTitle>Volumen de Reseñas por Mes</CardTitle></CardHeader>
+            <CardContent className="h-80">
+              <ReviewsAreaChart {...({ data: monthlySeries, xKey: "month", yKey: "reviews" } as any)} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* UBICACIONES */}
+      {activeTab === "locations" && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader><CardTitle>Tiempo de Respuesta por Ubicación</CardTitle></CardHeader>
+            <CardContent className="h-80">
+              <ResponseTimeCompare
+                {...({ data: responseCompareData, xKey: "label", avgKey: "avg", targetKey: "target" } as any)}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Dispositivos de Origen</CardTitle></CardHeader>
+            <CardContent className="h-80">
+              <DeviceOriginList {...({ data: deviceData } as any)} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* RENDIMIENTO */}
+      {activeTab === "performance" && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <Card className="lg:col-span-1">
+            <CardHeader><CardTitle>KPIs Objetivo</CardTitle></CardHeader>
+            <CardContent className="h-80">
+              <KpiTargetsProgress items={kpiTargets as any} />
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-1">
+            <CardHeader><CardTitle>Alertas Activas</CardTitle></CardHeader>
+            <CardContent className="h-80 overflow-auto">
+              <AlertsList items={alertItems} />
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-1">
+            <CardHeader><CardTitle>Resumen del Mes</CardTitle></CardHeader>
+            <CardContent className="h-80">
+              <MonthlyHighlights items={monthlyHighlightsItems} />
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-3">
+            <CardHeader><CardTitle>Análisis Competitivo</CardTitle></CardHeader>
+            <CardContent className="h-96">
+              <CompetitiveRadar {...({ data: competitiveData } as any)} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </SectionLayout>
   );
 }

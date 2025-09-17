@@ -4,8 +4,8 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/app/components/ui/button";
-import { Plus, Building2 } from "lucide-react";
-
+import { Plus, Building2, Settings } from "lucide-react";
+import ListToolbar from "@/app/components/ListToolbar";
 import SectionLayout from "@/app/components/layouts/SectionLayout";
 
 import {
@@ -360,16 +360,21 @@ export default function CompanyPage() {
         <>
 
 
-          {/* Establecimientos (más ceñido) */}
+          {/* Establecimientos */}
           <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold">Establecimientos</h2>
-              {companyId && (
-                <Button onClick={() => setAddOpen(true)}>
-                  <Plus size={16} className="mr-2" />
-                  Añadir ubicación
-                </Button>
-              )}
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              {/* Botón */}
+              <div>
+                {companyId && (
+                  <Button onClick={() => setAddOpen(true)}>
+                    <Plus size={16} className="mr-2" />
+                    Añadir ubicación
+                  </Button>
+                )}
+              </div>
+
+              {/* Toolbar */}
+              <ListToolbar />
             </div>
 
             {locsError && <div className="text-sm text-red-600">{locsError}</div>}
@@ -397,6 +402,7 @@ export default function CompanyPage() {
               </div>
             )}
           </section>
+
         </>
       )}
 

@@ -41,7 +41,9 @@ export default function ReviewsPage() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
         if (cancelled) return;
-        const rows: ReviewForCard[] = Array.isArray(json?.reviews) ? json.reviews : [];
+        const rows: ReviewForCard[] = Array.isArray(json?.reviews)
+          ? json.reviews
+          : [];
         setReviews(rows);
         setTotalPages(json?.totalPages ?? 1);
       } catch (e) {
@@ -66,15 +68,18 @@ export default function ReviewsPage() {
       icon={MessageSquare}
       title="Reseñas"
       subtitle="Lee y responde a las reseñas de tus establecimientos"
-      // 👇 Todo lo previo a la toolbar va aquí (dentro de la cabecera blanca)
       headerContent={
-        <>
-          <EstablishmentTabs onEstablishmentChange={setActiveEst} />
-          {activeEst && <EstablishmentKpis establishment={activeEst} />}
-        </>
+        <EstablishmentTabs onEstablishmentChange={setActiveEst} />
       }
     >
-      {/* Barra de filtros/busqueda/orden: FUERA de la cabecera */}
+      {/* KPIs del establecimiento */}
+      {activeEst && (
+        <div className="mb-8">
+          <EstablishmentKpis establishment={activeEst} />
+        </div>
+      )}
+
+      {/* Barra de filtros/busqueda/orden */}
       <div className="mb-8">
         <ReviewsToolbar />
       </div>
@@ -85,7 +90,9 @@ export default function ReviewsPage() {
           <ReviewCard key={r.id} review={r} />
         ))}
         {!loading && reviews.length === 0 && (
-          <div className="col-span-full text-muted-foreground">No hay reseñas.</div>
+          <div className="col-span-full text-muted-foreground">
+            No hay reseñas.
+          </div>
         )}
       </div>
 

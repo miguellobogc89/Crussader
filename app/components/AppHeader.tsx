@@ -2,6 +2,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { Settings, User, Bell, LogOut } from "lucide-react";
 
@@ -10,20 +11,50 @@ import { Button } from "@/app/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
 
 export type AppHeaderProps = {
-  title: string;
+  /** Deprecated: el título se calcula desde la URL. */
+  title?: string;
   subtitle?: string;
   showCreateButton?: boolean;
   createButtonText?: string;
   onCreateClick?: () => void;
 };
 
+// Rutas → Títulos (añade aquí nuevas secciones del sidebar)
+const TITLE_MAP: Record<string, string> = {
+  "/dashboard": "Panel de Control",
+  "/dashboard/home": "Inicio",
+  "/dashboard/reviews": "Reseñas",
+  "/dashboard/company": "Mi empresa",
+  // "/dashboard/integrations": "Integraciones",
+  "/dashboard/integrations-test": "Conexiones",
+  "/dashboard/database": "Base de datos",
+  "/dashboard/reports": "Reportes",
+  "/dashboard/reports-test": "Reportes de prueba",
+  "/dashboard/charts-test": "Gráficos de prueba",
+  "/dashboard/tabsmenu-test": "TabMenu de prueba",
+  "/dashboard/settings": "Configuración",
+  "/dashboard/admin": "Panel de administrador",
+};
+
+function getTitleFromPath(pathname: string | null): string {
+  if (!pathname) return "Panel de Control";
+  // 1) Match exacto
+  if (TITLE_MAP[pathname]) return TITLE_MAP[pathname];
+  // 2) Prefijo (para subrutas)
+  const key = Object.keys(TITLE_MAP).find((p) => p !== "/dashboard" && pathname.startsWith(p));
+  return key ? TITLE_MAP[key] : "Panel de Control";
+}
+
 export function AppHeader({
-  title,
+  // title,  // ← lo ignoramos a propósito
   subtitle,
   showCreateButton,
   createButtonText = "Crear",
   onCreateClick,
 }: AppHeaderProps) {
+  const pathname = usePathname();
+  const computedTitle = getTitleFromPath(pathname);
+
   const { data } = useSession();
   const name = data?.user?.name ?? "Usuario";
   const initials =
@@ -58,8 +89,8 @@ export function AppHeader({
         <div className="flex items-center gap-4 min-w-0">
           <SidebarTrigger className="h-8 w-8" />
           <div className="min-w-0">
-            <h1 className="text-xl font-bold truncate bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              {title}
+            <h1 className="text-2xl sm:text-2xl font-bold truncate bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+              {computedTitle}
             </h1>
             {subtitle ? (
               <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
@@ -117,5 +148,4 @@ export function AppHeader({
   );
 }
 
-// Export default por si en algún sitio lo importas como default.
 export default AppHeader;

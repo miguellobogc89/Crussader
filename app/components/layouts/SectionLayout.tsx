@@ -4,6 +4,7 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import SectionHeader from "./SectionHeader";
 
 export type SectionTab = {
   href: string;
@@ -17,32 +18,30 @@ export default function SectionLayout({
   title,
   subtitle,
   tabs,
-  headerContent,      // 👈 NUEVO: contenido extra dentro de la cabecera (debajo del título)
+  headerContent,
   children,
+  headerVariant = "default",
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   subtitle?: string;
   tabs?: SectionTab[];
-  headerContent?: ReactNode; // 👈 nuevo
+  headerContent?: ReactNode;
   children: ReactNode;
+  /** "default" | "subtitle-only" */
+  headerVariant?: "default" | "subtitle-only";
 }) {
   const pathname = usePathname();
-  const isActive = (href: string) => pathname === href || pathname?.startsWith(href + "/");
+  const isActive = (href: string) =>
+    pathname === href || pathname?.startsWith(href + "/");
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* HEADER (bloque blanco) */}
       <div className="border-b bg-white">
         <div className="mx-auto max-w-7xl px-6 py-6 space-y-6">
-          {/* Título */}
-          <div className="flex items-center space-x-3">
-            <Icon className="h-6 w-6 text-primary" />
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-              {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
-            </div>
-          </div>
+          {/* Header unificado */}
+          <SectionHeader icon={Icon} title={title}  />
 
           {/* Tabs de navegación (opcionales) */}
           {tabs?.length ? (
@@ -73,7 +72,7 @@ export default function SectionLayout({
             </nav>
           ) : null}
 
-          {/* 👉 Extra de cabecera (queda DENTRO del bloque blanco) */}
+          {/* Extra de cabecera */}
           {headerContent ? <div className="space-y-6">{headerContent}</div> : null}
         </div>
       </div>

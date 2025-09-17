@@ -3,9 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSession, signIn } from "next-auth/react";
-import { MapPin, Plus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
-import { Badge } from "@/app/components/ui/badge";
+import { TabsMenu, type TabItem } from "@/app/components/TabsMenu";
 
 export type Establishment = {
   id: string;
@@ -41,6 +40,7 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
+
   const urlLocationId: string | null = search.get("locationId");
 
   const [items, setItems] = useState<Establishment[]>([]);
@@ -56,10 +56,8 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
         setLoading(true);
         setNeedsAuth(false);
 
-        // Espera a que la sesión esté lista
         if (status === "loading") return;
 
-        // Si no hay sesión, no sigas
         if (status === "unauthenticated") {
           if (mounted) {
             setNeedsAuth(true);
@@ -70,7 +68,6 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
           return;
         }
 
-        // Token opcional desde la sesión (ajusta si lo guardas en otra propiedad)
         const token =
           (data as any)?.accessToken ??
           (data?.user as any)?.accessToken ??
@@ -79,7 +76,7 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
         const baseInit: RequestInit = {
           method: "GET",
           cache: "no-store",
-          credentials: "include", // asegura envío de cookies de sesión
+          credentials: "include",
           headers: {
             accept: "application/json",
             ...(token ? { authorization: `Bearer ${token}` } : {}),
@@ -136,12 +133,12 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
             location: [city, country].filter(Boolean).join(", ") || "—",
             avatar,
             rating: Number(
-              location?.reviewsAvg ?? // <- tu API principal
-              location?.avgRating ??  // <- fallback
+              location?.reviewsAvg ??
+              location?.avgRating ??
               location?.rating ?? 0
             ),
             totalReviews: Number(
-              location?.reviewsCount ?? // <- tu API principal
+              location?.reviewsCount ??
               location?.reviewCount ?? 0
             ),
             pendingResponses: Number(location?.pendingResponses ?? 0),
@@ -187,10 +184,10 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
     return () => {
       mounted = false;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, status]); // recarga cuando haya sesión lista o cambie el rol
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, status]);
 
-  // Si cambia ?locationId externamente, sincroniza
+  // Sincroniza si cambia ?locationId externamente
   useEffect(() => {
     if (!items.length || !urlLocationId) return;
     const found = items.find((i) => i.id === urlLocationId) ?? null;
@@ -206,15 +203,27 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
     [items, activeId]
   );
 
-  const onTabClick = (est: Establishment) => {
-    setActiveId(est.id);
-    onEstablishmentChange(est);
+  // ------ TabsMenu integration ------
+  const tabItems: TabItem[] = useMemo(() => {
+    return items.map((est) => {
+      const params = new URLSearchParams(search.toString());
+      params.set("locationId", est.id);
+      params.set("page", "1"); // resetea paginación al cambiar
+      return {
+        href: `${pathname}?${params.toString()}`,
+        label: est.name,
+        icon: "building-2", // lucide id que ya usas en TabsMenu
+      };
+    });
+  }, [items, pathname, search]);
 
+  const activeHref = useMemo(() => {
+    if (!active?.id) return undefined;
     const params = new URLSearchParams(search.toString());
-    params.set("locationId", est.id);
+    params.set("locationId", active.id);
     params.set("page", "1");
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
-  };
+    return `${pathname}?${params.toString()}`;
+  }, [active?.id, pathname, search]);
 
   if (needsAuth) {
     return (
@@ -234,70 +243,25 @@ export const EstablishmentTabs = ({ onEstablishmentChange }: Props) => {
   }
 
   return (
-    <div className="border-b border-border/50 backdrop-blur-sm">
-      <div className="container mx-auto px-6 py-6">
-        {/* Tabs MULTIFILA */}
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          {loading && (
-            <div className="text-sm text-muted-foreground">Cargando ubicaciones…</div>
-          )}
-
-          {!loading &&
-            items.map((est) => {
-              const isActive = active?.id === est.id;
-              return (
-                <button
-                  key={est.id}
-                  onClick={() => onTabClick(est)}
-                  className={[
-                    "relative group flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-300",
-                    "whitespace-nowrap",
-                    isActive
-                      ? "border-2 border-primary/30 bg-gradient-to-r from-primary/20 to-accent/20 shadow-lg"
-                      : "border border-border/30 bg-card/60 hover:border-primary/20 hover:bg-card/80 hover:shadow-md",
-                  ].join(" ")}
-                >
-                  <div className="grid h-7 w-7 place-items-center rounded-full bg-primary/15 text-base font-semibold text-primary">
-                    {est.avatar}
-                  </div>
-                  <div className="text-left">
-                    <div
-                      className={[
-                        "text-sm font-semibold",
-                        isActive ? "text-primary" : "text-foreground",
-                      ].join(" ")}
-                    >
-                      {est.name}
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin size={10} />
-                      {(est.location ?? "").split(",")[0] || "—"}
-                    </div>
-                  </div>
-
-                  {est.pendingResponses > 0 && (
-                    <Badge className="text-warning-foreground bg-warning px-2 py-0 text-xs">
-                      {est.pendingResponses}
-                    </Badge>
-                  )}
-
-                  {isActive && (
-                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10" />
-                  )}
-                </button>
-              );
-            })}
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2 whitespace-nowrap border-dashed border-primary/40 text-primary hover:bg-primary/10"
-          >
-            <Plus size={16} />
-            Añadir establecimiento
-          </Button>
-        </div>
+    <div className="backdrop-blur-sm">
+      <div className="container mx-auto">
+        <TabsMenu
+          items={tabItems}
+          activeHref={activeHref}
+          loading={loading}
+          emptyLabel="Sin ubicaciones"
+          onItemClick={(item: TabItem) => {
+            router.replace(item.href, { scroll: false });
+            const targetId = new URL(item.href, "http://x").searchParams.get("locationId");
+            if (!targetId) return;
+            const est = items.find((e) => e.id === targetId) ?? null;
+            setActiveId(est?.id ?? null);
+            onEstablishmentChange(est);
+          }}
+        />
       </div>
     </div>
   );
 };
+
+export default EstablishmentTabs;

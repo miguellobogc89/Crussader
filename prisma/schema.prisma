@@ -44,6 +44,36 @@ enum LocationType {
   FRANCHISE
 }
 
+enum Sentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+  MIXED
+}
+
+enum JobType {
+  GENERATE_RESPONSE
+  PUBLISH_RESPONSE
+  SYNC_REVIEWS
+  SYNC_LOCATIONS
+  RECOMPUTE_KPI
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum LocationRole {
+  MANAGER
+  STAFF
+  VIEWER
+}
+
+
 enum LocationStatus {
   ACTIVE
   INACTIVE
@@ -55,6 +85,7 @@ enum Role {
   system_admin
   org_admin
   user
+  test
 }
 
 enum ReviewProvider {
@@ -112,6 +143,7 @@ model User {
   termsAcceptedAt   DateTime?
   privacyAcceptedAt DateTime?
   notes             String? // notas internas
+  
 
   // Relaciones
   Account            Account[]
@@ -122,6 +154,7 @@ model User {
   UserCompany        UserCompany[]
   UserLogin          UserLogin[] // auditoría de logins
   UserStatusEvent    UserStatusEvent[] // histórico de estado
+  UserLocation       UserLocation[]
   passwordHash       String?
 
   createdAt DateTime @default(now())
@@ -252,6 +285,8 @@ model Company {
   lastSyncAt       DateTime?
   updatedAt        DateTime           @default(now()) @updatedAt
   LocationKpiDaily LocationKpiDaily[] @relation("CompanyToKpiDaily")
+  jobs Job[]     // ← NUEVO: inversa de Job.company
+
 
   // Facturación (básico)
   plan                 String?   @default("free")
@@ -287,12 +322,16 @@ model UserCompany {
   companyId String
   role      CompanyRole @default(MEMBER)
   createdAt DateTime    @default(now())
+
   Company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   User      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+
+  @@unique([userId, companyId])   // ← NUEVO: evita duplicados de pares user-company
   @@index([userId])
   @@index([companyId])
 }
+
 
 model Lead {
   id        String     @id @default(cuid())
@@ -346,17 +385,42 @@ model Location {
   slug                 String?         @unique
   status               LocationStatus? @default(DRAFT)
   timezone             String?
-  type                 LocationType?
   isFeatured           Boolean         @default(false)
+
+  // 🎯 NUEVO: relación Actividad → Tipo
+  activityId           String?
+  typeId               String?
+
+  activity             Activity?       @relation(fields: [activityId], references: [id])
+  type                 Type?           @relation(fields: [typeId], references: [id])
 
   company            Company             @relation(fields: [companyId], references: [id])
   ExternalConnection ExternalConnection? @relation(fields: [externalConnectionId], references: [id])
   Reviews            Review[]            @relation("LocationReviews")
   KpiDaily           LocationKpiDaily[]  @relation("LocationToKpiDaily")
+  UserLocation       UserLocation[]
+  jobs Job[]   // inversa de Job.location
+
 
   @@index([companyId])
   @@index([googleAccountId])
   @@index([status])
+  @@index([activityId])
+  @@index([typeId])
+}
+
+model UserLocation {
+  id         String       @id @default(cuid())
+  userId     String
+  locationId String
+  role       LocationRole @default(VIEWER)
+  createdAt  DateTime     @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, locationId])
+  @@index([locationId])
 }
 
 model Review {
@@ -380,6 +444,9 @@ model Review {
   responses       Response[]
   Company         Company        @relation("CompanyReviews", fields: [companyId], references: [id], onDelete: Cascade)
   Location        Location       @relation("LocationReviews", fields: [locationId], references: [id], onDelete: Cascade)
+  analysis  ReviewAnalysis?   // ← NUEVO: inversa 1:1 de ReviewAnalysis.review
+  jobs      Job[]             // ← NUEVO: inversa de Job.review
+
 
   @@unique([provider, externalId])
   @@index([companyId])
@@ -416,6 +483,9 @@ model Response {
   createdBy       User?          @relation("ResponseCreatedBy", fields: [createdById], references: [id])
   editedBy        User?          @relation("ResponseEditedBy", fields: [editedById], references: [id])
   review          Review         @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  publishLogs ResponsePublishLog[]  // ← NUEVO: inversa de ResponsePublishLog.response
+  jobs        Job[]                 // ← NUEVO: inversa de Job.response
+
 
   @@index([reviewId])
   @@index([status, published, active])
@@ -463,3 +533,98 @@ model ResponseSettings {
 
   @@index([updatedAt])
 }
+
+model Activity {
+  id        String     @id @default(cuid())
+  name      String     @unique
+
+  // Relaciones
+  types     Type[]
+  locations Location[]   // ← inversa de Location.activity
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Type {
+  id          String     @id @default(cuid())
+  name        String
+  activityId  String
+  activity    Activity   @relation(fields: [activityId], references: [id])
+
+  // Relaciones
+  locations   Location[]   // ← inversa de Location.type
+
+  @@unique([activityId, name])
+  @@index([activityId])
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+// Análisis de reviews para tendencias, palabras clave y sentimiento
+model ReviewAnalysis {
+  id          String     @id @default(cuid())
+  reviewId    String     @unique
+  language    String?    @db.VarChar(8)
+  sentiment   Sentiment?
+  summary     String?
+  keyPhrases  String[]   // PG: text[]
+  categories  String[]   // PG: text[] (ej. ["servicio","precio"])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  review      Review     @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([sentiment])
+  @@index([createdAt])
+}
+
+// Auditoría de publicación de respuestas a proveedores (Google, etc.)
+model ResponsePublishLog {
+  id            String         @id @default(cuid())
+  responseId    String
+  provider      ReviewProvider
+  publishedAt   DateTime?
+  externalMsgId String?
+  payload       Json?
+  error         String?
+  createdAt     DateTime       @default(now())
+
+  response      Response       @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  @@index([responseId, createdAt])
+  @@index([provider, createdAt])
+}
+
+// Cola de trabajos (generación, publicación, sync, KPIs…)
+model Job {
+  id          String     @id @default(cuid())
+  type        JobType
+  status      JobStatus  @default(QUEUED)
+  payload     Json?
+  attempts    Int        @default(0)
+  lastError   String?
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  companyId   String?
+  locationId  String?
+  reviewId    String?
+  responseId  String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  company   Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  location  Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  review    Review?   @relation(fields: [reviewId], references: [id], onDelete: SetNull)
+  response  Response? @relation(fields: [responseId], references: [id], onDelete: SetNull)
+
+  @@index([status, type, scheduledAt])
+  @@index([companyId])
+  @@index([locationId])
+  @@index([reviewId])
+  @@index([responseId])
+}
+
+

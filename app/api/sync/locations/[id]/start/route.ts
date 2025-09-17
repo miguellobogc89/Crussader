@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { CompanyRole } from "@prisma/client";
 
 // ⚠️ En el siguiente paso creamos esto:
-import { runFlashSync } from "@/app/lib/sync/runFlashSync";
+import { runFlashSync } from "@/lib/sync/runFlashSync";
 
 export const dynamic = "force-dynamic";
 

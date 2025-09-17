@@ -3,6 +3,15 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 
+
+type LocationTypeRel = {
+  id: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+  activityId: string;
+};
+
 /** Tipos que expondrá el buffer de sesión (seguros para hidratar en cliente) */
 export type BootstrapData = {
   user: {
@@ -10,7 +19,7 @@ export type BootstrapData = {
     name: string | null;
     email: string;
     image: string | null;
-    role: "system_admin" | "org_admin" | "user";
+    role: "system_admin" | "org_admin" | "user" | "test";
     locale: string | null;
     timezone: string | null;
   };
@@ -37,7 +46,7 @@ export type BootstrapData = {
     title: string;
     slug: string | null;
     status: "ACTIVE" | "INACTIVE" | "DRAFT" | "PENDING_VERIFICATION" | null;
-    type: "HQ" | "BRANCH" | "FRANCHISE" | null;
+    type: LocationTypeRel | "HQ" | "BRANCH" | "FRANCHISE" | null;
     address: string | null;
     address2: string | null;
     city: string | null;

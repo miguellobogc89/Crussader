@@ -1,5 +1,7 @@
+// app/dashboard/integrations/page.tsx
 "use client";
 
+import SectionLayout from "@/app/components/layouts/SectionLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
@@ -23,7 +25,7 @@ type PlatformStatus = "connected" | "warning" | "error" | "available";
 
 type ConnectedPlatform = {
   name: string;
-  logo: string; // emoji o placeholder
+  logo: string;
   status: Exclude<PlatformStatus, "available">;
   reviewCount: number;
   issue?: string;
@@ -48,7 +50,7 @@ type LocationRow = {
   };
 };
 
-/* ===================== Mock data (visual) ===================== */
+/* ===================== Mock data ===================== */
 const locations: LocationRow[] = [
   {
     id: 1,
@@ -109,7 +111,7 @@ const locations: LocationRow[] = [
   },
 ];
 
-/* ===================== Helpers UI ===================== */
+/* ===================== Helpers ===================== */
 function getStatusIcon(status: PlatformStatus): JSX.Element {
   switch (status) {
     case "connected":
@@ -139,67 +141,63 @@ function getStatusBadge(status: PlatformStatus): JSX.Element {
 /* ===================== Page ===================== */
 export default function IntegrationsPage() {
   return (
-    <div className="container mx-auto p-6 space-y-8">
-      {/* Header inline (sin Layout) */}
-      <header className="space-y-1">
-        <h1 className="text-3xl font-bold tracking-tight">Integraciones</h1>
-        <p className="text-muted-foreground">
-          Gestiona las conexiones de tus ubicaciones con plataformas de reseñas
-        </p>
-      </header>
-
-      {/* Overview Stats */}
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <Card className="border-success/20 bg-gradient-to-br from-success/10 to-success/5">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Wifi className="h-5 w-5 text-success" />
-              <div>
-                <p className="text-sm font-medium text-success">Conectadas</p>
-                <p className="text-2xl font-bold text-success">5</p>
+    <SectionLayout
+      icon={Plug}
+      title="Integraciones"
+      subtitle="Gestiona las conexiones de tus ubicaciones con plataformas de reseñas"
+      headerContent={
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4 w-full">
+          <Card className="border-success/20 bg-gradient-to-br from-success/10 to-success/5">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Wifi className="h-5 w-5 text-success" />
+                <div>
+                  <p className="text-sm font-medium text-success">Conectadas</p>
+                  <p className="text-2xl font-bold text-success">5</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card className="border-warning/20 bg-gradient-to-br from-warning/10 to-warning/5">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="h-5 w-5 text-warning" />
-              <div>
-                <p className="text-sm font-medium text-warning">Con avisos</p>
-                <p className="text-2xl font-bold text-warning">1</p>
+          <Card className="border-warning/20 bg-gradient-to-br from-warning/10 to-warning/5">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="h-5 w-5 text-warning" />
+                <div>
+                  <p className="text-sm font-medium text-warning">Con avisos</p>
+                  <p className="text-2xl font-bold text-warning">1</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card className="border-muted/20 bg-gradient-to-br from-muted/10 to-muted/5">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <WifiOff className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Disponibles</p>
-                <p className="text-2xl font-bold text-muted-foreground">11</p>
+          <Card className="border-muted/20 bg-gradient-to-br from-muted/10 to-muted/5">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <WifiOff className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Disponibles</p>
+                  <p className="text-2xl font-bold text-muted-foreground">11</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/10 to-accent/5">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Store className="h-5 w-5 text-primary" />
-              <div>
-                <p className="text-sm font-medium text-primary">Ubicaciones</p>
-                <p className="text-2xl font-bold text-primary">3</p>
+          <Card className="border-primary/20 bg-gradient-to-br from-primary/10 to-accent/5">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Store className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium text-primary">Ubicaciones</p>
+                  <p className="text-2xl font-bold text-primary">3</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* Locations */}
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
+      {/* Ubicaciones */}
       <section className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">Ubicaciones</h2>
@@ -340,6 +338,6 @@ export default function IntegrationsPage() {
           </CardContent>
         </Card>
       </section>
-    </div>
+    </SectionLayout>
   );
 }
