@@ -1,0 +1,22 @@
+[
+  { "id": "cmfmr96rr0004i5r8nzri3ck6", "country": "España", "email": "sevilla@lamiagelateria.es",           "reviewsAvg": "4.60", "reviewsCount": 128 },
+  { "id": "cmfmxqyuj0004i5i49knezg6c","country": "España", "email": "oeste@alamedarest.es",                 "reviewsAvg": "4.20", "reviewsCount": 364 },
+  { "id": "cmfmxqz4k0006i5i4ua8ozsf8","country": "España", "email": "nervion@alamedarest.es",               "reviewsAvg": "4.10", "reviewsCount": 298 },
+  { "id": "cmfmxqzb40008i5i4gugizxar","country": "España", "email": "gracia@alamedarest.es",                "reviewsAvg": "4.30", "reviewsCount": 412 },
+  { "id": "cmfmxr01c000di5i4kh7tal6o","country": "España", "email": "casco-antiguo@clinicalluzvida.com",    "reviewsAvg": "4.55", "reviewsCount": 186 },
+  { "id": "cmfmxr07w000fi5i4e7cd7liz","country": "España", "email": "norte@clinicalluzvida.com",            "reviewsAvg": "4.48", "reviewsCount": 149 },
+  { "id": "cmfmxr0y7000ki5i42ld6xpx5","country": "España", "email": "sur@ibertechsistemas.com",             "reviewsAvg": "4.42", "reviewsCount": 73  },
+  { "id": "cmfmxr1og000pi5i47z90ume8","country": "España", "email": "gracia@verdalia.es",                   "reviewsAvg": "4.18", "reviewsCount": 255 },
+  { "id": "cmfmxr1v0000ri5i4nk3m1b45","country": "España", "email": "salamanca@verdalia.es",                "reviewsAvg": "4.12", "reviewsCount": 203 },
+  { "id": "cmfmxr21j000ti5i492gb83tq","country": "España", "email": "la-latina@verdalia.es",                "reviewsAvg": "4.16", "reviewsCount": 227 },
+  { "id": "cmfmxr2ro000yi5i4wnzoqk68","country": "España", "email": "sur@motorsur.es",                      "reviewsAvg": "4.33", "reviewsCount": 321 },
+  { "id": "cmfmxr2y90010i5i4wroyit37","country": "España", "email": "oeste@motorsur.es",                    "reviewsAvg": "4.29", "reviewsCount": 289 },
+  { "id": "cmfmxr34u0012i5i4ad2ac53i","country": "España", "email": "nervion@motorsur.es",                  "reviewsAvg": "4.31", "reviewsCount": 267 },
+  { "id": "cmfmxr3v00017i5i4r5ole5xh","country": "España", "email": "la-latina@casadelpan.es",              "reviewsAvg": "4.62", "reviewsCount": 178 },
+  { "id": "cmfmxr41k0019i5i4ujdjzs4i","country": "España", "email": "indautxu@casadelpan.es",               "reviewsAvg": "4.58", "reviewsCount": 132 },
+  { "id": "cmfmxr779001vi5i4m110tl4p","country": "España", "email": "gracia@creativonaranja.com",           "reviewsAvg": "4.74", "reviewsCount": 91  },
+  { "id": "cmfmxr6h5001qi5i4k8tivx6b","country": "España", "email": "norte@financredit.es",                 "reviewsAvg": "4.41", "reviewsCount": 84  },
+  { "id": "cmfmxr680001oi5i47xefknmz","country": "España", "email": "casco-antiguo@financredit.es",         "reviewsAvg": "4.39", "reviewsCount": 77  },
+  { "id": "cmfmxr5hw001ji5i47twig7zt","country": "España", "email": "el-carmen@hotelmarazul.es",            "reviewsAvg": "4.23", "reviewsCount": 506 },
+  { "id": "cmfmxr4rr001ei5i4c6wkgmz6","country": "España", "email": "chamberi@opticahorizonte.es",          "reviewsAvg": "4.44", "reviewsCount": 164 }
+]

@@ -1,18 +1,477 @@
 generator client {
   provider   = "prisma-client-js"
-  engineType = "library" // <-- Node-API, evita el binario .dll “query_engine-windows.dll.node”
+  engineType = "library"
 }
 
 datasource db {
-  provider          = "postgresql"
-  url               = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-/**
- * =========================
- * Enums
- * =========================
- */
+/// *
+///  * =========================
+///  * Core Auth
+///  * =========================
+model User {
+  id                 String               @id @default(cuid())
+  name               String?
+  email              String?              @unique
+  emailVerified      DateTime?
+  image              String?
+  role               Role                 @default(user)
+  createdAt          DateTime             @default(now())
+  deactivatedAt      DateTime?
+  failedLoginCount   Int                  @default(0)
+  isActive           Boolean              @default(true)
+  isSuspended        Boolean              @default(false)
+  lastLoginAt        DateTime?
+  lastSeenAt         DateTime?
+  locale             String?              @default("es-ES")
+  loginCount         Int                  @default(0)
+  marketingOptIn     Boolean              @default(false)
+  notes              String?
+  passwordHash       String?
+  phone              String?
+  privacyAcceptedAt  DateTime?
+  suspendedAt        DateTime?
+  suspendedReason    String?
+  termsAcceptedAt    DateTime?
+  timezone           String?              @default("Europe/Madrid")
+  updatedAt          DateTime             @updatedAt
+  Account            Account[]
+  ExternalConnection ExternalConnection[]
+  responsesCreated   Response[]           @relation("ResponseCreatedBy")
+  responsesEdited    Response[]           @relation("ResponseEditedBy")
+  Session            Session[]
+  UserCompany        UserCompany[]
+  UserLocation       UserLocation[]
+  UserLogin          UserLogin[]
+  UserStatusEvent    UserStatusEvent[]
+
+  @@index([role])
+  @@index([isActive, isSuspended])
+  @@index([lastLoginAt])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model UserLogin {
+  id        String   @id @default(cuid())
+  userId    String?
+  provider  String?
+  success   Boolean  @default(false)
+  ip        String?
+  userAgent String?
+  error     String?
+  createdAt DateTime @default(now())
+  User      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+model UserStatusEvent {
+  id        String              @id @default(cuid())
+  userId    String
+  type      UserStatusEventType
+  reason    String?
+  createdAt DateTime            @default(now())
+  User      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model ExternalConnection {
+  id             String     @id @default(cuid())
+  userId         String
+  provider       String
+  accountEmail   String?
+  access_token   String
+  refresh_token  String?
+  expires_at     Int?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  companyId      String?
+  accountName    String?
+  providerUserId String?
+  scope          String?
+  User           User       @relation(fields: [userId], references: [id])
+  Location       Location[]
+
+  @@unique([userId, provider])
+  @@index([companyId])
+}
+
+model Company {
+  id                   String             @id @default(cuid())
+  name                 String
+  createdById          String
+  createdAt            DateTime           @default(now())
+  activity             String?            @db.VarChar(64)
+  cif                  String?            @db.VarChar(32)
+  employeesBand        String?            @db.VarChar(32)
+  logoUrl              String?
+  address              String?
+  brandColor           String?            @db.VarChar(16)
+  city                 String?
+  country              String?
+  countryCode          String?            @db.VarChar(2)
+  description          String?
+  email                String?
+  facebookUrl          String?
+  instagramUrl         String?
+  lastSyncAt           DateTime?
+  linkedinUrl          String?
+  matrix               String?            @db.VarChar(128)
+  phone                String?
+  postalCode           String?
+  region               String?
+  registryId           String?            @db.VarChar(64)
+  reviewsAvg           Decimal?           @db.Decimal(3, 2)
+  reviewsCount         Int                @default(0)
+  twitterUrl           String?
+  updatedAt            DateTime           @default(now()) @updatedAt
+  vatNumber            String?            @db.VarChar(32)
+  website              String?
+  plan                 String?            @default("free")
+  planRenewsAt         DateTime?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  jobs                 Job[]
+  Lead                 Lead[]
+  Location             Location[]
+  LocationKpiDaily     LocationKpiDaily[] @relation("CompanyToKpiDaily")
+  responseSettings     ResponseSettings?
+  Reviews              Review[]           @relation("CompanyReviews")
+  UserCompany          UserCompany[]
+  WebchatSites         WebchatSite[]      @relation("CompanyToWebchatSite")
+  knowledgeItems       KnowledgeItem[]
+
+  @@index([name])
+  @@index([activity])
+  @@index([matrix])
+}
+
+model UserCompany {
+  id        String      @id @default(cuid())
+  userId    String
+  companyId String
+  role      CompanyRole @default(MEMBER)
+  createdAt DateTime    @default(now())
+  Company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  User      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+  @@index([userId])
+  @@index([companyId])
+}
+
+model Lead {
+  id        String     @id @default(cuid())
+  companyId String
+  ownerId   String?
+  name      String
+  email     String?
+  phone     String?
+  source    LeadSource @default(UNKNOWN)
+  status    LeadStatus @default(NEW)
+  notes     String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @default(now()) @updatedAt
+  company   Company    @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@index([ownerId])
+  @@index([status])
+}
+
+model Location {
+  id                   String              @id @default(cuid())
+  companyId            String
+  title                String
+  address              String?
+  city                 String?
+  region               String?
+  country              String?
+  postalCode           String?
+  phone                String?
+  website              String?
+  googleName           String?
+  googlePlaceId        String?             @unique
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @default(now()) @updatedAt
+  address2             String?
+  countryCode          String?             @db.VarChar(2)
+  email                String?
+  externalConnectionId String?
+  facebookUrl          String?
+  featuredImageUrl     String?
+  googleAccountId      String?
+  googleLocationId     String?
+  instagramUrl         String?
+  lastSyncAt           DateTime?
+  latitude             Decimal?            @db.Decimal(10, 7)
+  longitude            Decimal?            @db.Decimal(10, 7)
+  openingHours         Json?
+  reviewsAvg           Decimal?            @db.Decimal(3, 2)
+  reviewsCount         Int                 @default(0)
+  slug                 String?             @unique
+  status               LocationStatus?     @default(DRAFT)
+  timezone             String?
+  isFeatured           Boolean             @default(false)
+  activityId           String?
+  typeId               String?
+  jobs                 Job[]
+  activity             Activity?           @relation(fields: [activityId], references: [id])
+  company              Company             @relation(fields: [companyId], references: [id])
+  ExternalConnection   ExternalConnection? @relation(fields: [externalConnectionId], references: [id])
+  type                 Type?               @relation(fields: [typeId], references: [id])
+  KpiDaily             LocationKpiDaily[]  @relation("LocationToKpiDaily")
+  Reviews              Review[]            @relation("LocationReviews")
+  UserLocation         UserLocation[]
+  WebchatSites         WebchatSite[]       @relation("LocationToWebchatSite")
+
+  @@index([companyId])
+  @@index([googleAccountId])
+  @@index([status])
+  @@index([activityId])
+  @@index([typeId])
+}
+
+model UserLocation {
+  id         String       @id @default(cuid())
+  userId     String
+  locationId String
+  createdAt  DateTime     @default(now())
+  role       LocationRole @default(VIEWER)
+  location   Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, locationId])
+  @@index([locationId])
+}
+
+model Review {
+  id              String          @id @default(cuid())
+  companyId       String
+  locationId      String
+  provider        ReviewProvider
+  externalId      String
+  reviewerName    String?
+  reviewerPhoto   String?
+  reviewerAnon    Boolean?
+  rating          Int
+  comment         String?
+  languageCode    String?         @db.VarChar(8)
+  createdAtG      DateTime?
+  updatedAtG      DateTime?
+  replyComment    String?
+  replyUpdatedAtG DateTime?
+  ingestedAt      DateTime        @default(now())
+  updatedAt       DateTime        @default(now()) @updatedAt
+  isTest          Boolean         @default(false)
+  jobs            Job[]
+  responses       Response[]
+  Company         Company         @relation("CompanyReviews", fields: [companyId], references: [id], onDelete: Cascade)
+  Location        Location        @relation("LocationReviews", fields: [locationId], references: [id], onDelete: Cascade)
+  analysis        ReviewAnalysis?
+
+  @@unique([provider, externalId])
+  @@index([companyId])
+  @@index([locationId])
+  @@index([rating])
+  @@index([createdAtG])
+}
+
+model Response {
+  id              String               @id @default(cuid())
+  reviewId        String
+  content         String
+  status          ResponseStatus       @default(PENDING)
+  active          Boolean              @default(true)
+  published       Boolean              @default(false)
+  edited          Boolean              @default(false)
+  generationCount Int                  @default(1)
+  lastGeneratedAt DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  publishedAt     DateTime?
+  createdById     String?
+  editedById      String?
+  source          ResponseSource       @default(AI)
+  model           String?
+  temperature     Float?
+  promptVersion   String?
+  language        String?
+  tone            String?
+  businessType    String?
+  moderationFlag  Boolean              @default(false)
+  moderationNotes String?
+  lastError       String?
+  jobs            Job[]
+  createdBy       User?                @relation("ResponseCreatedBy", fields: [createdById], references: [id])
+  editedBy        User?                @relation("ResponseEditedBy", fields: [editedById], references: [id])
+  review          Review               @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  publishLogs     ResponsePublishLog[]
+
+  @@index([reviewId])
+  @@index([status, published, active])
+}
+
+model LocationKpiDaily {
+  id              String   @id @default(cuid())
+  companyId       String
+  locationId      String
+  snapshotDate    DateTime
+  totalReviews    Int
+  newReviews7d    Int
+  newReviews30d   Int
+  unansweredCount Int
+  answeredRate    Int
+  avgAll          Decimal? @db.Decimal(3, 2)
+  avg30d          Decimal? @db.Decimal(3, 2)
+  prev30dAvg      Decimal? @db.Decimal(3, 2)
+  responses7d     Int
+  responseAvgSec  Int?
+  lastComputedAt  DateTime @default(now())
+  company         Company  @relation("CompanyToKpiDaily", fields: [companyId], references: [id], onDelete: Cascade)
+  location        Location @relation("LocationToKpiDaily", fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, snapshotDate])
+  @@index([companyId, snapshotDate])
+  @@index([snapshotDate])
+}
+
+model ResponseSettings {
+  id              String   @id @default(cuid())
+  companyId       String   @unique
+  config          Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdByUserId String?
+  updatedByUserId String?
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([updatedAt])
+}
+
+model Activity {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  locations Location[]
+  types     Type[]
+}
+
+model Type {
+  id         String     @id @default(cuid())
+  name       String
+  activityId String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  locations  Location[]
+  activity   Activity   @relation(fields: [activityId], references: [id])
+
+  @@unique([activityId, name])
+  @@index([activityId])
+}
+
+model ReviewAnalysis {
+  id         String     @id @default(cuid())
+  reviewId   String     @unique
+  language   String?    @db.VarChar(8)
+  sentiment  Sentiment?
+  summary    String?
+  keyPhrases String[]
+  categories String[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  review     Review     @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([sentiment])
+  @@index([createdAt])
+}
+
+model ResponsePublishLog {
+  id            String         @id @default(cuid())
+  responseId    String
+  provider      ReviewProvider
+  publishedAt   DateTime?
+  externalMsgId String?
+  payload       Json?
+  error         String?
+  createdAt     DateTime       @default(now())
+  response      Response       @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  @@index([responseId, createdAt])
+  @@index([provider, createdAt])
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  type        JobType
+  status      JobStatus @default(QUEUED)
+  payload     Json?
+  attempts    Int       @default(0)
+  lastError   String?
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  companyId   String?
+  locationId  String?
+  reviewId    String?
+  responseId  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  company     Company?  @relation(fields: [companyId], references: [id])
+  location    Location? @relation(fields: [locationId], references: [id])
+  response    Response? @relation(fields: [responseId], references: [id])
+  review      Review?   @relation(fields: [reviewId], references: [id])
+
+  @@index([status, type, scheduledAt])
+  @@index([companyId])
+  @@index([locationId])
+  @@index([reviewId])
+  @@index([responseId])
+}
+
+/// *
+///  * =========================
+///  * Enums
+///  * =========================
 enum CompanyRole {
   OWNER
   ADMIN
@@ -73,7 +532,6 @@ enum LocationRole {
   VIEWER
 }
 
-
 enum LocationStatus {
   ACTIVE
   INACTIVE
@@ -113,518 +571,93 @@ enum UserStatusEventType {
   DEACTIVATED
 }
 
-/**
- * =========================
- * Core Auth
- * =========================
- */
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  role          Role      @default(user)
+enum WebchatRole {
+  USER
+  BOT
+  AGENT
+}
 
-  // ---- Campos de negocio / estado
-  isActive          Boolean   @default(true) // activo en la plataforma
-  isSuspended       Boolean   @default(false) // suspendido (no puede acceder)
-  suspendedAt       DateTime?
-  suspendedReason   String?
-  deactivatedAt     DateTime? // baja voluntaria o soft-delete
-  lastLoginAt       DateTime?
-  lastSeenAt        DateTime? // última actividad
-  loginCount        Int       @default(0)
-  failedLoginCount  Int       @default(0)
-  locale            String?   @default("es-ES")
-  timezone          String?   @default("Europe/Madrid")
-  phone             String?
-  marketingOptIn    Boolean   @default(false)
-  termsAcceptedAt   DateTime?
-  privacyAcceptedAt DateTime?
-  notes             String? // notas internas
-  
+enum WebchatSiteStatus {
+  ACTIVE
+  PAUSED
+  DISABLED
+}
 
-  // Relaciones
-  Account            Account[]
-  ExternalConnection ExternalConnection[]
-  responsesCreated   Response[]           @relation("ResponseCreatedBy")
-  responsesEdited    Response[]           @relation("ResponseEditedBy")
-  Session            Session[]
-  UserCompany        UserCompany[]
-  UserLogin          UserLogin[] // auditoría de logins
-  UserStatusEvent    UserStatusEvent[] // histórico de estado
-  UserLocation       UserLocation[]
-  passwordHash       String?
+enum KnowledgeVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+model WebchatSite {
+  id         String            @id @default(cuid())
+  companyId  String
+  locationId String?
+  publicKey  String            @unique
+  status     WebchatSiteStatus @default(ACTIVE)
+  name       String
+  settings   Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([role])
-  @@index([isActive, isSuspended])
-  @@index([lastLoginAt])
-}
+  // Relaciones
+  Company        Company          @relation(name: "CompanyToWebchatSite", fields: [companyId], references: [id], onDelete: Cascade)
+  Location       Location?        @relation(name: "LocationToWebchatSite", fields: [locationId], references: [id], onDelete: SetNull)
+  Sessions       WebchatSession[]
+  Messages       WebchatMessage[]
+  knowledgeItems KnowledgeItem[]
 
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-  User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-/**
- * =========================
- * Auditoría y eventos
- * =========================
- */
-
-// Cada intento de login exitoso/erróneo
-model UserLogin {
-  id        String   @id @default(cuid())
-  userId    String?
-  provider  String?
-  success   Boolean  @default(false)
-  ip        String?
-  userAgent String?
-  error     String?
-  createdAt DateTime @default(now())
-  User      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([userId, createdAt])
-}
-
-// Histórico de cambios de estado (suspensiones, reactivaciones, etc.)
-model UserStatusEvent {
-  id        String              @id @default(cuid())
-  userId    String
-  type      UserStatusEventType
-  reason    String?
-  createdAt DateTime            @default(now())
-  User      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-}
-
-/**
- * =========================
- * Negocio
- * =========================
- */
-
-model ExternalConnection {
-  id             String     @id @default(cuid())
-  userId         String
-  provider       String
-  providerUserId String? // id en el proveedor
-  accountName    String?
-  accountEmail   String?
-  scope          String?
-  access_token   String
-  refresh_token  String?
-  expires_at     Int?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  companyId      String?
-  User           User       @relation(fields: [userId], references: [id])
-  Location       Location[]
-
-  @@unique([userId, provider])
   @@index([companyId])
+  @@index([locationId])
 }
 
-model Company {
-  id            String   @id @default(cuid())
-  name          String
-  createdById   String
-  createdAt     DateTime @default(now())
-  activity      String?  @db.VarChar(64)
-  cif           String?  @db.VarChar(32)
-  employeesBand String?  @db.VarChar(32)
-  logoUrl       String?
-  address       String?
-  brandColor    String?  @db.VarChar(16)
-  city          String?
-  country       String?
-  countryCode   String?  @db.VarChar(2)
-  description   String?
-  email         String?
-  phone         String?
-  website       String?
+model WebchatSession {
+  id             String   @id @default(cuid())
+  siteId         String
+  visitorId      String
+  startedAt      DateTime @default(now())
+  lastActivityAt DateTime @default(now())
+  meta           Json?
 
-  // Métricas y estado
-  reviewsAvg       Decimal?           @db.Decimal(3, 2)
-  reviewsCount     Int                @default(0)
-  lastSyncAt       DateTime?
-  updatedAt        DateTime           @default(now()) @updatedAt
-  LocationKpiDaily LocationKpiDaily[] @relation("CompanyToKpiDaily")
-  jobs Job[]     // ← NUEVO: inversa de Job.company
+  Site     WebchatSite      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  Messages WebchatMessage[]
 
-
-  // Facturación (básico)
-  plan                 String?   @default("free")
-  planRenewsAt         DateTime?
-  stripeCustomerId     String?
-  stripeSubscriptionId String?
-
-  // Redes
-  facebookUrl  String?
-  instagramUrl String?
-  linkedinUrl  String?
-  twitterUrl   String?
-  matrix       String? @db.VarChar(128)
-  registryId   String? @db.VarChar(64)
-  region       String?
-  postalCode   String?
-  vatNumber    String? @db.VarChar(32)
-
-  Lead             Lead[]
-  Location         Location[]
-  Reviews          Review[]          @relation("CompanyReviews")
-  UserCompany      UserCompany[]
-  responseSettings ResponseSettings?
-
-  @@index([name])
-  @@index([activity])
-  @@index([matrix])
+  @@unique([siteId, visitorId])
+  @@index([siteId, lastActivityAt])
 }
 
-model UserCompany {
+model WebchatMessage {
   id        String      @id @default(cuid())
-  userId    String
-  companyId String
-  role      CompanyRole @default(MEMBER)
+  siteId    String
+  sessionId String
+  role      WebchatRole
+  text      String
+  payload   Json?
   createdAt DateTime    @default(now())
 
-  Company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  User      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Site    WebchatSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  Session WebchatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
-
-  @@unique([userId, companyId])   // ← NUEVO: evita duplicados de pares user-company
-  @@index([userId])
-  @@index([companyId])
+  @@index([siteId, createdAt])
+  @@index([sessionId, createdAt])
 }
 
+model KnowledgeItem {
+  id         String              @id @default(cuid())
+  companyId  String
+  siteId     String?
+  title      String
+  content    String
+  visibility KnowledgeVisibility @default(PUBLIC)
 
-model Lead {
-  id        String     @id @default(cuid())
-  companyId String
-  ownerId   String?
-  name      String
-  email     String?
-  phone     String?
-  source    LeadSource @default(UNKNOWN)
-  status    LeadStatus @default(NEW)
-  notes     String?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @default(now()) @updatedAt
-  company   Company    @relation(fields: [companyId], references: [id])
-
-  @@index([companyId])
-  @@index([ownerId])
-  @@index([status])
-}
-
-model Location {
-  id                   String          @id @default(cuid())
-  companyId            String
-  title                String
-  address              String?
-  city                 String?
-  region               String?
-  country              String?
-  postalCode           String?
-  phone                String?
-  website              String?
-  googleName           String?
-  googlePlaceId        String?         @unique
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @default(now()) @updatedAt
-  address2             String?
-  countryCode          String?         @db.VarChar(2)
-  email                String?
-  externalConnectionId String?
-  facebookUrl          String?
-  featuredImageUrl     String?
-  googleAccountId      String?
-  googleLocationId     String?
-  instagramUrl         String?
-  lastSyncAt           DateTime?
-  latitude             Decimal?        @db.Decimal(10, 7)
-  longitude            Decimal?        @db.Decimal(10, 7)
-  openingHours         Json?
-  reviewsAvg           Decimal?        @db.Decimal(3, 2)
-  reviewsCount         Int             @default(0)
-  slug                 String?         @unique
-  status               LocationStatus? @default(DRAFT)
-  timezone             String?
-  isFeatured           Boolean         @default(false)
-
-  // 🎯 NUEVO: relación Actividad → Tipo
-  activityId           String?
-  typeId               String?
-
-  activity             Activity?       @relation(fields: [activityId], references: [id])
-  type                 Type?           @relation(fields: [typeId], references: [id])
-
-  company            Company             @relation(fields: [companyId], references: [id])
-  ExternalConnection ExternalConnection? @relation(fields: [externalConnectionId], references: [id])
-  Reviews            Review[]            @relation("LocationReviews")
-  KpiDaily           LocationKpiDaily[]  @relation("LocationToKpiDaily")
-  UserLocation       UserLocation[]
-  jobs Job[]   // inversa de Job.location
-
-
-  @@index([companyId])
-  @@index([googleAccountId])
-  @@index([status])
-  @@index([activityId])
-  @@index([typeId])
-}
-
-model UserLocation {
-  id         String       @id @default(cuid())
-  userId     String
-  locationId String
-  role       LocationRole @default(VIEWER)
-  createdAt  DateTime     @default(now())
-
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, locationId])
-  @@index([locationId])
-}
-
-model Review {
-  id              String         @id @default(cuid())
-  companyId       String
-  locationId      String
-  provider        ReviewProvider
-  externalId      String
-  reviewerName    String?
-  reviewerPhoto   String?
-  reviewerAnon    Boolean?
-  rating          Int
-  comment         String?
-  languageCode    String?        @db.VarChar(8)
-  createdAtG      DateTime?
-  updatedAtG      DateTime?
-  replyComment    String?
-  replyUpdatedAtG DateTime?
-  ingestedAt      DateTime       @default(now())
-  updatedAt       DateTime       @default(now()) @updatedAt
-  responses       Response[]
-  Company         Company        @relation("CompanyReviews", fields: [companyId], references: [id], onDelete: Cascade)
-  Location        Location       @relation("LocationReviews", fields: [locationId], references: [id], onDelete: Cascade)
-  analysis  ReviewAnalysis?   // ← NUEVO: inversa 1:1 de ReviewAnalysis.review
-  jobs      Job[]             // ← NUEVO: inversa de Job.review
-
-
-  @@unique([provider, externalId])
-  @@index([companyId])
-  @@index([locationId])
-  @@index([rating])
-  @@index([createdAtG])
-}
-
-model Response {
-  id              String         @id @default(cuid())
-  reviewId        String
-  content         String
-  status          ResponseStatus @default(PENDING)
-  active          Boolean        @default(true)
-  published       Boolean        @default(false)
-  edited          Boolean        @default(false)
-  generationCount Int            @default(1)
-  lastGeneratedAt DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  publishedAt     DateTime?
-  createdById     String?
-  editedById      String?
-  source          ResponseSource @default(AI)
-  model           String?
-  temperature     Float?
-  promptVersion   String?
-  language        String?
-  tone            String?
-  businessType    String?
-  moderationFlag  Boolean        @default(false)
-  moderationNotes String?
-  lastError       String?
-  createdBy       User?          @relation("ResponseCreatedBy", fields: [createdById], references: [id])
-  editedBy        User?          @relation("ResponseEditedBy", fields: [editedById], references: [id])
-  review          Review         @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  publishLogs ResponsePublishLog[]  // ← NUEVO: inversa de ResponsePublishLog.response
-  jobs        Job[]                 // ← NUEVO: inversa de Job.response
-
-
-  @@index([reviewId])
-  @@index([status, published, active])
-}
-
-model LocationKpiDaily {
-  id           String   @id @default(cuid())
-  companyId    String
-  locationId   String
-  snapshotDate DateTime
-
-  // Métricas base
-  totalReviews    Int
-  newReviews7d    Int
-  newReviews30d   Int
-  unansweredCount Int
-  answeredRate    Int
-  avgAll          Decimal? @db.Decimal(3, 2)
-  avg30d          Decimal? @db.Decimal(3, 2)
-  prev30dAvg      Decimal? @db.Decimal(3, 2)
-  responses7d     Int
-  responseAvgSec  Int?
-  lastComputedAt  DateTime @default(now())
-
-  // Relaciones explícitas + nombres (para evitar ambigüedades)
-  company  Company  @relation(name: "CompanyToKpiDaily", fields: [companyId], references: [id], onDelete: Cascade)
-  location Location @relation(name: "LocationToKpiDaily", fields: [locationId], references: [id], onDelete: Cascade)
-
-  @@unique([locationId, snapshotDate])
-  @@index([companyId, snapshotDate])
-  @@index([snapshotDate])
-}
-
-model ResponseSettings {
-  id        String  @id @default(cuid())
-  companyId String  @unique
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  config Json
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  createdByUserId String?
-  updatedByUserId String?
-
-  @@index([updatedAt])
-}
-
-model Activity {
-  id        String     @id @default(cuid())
-  name      String     @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relaciones
-  types     Type[]
-  locations Location[]   // ← inversa de Location.activity
+  company Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site    WebchatSite? @relation(fields: [siteId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-}
-
-model Type {
-  id          String     @id @default(cuid())
-  name        String
-  activityId  String
-  activity    Activity   @relation(fields: [activityId], references: [id])
-
-  // Relaciones
-  locations   Location[]   // ← inversa de Location.type
-
-  @@unique([activityId, name])
-  @@index([activityId])
-
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-}
-
-// Análisis de reviews para tendencias, palabras clave y sentimiento
-model ReviewAnalysis {
-  id          String     @id @default(cuid())
-  reviewId    String     @unique
-  language    String?    @db.VarChar(8)
-  sentiment   Sentiment?
-  summary     String?
-  keyPhrases  String[]   // PG: text[]
-  categories  String[]   // PG: text[] (ej. ["servicio","precio"])
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  review      Review     @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-
-  @@index([sentiment])
-  @@index([createdAt])
-}
-
-// Auditoría de publicación de respuestas a proveedores (Google, etc.)
-model ResponsePublishLog {
-  id            String         @id @default(cuid())
-  responseId    String
-  provider      ReviewProvider
-  publishedAt   DateTime?
-  externalMsgId String?
-  payload       Json?
-  error         String?
-  createdAt     DateTime       @default(now())
-
-  response      Response       @relation(fields: [responseId], references: [id], onDelete: Cascade)
-
-  @@index([responseId, createdAt])
-  @@index([provider, createdAt])
-}
-
-// Cola de trabajos (generación, publicación, sync, KPIs…)
-model Job {
-  id          String     @id @default(cuid())
-  type        JobType
-  status      JobStatus  @default(QUEUED)
-  payload     Json?
-  attempts    Int        @default(0)
-  lastError   String?
-  scheduledAt DateTime?
-  startedAt   DateTime?
-  finishedAt  DateTime?
-  companyId   String?
-  locationId  String?
-  reviewId    String?
-  responseId  String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  company   Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  location  Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  review    Review?   @relation(fields: [reviewId], references: [id], onDelete: SetNull)
-  response  Response? @relation(fields: [responseId], references: [id], onDelete: SetNull)
-
-  @@index([status, type, scheduledAt])
   @@index([companyId])
-  @@index([locationId])
-  @@index([reviewId])
-  @@index([responseId])
+  @@index([siteId])
+  @@index([visibility])
 }
-
-

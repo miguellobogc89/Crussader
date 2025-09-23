@@ -1,21 +1,28 @@
-// app/components/admin/LocationsTable.tsx
-import Link from "next/link";
-import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
-import { Badge } from "@/app/components/ui/badge";
-import { Calendar, Star } from "lucide-react";
-import LocationRowActions from "@/app/components/admin/LocationRowActions";
+"use client";
 
-function formatTime(d: Date | null | undefined) {
-  if (!d) return "—";
+import * as React from "react";
+import Link from "next/link";
+import { Badge } from "@/app/components/ui/badge";
+import { Star } from "lucide-react";
+import LocationRowActions from "@/app/components/admin/LocationRowActions";
+import { useAdminLocations } from "@/hooks/useAdminLocations";
+import AdminSearch from "@/app/components/admin/AdminSearch";
+
+function formatTimeISO(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
   return new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(d);
 }
-function formatDate(d: Date | null | undefined) {
-  if (!d) return "—";
+
+function formatDateISO(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
   return new Intl.DateTimeFormat("es-ES", { year: "numeric", month: "short", day: "2-digit" }).format(d);
 }
-function timeAgoOrDash(d: Date | null | undefined) {
-  if (!d) return "—";
+
+function timeAgoOrDashISO(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
   const diff = Date.now() - d.getTime();
   const m = Math.floor(diff / 60000);
   if (m < 1) return "Hace <1 min";
@@ -37,107 +44,54 @@ const getStatusBadge = (status: string, connected: boolean) => {
       return <Badge variant="outline">Desconocido</Badge>;
   }
 };
+
 const getRatingColor = (rating: number) => {
   if (rating >= 4.5) return "text-green-600";
   if (rating >= 4.0) return "text-yellow-600";
   return "text-red-600";
 };
 
-export default async function LocationsTable({
-  lq, lpage, uq, upage, cq, cpage,
-}: { lq: string; lpage: number; uq: string; upage: number; cq: string; cpage: number; }) {
-  const take = 20;
-  const page = Math.max(1, lpage || 1);
-  const skip = (page - 1) * take;
+export default function LocationsTable({
+  lq = "",
+  lpage = 1,
+  uq = "",
+  upage = 1,
+  cq = "",
+  cpage = 1,
+}: {
+  lq?: string;
+  lpage?: number;
+  uq?: string;
+  upage?: number;
+  cq?: string;
+  cpage?: number;
+})
+ {
+  const take = 10;
+  const { data, isLoading, error } = useAdminLocations(lq ?? "", lpage || 1, take);
 
-  const where: Prisma.LocationWhereInput = lq
-    ? {
-        OR: [
-          { title: { contains: lq, mode: "insensitive" } },
-          { company: { name: { contains: lq, mode: "insensitive" } } },
-          { city: { contains: lq, mode: "insensitive" } },
-          { country: { contains: lq, mode: "insensitive" } },
-          { type: { name: { contains: lq, mode: "insensitive" } } },
-          { activity: { name: { contains: lq, mode: "insensitive" } } },
-        ],
-      }
-    : {};
-
-  const [total, locations] = await Promise.all([
-    prisma.location.count({ where }),
-    prisma.location.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        title: true,
-        address: true,
-        city: true,
-        postalCode: true,
-        // 👇 Traemos SOLO el nombre para no renderizar objetos
-        type: { select: { name: true } },
-        activity: { select: { name: true } },
-        status: true,
-        createdAt: true,
-        lastSyncAt: true,
-        googlePlaceId: true,
-        reviewsAvg: true,
-        reviewsCount: true,
-        company: { select: { id: true, name: true } },
-        ExternalConnection: { select: { id: true } },
-      },
-      skip,
-      take,
-    }),
-  ]);
-
+  const total = data?.total ?? 0;
+  const page = data?.page ?? Math.max(1, lpage || 1);
   const pages = Math.max(1, Math.ceil(total / take));
+  const locations = data?.locations ?? [];
+
 
   return (
     <section>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-xl md:text-2xl font-bold text-neutral-900 tracking-tight">
-            Ubicaciones
-          </h2>
-          <p className="text-sm text-neutral-500">
-            {total} ubicacione{total === 1 ? "" : "s"} en total
-          </p>
+          <h2 className="text-xl md:text-2xl font-bold text-neutral-900 tracking-tight">Ubicaciones</h2>
+          <p className="text-sm text-neutral-500">{total} ubicacione{total === 1 ? "" : "s"} en total</p>
         </div>
 
-        <form method="get" className="flex items-center gap-2">
-          <input
-            type="text"
+        <div className="flex items-center gap-3">
+          <AdminSearch
             name="lq"
-            defaultValue={lq}
             placeholder="Buscar por nombre, empresa, ciudad, categoría…"
-            className="w-80 rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-violet-400"
+            defaultValue={lq}
+            hiddenParams={{ tab: "locations", uq, upage, cq, cpage }}
           />
-          {/* preserva estado de otras tablas */}
-          <input type="hidden" name="cq" value={cq} />
-          <input type="hidden" name="cpage" value={String(cpage)} />
-          <input type="hidden" name="uq" value={uq} />
-          <input type="hidden" name="upage" value={String(upage)} />
-          <button
-            type="submit"
-            className="rounded-md border px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
-          >
-            Buscar
-          </button>
-          {lq && (
-            <Link
-              href={`/admin?${new URLSearchParams({
-                cq,
-                cpage: String(cpage),
-                uq,
-                upage: String(upage),
-              }).toString()}`}
-              className="text-sm text-violet-700 hover:underline"
-            >
-              Limpiar
-            </Link>
-          )}
-        </form>
+        </div>
       </div>
 
       <div className="rounded-xl border border-neutral-200 bg-white shadow-sm">
@@ -155,120 +109,129 @@ export default async function LocationsTable({
         </div>
         <hr className="border-neutral-200" />
 
-        <ul className="divide-y divide-neutral-200">
-          {locations.map((loc) => {
-            const connected = Boolean(loc.googlePlaceId || loc.ExternalConnection?.id);
-            const companyName = loc.company?.name || "—";
-            const city = loc.city || "—";
-            const street = loc.address || "—";
-
-            const activityName = loc.activity?.name ?? null;
-            const typeName = loc.type?.name ?? null;
-            const category = typeName ?? activityName ?? "—";
-
-            const createdTime = formatTime(loc.createdAt);
-            const createdDate = formatDate(loc.createdAt);
-
-            const rating = typeof loc.reviewsAvg === "number"
-              ? loc.reviewsAvg
-              : Number(loc.reviewsAvg ?? 0) || 0;
-
-            const reviews = loc.reviewsCount ?? 0;
-            const monthlyReviews = 0;
-            const responseRate = 0;
-            const lastSync = timeAgoOrDash(loc.lastSyncAt);
-
-            // Mapear enum a etiquetas usadas por getStatusBadge
-            const status =
-              loc.status === "ACTIVE" ? "active"
-              : loc.status === "PENDING_VERIFICATION" ? "pending"
-              : connected ? "active"
-              : "disconnected";
-
-            return (
-              <li key={loc.id} className="grid grid-cols-12 gap-2 px-4 py-4 items-center">
-                {/* Ubicación: empresa (bold) · ciudad · calle */}
-                <div className="col-span-3 min-w-0 text-left">
-                  <div className="truncate font-semibold text-neutral-900" title={companyName}>
-                    {companyName}
-                  </div>
-                  <div className="text-xs text-neutral-500 truncate" title={city}>
-                    {city}
-                  </div>
-                  <div className="text-xs text-neutral-500 truncate" title={street}>
-                    {street}
-                  </div>
-                </div>
-
-                <div className="col-span-1 text-center">
-                  <Badge variant="outline">{category}</Badge>
-                </div>
-
-                <div className="col-span-1 text-center whitespace-nowrap">
-                  <div className="text-sm text-neutral-800">{createdTime}</div>
-                  <div className="text-xs text-neutral-500">{createdDate}</div>
-                </div>
-
-                <div className="col-span-1 text-center whitespace-nowrap">
-                  {getStatusBadge(status, connected)}
-                </div>
-
-                <div className="col-span-1 text-center whitespace-nowrap">
-                  <div className="inline-flex items-center justify-center gap-1">
-                    <Star className={`h-4 w-4 ${getRatingColor(rating)}`} />
-                    <span className={`font-medium ${getRatingColor(rating)}`}>{rating.toFixed(1)}</span>
-                  </div>
-                </div>
-
-                <div className="col-span-1 text-center font-medium text-neutral-800 whitespace-nowrap">
-                  {reviews}
-                </div>
-
-                <div className="col-span-1 text-center whitespace-nowrap">
-                  <Badge variant={monthlyReviews > 0 ? "default" : "secondary"}>
-                    {monthlyReviews > 0 ? `+${monthlyReviews}` : "0"}
-                  </Badge>
-                </div>
-
-                <div className="col-span-1 text-center whitespace-nowrap">
-                  <div
-                    className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      responseRate >= 90
-                        ? "bg-green-100 text-green-700"
-                        : responseRate >= 70
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {responseRate}%
-                  </div>
-                </div>
-
-                <div className="col-span-1 text-center text-sm text-neutral-600 whitespace-nowrap">
-                  {lastSync}
-                </div>
-
-                <div className="col-span-1 flex items-center justify-end">
-                  <LocationRowActions locationId={loc.id} />
-                </div>
+        {isLoading && (
+          <ul className="divide-y divide-neutral-200">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <li key={i} className="grid grid-cols-12 gap-2 px-4 py-4">
+                <div className="col-span-12 h-6 bg-neutral-100 animate-pulse rounded" />
               </li>
-            );
-          })}
+            ))}
+          </ul>
+        )}
 
-          {locations.length === 0 && (
-            <li className="px-4 py-10 text-center text-sm text-neutral-500">
-              No hay ubicaciones que coincidan con la búsqueda.
-            </li>
-          )}
-        </ul>
+        {!isLoading && error && (
+          <div className="px-4 py-8 text-sm text-red-600">Error cargando ubicaciones.</div>
+        )}
+
+        {!isLoading && !error && (
+          <ul className="divide-y divide-neutral-200">
+            {locations.map((loc) => {
+              const connected = Boolean(loc.googlePlaceId || loc.ExternalConnection?.id);
+              const companyName = loc.company?.name || "—";
+              const city = loc.city || "—";
+              const street = loc.address || "—";
+
+              const activityName = loc.activity?.name ?? null;
+              const typeName = loc.type?.name ?? null;
+              const category = typeName ?? activityName ?? "—";
+
+              const createdTime = formatTimeISO(loc.createdAt);
+              const createdDate = formatDateISO(loc.createdAt);
+
+              const rating = typeof loc.reviewsAvg === "number"
+                ? loc.reviewsAvg
+                : Number(loc.reviewsAvg ?? 0) || 0;
+
+              const reviews = loc.reviewsCount ?? 0;
+              const monthlyReviews = 0;
+              const responseRate = 0;
+              const lastSync = timeAgoOrDashISO(loc.lastSyncAt);
+
+              const status =
+                loc.status === "ACTIVE" ? "active"
+                : loc.status === "PENDING_VERIFICATION" ? "pending"
+                : connected ? "active"
+                : "disconnected";
+
+              return (
+                <li key={loc.id} className="grid grid-cols-12 gap-2 px-4 py-4 items-center">
+                  <div className="col-span-3 min-w-0 text-left">
+                    <div className="truncate font-semibold text-neutral-900" title={companyName}>{companyName}</div>
+                    <div className="text-xs text-neutral-500 truncate" title={city}>{city}</div>
+                    <div className="text-xs text-neutral-500 truncate" title={street}>{street}</div>
+                  </div>
+
+                  <div className="col-span-1 text-center">
+                    <Badge variant="outline">{category}</Badge>
+                  </div>
+
+                  <div className="col-span-1 text-center whitespace-nowrap">
+                    <div className="text-sm text-neutral-800">{createdTime}</div>
+                    <div className="text-xs text-neutral-500">{createdDate}</div>
+                  </div>
+
+                  <div className="col-span-1 text-center whitespace-nowrap">
+                    {getStatusBadge(status, connected)}
+                  </div>
+
+                  <div className="col-span-1 text-center whitespace-nowrap">
+                    <div className="inline-flex items-center justify-center gap-1">
+                      <Star className={`h-4 w-4 ${getRatingColor(rating)}`} />
+                      <span className={`font-medium ${getRatingColor(rating)}`}>{rating.toFixed(1)}</span>
+                    </div>
+                  </div>
+
+                  <div className="col-span-1 text-center font-medium text-neutral-800 whitespace-nowrap">{reviews}</div>
+
+                  <div className="col-span-1 text-center whitespace-nowrap">
+                    <Badge variant={monthlyReviews > 0 ? "default" : "secondary"}>
+                      {monthlyReviews > 0 ? `+${monthlyReviews}` : "0"}
+                    </Badge>
+                  </div>
+
+                  <div className="col-span-1 text-center whitespace-nowrap">
+                    <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      responseRate >= 90 ? "bg-green-100 text-green-700"
+                      : responseRate >= 70 ? "bg-yellow-100 text-yellow-700"
+                      : "bg-red-100 text-red-700"
+                    }`}>
+                      {responseRate}%
+                    </div>
+                  </div>
+
+                  <div className="col-span-1 text-center text-sm text-neutral-600 whitespace-nowrap">
+                    {lastSync}
+                  </div>
+
+                  <div className="col-span-1 flex items-center justify-end">
+                    <LocationRowActions locationId={loc.id} />
+                  </div>
+                </li>
+              );
+            })}
+
+            {locations.length === 0 && (
+              <li className="px-4 py-10 text-center text-sm text-neutral-500">
+                No hay ubicaciones que coincidan con la búsqueda.
+              </li>
+            )}
+          </ul>
+        )}
       </div>
 
+      {/* Paginación */}
       <div className="mt-4 flex items-center justify-between text-sm text-neutral-600">
-        <div> Página {page} de {pages} · Mostrando {locations.length} / {total} </div>
+        <div>Página {page} de {pages} · Mostrando {locations.length} / {total}</div>
         <div className="flex items-center gap-2">
           <Link
             href={`/admin?${new URLSearchParams({
-              lq, lpage: String(Math.max(1, page - 1)), uq, upage: String(upage), cq, cpage: String(cpage),
+              lq,
+              lpage: String(Math.max(1, page - 1)),
+              uq,
+              upage: String(upage),
+              cq,
+              cpage: String(cpage),
+              tab: "locations",
             }).toString()}`}
             className="rounded-full border px-3 py-1.5 hover:bg-neutral-50 aria-disabled:opacity-50"
             aria-disabled={page <= 1}
@@ -277,7 +240,13 @@ export default async function LocationsTable({
           </Link>
           <Link
             href={`/admin?${new URLSearchParams({
-              lq, lpage: String(Math.min(pages, page + 1)), uq, upage: String(upage), cq, cpage: String(cpage),
+              lq,
+              lpage: String(Math.min(pages, page + 1)),
+              uq,
+              upage: String(upage),
+              cq,
+              cpage: String(cpage),
+              tab: "locations",
             }).toString()}`}
             className="rounded-full border px-3 py-1.5 hover:bg-neutral-50 aria-disabled:opacity-50"
             aria-disabled={page >= pages}

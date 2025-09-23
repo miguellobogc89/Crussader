@@ -1,0 +1,34 @@
+(()=>{if(typeof window>"u"||window.__crussaderChatLoaded)return;window.__crussaderChatLoaded=!0;let v=[];window.crussaderChat=(...i)=>v.push(i);function C(i){document.readyState==="complete"||document.readyState==="interactive"?setTimeout(i,0):document.addEventListener("DOMContentLoaded",i)}function f(i){return(window.__CRUSSADER_API_BASE__||"")+i}C(()=>{let m=(document.currentScript||document.querySelector('script[src*="wc.js"]'))?.getAttribute("data-key")||"demo-public-key-123",l=null,u=null,a={async bootstrap(e){let t=await fetch(f(`/api/webchat/bootstrap?key=${encodeURIComponent(e)}`));if(!t.ok)throw new Error("bootstrap error");return t.json()},sessionLSKey(e){return`crussader:webchat:session:${e}`},readSessionFromLS(e){try{return JSON.parse(localStorage.getItem(a.sessionLSKey(e))||"null")}catch{return null}},writeSessionToLS(e,t){try{localStorage.setItem(a.sessionLSKey(e),JSON.stringify(t))}catch{}},async ensureSessionByKey(e){let t=a.readSessionFromLS(e),n=t?.visitorId||(crypto?.randomUUID?.()??String(Date.now()));if(t?.sessionId&&t?.siteId)return l=t.siteId,u=t.sessionId,{siteId:t.siteId,sessionId:t.sessionId};let r=await fetch(f("/api/webchat/sessions"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:e,visitorId:n,meta:{ua:navigator.userAgent,lang:navigator.language,ref:document.referrer}})}),c=await r.json();if(!r.ok)throw new Error(c?.error||"session error");return a.writeSessionToLS(e,{visitorId:n,sessionId:c.sessionId,siteId:c.siteId}),l=c.siteId,u=c.sessionId,{siteId:l,sessionId:u}},async sendUserMessage(e){if(!l||!u)throw new Error("No session");let t=await fetch(f("/api/webchat/messages"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({siteId:l,sessionId:u,role:"USER",text:e})}),n=await t.json();if(!t.ok)throw new Error(n?.error||"send error");return n}},d=document.createElement("div");d.id="crussader-chat-host",d.style.position="fixed",d.style.zIndex="2147483647",d.style.bottom="20px",d.style.right="20px",document.body.appendChild(d);let h=d.attachShadow({mode:"open"}),y="#7c3aed",E=document.createElement("style");E.textContent=`
+      :host { all: initial; }
+      .btn { width:56px; height:56px; border-radius:9999px; display:grid; place-items:center; background:${y};
+             color:#fff; border:none; box-shadow:0 8px 24px rgba(0,0,0,.18); cursor:pointer; }
+      .panel { position:fixed; right:0; bottom:86px; width:min(360px,90vw); height:520px; background:#fff;
+               border-radius:16px; box-shadow:0 16px 48px rgba(0,0,0,.16); border:1px solid rgba(0,0,0,.06);
+               display:none; overflow:hidden; }
+      .header { height:56px; background:${y}; color:#fff; display:flex; align-items:center; justify-content:space-between; padding:0 14px; font:600 14px system-ui,sans-serif; }
+      .body { display:flex; flex-direction:column; height:calc(100% - 56px); background:#fafafa; }
+      .msgs { flex:1; overflow:auto; padding:12px; font:14px/1.4 system-ui,sans-serif; color:#111; }
+      .row { margin:8px 0; display:flex; }
+      .row.user { justify-content:flex-end; }
+      .bubble { max-width:80%; padding:10px 12px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; white-space:pre-wrap; }
+      .row.user .bubble { background:#eef2ff; }
+      .input { display:flex; gap:8px; padding:10px; background:#fff; border-top:1px solid #eee; }
+      .input input { flex:1; border:1px solid #e5e7eb; border-radius:10px; padding:10px; font:14px system-ui,sans-serif; }
+      .input button { background:${y}; color:#fff; border:none; padding:10px 14px; border-radius:10px; cursor:pointer; }
+      .close { background:rgba(255,255,255,.2); color:#fff; border:none; padding:6px 10px; border-radius:8px; cursor:pointer; }
+    `,h.appendChild(E);let p=document.createElement("button");p.className="btn",p.setAttribute("aria-label","Abrir chat"),p.innerHTML=`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M21 12c0 4.418-4.03 8-9 8-1.003 0-1.966-.146-2.86-.416L3 20l1.52-4.28C4.191 14.79 4 13.915 4 13c0-4.418 4.03-8 9-8s9 3.582 9 7z"
+        stroke="white" stroke-width="1.5" fill="none"/></svg>`,h.appendChild(p);let s=document.createElement("div");s.className="panel",s.innerHTML=`
+      <div class="header">
+        <div>Chat con Crussader</div>
+        <button class="close">Cerrar</button>
+      </div>
+      <div class="body">
+        <div class="msgs" id="msgs"></div>
+        <div class="input">
+          <input id="msgInput" placeholder="Escribe tu mensaje..." />
+          <button id="sendBtn">Enviar</button>
+        </div>
+      </div>
+    `,h.appendChild(s);let w=s.querySelector("#msgs"),x=s.querySelector("#msgInput"),L=s.querySelector("#sendBtn"),_=s.querySelector(".close"),b=!1;function g(){b||(s.style.display="block",b=!0)}function S(){b&&(s.style.display="none",b=!1)}function o(e,t){let n=document.createElement("div");n.className="row "+e;let r=document.createElement("div");r.className="bubble",r.textContent=t,n.appendChild(r),w.appendChild(n),w.scrollTop=w.scrollHeight}p.addEventListener("click",()=>b?S():g()),_.addEventListener("click",S),(async()=>{try{let e=await a.bootstrap(m);if(l=e.site.id,await a.ensureSessionByKey(m),e.allowPrivate&&e.user){let t=e.user.name||e.user.email||"usuario",n=e.company?.plan??"free",r=e.counts?.locations??0,c=e.responseSettings?.configured?"\u2705 voz de marca configurada":"\u26A0\uFE0F voz de marca sin configurar";g(),o("bot",`\xA1Hola ${t}! \u{1F44B}`),o("bot",`Est\xE1s en ${e.company?.name??"tu empresa"} \xB7 plan: ${n} \xB7 ubicaciones: ${r} \xB7 ${c}.`),o("bot","\xBFEn qu\xE9 te ayudo? Puedo guiarte para configurar el webchat o tus respuestas.")}else{let t=e.site?.settings?.greeting;t&&(g(),o("bot",t))}}catch(e){console.error("[webchat] init error:",e)}})();async function I(){let e=(x.value||"").trim();if(e){o("user",e),x.value="";try{let t=await a.sendUserMessage(e);t?.botMessage?.text&&o("bot",t.botMessage.text)}catch(t){console.error("[webchat] send error:",t),o("bot","\u26A0\uFE0F No he podido enviar tu mensaje ahora mismo.")}}}L.addEventListener("click",I),x.addEventListener("keydown",e=>{e.key==="Enter"&&I()});function k(e,t){switch(e){case"open":g();break;case"close":S();break;case"identify":o("bot","\u2705 Usuario: "+JSON.stringify(t));break;case"message":t?.text&&o(t.role==="user"?"user":"bot",t.text);break;default:console.warn("[crussaderChat] comando desconocido:",e)}}v.forEach(e=>k(e[0],e[1])),window.crussaderChat=k,console.info("[crussaderChat] Widget cargado")})})();
+//# sourceMappingURL=index.js.map

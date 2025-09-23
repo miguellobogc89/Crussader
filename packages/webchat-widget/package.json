@@ -1,0 +1,23 @@
+{
+  "name": "@crussader/webchat-widget",
+  "version": "0.0.1",
+  "private": false,
+  "type": "module",
+  "main": "dist/wc.js",
+  "module": "dist/wc.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/wc.mjs",
+      "default": "./dist/wc.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsup src/index.ts --format iife --global-name CrussaderWC --watch --sourcemap --out-dir dist",
+    "build": "tsup src/index.ts --format iife,esm --global-name CrussaderWC --minify --sourcemap --out-dir dist"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.6.0"
+  }
+}

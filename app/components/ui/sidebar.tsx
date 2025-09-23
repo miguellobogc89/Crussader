@@ -193,28 +193,56 @@ const Sidebar = React.forwardRef<
 
     if (isMobile) {
       return (
-        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-          <SheetContent
-            data-sidebar="sidebar"
-            data-mobile="true"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+        <>
+          {/* 🚧 Rail fijo con iconos (visible SIEMPRE en móvil) */}
+          <div
+            className={cn(
+              "group fixed inset-y-0 z-10 md:hidden",
+              side === "left" ? "left-0" : "right-0",
+              // ancho columna de iconos
+              "w-[--sidebar-width-icon] border-r bg-sidebar text-sidebar-foreground"
+            )}
+            data-state="collapsed"
+            data-collapsible={collapsible === "icon" ? "icon" : "offcanvas"}
+            data-variant={variant}
+            data-side={side}
             style={
               {
-                "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+                "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
               } as React.CSSProperties
             }
-            side={side}
           >
-            {/* 🔽 Título accesible oculto */}
-            <SheetHeader className="sr-only">
-              <SheetTitle>Menú lateral</SheetTitle>
-            </SheetHeader>
+            <div
+              data-sidebar="sidebar"
+              className="flex h-full w-full flex-col"
+            >
+              {children}
+            </div>
+          </div>
 
-            <div className="flex h-full w-full flex-col">{children}</div>
-          </SheetContent>
-        </Sheet>
+          {/* 📱 Menú completo tipo Drawer cuando está "abierto" en móvil */}
+          <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+            <SheetContent
+              data-sidebar="sidebar"
+              data-mobile="true"
+              className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+              style={
+                {
+                  "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+                } as React.CSSProperties
+              }
+              side={side}
+            >
+              <SheetHeader className="sr-only">
+                <SheetTitle>Menú lateral</SheetTitle>
+              </SheetHeader>
+              <div className="flex h-full w-full flex-col">{children}</div>
+            </SheetContent>
+          </Sheet>
+        </>
       )
     }
+
 
 
     return (
@@ -327,10 +355,9 @@ const SidebarInset = React.forwardRef<
     <main
       ref={ref}
       className={cn(
-        // base: ocupa todo, sin márgenes externos
         "relative flex min-h-svh flex-1 flex-col bg-background",
-        // ❌ quitamos los m-2, ml-2, rounded y shadow
-        // ✅ mantenemos solo la altura mínima si hace falta
+        // 👇 deja hueco fijo de 3rem (48px) en móvil para el rail de iconos
+        "pl-12 md:pl-0",
         "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))]",
         className
       )}

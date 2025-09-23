@@ -1,7 +1,7 @@
 // hooks/useCompanyLocations.ts
 "use client";
 
-import { useState } from "react";
+import { useQuery, QueryClient } from "@tanstack/react-query";
 
 export type LocationRow = {
   id: string;
@@ -13,28 +13,57 @@ export type LocationRow = {
   reviewsCount: number;
   googlePlaceId?: string | null;
   externalConnectionId?: string | null;
-  ExternalConnection?: { id: string; accountEmail: string | null } | null; // 👈
+  ExternalConnection?: { id: string; accountEmail: string | null } | null;
 };
 
-export function useCompanyLocations(companyId: string) {
-  const [locations, setLocations] = useState<LocationRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+const qk = {
+  companyLocations: (companyId: string) =>
+    ["company", companyId, "locations"] as const,
+};
 
-  async function loadLocations() {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch(`/api/companies/${companyId}/locations`, { cache: "no-store" });
-      const data = await res.json();
-      if (res.ok && data.ok) setLocations(data.locations ?? []);
-      else setError(data?.error ?? "fetch_error");
-    } catch {
-      setError("network_error");
-    } finally {
-      setLoading(false);
-    }
+async function fetchCompanyLocations(companyId: string): Promise<LocationRow[]> {
+  const res = await fetch(`/api/companies/${companyId}/locations`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    // Dejamos la coherencia de cache a React Query; evitamos cache del navegador
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `GET /api/companies/${companyId}/locations → HTTP ${res.status}`
+    );
   }
 
-  return { locations, loading, error, loadLocations, setLocations };
+  const json = await res.json();
+  // Tu API devuelve { ok, locations } — respetamos eso
+  const rows: LocationRow[] = json?.locations ?? [];
+  return rows;
+}
+
+/**
+ * Hook de lectura con cache gestionado por React Query.
+ * Acepta companyId nullable; la queryKey siempre es estable y se bloquea con enabled.
+ */
+export function useCompanyLocations(companyId: string | null) {
+  const id = companyId ?? "pending";
+
+  return useQuery<LocationRow[], Error>({
+    queryKey: qk.companyLocations(id),
+    queryFn: () => fetchCompanyLocations(id),
+    enabled: Boolean(companyId),
+  });
+}
+
+/**
+ * Utilidad de prefetch para el “buffer” tras login.
+ */
+export async function prefetchCompanyLocations(
+  client: QueryClient,
+  companyId: string
+) {
+  await client.prefetchQuery({
+    queryKey: qk.companyLocations(companyId),
+    queryFn: () => fetchCompanyLocations(companyId),
+  });
 }

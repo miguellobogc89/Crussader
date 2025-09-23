@@ -7,20 +7,19 @@ import { Button } from "@/app/components/ui/button";
 import { Plus, Building2, Settings } from "lucide-react";
 import ListToolbar from "@/app/components/ListToolbar";
 import SectionLayout from "@/app/components/layouts/SectionLayout";
+import PreloadCompanyBuffer from "@/app/components/buffer/PreloadCompanyBuffer";
 
 import {
   CompanyModal,
   type CompanyForm, // { name, email, phone, address, employeesBand }
 } from "@/app/components/company/CompanyModal";
 
-import { CompanyInfoCard } from "@/app/components/company/cards/CompanyInfoCard";
-import { EstablishmentsCard } from "@/app/components/company/cards/EstablishmentsCard";
-import { AverageRatingCard } from "@/app/components/company/cards/AverageRatingCard";
-import { GrowthCard } from "@/app/components/company/cards/GrowthCard";
+import CompanyKpiRow from "@/app/components/company/cards/CompanyKpiRow";
 
 import { AddLocationsModal, type NewLocation } from "@/app/components/company/AddLocationsModal";
 import { EstablishmentCard } from "@/app/components/company/EstablishmentCard";
 import type { LocationRow } from "@/hooks/useCompanyLocations";
+import { useCompanySummary } from "@/hooks/useCompanySummary";
 
 /* ----------------------- helpers (fetchers) ----------------------- */
 
@@ -31,20 +30,6 @@ async function fetchMyCompanies(): Promise<CompanyRow[]> {
   if (!r.ok) return [];
   const j = await r.json();
   return Array.isArray(j?.companies) ? j.companies : [];
-}
-
-type Metrics = {
-  totalEstablishments: number;
-  totalReviews: number;
-  averageRating: number;
-  monthlyGrowthPct: number;
-};
-
-async function fetchSummary(companyId: string): Promise<Metrics | null> {
-  const r = await fetch(`/api/companies/${companyId}/summary`, { cache: "no-store" });
-  if (!r.ok) return null;
-  const j = await r.json();
-  return j?.metrics ?? null;
 }
 
 type CompanyDetails = {
@@ -77,7 +62,9 @@ export default function CompanyPage() {
   const [companyId, setCompanyId] = React.useState<string | null>(null);
   const [companyName, setCompanyName] = React.useState("Empresa");
   const [details, setDetails] = React.useState<CompanyDetails | null>(null);
-  const [metrics, setMetrics] = React.useState<Metrics | null>(null);
+
+  // Metrics desde buffer (React Query)
+  const { data: metrics, isLoading: metricsLoading } = useCompanySummary(companyId);
 
   // Modal (crear/editar empresa)
   const [modalOpen, setModalOpen] = React.useState(false);
@@ -116,9 +103,8 @@ export default function CompanyPage() {
         setCompanyId(c.id);
         setCompanyName(c.name ?? "Empresa");
 
-        const [m, d] = await Promise.all([fetchSummary(c.id), fetchCompanyDetails(c.id)]);
+        const d = await fetchCompanyDetails(c.id);
         if (abort) return;
-        setMetrics(m);
         setDetails(d);
       } else {
         setHasCompany(false);
@@ -132,7 +118,7 @@ export default function CompanyPage() {
     };
   }, []);
 
-  // cargar locations
+  // cargar locations (aún sin migrar a React Query; lo haremos en el siguiente paso)
   const loadLocations = React.useCallback(async () => {
     if (!companyId) return;
     setLocsLoading(true);
@@ -291,14 +277,6 @@ export default function CompanyPage() {
 
   /* --------- formatos para cards --------- */
 
-  const avgText = loading || !metrics ? "—" : metrics.averageRating.toFixed(1);
-  const totRevText = loading || !metrics ? "—" : String(metrics.totalReviews);
-  const totLocText = loading || !metrics ? "—" : String(metrics.totalEstablishments);
-  const growthText =
-    loading || !metrics
-      ? "—"
-      : `${metrics.monthlyGrowthPct >= 0 ? "+" : ""}${metrics.monthlyGrowthPct.toFixed(0)}%`;
-
   const infoEmail = details?.email ?? "—";
   const infoPhone = details?.phone ?? "—";
   const infoAddress = details?.address ?? "—";
@@ -307,123 +285,125 @@ export default function CompanyPage() {
   /* ----------------------- render (compacto) ----------------------- */
 
   return (
-    <SectionLayout
-      icon={Building2}
-      title={companyName}
-      subtitle="Gestiona tu empresa y todos sus establecimientos"
-      // Acción a la derecha del header
-      headerContent={
-        <>
-          {/* acciones en la franja superior del header, alineadas a la derecha */}
-          <div className="flex items-center justify-end">
-            {hasCompany && companyId ? (
-              <Button variant="secondary" onClick={openEdit}>Gestionar empresa</Button>
-            ) : (
-              <Button onClick={openCreate}>
-                <Plus size={16} className="mr-2" />
-                Crear empresa
-              </Button>
+    <>
+      <PreloadCompanyBuffer companyId={companyId} />
+      <SectionLayout
+        icon={Building2}
+        title={companyName}
+        subtitle="Gestiona tu empresa y todos sus establecimientos"
+        // Acción a la derecha del header
+        headerContent={
+          <>
+            {/* acciones en la franja superior del header, alineadas a la derecha */}
+            <div className="flex items-center justify-end">
+              {hasCompany && companyId ? (
+                <Button variant="secondary" onClick={openEdit}>
+                  Gestionar empresa
+                </Button>
+              ) : (
+                <Button onClick={openCreate}>
+                  <Plus size={16} className="mr-2" />
+                  Crear empresa
+                </Button>
+              )}
+            </div>
+
+            {/* KPIs: ahora dentro del header, igual que en reviews */}
+            {hasCompany && (
+              <div className="mt-4">
+                <CompanyKpiRow
+                  key={companyId ?? "none"}
+                  companyId={companyId}
+                  name={companyName}
+                  email={infoEmail}
+                  phone={infoPhone}
+                  address={infoAddress}
+                  employeesText={infoEmployees}
+                />
+              </div>
             )}
+
+          </>
+        }
+      >
+        {/* Estado vacío (sin empresa) */}
+        {!hasCompany ? (
+          <div className="py-12 text-center space-y-3">
+            <h2 className="text-base font-semibold">Aún no tienes ninguna empresa</h2>
+            <p className="text-sm text-muted-foreground">
+              Crea tu empresa para empezar a gestionarla.
+            </p>
+            <Button onClick={openCreate}>
+              <Plus size={16} className="mr-2" />
+              Crear empresa
+            </Button>
           </div>
+        ) : (
+          <>
+            {/* Establecimientos */}
+            <section className="space-y-3">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                {/* Botón */}
+                <div>
+                  {companyId && (
+                    <Button onClick={() => setAddOpen(true)}>
+                      <Plus size={16} className="mr-2" />
+                      Añadir ubicación
+                    </Button>
+                  )}
+                </div>
 
-          {/* KPIs: ahora dentro del header, igual que en reviews */}
-          {hasCompany && (
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              <CompanyInfoCard
-                name={companyName}
-                email={infoEmail}
-                phone={infoPhone}
-                address={infoAddress}
-                employeesText={infoEmployees}
-              />
-              <EstablishmentsCard count={totLocText} />
-              <AverageRatingCard average={avgText} totalReviews={totRevText} />
-              <GrowthCard growthText={growthText} />
-            </div>
-          )}
-        </>
-      }
-    >
-      {/* Estado vacío (sin empresa) */}
-      {!hasCompany ? (
-        <div className="py-12 text-center space-y-3">
-          <h2 className="text-base font-semibold">Aún no tienes ninguna empresa</h2>
-          <p className="text-sm text-muted-foreground">
-            Crea tu empresa para empezar a gestionarla.
-          </p>
-          <Button onClick={openCreate}>
-            <Plus size={16} className="mr-2" />
-            Crear empresa
-          </Button>
-        </div>
-      ) : (
-        <>
-
-
-          {/* Establecimientos */}
-          <section className="space-y-3">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              {/* Botón */}
-              <div>
-                {companyId && (
-                  <Button onClick={() => setAddOpen(true)}>
-                    <Plus size={16} className="mr-2" />
-                    Añadir ubicación
-                  </Button>
-                )}
+                {/* Toolbar */}
+                <ListToolbar />
               </div>
 
-              {/* Toolbar */}
-              <ListToolbar />
-            </div>
+              {locsError && <div className="text-sm text-red-600">{locsError}</div>}
 
-            {locsError && <div className="text-sm text-red-600">{locsError}</div>}
+              {locsLoading ? (
+                <div className="grid gap-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="h-20 rounded border bg-gray-50 animate-pulse" />
+                  ))}
+                </div>
+              ) : locs.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-8 text-center">
+                  No hay ubicaciones todavía.
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {locs.map((loc) => (
+                    <EstablishmentCard
+                      key={loc.id}
+                      location={loc}
+                      onSync={() => handleSync(loc.id)}
+                      onConnect={() => handleConnect(loc.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
 
-            {locsLoading ? (
-              <div className="grid gap-3">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="h-20 rounded border bg-gray-50 animate-pulse" />
-                ))}
-              </div>
-            ) : locs.length === 0 ? (
-              <div className="text-sm text-muted-foreground py-8 text-center">
-                No hay ubicaciones todavía.
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {locs.map((loc) => (
-                  <EstablishmentCard
-                    key={loc.id}
-                    location={loc}
-                    onSync={() => handleSync(loc.id)}
-                    onConnect={() => handleConnect(loc.id)}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+        {/* Modales */}
+        <CompanyModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          mode={hasCompany ? "edit" : "create"}
+          values={form}
+          onChange={modalChange}
+          onSubmit={hasCompany ? onSubmitEdit : onSubmitCreate}
+          submitting={submitting}
+        />
 
-        </>
-      )}
-
-      {/* Modales */}
-      <CompanyModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        mode={hasCompany ? "edit" : "create"}
-        values={form}
-        onChange={modalChange}
-        onSubmit={hasCompany ? onSubmitEdit : onSubmitCreate}
-        submitting={submitting}
-      />
-
-      <AddLocationsModal
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        onSubmitSingle={onSubmitSingle}
-        onSubmitBulk={onSubmitBulk}
-        submitting={adding}
-      />
-    </SectionLayout>
+        <AddLocationsModal
+          open={addOpen}
+          onOpenChange={setAddOpen}
+          onSubmitSingle={onSubmitSingle}
+          onSubmitBulk={onSubmitBulk}
+          submitting={adding}
+        />
+      </SectionLayout>
+    </>
   );
 }

@@ -1,11 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // ⚠️ TEMPORAL: no bloquear el build por ESLint
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  // Mantén TypeScript estricto (no tocamos esta parte)
+  eslint: { ignoreDuringBuilds: true },
+
+  // clave para evitar el “Package prettier can't be external”
+  serverExternalPackages: [],
+
+  // por si acaso, transpilar este paquete
+  transpilePackages: ["@react-email/render"],
 };
 
 export default nextConfig;

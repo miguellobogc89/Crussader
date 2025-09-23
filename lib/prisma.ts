@@ -43,3 +43,20 @@ export const prisma: ExtendedPrismaClient = globalForPrisma.prisma ?? buildClien
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
+// 👇 Alias solo-tipado con todos los modelos visibles para TS
+import type { PrismaClient as PrismaClientType } from "@prisma/client";
+export const prismaModels = prisma as unknown as PrismaClientType;
+// (sigue exportando `prisma` como hasta ahora)
+// --- Cliente SIN extensiones (tipado estándar) para endpoints que requieren todos los modelos ---
+import { PrismaClient as PrismaClientBase } from "@prisma/client";
+
+let _prismaRaw: PrismaClientBase | undefined = (globalThis as any).__prismaRaw__;
+if (!_prismaRaw) {
+  _prismaRaw = new PrismaClientBase({ log: ["warn", "error"] });
+  if (process.env.NODE_ENV !== "production") {
+    (globalThis as any).__prismaRaw__ = _prismaRaw;
+  }
+}
+
+/** Cliente Prisma sin $extends (expone webchatSite, webchatSession, webchatMessage, etc.) */
+export const prismaRaw = _prismaRaw;
