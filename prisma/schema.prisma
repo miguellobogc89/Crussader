@@ -9,9 +9,9 @@ datasource db {
 }
 
 /// *
-///  * =========================
-///  * Core Auth
-///  * =========================
+/// * =========================
+/// * Core Auth
+/// * =========================
 model User {
   id                 String               @id @default(cuid())
   name               String?
@@ -170,6 +170,7 @@ model Company {
   stripeCustomerId     String?
   stripeSubscriptionId String?
   jobs                 Job[]
+  knowledgeItems       KnowledgeItem[]
   Lead                 Lead[]
   Location             Location[]
   LocationKpiDaily     LocationKpiDaily[] @relation("CompanyToKpiDaily")
@@ -177,7 +178,6 @@ model Company {
   Reviews              Review[]           @relation("CompanyReviews")
   UserCompany          UserCompany[]
   WebchatSites         WebchatSite[]      @relation("CompanyToWebchatSite")
-  knowledgeItems       KnowledgeItem[]
 
   @@index([name])
   @@index([activity])
@@ -262,6 +262,12 @@ model Location {
   Reviews              Review[]            @relation("LocationReviews")
   UserLocation         UserLocation[]
   WebchatSites         WebchatSite[]       @relation("LocationToWebchatSite")
+  employeeLinks        EmployeeLocation[]
+  resources            Resource[]
+  services             Service[]
+  appointments         Appointment[]
+  employeeTimeOffs     EmployeeTimeOff[]
+  resourceTimeOffs     ResourceTimeOff[]
 
   @@index([companyId])
   @@index([googleAccountId])
@@ -468,10 +474,76 @@ model Job {
   @@index([responseId])
 }
 
+model WebchatSite {
+  id             String            @id @default(cuid())
+  companyId      String
+  locationId     String?
+  publicKey      String            @unique
+  status         WebchatSiteStatus @default(ACTIVE)
+  name           String
+  settings       Json?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  knowledgeItems KnowledgeItem[]
+  Messages       WebchatMessage[]
+  Sessions       WebchatSession[]
+  Company        Company           @relation("CompanyToWebchatSite", fields: [companyId], references: [id], onDelete: Cascade)
+  Location       Location?         @relation("LocationToWebchatSite", fields: [locationId], references: [id])
+
+  @@index([companyId])
+  @@index([locationId])
+}
+
+model WebchatSession {
+  id             String           @id @default(cuid())
+  siteId         String
+  visitorId      String
+  startedAt      DateTime         @default(now())
+  lastActivityAt DateTime         @default(now())
+  meta           Json?
+  Messages       WebchatMessage[]
+  Site           WebchatSite      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, visitorId])
+  @@index([siteId, lastActivityAt])
+}
+
+model WebchatMessage {
+  id        String         @id @default(cuid())
+  siteId    String
+  sessionId String
+  role      WebchatRole
+  text      String
+  payload   Json?
+  createdAt DateTime       @default(now())
+  Session   WebchatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  Site      WebchatSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId, createdAt])
+  @@index([sessionId, createdAt])
+}
+
+model KnowledgeItem {
+  id         String              @id @default(cuid())
+  companyId  String
+  siteId     String?
+  title      String
+  content    String
+  visibility KnowledgeVisibility @default(PUBLIC)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  company    Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  site       WebchatSite?        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([siteId])
+  @@index([visibility])
+}
+
 /// *
-///  * =========================
-///  * Enums
-///  * =========================
+/// * =========================
+/// * Enums
+/// * =========================
 enum CompanyRole {
   OWNER
   ADMIN
@@ -588,76 +660,256 @@ enum KnowledgeVisibility {
   PRIVATE
 }
 
-model WebchatSite {
-  id         String            @id @default(cuid())
-  companyId  String
-  locationId String?
-  publicKey  String            @unique
-  status     WebchatSiteStatus @default(ACTIVE)
-  name       String
-  settings   Json?
+/// =========================
+/// Employees & Roles (simple, sin company)
+/// =========================
 
+model Employee {
+  id     String  @id @default(cuid())
+  name   String
+  notes  String?
+  color  String?
+  active Boolean @default(true)
+
+  // N-N con Location (con metadata en el pivot)
+  locations EmployeeLocation[]
+
+  // Roles (globales por ahora)
+  roles EmployeeRole[]
+
+  appointments Appointment[]
+  timeOffs     EmployeeTimeOff[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([active])
+}
+
+model StaffRole {
+  id String @id @default(cuid())
+
+  name      String
+  slug      String
+  color     String?
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relaciones
-  Company        Company          @relation(name: "CompanyToWebchatSite", fields: [companyId], references: [id], onDelete: Cascade)
-  Location       Location?        @relation(name: "LocationToWebchatSite", fields: [locationId], references: [id], onDelete: SetNull)
-  Sessions       WebchatSession[]
-  Messages       WebchatMessage[]
-  knowledgeItems KnowledgeItem[]
+  services  Service[]
+  employees EmployeeRole[]
 
-  @@index([companyId])
+  @@unique([slug])
+}
+
+model EmployeeRole {
+  id         String  @id @default(cuid())
+  employeeId String
+  roleId     String
+  isPrimary  Boolean @default(false)
+
+  employee Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  role     StaffRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, roleId]) // no repetir el mismo rol
+  @@index([employeeId])
+  @@index([roleId])
+}
+
+model EmployeeLocation {
+  id         String @id @default(cuid())
+  employeeId String
+  locationId String
+
+  // Flags para el motor de calendario
+  isPrimary                 Boolean @default(false)
+  visibleInLocation         Boolean @default(true) // aparece al agendar en ESTA location
+  allowCrossLocationBooking Boolean @default(false) // si true, puede aparecer en búsquedas cruzadas
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, locationId])
+  @@index([employeeId])
   @@index([locationId])
 }
 
-model WebchatSession {
-  id             String   @id @default(cuid())
-  siteId         String
-  visitorId      String
-  startedAt      DateTime @default(now())
-  lastActivityAt DateTime @default(now())
-  meta           Json?
+model ResourceType {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  Site     WebchatSite      @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  Messages WebchatMessage[]
+  resources Resource[]
 
-  @@unique([siteId, visitorId])
-  @@index([siteId, lastActivityAt])
+  @@unique([slug])
 }
 
-model WebchatMessage {
-  id        String      @id @default(cuid())
-  siteId    String
-  sessionId String
-  role      WebchatRole
-  text      String
-  payload   Json?
-  createdAt DateTime    @default(now())
+model Resource {
+  id         String  @id @default(cuid())
+  locationId String
+  name       String
+  notes      String?
+  capacity   Int?
+  active     Boolean @default(true)
 
-  Site    WebchatSite    @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  Session WebchatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  typeId String?
+  type   ResourceType? @relation(fields: [typeId], references: [id], onDelete: SetNull)
 
-  @@index([siteId, createdAt])
-  @@index([sessionId, createdAt])
+  location     Location                @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  tags         ResourceTagOnResource[]
+  appointments Appointment[]
+  timeOffs     ResourceTimeOff[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-model KnowledgeItem {
-  id         String              @id @default(cuid())
-  companyId  String
-  siteId     String?
-  title      String
-  content    String
-  visibility KnowledgeVisibility @default(PUBLIC)
+model ResourceTag {
+  id    String  @id @default(cuid())
+  name  String
+  slug  String
+  color String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relaciones
-  company Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  site    WebchatSite? @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  resources ResourceTagOnResource[]
 
-  @@index([companyId])
-  @@index([siteId])
-  @@index([visibility])
+  // 👇 opposite nombrado; debe coincidir con Service.requiredTag
+  services Service[] @relation("ServiceToResourceTag")
+
+  @@unique([slug])
+}
+
+model ResourceTagOnResource {
+  id            String @id @default(cuid())
+  resourceId    String
+  resourceTagId String
+
+  resource Resource    @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  tag      ResourceTag @relation(fields: [resourceTagId], references: [id], onDelete: Cascade)
+
+  @@unique([resourceId, resourceTagId])
+}
+
+/// =========================
+/// Appointments - núcleo mínimo
+/// =========================
+
+enum AppointmentStatus {
+  PENDING
+  BOOKED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Service {
+  id              String  @id @default(cuid())
+  locationId      String
+  name            String
+  description     String?
+  durationMin     Int     @default(30)
+  bufferBeforeMin Int     @default(0)
+  bufferAfterMin  Int     @default(0)
+  color           String?
+
+  // requisitos simples (v1)
+  requiredRoleId        String?
+  requiredResourceTagId String?
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  location     Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  requiredRole StaffRole? @relation(fields: [requiredRoleId], references: [id], onDelete: SetNull)
+
+  // 👇 nombra la relación y que coincida con ResourceTag.services
+  requiredTag ResourceTag? @relation("ServiceToResourceTag", fields: [requiredResourceTagId], references: [id], onDelete: SetNull)
+
+  appointments Appointment[]
+
+  @@index([locationId])
+  @@index([active])
+  @@index([requiredRoleId])
+  @@index([requiredResourceTagId])
+}
+
+model Appointment {
+  id         String            @id @default(cuid())
+  locationId String
+  serviceId  String
+  startAt    DateTime
+  endAt      DateTime
+  status     AppointmentStatus @default(PENDING)
+
+  // asignaciones opcionales (el motor decidirá si faltan)
+  employeeId String?
+  resourceId String?
+
+  // datos cliente (mínimos para empezar)
+  customerName  String?
+  customerPhone String?
+  customerEmail String?
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  location Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  service  Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  resource Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+
+  @@index([locationId, startAt])
+  @@index([serviceId])
+  @@index([employeeId, startAt])
+  @@index([resourceId, startAt])
+  @@index([status, startAt])
+}
+
+enum TimeOffType {
+  VACATION
+  SICK
+  BLOCK
+  OTHER
+}
+
+model EmployeeTimeOff {
+  id         String   @id @default(cuid())
+  employeeId String
+  locationId String
+  type       String   @default("BLOCK") // si quieres enum, lo definimos luego
+  reason     String?
+  startAt    DateTime
+  endAt      DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, startAt])
+  @@index([locationId, startAt])
+}
+
+model ResourceTimeOff {
+  id         String   @id @default(cuid())
+  resourceId String
+  locationId String
+  type       String   @default("BLOCK")
+  reason     String?
+  startAt    DateTime
+  endAt      DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([resourceId, startAt])
+  @@index([locationId, startAt])
 }

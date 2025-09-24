@@ -65,7 +65,7 @@ export function AppSidebar() {
     { title: "Integraciones", url: "/dashboard/integrations-test", icon: Plug, description: "Conecta servicios" },
     { title: "Base de Datos", url: "/dashboard/database", icon: Database, description: "Conexiones y datos" },
     { title: "Reportes", url: "/dashboard/reports", icon: FileText, description: "Generación de informes" },
-    { title: "Conexiones", url: "/dashboard/connections-test", icon: FileText, description: "Pruebas de conexión" },
+    { title: "Calendario", url: "/dashboard/calendar", icon: FileText, description: "Calendario en pruebas" },
     { title: "Reportes de prueba", url: "/dashboard/reports-test", icon: FileText, description: "Generación de informes" },
     { title: "Gráficos de prueba", url: "/dashboard/charts-test", icon: FileText, description: "Pruebas de gráficos" },
   ];
