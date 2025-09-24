@@ -169,7 +169,7 @@ model Company {
   planRenewsAt         DateTime?
   stripeCustomerId     String?
   stripeSubscriptionId String?
-  customers   CompanyCustomer[]
+  customers            CompanyCustomer[]
   jobs                 Job[]
   knowledgeItems       KnowledgeItem[]
   Lead                 Lead[]
@@ -179,6 +179,8 @@ model Company {
   Reviews              Review[]           @relation("CompanyReviews")
   UserCompany          UserCompany[]
   WebchatSites         WebchatSite[]      @relation("CompanyToWebchatSite")
+  Agents               Agent[]
+  AgentSessions        AgentSession[]
 
   @@index([name])
   @@index([activity])
@@ -269,6 +271,7 @@ model Location {
   appointments         Appointment[]
   employeeTimeOffs     EmployeeTimeOff[]
   resourceTimeOffs     ResourceTimeOff[]
+  agentSessions        AgentSession[]
 
   @@index([companyId])
   @@index([googleAccountId])
@@ -830,7 +833,8 @@ model Service {
   // 👇 nombra la relación y que coincida con ResourceTag.services
   requiredTag ResourceTag? @relation("ServiceToResourceTag", fields: [requiredResourceTagId], references: [id], onDelete: SetNull)
 
-  appointments Appointment[]
+  appointments  Appointment[]
+  agentSessions AgentSession[]
 
   @@index([locationId])
   @@index([active])
@@ -851,7 +855,7 @@ model Appointment {
   resourceId String?
 
   // datos cliente (mínimos para empezar)
-  customerId   String?
+  customerId    String?
   customerName  String?
   customerPhone String?
   customerEmail String?
@@ -865,7 +869,7 @@ model Appointment {
   service  Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   resource Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
-  customer     Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   @@index([locationId, startAt])
   @@index([serviceId])
@@ -921,13 +925,13 @@ model ResourceTimeOff {
 // Customers
 // =========================
 model Customer {
-  id         String      @id @default(cuid())
-  firstName  String
-  lastName   String
-  phone      String      // requerido
-  email      String?     // opcional
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id        String   @id @default(cuid())
+  firstName String
+  lastName  String
+  phone     String // requerido
+  email     String? // opcional
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relación 1:N con citas
   appointments Appointment[]
@@ -953,3 +957,196 @@ model CompanyCustomer {
   @@index([customerId, companyId])
 }
 
+/// =========================
+/// Agents (base + Voice + Chat)
+/// =========================
+
+enum AgentChannel {
+  VOICE
+  CHAT
+}
+
+enum AgentStatus {
+  ACTIVE
+  PAUSED
+  DISABLED
+}
+
+enum AgentSessionStatus {
+  INIT
+  LIVE
+  ENDED
+  ERROR
+}
+
+enum AgentTurnRole {
+  USER
+  AGENT
+  SYSTEM
+  TOOL
+}
+
+enum AgentLogLevel {
+  INFO
+  WARN
+  ERROR
+  DEBUG
+}
+
+model Agent {
+  id        String       @id @default(cuid())
+  companyId String
+  name      String
+  channel   AgentChannel
+  status    AgentStatus  @default(ACTIVE)
+  // metadatos genéricos del agente (labels, tags…)
+  meta      Json?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  company  Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  voice    VoiceAgent?
+  chat     ChatAgent?
+  sessions AgentSession[]
+
+  @@index([companyId, channel, status])
+  @@index([name])
+}
+
+model VoiceAgent {
+  id                 String  @id @default(cuid())
+  agentId            String  @unique
+  // configuración por defecto (fallback si no hay VoiceAgentSettings activo)
+  defaultModel       String? // p.ej. "gpt-4o-mini"
+  defaultTemperature Float?  @default(0.4)
+  defaultPrompt      String? // prompt base de “persona” del agente
+  // proveedor/telefonía (aunque simulemos, lo dejamos listo)
+  provider           String? // "twilio", "mock", etc.
+  providerConfig     Json? // claves/ids del proveedor
+  // audio
+  voiceName          String? // voz TTS
+  language           String? @default("es-ES")
+
+  agent    Agent                @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  settings VoiceAgentSettings[]
+}
+
+model VoiceAgentSettings {
+  id           String  @id @default(cuid())
+  agentId      String
+  // versionado de prompts / plantillas
+  version      Int     @default(1)
+  isActive     Boolean @default(true)
+  prompt       String // prompt “persona” completo (puede incluir few-shots)
+  model        String? // override de modelo
+  temperature  Float?  @default(0.4)
+  // políticas del turno (máx duración, silencios, barge-in, etc.)
+  policy       Json? // {maxSeconds, silenceTimeoutMs, bargeIn:true, ...}
+  // routing/capacidades (qué endpoints puede tocar)
+  capabilities Json? // { canReadCalendar:true, canBook:true, ... }
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agent VoiceAgent @relation(fields: [agentId], references: [agentId], onDelete: Cascade)
+
+  @@index([agentId, isActive, version])
+}
+
+model ChatAgent {
+  id                 String  @id @default(cuid())
+  agentId            String  @unique
+  defaultModel       String?
+  defaultTemperature Float?  @default(0.3)
+  defaultPrompt      String?
+
+  agent    Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  settings ChatAgentSettings[]
+}
+
+model ChatAgentSettings {
+  id           String  @id @default(cuid())
+  agentId      String
+  version      Int     @default(1)
+  isActive     Boolean @default(true)
+  prompt       String
+  model        String?
+  temperature  Float?  @default(0.3)
+  policy       Json?
+  capabilities Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agent ChatAgent @relation(fields: [agentId], references: [agentId], onDelete: Cascade)
+
+  @@index([agentId, isActive, version])
+}
+
+/// =========================
+/// Sesiones, turnos, logs
+/// =========================
+
+model AgentSession {
+  id        String             @id @default(cuid())
+  agentId   String
+  companyId String
+  channel   AgentChannel
+  status    AgentSessionStatus @default(INIT)
+
+  // info de conversación/llamada
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  durationSec Int?
+  // phone (aunque simulemos llamadas)
+  caller      String? // número de cliente (tel) o userId si chat
+  callee      String? // número de la clínica (si existiera)
+  // vínculo con negocio
+  locationId  String? // si la sesión se asocia a una ubicación concreta
+  serviceId   String? // si el objetivo quedó claro
+
+  meta  Json? // {conversationGoal, notes, tags:[], ...}
+  error String? // motivo si status=ERROR
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agent    Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  service  Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  turns AgentTurn[]
+  logs  AgentLog[]
+
+  @@index([agentId, companyId, channel, status])
+  @@index([startedAt])
+}
+
+model AgentTurn {
+  id        String        @id @default(cuid())
+  sessionId String
+  role      AgentTurnRole // USER | AGENT | SYSTEM | TOOL
+  text      String? // texto transcrito o generado
+  audioUrl  String? // si guardas TTS o grabación
+  payload   Json? // {nlu, entities, toolCalls, modelRaw, ...}
+  createdAt DateTime      @default(now())
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@index([role])
+}
+
+model AgentLog {
+  id        String        @id @default(cuid())
+  sessionId String
+  level     AgentLogLevel @default(INFO)
+  message   String
+  payload   Json?
+  createdAt DateTime      @default(now())
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, level, createdAt])
+}
