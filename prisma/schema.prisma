@@ -169,6 +169,7 @@ model Company {
   planRenewsAt         DateTime?
   stripeCustomerId     String?
   stripeSubscriptionId String?
+  customers   CompanyCustomer[]
   jobs                 Job[]
   knowledgeItems       KnowledgeItem[]
   Lead                 Lead[]
@@ -850,6 +851,7 @@ model Appointment {
   resourceId String?
 
   // datos cliente (mínimos para empezar)
+  customerId   String?
   customerName  String?
   customerPhone String?
   customerEmail String?
@@ -863,6 +865,7 @@ model Appointment {
   service  Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   resource Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+  customer     Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   @@index([locationId, startAt])
   @@index([serviceId])
@@ -913,3 +916,40 @@ model ResourceTimeOff {
   @@index([resourceId, startAt])
   @@index([locationId, startAt])
 }
+
+// =========================
+// Customers
+// =========================
+model Customer {
+  id         String      @id @default(cuid())
+  firstName  String
+  lastName   String
+  phone      String      // requerido
+  email      String?     // opcional
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  // Relación 1:N con citas
+  appointments Appointment[]
+
+  // Relación N:M con compañías (tabla puente)
+  companies CompanyCustomer[]
+
+  // Índices útiles para búsquedas (sin unique global para permitir duplicados cross-empresa)
+  @@index([phone])
+  @@index([email])
+}
+
+model CompanyCustomer {
+  id         String   @id @default(cuid())
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId  String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String
+  createdAt  DateTime @default(now())
+
+  // Un cliente solo una vez por compañía
+  @@unique([companyId, customerId])
+  @@index([customerId, companyId])
+}
+
