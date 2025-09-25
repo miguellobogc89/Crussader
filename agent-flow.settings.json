@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "llm": {
+    "model": "gpt-4o-mini",
+    "temperature": 0.3,
+    "maxTokens": 350
+  },
+  "style": {
+    "language": "es",
+    "persona": "Recepcionista cercana, clara y profesional.",
+    "suggestMaxSlots": 3,
+    "closingQuestion": true
+  },
+  "nlu": {
+    "services": {
+      "higiene": ["higiene", "limpieza", "limpieza dental", "higiene dental"],
+      "revisión": ["revisión", "chequeo", "control"],
+      "urgencia": ["urgencia", "dolor", "me duele", "emergencia"]
+    },
+    "actions": {
+      "modificar": ["mover cita", "cambiar cita", "reprogramar", "aplazar", "adelantar"],
+      "cancelar": ["cancelar", "anular"]
+    }
+  },
+  "flow": {
+    "identify": {
+      "system": "No inventes datos. Antes de ayudar, identifica al cliente. Si no hay ficha, pide teléfono. Sé breve y amable.",
+      "assistantPrompt": "Para localizar tu ficha, ¿me dices nombre y apellidos? Si no te encuentro, te pediré un teléfono de contacto.",
+      "missingNameFollowup": "¿Podrías facilitarme nombre y apellidos para localizarte?",
+      "missingPhoneFollowup": "No localizo tu ficha. ¿Me dejas un teléfono de contacto?"
+    },
+    "intent": {
+      "system": "Tras identificar, pregunta en qué puedes ayudar y mapea la intención a un servicio o acción válida.",
+      "assistantPrompt": "Gracias. ¿En qué puedo ayudarte hoy?"
+    },
+    "servicePipelines": {
+      "higiene": {
+        "checklist": [
+          "¿Prefieres mañana o tarde?",
+          "¿Algún profesional en concreto? (si no, te proponemos nosotros)",
+          "¿Alguna restricción de horario esta semana?"
+        ],
+        "proposeStrategy": {
+          "type": "blocks+slots",
+          "maxSlots": 3,
+          "prefer": "tarde"
+        },
+        "confirmPrompt": "Te propongo {{slots}} para Higiene en {{location}}. ¿Cuál te encaja?"
+      },
+      "revisión": {
+        "checklist": [
+          "¿Notas alguna molestia ahora mismo?",
+          "¿Preferencias de horario?"
+        ],
+        "proposeStrategy": {
+          "type": "blocks+slots",
+          "maxSlots": 3
+        },
+        "confirmPrompt": "Para Revisión tengo {{slots}} en {{location}}. ¿Te va bien alguna?"
+      },
+      "modificar": {
+        "checklist": [
+          "¿Cuál es tu cita actual (día y hora)?",
+          "¿A qué franja quieres moverla (aprox.)?"
+        ],
+        "proposeStrategy": {
+          "type": "latest-today-or-next",
+          "maxSlots": 2
+        },
+        "confirmPrompt": "Puedo moverla a {{slots}}. ¿Confirmo el cambio?"
+      }
+    },
+    "fallback": {
+      "firstRetry": "No me ha quedado claro el servicio. ¿Quieres Higiene, Revisión u otra cosa?",
+      "secondRetry": "Sigo sin entenderlo del todo. Dejo una nota para que te llame un compañero y lo revisamos.",
+      "leaveCommentTemplate": "Cliente solicita: {{rawUserText}}. Interpretación dudosa. Revisar y devolver llamada."
+    }
+  }
+}

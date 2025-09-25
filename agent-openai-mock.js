@@ -1,19 +1,24 @@
-// agent-openai-mock.js — Node 22 (fetch nativo)
-// Objetivo: tú calculas huecos; el LLM los resume con tono humano, sin hardcodeos.
+// agent-openai-mock.js — Node 22 (ESM)
+// Calcula huecos y usa settings de empresa (si tienes el puente). Aquí sin settings externos para exportar fácil.
 
-const BASE_URL = "http://localhost:3000";
-const API_KEY = "secret123"; // = CALENDAR_API_KEY
+import { config as dotenvConfig } from "dotenv";
+import { fileURLToPath } from "url";
+import path from "path";
+
+dotenvConfig({ path: ".env.local" });
+if (!process.env.OPENAI_API_KEY || !process.env.CALENDAR_API_KEY) dotenvConfig();
+
+const BASE_URL = process.env.AGENT_BASE_URL || "http://localhost:3000";
+const API_KEY = process.env.CALENDAR_API_KEY;
 const COMPANY_ID = "cmfmxqxqx0000i5i4ph2bb3ij";
 const OPENAI_MODEL = "gpt-4o-mini";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-if (!OPENAI_API_KEY) {
-  console.error('❌ Falta OPENAI_API_KEY. PowerShell:  $env:OPENAI_API_KEY="TU_CLAVE"');
-  process.exit(1);
-}
+if (!OPENAI_API_KEY) throw new Error("Falta OPENAI_API_KEY");
+if (!API_KEY) throw new Error("Falta CALENDAR_API_KEY");
 
 // ====== TZ helpers (MVP) ======
-const MADRID_OFFSET_MIN = 120; // CEST (24/09). Para prod usar lib TZ (p.ej. luxon)
+const MADRID_OFFSET_MIN = 120;
 function toMinutesLocal(isoUtc) {
   const d = new Date(isoUtc);
   return d.getUTCHours() * 60 + d.getUTCMinutes() + MADRID_OFFSET_MIN;
@@ -26,7 +31,8 @@ function fromMinutesLocalToIso(dateISO, minutesLocal) {
 }
 function fmtHourLocal(isoUtc) {
   const mins = toMinutesLocal(isoUtc);
-  const h = Math.floor(mins / 60) % 24, mm = mins % 60;
+  const h = Math.floor(mins / 60) % 24;
+  const mm = mins % 60;
   return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 function fmtDate(iso) {
@@ -44,19 +50,36 @@ async function fetchBootstrap() {
   return json;
 }
 
-// ====== Cálculo de ocupados/libres ======
-function getOccupiedBlocks(bootstrap, locationTitle, workStartMin, workEndMin) {
-  const taken = (bootstrap.appointments || [])
-    .filter((a) => a.location?.title === locationTitle)
+// ====== Horarios Location (con exceptions) ======
+function getDow(dateISO) {
+  const d = new Date(`${dateISO}T00:00:00Z`);
+  return d.getUTCDay();
+}
+function getWorkWindowsForDate(location, dateISO) {
+  const oh = location.openingHours || null;
+  const ex = Array.isArray(location.exceptions) ? location.exceptions : [];
+  const exToday = ex.find((e) => e.date === dateISO);
+  if (exToday) {
+    if (exToday.isClosed) return [];
+    const wins = Array.isArray(exToday.windows) ? exToday.windows : [];
+    return wins.map((w) => ({ start: Number(w.startMin)||0, end: Number(w.endMin)||0 }))
+               .filter((w) => w.end > w.start);
+  }
+  if (!oh || !Array.isArray(oh.week)) return [];
+  const dow = getDow(dateISO);
+  const day = oh.week.find((d) => d.dow === dow);
+  if (!day || day.isClosed) return [];
+  return (day.windows||[]).map((w) => ({ start: Number(w.startMin)||0, end: Number(w.endMin)||0 }))
+                          .filter((w) => w.end > w.start);
+}
+
+// ====== Disponibilidad ======
+function mergeOccupiedInWindow(appointments, windowStart, windowEnd) {
+  const taken = appointments
     .map((a) => ({ start: toMinutesLocal(a.startAt), end: toMinutesLocal(a.endAt) }))
-    .map(({ start, end }) => ({
-      start: Math.max(start, workStartMin),
-      end: Math.min(end, workEndMin),
-    }))
+    .map(({ start, end }) => ({ start: Math.max(start, windowStart), end: Math.min(end, windowEnd) }))
     .filter((b) => b.end > b.start)
     .sort((a, b) => a.start - b.start);
-
-  // merge
   const merged = [];
   for (const b of taken) {
     if (!merged.length || b.start > merged[merged.length - 1].end) merged.push({ ...b });
@@ -64,41 +87,43 @@ function getOccupiedBlocks(bootstrap, locationTitle, workStartMin, workEndMin) {
   }
   return merged;
 }
-
-function getFreeBlocks(occupied, workStartMin, workEndMin) {
+function freeFromOccupied(occupied, windowStart, windowEnd) {
   const free = [];
-  let cur = workStartMin;
+  let cur = windowStart;
   for (const b of occupied) {
     if (b.start > cur) free.push({ start: cur, end: b.start });
     cur = Math.max(cur, b.end);
   }
-  if (cur < workEndMin) free.push({ start: cur, end: workEndMin });
+  if (cur < windowEnd) free.push({ start: cur, end: windowEnd });
   return free;
 }
-
-/**
- * Devuelve:
- * - blocks: tramos libres (p.ej. 08:00–10:00, 12:30–14:00)
- * - slots: slots discretos de tamaño duración cada 15'
- */
+function blocksToHuman(blocks, dateISO) {
+  return blocks.map((b) => {
+    const sIso = fromMinutesLocalToIso(dateISO, b.start);
+    const eIso = fromMinutesLocalToIso(dateISO, b.end);
+    return `${fmtHourLocal(sIso)}–${fmtHourLocal(eIso)}`;
+  });
+}
 function computeFreeSlotsAndBlocks({ bootstrap, locationTitle, serviceName }) {
   const loc = (bootstrap.company?.locations || []).find((l) => l.title === locationTitle);
   if (!loc) return { dateISO: null, durationMin: 0, blocks: [], slots: [] };
-  const service = (loc.services || []).find((s) => s.name.toLowerCase() === serviceName.toLowerCase());
+  const service = (loc.services || []).find((s) => (s.name||"").toLowerCase() === (serviceName||"").toLowerCase());
   if (!service) return { dateISO: null, durationMin: 0, blocks: [], slots: [] };
 
   const anyAppt = (bootstrap.appointments || []).find((a) => a.location?.title === locationTitle);
   const dateISO = anyAppt ? anyAppt.startAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
-
-  // Ventana de trabajo (MVP). Puedes parametrizar por location.openingHours más adelante.
-  const WORK_START_MIN = 8 * 60;   // 08:00
-  const WORK_END_MIN   = 20 * 60;  // 20:00
   const duration = service.durationMin || 45;
 
-  const occupied = getOccupiedBlocks(bootstrap, locationTitle, WORK_START_MIN, WORK_END_MIN);
-  const freeBlocks = getFreeBlocks(occupied, WORK_START_MIN, WORK_END_MIN);
+  const workWins = getWorkWindowsForDate(loc, dateISO);
+  if (!workWins.length) return { dateISO, durationMin: duration, blocks: [], slots: [] };
 
-  // slots discretos cada 15'
+  const todaysAppts = (bootstrap.appointments || []).filter((a) => a.location?.title === locationTitle);
+  const freeBlocks = [];
+  for (const win of workWins) {
+    const occ = mergeOccupiedInWindow(todaysAppts, win.start, win.end);
+    freeBlocks.push(...freeFromOccupied(occ, win.start, win.end));
+  }
+
   const slots = [];
   const STEP = 15;
   for (const gap of freeBlocks) {
@@ -108,120 +133,63 @@ function computeFreeSlotsAndBlocks({ bootstrap, locationTitle, serviceName }) {
       slots.push({ startIso, endIso, startLocal: fmtHourLocal(startIso), endLocal: fmtHourLocal(endIso) });
     }
   }
-
   return { dateISO, durationMin: duration, blocks: freeBlocks, slots: slots.slice(0, 20) };
 }
 
-function blocksToHuman(blocks, dateISO) {
-  // p.ej. [{start: 480, end: 600}, ...] -> ["08:00–10:00", ...]
-  return blocks.map((b) => {
-    const sIso = fromMinutesLocalToIso(dateISO, b.start);
-    const eIso = fromMinutesLocalToIso(dateISO, b.end);
-    return `${fmtHourLocal(sIso)}–${fmtHourLocal(eIso)}`;
-  });
+// ====== (Opcional) slots representativos ======
+function pickRepresentativeSlots(slots, blocks, max = 3) {
+  if (!slots?.length) return [];
+  if (!blocks?.length) return slots.slice(0, Math.min(max, slots.length));
+  const picks = [];
+  for (const b of blocks) {
+    const found = slots.find(s => {
+      const m = toMinutesLocal(s.startIso);
+      return m >= b.start && m < b.end;
+    });
+    if (found) picks.push(found);
+    if (picks.length >= max) break;
+  }
+  let i = 0;
+  while (picks.length < max && i < slots.length) {
+    const cand = slots[i++];
+    if (!picks.some(p => p.startIso === cand.startIso)) picks.push(cand);
+  }
+  return picks.slice(0, max);
 }
 
-// ====== OpenAI: persona humana y resumen inteligente ======
-async function askOpenAI({ question, meta, blocks, slots }) {
-  // FREE_BLOCKS (rangos) y FREE_SLOTS (horas puntuales) vienen ya calculados por nosotros
-  // Persona: recepcionista joven, simpática, profesional; evita sonar a IA; natural y eficiente.
+// ====== OpenAI ======
+async function askOpenAI({ question, meta, blocks, slots, suggestedSlotsText }) {
   const systemPrompt = `
-Eres una recepcionista joven de una clínica dental. Quieres causar buena impresión: eres amable, directa y profesional.
-No te presentes como IA. Evita frases tipo "según mis datos" o "como modelo de lenguaje".
-Dispones de disponibilidad YA CALCULADA por el sistema (FREE_BLOCKS y FREE_SLOTS). No inventes horas.
-
-Guía de estilo:
-- Si hay tramos amplios, resúmelos en lenguaje natural (p.ej., "por la mañana tenemos bastante margen").
-- Si el usuario pide "hoy/mañana" para un servicio concreto, ofrece lo más útil: 
-  - O bien una frase-resumen + pregunta abierta ("¿te viene bien por la mañana?"),
-  - O bien 2–3 horas concretas si es mejor (evita listas largas).
-- Sé cálida y resolutiva (una frase de contexto + propuesta clara + pregunta de cierre).
-- Mantén respuestas cortas. Usa tono humano y profesional. No uses emojis salvo que el usuario los use.
-- No menciones "FREE_BLOCKS", "FREE_SLOTS" ni "contexto"; son detalles internos.
-
-Formato sugerido (elige lo que aplique):
-- Resumen: "Hoy, en ${meta.locationTitle}, para ${meta.serviceName}, tenemos la mañana bastante libre."
-- Propuesta concreta: "Podría darte a las 12:30 o 12:45. ¿Cuál te encaja?"
-- Pregunta abierta: "¿Te va bien por la mañana o prefieres tarde?"
-
-No confirmes reservas sin que el cliente elija una hora.
+Eres una recepcionista joven de una clínica dental. Amable, directa y profesional.
+No te presentes como IA ni inventes horarios. Sé breve y práctica.
 `.trim();
 
-  // Preparamos datos “internos” que el modelo usará SOLO para redactar
-  const FREE_BLOCKS = blocksToHuman(blocks, meta.dateISO).join(", ") || "(sin tramos largos)";
-  const FREE_SLOTS  = slots.slice(0, 6).map((s) => s.startLocal).join(", ") || "(sin slots)";
+  const FREE_BLOCKS = blocksToHuman(blocks, meta.dateISO).join(", ") || "(sin tramos)";
+  const SUGGESTED_SLOTS = suggestedSlotsText ||
+    (pickRepresentativeSlots(slots, blocks, 3).map(s => s.startLocal).join(", ") || "(sin sugerencias)");
 
   const messages = [
     { role: "system", content: systemPrompt },
     { role: "system", content: `META: ${JSON.stringify(meta)}` },
     { role: "system", content: `FREE_BLOCKS: ${FREE_BLOCKS}` },
-    { role: "system", content: `FREE_SLOTS: ${FREE_SLOTS}` },
-
-    // Few-shots breves para anclar el estilo:
-    {
-      role: "system",
-      content:
-        "EJEMPLO 1 (muchos huecos): 'Hoy tenemos margen por la mañana en Clínica HiperDental Centro para Limpieza Dental. ¿Te viene bien entre las 10:00 y las 13:00 o prefieres que te proponga una hora concreta?'",
-    },
-    {
-      role: "system",
-      content:
-        "EJEMPLO 2 (pocos huecos): 'Puedo ofrecerte a las 12:30 o 12:45 para Limpieza Dental en Clínica HiperDental Centro. ¿Cuál prefieres?'",
-    },
+    { role: "system", content: `SUGGESTED_SLOTS: ${SUGGESTED_SLOTS}` },
     { role: "user", content: question },
   ];
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: OPENAI_MODEL, messages, temperature: 0.4 }),
+    body: JSON.stringify({ model: OPENAI_MODEL, temperature: 0.3, max_tokens: 300, messages }),
   });
   if (!res.ok) throw new Error(`OpenAI HTTP ${res.status}`);
   const data = await res.json();
   return data?.choices?.[0]?.message?.content?.trim() || "(sin respuesta)";
 }
 
-// ====== Reserva demo (si la quisieras tras confirmación del cliente) ======
-async function bookFirstSlot({ slot, bootstrap }) {
-  const location = (bootstrap.company.locations || []).find((l) => l.title === "Clínica HiperDental Centro");
-  if (!location) throw new Error("Location no encontrada");
-  const service = (location.services || []).find((s) => s.name === "Limpieza Dental");
-  if (!service) throw new Error("Servicio no encontrado");
-
-  const url = `${BASE_URL}/api/agent/${bootstrap.company.id}/appointments`;
-  const payload = {
-    locationId: location.id,
-    serviceId: service.id,
-    startAt: slot.startIso,
-    customerName: "Cliente Demo",
-    customerPhone: "+34600111222",
-    notes: "Reserva creada por agente IA (demo)",
-  };
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`Fallo al crear cita: HTTP ${res.status} ${t}`);
-  }
-  const json = await res.json();
-  if (!json.ok) throw new Error(`API error: ${json.error || "unknown"}`);
-  return json.item;
-}
-
-// ====== MAIN ======
+// ====== MAIN demo ======
 async function main() {
-  const question = "¿Qué huecos hay hoy para una limpieza dental en la Clínica HiperDental Centro?";
   const bootstrap = await fetchBootstrap();
-
-  const anyAppt = (bootstrap.appointments || []).find((a) => a.location?.title === "Clínica HiperDental Centro");
-  const dateISO = anyAppt ? anyAppt.startAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
-  const dateHuman = fmtDate(dateISO);
-
-  const { blocks, slots, durationMin } = computeFreeSlotsAndBlocks({
+  const { blocks, slots, durationMin, dateISO } = computeFreeSlotsAndBlocks({
     bootstrap,
     locationTitle: "Clínica HiperDental Centro",
     serviceName: "Limpieza Dental",
@@ -232,24 +200,33 @@ async function main() {
     locationTitle: "Clínica HiperDental Centro",
     serviceName: "Limpieza Dental",
     dateISO,
-    dateHuman,
+    dateHuman: fmtDate(dateISO),
     durationMin,
   };
 
   console.log("\n=== DEBUG disponibilidad ===");
   console.log("- FREE_BLOCKS:", blocksToHuman(blocks, dateISO).join(", ") || "(ninguno)");
-  console.log("- FREE_SLOTS (primeros):", slots.slice(0, 6).map((s) => s.startLocal).join(", ") || "(ninguno)");
+  console.log("- SUGGESTED_SLOTS:", pickRepresentativeSlots(slots, blocks, 3).map(s=>s.startLocal).join(", ") || "(ninguno)");
 
-  const reply = await askOpenAI({ question, meta, blocks, slots });
-
-  console.log("\n=== RESPUESTA DEL AGENTE (estilo humano) ===");
-  console.log(reply);
-
-  // Nota: aquí NO reservamos automáticamente. Eso se hará tras confirmación del cliente.
-  // if (slots.length > 0) {
-  //   const created = await bookFirstSlot({ slot: slots[0], bootstrap });
-  //   console.log("\n✅ Cita creada:", created.id, created.startAt);
-  // }
+  const reply = await askOpenAI({
+    question: "¿Qué huecos hay hoy para una limpieza dental en la Clínica HiperDental Centro?",
+    meta, blocks, slots,
+  });
+  console.log("\n=== RESPUESTA DEL AGENTE ===\n" + reply);
 }
 
-main().catch((err) => console.error("❌ Error:", err.message || err));
+// Detectar ejecución directa vs import
+const isDirect = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] || "");
+if (isDirect) {
+  main().catch((err) => console.error("❌ Error:", err.message || err));
+}
+
+// Exports para el simulador
+export {
+  fetchBootstrap,
+  computeFreeSlotsAndBlocks,
+  blocksToHuman,
+  askOpenAI,
+  pickRepresentativeSlots,
+  fmtDate,
+};

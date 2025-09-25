@@ -1,3 +1,4 @@
+// /app/api/agent/[companyId]/bootstrap/route.ts
 import { NextResponse } from "next/server";
 import { PrismaClient, AppointmentStatus } from "@prisma/client";
 
@@ -9,26 +10,37 @@ export async function GET(
 ) {
   try {
     const { companyId } = params;
-    const auth = req.headers.get("authorization");
-    const apiKey = process.env.CALENDAR_API_KEY; // de momento global, luego por empresa
 
-    if (auth !== `Bearer ${apiKey}`) {
+    // === Auth por API key (con check de config) ===
+    const apiKey = process.env.CALENDAR_API_KEY; // de momento global, luego por empresa
+    if (!apiKey) {
+      console.error("[bootstrap] CALENDAR_API_KEY no configurada en el servidor");
       return NextResponse.json(
-        { ok: false, error: "Unauthorized" },
-        { status: 401 }
+        { ok: false, error: "Server misconfigured: missing CALENDAR_API_KEY" },
+        { status: 500 }
       );
     }
 
-    // Info de la compañía con locations (cada location ya trae services y resources)
+    const auth = req.headers.get("authorization");
+    if (auth !== `Bearer ${apiKey}`) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    // === Company + locations con horarios/recursos ===
+    // (No seleccionamos agentSettings porque no existe en tu schema actual)
     const company = await prisma.company.findUnique({
       where: { id: companyId },
       select: {
         id: true,
         name: true,
+        // En tu schema la relación se llama "Location" (tal como usabas antes)
         Location: {
           select: {
             id: true,
             title: true,
+            timezone: true,      // tz IANA
+            openingHours: true,  // jsonb (semana con windows)
+            exceptions: true,    // jsonb (fechas concretas)
             services: { select: { id: true, name: true, durationMin: true } },
             resources: { select: { id: true, name: true } },
           },
@@ -37,25 +49,20 @@ export async function GET(
     });
 
     if (!company) {
-      return NextResponse.json(
-        { ok: false, error: "Company not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ ok: false, error: "Company not found" }, { status: 404 });
     }
 
-    // empleados: todos los que estén vinculados a las locations de la company
+    // === Empleados vinculados a las locations de la company (sin horarios por ahora) ===
     const employees = await prisma.employee.findMany({
       where: {
         locations: {
-          some: {
-            location: { companyId },
-          },
+          some: { location: { companyId } },
         },
       },
       select: { id: true, name: true, active: true },
     });
 
-    // citas de hoy (todas las locations de esta company)
+    // === Citas de HOY (límites en día UTC) ===
     const today = new Date();
     const startDay = new Date(
       Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 0, 0, 0)
@@ -90,12 +97,13 @@ export async function GET(
       orderBy: { startAt: "asc" },
     });
 
+    // === Respuesta ===
     return NextResponse.json({
       ok: true,
       company: {
         id: company.id,
         name: company.name,
-        locations: company.Location,
+        locations: company.Location, // incluye timezone/openingHours/exceptions
         employees,
       },
       appointments,

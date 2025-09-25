@@ -47,6 +47,7 @@ model User {
   UserLocation       UserLocation[]
   UserLogin          UserLogin[]
   UserStatusEvent    UserStatusEvent[]
+  phasesCreated      Phase[]              @relation("UserPhasesCreated")
 
   @@index([role])
   @@index([isActive, isSuspended])
@@ -169,6 +170,7 @@ model Company {
   planRenewsAt         DateTime?
   stripeCustomerId     String?
   stripeSubscriptionId String?
+  agentSettings        Json?
   customers            CompanyCustomer[]
   jobs                 Job[]
   knowledgeItems       KnowledgeItem[]
@@ -181,6 +183,8 @@ model Company {
   WebchatSites         WebchatSite[]      @relation("CompanyToWebchatSite")
   Agents               Agent[]
   AgentSessions        AgentSession[]
+  voiceAgentId         String?
+  voiceAgent           VoiceAgent?        @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id], onDelete: SetNull)
 
   @@index([name])
   @@index([activity])
@@ -251,11 +255,12 @@ model Location {
   reviewsAvg           Decimal?            @db.Decimal(3, 2)
   reviewsCount         Int                 @default(0)
   slug                 String?             @unique
-  status               LocationStatus?     @default(DRAFT)
   timezone             String?
+  exceptions           Json? // jsonb
   isFeatured           Boolean             @default(false)
   activityId           String?
   typeId               String?
+  status               LocationStatus?     @default(DRAFT)
   jobs                 Job[]
   activity             Activity?           @relation(fields: [activityId], references: [id])
   company              Company             @relation(fields: [companyId], references: [id])
@@ -669,11 +674,14 @@ enum KnowledgeVisibility {
 /// =========================
 
 model Employee {
-  id     String  @id @default(cuid())
-  name   String
-  notes  String?
-  color  String?
-  active Boolean @default(true)
+  id           String  @id @default(cuid())
+  name         String
+  notes        String?
+  color        String?
+  active       Boolean @default(true)
+  timezone     String  @default("Europe/Madrid")
+  openingHours Json?
+  exceptions   Json?
 
   // N-N con Location (con metadata en el pivot)
   locations EmployeeLocation[]
@@ -1027,8 +1035,10 @@ model VoiceAgent {
   voiceName          String? // voz TTS
   language           String? @default("es-ES")
 
-  agent    Agent                @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  settings VoiceAgentSettings[]
+  agent     Agent                @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  settings  VoiceAgentSettings[]
+  companies Company[]            @relation("CompanyVoiceAgent")
+  phases    AgentPhase[]         @relation("VoiceAgentPhases")
 }
 
 model VoiceAgentSettings {
@@ -1048,7 +1058,7 @@ model VoiceAgentSettings {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  agent VoiceAgent @relation(fields: [agentId], references: [agentId], onDelete: Cascade)
+  agent VoiceAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@index([agentId, isActive, version])
 }
@@ -1078,7 +1088,7 @@ model ChatAgentSettings {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  agent ChatAgent @relation(fields: [agentId], references: [agentId], onDelete: Cascade)
+  agent ChatAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@index([agentId, isActive, version])
 }
@@ -1149,4 +1159,57 @@ model AgentLog {
   session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId, level, createdAt])
+}
+
+/// ==============================
+/// Fases reutilizables
+/// ==============================
+model Phase {
+  id     String    @id @default(cuid())
+  key    String // slug estable, reutilizable p.ej. "intro", "solicitud_datos"
+  label  String // nombre visible
+  type   PhaseType @default(CUSTOM)
+  prompt String // plantilla base (se puede sobrescribir en AgentPhase.overrides)
+  meta   Json? // datos auxiliares (checklists, UI hints…)
+
+  // Relaciones
+  agents AgentPhase[] // N–N con VoiceAgent a través de AgentPhase
+
+  // Auditoría
+  createdById String?
+  createdBy   User?    @relation("UserPhasesCreated", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([key])
+}
+
+/// ==============================
+/// Pivot N–N con orden/prioridad/overrides
+/// ==============================
+model AgentPhase {
+  id        String  @id @default(cuid())
+  agentId   String
+  phaseId   String
+  order     Int
+  priority  Int?
+  overrides Json?
+  isEnabled Boolean @default(true)
+
+  agent VoiceAgent @relation("VoiceAgentPhases", fields: [agentId], references: [id], onDelete: Cascade)
+  phase Phase      @relation(fields: [phaseId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([agentId, phaseId])
+  @@index([agentId, order])
+}
+
+/// Tipos de fase canónicos
+enum PhaseType {
+  INTRO
+  COLLECT
+  INTENT
+  CUSTOM
 }
