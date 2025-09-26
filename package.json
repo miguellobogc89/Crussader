@@ -10,7 +10,7 @@
     "export:locations": "ts-node scripts/export-locations.ts",
     "dev": "next dev --turbopack",
     "prebuild": "prisma generate",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "seed": "ts-node prisma/seed.ts",

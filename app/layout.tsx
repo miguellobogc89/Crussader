@@ -59,9 +59,12 @@ export default function RootLayout({
         <script
           src="/webchat/wc.js"
           async
-          data-color="#10b981"        // verde tailwind
-          data-position="right"        // "right" o "left"
+          data-key="demo-public-key-123"
+          data-color="#10b981"
+          data-position="left"
           data-greeting="Hola 👋 soy tu asistente Crussader"
+          data-auto-open="false"
+          data-greet-on="open"
         />
         <script dangerouslySetInnerHTML={{
           __html: `
