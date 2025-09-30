@@ -1,0 +1,11 @@
+# Normaliza texto a LF en el repo
+*           text=auto
+*.{js,jsx,ts,tsx,css,scss,md,mdx,html,json,yml,yaml,prisma} text eol=lf
+*.sh        text eol=lf
+*.bat       text eol=crlf
+*.ps1       text eol=crlf
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.pdf       binary
