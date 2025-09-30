@@ -33,7 +33,7 @@
     "**/*.tsx",
     "next-env.d.ts",
     ".next/types/**/*.ts"
-  ],
+, "scripts/deepgram-proxy.js"  ],
   "exclude": [
     "node_modules",
     ".next"

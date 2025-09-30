@@ -297,7 +297,7 @@ export default function FlowEditor(props: {
                           </>
                         ) : (
                           <>
-                            Editar prompt <ChevronRight className="h-3.5 w-3.5" />
+                            Prompt <ChevronRight className="h-3.5 w-3.5" />
                           </>
                         )}
                       </button>

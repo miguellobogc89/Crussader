@@ -183,6 +183,7 @@ model Company {
   WebchatSites         WebchatSite[]      @relation("CompanyToWebchatSite")
   Agents               Agent[]
   AgentSessions        AgentSession[]
+  knowledgeSpaces      KnowledgeSpace[]
   voiceAgentId         String?
   voiceAgent           VoiceAgent?        @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id], onDelete: SetNull)
 
@@ -658,6 +659,11 @@ enum WebchatRole {
   AGENT
 }
 
+enum KnowledgeScope {
+  COMPANY // KB de compañía
+  AGENT // KB específico de agente
+}
+
 enum WebchatSiteStatus {
   ACTIVE
   PAUSED
@@ -858,32 +864,40 @@ model Appointment {
   endAt      DateTime
   status     AppointmentStatus @default(PENDING)
 
-  // asignaciones opcionales (el motor decidirá si faltan)
+  // 🔁 BACK-REL EMPLOYEE
   employeeId String?
-  resourceId String?
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
 
-  // datos cliente (mínimos para empezar)
+  // 🔁 BACK-REL RESOURCE
+  resourceId String?
+  resource   Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
+
+  // Cliente (si ya lo tienes, mantenlo)
   customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   customerName  String?
   customerPhone String?
   customerEmail String?
 
-  notes String?
-
+  notes     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  location Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  service  Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  resource Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
-  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  // 🔁 BACK-REL: quién lo creó (AGENTE)
+  createdByAgentId String?
+  createdByAgent   Agent?  @relation("AppointmentCreatedByAgent", fields: [createdByAgentId], references: [id], onDelete: SetNull)
 
-  @@index([locationId, startAt])
-  @@index([serviceId])
+  // 🔁 BACK-REL: en qué sesión se creó
+  createdInSessionId String?
+  createdInSession   AgentSession? @relation("AppointmentCreatedInSession", fields: [createdInSessionId], references: [id], onDelete: SetNull)
+
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
   @@index([employeeId, startAt])
-  @@index([resourceId, startAt])
-  @@index([status, startAt])
+  @@index([locationId, startAt])
+  @@index([createdByAgentId])
+  @@index([createdInSessionId])
 }
 
 enum TimeOffType {
@@ -936,20 +950,24 @@ model Customer {
   id        String   @id @default(cuid())
   firstName String
   lastName  String
-  phone     String // requerido
-  email     String? // opcional
+  phone     String
+  email     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relación 1:N con citas
   appointments Appointment[]
+  companies    CompanyCustomer[]
 
-  // Relación N:M con compañías (tabla puente)
-  companies CompanyCustomer[]
+  // NUEVO: quién/desde dónde lo creó
+  createdByAgentId   String?
+  createdInSessionId String?
 
-  // Índices útiles para búsquedas (sin unique global para permitir duplicados cross-empresa)
+  createdByAgent   Agent?        @relation("CustomerCreatedByAgent", fields: [createdByAgentId], references: [id], onDelete: SetNull)
+  createdInSession AgentSession? @relation("CustomerCreatedInSession", fields: [createdInSessionId], references: [id], onDelete: SetNull)
+
   @@index([phone])
-  @@index([email])
+  @@index([createdInSessionId])
+  @@index([createdByAgentId])
 }
 
 model CompanyCustomer {
@@ -1001,6 +1019,11 @@ enum AgentLogLevel {
   DEBUG
 }
 
+enum AgentEnvironment {
+  TEST
+  PROD
+}
+
 model Agent {
   id        String       @id @default(cuid())
   companyId String
@@ -1012,10 +1035,13 @@ model Agent {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  company  Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  voice    VoiceAgent?
-  chat     ChatAgent?
-  sessions AgentSession[]
+  company             Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  voice               VoiceAgent?
+  chat                ChatAgent?
+  sessions            AgentSession[]
+  appointmentsCreated Appointment[]         @relation("AppointmentCreatedByAgent")
+  customersCreated    Customer[]            @relation("CustomerCreatedByAgent")
+  knowledgeSpaces     AgentKnowledgeSpace[]
 
   @@index([companyId, channel, status])
   @@index([name])
@@ -1104,23 +1130,35 @@ model AgentSession {
   channel   AgentChannel
   status    AgentSessionStatus @default(INIT)
 
+  // NUEVO
+  environment AgentEnvironment @default(TEST) // este panel = TEST por defecto
+  source      String?          @default("constructor") // de dónde nace la sesión
+
+  // Metadatos de ejecución (para trazabilidad QA)
+  model        String? // p.ej. "gpt-4o-realtime-preview"
+  voice        String? // p.ej. "alloy"
+  language     String? @default("es")
+  temperature  Float?
+  instructions String? @db.Text
+  settings     Json?   @map("meta")
+
   // info de conversación/llamada
-  startedAt   DateTime  @default(now())
+  startedAt    DateTime @default(now()) @map("createdAt")
+  updatedAt   DateTime  @updatedAt @map("updatedAt")
   endedAt     DateTime?
   durationSec Int?
-  // phone (aunque simulemos llamadas)
-  caller      String? // número de cliente (tel) o userId si chat
-  callee      String? // número de la clínica (si existiera)
-  // vínculo con negocio
-  locationId  String? // si la sesión se asocia a una ubicación concreta
-  serviceId   String? // si el objetivo quedó claro
+  caller      String?
+  callee      String?
 
-  meta  Json? // {conversationGoal, notes, tags:[], ...}
-  error String? // motivo si status=ERROR
+  // vínculo con negocio (ya tenías algunos campos)
+  locationId String?
+  serviceId  String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // NUEVO: metadatos de cliente web
+  clientIp  String?
+  userAgent String?
 
+  // RELACIONES (ya existentes)
   agent    Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
   company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
@@ -1129,7 +1167,12 @@ model AgentSession {
   turns AgentTurn[]
   logs  AgentLog[]
 
+  // NUEVO: “opuestos” para lo que se cree durante la sesión
+  createdCustomers    Customer[]    @relation("CustomerCreatedInSession")
+  createdAppointments Appointment[] @relation("AppointmentCreatedInSession")
+
   @@index([agentId, companyId, channel, status])
+  @@index([environment, startedAt]) // útil para separar TEST/PROD
   @@index([startedAt])
 }
 
@@ -1212,4 +1255,63 @@ enum PhaseType {
   COLLECT
   INTENT
   CUSTOM
+}
+
+model KnowledgeSpace {
+  id        String         @id @default(cuid())
+  companyId String
+  name      String
+  scope     KnowledgeScope @default(COMPANY)
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  company Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  docs    KnowledgeDoc[]
+  agents  AgentKnowledgeSpace[]
+
+  @@index([companyId, scope, isActive])
+}
+
+model KnowledgeDoc {
+  id         String   @id @default(cuid())
+  spaceId    String
+  title      String
+  sourceUrl  String?
+  mime       String? // "text/markdown", "text/plain", ...
+  text       String   @db.Text
+  tokens     Int?
+  chunkCount Int?
+  updatedAt  DateTime @default(now()) @updatedAt
+  createdAt  DateTime @default(now())
+
+  space  KnowledgeSpace   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  chunks KnowledgeChunk[]
+
+  @@index([spaceId, updatedAt])
+}
+
+model KnowledgeChunk {
+  id      String @id @default(cuid())
+  docId   String
+  idx     Int
+  content String @db.Text
+  // embedding Json?    // añade si ya usas vector DB
+
+  doc KnowledgeDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@unique([docId, idx])
+  @@index([docId])
+}
+
+model AgentKnowledgeSpace {
+  id      String @id @default(cuid())
+  agentId String
+  spaceId String
+
+  agent Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  space KnowledgeSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, spaceId])
+  @@index([spaceId])
 }
