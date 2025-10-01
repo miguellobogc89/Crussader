@@ -1,5 +1,3 @@
-// app/components/PageContainer.tsx
-
 "use client";
 
 import { cn } from "@/lib/utils";
@@ -18,8 +16,10 @@ export default function PageContainer({
   return (
     <div
       className={cn(
-        "transition-all duration-300 ease-in-out",
-        "flex-1 h-screen overflow-y-auto",   // ✅ usamos flex-1 en lugar de w-full
+        "transition-all duration-300 ease-in-out px-50",
+        "flex-1 min-h-[100dvh] overflow-y-auto",
+        "bg-gradient-to-br from-[#e0f7fa] via-white via-40% to-[#fce4ec] to-90%",
+        "bg-fixed", // 👈 fondo fijo
         className
       )}
     >
