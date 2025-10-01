@@ -1,4 +1,4 @@
-// postcss.config.js  (o .cjs / .mjs según uses)
+// postcss.config.mjs  (o .cjs / .jjs según uses)
 export default {
   plugins: {
     tailwindcss: {},

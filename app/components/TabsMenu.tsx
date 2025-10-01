@@ -207,26 +207,23 @@ const Nav = (
     <div className="flex min-h-screen flex-col">
       {/* Header */}
       <div className="border-b bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-6">
+        <div className="px-6 py-6">
           <div className="flex items-center space-x-3">
             {MainIcon ? <MainIcon className="h-6 w-6 text-primary" /> : null}
             <div>
-              {title ? (
-                <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-              ) : null}
-              {description ? (
-                <p className="text-sm text-muted-foreground">{description}</p>
-              ) : null}
+              {title && <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>}
+              {description && <p className="text-sm text-muted-foreground">{description}</p>}
             </div>
           </div>
         </div>
 
         {/* Navbar horizontal */}
-        <div className="mx-auto max-w-7xl px-6">{Nav}</div>
+        <div className="px-6">{Nav}</div>
       </div>
 
       {/* Content */}
-      <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">{children}</main>
+      <main className="flex-1 px-6 py-8">{children}</main>
     </div>
   );
+
 }

@@ -4,220 +4,290 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
-import { useEffect, useState } from "react";
-import {
-  BookOpen,
-  User,
-  MessageSquare,
-  Building2,
-  Plug,
-  Shield,
-  Database,
-  Bell,
-  FileText,
-  BarChart3,
-  LogOut,
-  Settings,
-} from "lucide-react";
-
-import Dot from "@/app/components/ui/Dot"; // si no existe, comenta esta línea y los usos
+import { useEffect, useMemo, useState } from "react";
+import { LogOut } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarSeparator,
   SidebarHeader,
+  SidebarSeparator,
   SidebarRail,
+  SidebarTrigger,
   useSidebar,
 } from "@/app/components/ui/sidebar";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/app/components/ui/collapsible";
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, setOpen } = useSidebar();
   const isCollapsed = state === "collapsed";
 
   const pathname = usePathname() ?? "/";
   const { data } = useSession();
   const role = (data?.user as any)?.role ?? "user";
 
+  const displayName = data?.user?.name ?? "Usuario";
+  const avatar =
+    data?.user?.image ||
+    `https://ui-avatars.com/api/?background=111827&color=ffffff&name=${encodeURIComponent(
+      displayName
+    )}`;
+
   const [brandSrc, setBrandSrc] = useState("/img/logo_crussader.png");
 
-  const [hasCompany, setHasCompany] = useState<boolean | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
-    let mounted = true;
-    fetch("/api/companies/has", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => mounted && setHasCompany(!!d?.hasCompany))
-      .catch(() => mounted && setHasCompany(true));
-    return () => {
-      mounted = false;
-    };
+    const fx = () =>
+      setIsMobile(
+        typeof window !== "undefined" &&
+          window.matchMedia("(max-width: 640px)").matches
+      );
+    fx();
+    window.addEventListener("resize", fx);
+    return () => window.removeEventListener("resize", fx);
   }, []);
 
-  const baseItems = [
-    { title: "Inicio", url: "/dashboard/home", icon: User, description: "Inicio" },
-    { title: "Reviews", url: "/dashboard/reviews", icon: MessageSquare, description: "Reseñas de Google" },
-    { title: "Empresas", url: "/dashboard/company", icon: Building2, description: "Información de la empresa" },
-    { title: "Conocimiento", url: "/dashboard/knowledge", icon: BookOpen, description: "Texto y FAQs para el chat" },
-    { title: "Integraciones", url: "/dashboard/integrations-test", icon: Plug, description: "Conecta servicios" },
-    { title: "Base de Datos", url: "/dashboard/database", icon: Database, description: "Conexiones y datos" },
-    { title: "Reportes", url: "/dashboard/reports", icon: FileText, description: "Generación de informes" },
-    { title: "Aegente Voz IA", url: "/dashboard/voiceagent", icon: FileText, description: "Pruebas agente de voz" },
-    { title: "Calendario", url: "/dashboard/calendar", icon: FileText, description: "Calendario en pruebas" },
-    { title: "Reportes de prueba", url: "/dashboard/reports-test", icon: FileText, description: "Generación de informes" },
-    { title: "Gráficos de prueba", url: "/dashboard/charts-test", icon: FileText, description: "Pruebas de gráficos" },
-  ];
-  const items =
-    role === "system_admin"
-      ? [{ title: "Admin", url: "/dashboard/admin", icon: Shield, description: "Gestión avanzada" }, ...baseItems]
-      : baseItems;
+  const handleNavClick = () => {
+    if (isMobile && !isCollapsed) {
+      setOpen(false);
+    }
+  };
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(href + "/");
+
+  const items = [
+    { title: "Inicio", url: "/dashboard/home", emoji: "🏠", group: "solo" },
+    { title: "Reviews", url: "/dashboard/reviews", emoji: "💬", group: "dashboard" },
+    { title: "Reportes", url: "/dashboard/reports", emoji: "📋", group: "dashboard" },
+    { title: "Gráficos", url: "/dashboard/charts-test", emoji: "📈", group: "dashboard" },
+    { title: "Reportes de prueba", url: "/dashboard/reports-test", emoji: "🧪", group: "dashboard" },
+
+    { title: "Empresas", url: "/dashboard/company", emoji: "🏛️", group: "negocio" },
+    { title: "Productos", url: "/dashboard/products", emoji: "📦", group: "negocio" },
+    { title: "Calendario", url: "/dashboard/calendar", emoji: "📅", group: "negocio" },
+
+    { title: "Conocimiento", url: "/dashboard/knowledge", emoji: "📚", group: "tools" },
+    { title: "Integraciones", url: "/dashboard/integrations-test", emoji: "🔌", group: "tools" },
+    { title: "Base de Datos", url: "/dashboard/database", emoji: "🗄️", group: "tools" },
+    { title: "Agente Voz IA", url: "/dashboard/voiceagent", emoji: "🎙️", group: "tools" },
+
+    { title: "Perfil de Usuario", url: "/dashboard/settings", emoji: "👤", group: "settings" },
+    { title: "Notificaciones", url: "/dashboard/notifications", emoji: "🔔", group: "settings", description: "3 sin leer" },
+    { title: "Seguridad", url: "/dashboard/security", emoji: "🛡️", group: "settings" },
+    { title: "Facturación", url: "/dashboard/billing", emoji: "💳", group: "settings" },
+    { title: "Soporte", url: "/dashboard/support", emoji: "💬", group: "settings" },
+    ...(role === "system_admin"
+      ? [{ title: "Admin", url: "/dashboard/admin", emoji: "🛡️", group: "settings" }]
+      : []),
+  ];
+
+  const groups = [
+    { id: "dashboard", title: "Dashboard", emoji: "📊" },
+    { id: "negocio", title: "Negocio", emoji: "🏢" },
+    { id: "tools", title: "Herramientas", emoji: "🛠️" },
+    { id: "settings", title: "Configuración", emoji: "⚙️" },
+  ];
+
+  const groupedItems = (groupId: string) =>
+    items.filter((item) => item.group === groupId);
+
+  const [openGroup, setOpenGroup] = useState(() => {
+    const match = groups.find((g) =>
+      groupedItems(g.id).some((item) => isActive(item.url))
+    );
+    return match?.id ?? "dashboard";
+  });
+
+  useEffect(() => {
+    const match = groups.find((g) =>
+      groupedItems(g.id).some((item) => isActive(item.url))
+    );
+    setOpenGroup(match?.id ?? "dashboard");
+  }, [pathname]);
 
   return (
-    <Sidebar className={isCollapsed ? "w-16" : "w-64"} collapsible="icon">
-      <SidebarContent className="bg-card/50 backdrop-blur-sm border-r border-border/50">
-        <SidebarHeader className={`h-14 sm:h-16 md:h-20 px-0 ${isCollapsed ? "" : "border-b border-border/50"}`}>
+    <Sidebar
+      className={`${isCollapsed ? "w-16" : "w-72"}`}
+      style={{ height: "100dvh" }}
+      collapsible="icon"
+    >
+      <SidebarContent className="bg-slate-900 border-r border-slate-700 h-full flex flex-col overflow-x-hidden">
+        {/* Header */}
+        <SidebarHeader className="h-16 px-0 border-b border-slate-700/50">
           <Link
             href="/dashboard"
-            className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50 transition-colors"
+            onClick={handleNavClick}
+            className={`flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-800/60 transition-colors ${
+              isCollapsed ? "justify-center" : ""
+            }`}
           >
             <img
-              src={brandSrc}
+              src="/img/logo_crussader.png"
               alt="Crussader"
               className="h-8 w-8 rounded-md object-contain shrink-0"
-              onError={() => setBrandSrc("/img/logo_crussader.png")}
             />
             {!isCollapsed && (
               <div className="min-w-0">
-                <div className="truncate font-semibold leading-none">Crussader</div>
-                <div className="truncate text-xs text-muted-foreground">Panel de usuario</div>
+                <div className="truncate font-semibold leading-none text-white">
+                  Crussader
+                </div>
+                <div className="truncate text-[0.8rem] text-slate-400">
+                  Panel de usuario
+                </div>
               </div>
             )}
           </Link>
         </SidebarHeader>
 
-        <SidebarGroup className="px-0">
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-1">
-              {items.map((item) => {
-                const active = isActive(item.url);
-                const isCompany = item.url === "/dashboard/company";
+        {/* Inicio (estilo agrupador pero clic directo) */}
+        <Link
+          href="/dashboard/home"
+          onClick={handleNavClick}
+          className={`
+            flex items-center justify-between 
+            px-4 py-3 
+            text-white hover:text-white hover:bg-slate-800/50 
+            transition-colors rounded-lg mx-2 my-1
+          `}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-lg">🏠</span>
+            <span className="font-medium text-sm">Inicio</span>
+          </div>
+        </Link>
 
-                return (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={active}
-                      className={`h-12 ${
-                        active
-                          ? "bg-primary/10 text-primary font-medium border-r-2 border-primary"
-                          : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <Link
-                        href={item.url}
-                          className={`relative flex items-center rounded-lg transition-all duration-200 py-3 ${
-                            isCollapsed
-                              ? "w-full justify-center text-center"
-                              : "w-[90%] mx-auto gap-3 px-3"
-                          }`}
-                      >
-
-
-                        <item.icon className="h-5 w-5 flex-shrink-0" />
-
-                        {isCollapsed && isCompany && hasCompany === false && (
-                          <span className="absolute right-2 top-2">
-                            <Dot size="xs" color="emerald" title="Crea tu empresa" />
-                          </span>
-                        )}
-
-                        {!isCollapsed && (
-                          <div className="flex-1 min-w-0">
-                            <span className="text-sm font-medium block truncate">{item.title}</span>
-                            <span className="text-xs text-muted-foreground block truncate">{item.description}</span>
-                            {isCompany && hasCompany === false && (
-                              <span className="inline-flex align-middle ml-2">
-                                <Dot size="xs" color="emerald" title="Crea tu empresa" />
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarSeparator className="mx-0" />
-
-          <div className="px-0 pb-3">
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive("/dashboard/settings")}
-                  className={`h-11 ${
-                    isActive("/dashboard/settings")
-                      ? "bg-primary/10 text-primary font-medium border-r-2 border-primary"
-                      : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                  }`}
+        {/* Grupos */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pr-1">
+          {groups.map((group) => {
+            const items = groupedItems(group.id);
+            const isOpen = openGroup === group.id;
+            return (
+              <div key={group.id} className="mb-2">
+                <Collapsible
+                  open={isOpen}
+                  onOpenChange={() =>
+                    setOpenGroup((prev) => (prev === group.id ? "" : group.id))
+                  }
                 >
-                  <Link
-                    href="/dashboard/settings"
-                    className={`relative flex items-center rounded-lg transition-all duration-200 py-3 ${
-                      isCollapsed
-                        ? "w-full justify-center text-center"
-                        : "w-[90%] mx-auto gap-3 px-3"
-                    }`}
-                  >
-                    <Settings className="h-5 w-5 flex-shrink-0" />
-                    {!isCollapsed && (
-                      <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium block truncate">Configuración</span>
-                        <span className="text-xs text-muted-foreground block truncate">Ajustes de usuario</span>
+                  <CollapsibleTrigger className="w-full">
+                    <div className="flex items-center justify-between px-4 py-3 text-white hover:text-white hover:bg-slate-800/50 transition-colors rounded-lg mx-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg">{group.emoji}</span>
+                        <span className="font-medium text-sm">
+                          {group.title}
+                        </span>
                       </div>
-                    )}
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </div>
-
-          <div className="px-0 pb-3">
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild className="h-11 hover:bg-red-50 text-red-600">
-                  <button
-                    onClick={() => signOut({ callbackUrl: "/" })}
-                    className={`relative flex items-center rounded-lg transition-all duration-200 py-3 ${
-                      isCollapsed
-                        ? "w-full justify-center text-center"
-                        : "w-[90%] mx-auto gap-3 px-3"
-                    }`}
+                      <svg
+                        className={`h-4 w-4 transition-transform duration-300 ease-in-out ${
+                          isOpen ? "rotate-180" : ""
+                        }`}
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M5.23 7.21a.75.75 0 011.06.02L10 11.067l3.71-3.835a.75.75 0 111.08 1.04l-4.24 4.388a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent
+                    className="
+                      overflow-hidden
+                      data-[state=open]:animate-accordion-down
+                      data-[state=closed]:animate-accordion-up
+                      space-y-1 pb-2
+                      will-change-[height]
+                      border-l border-slate-700/70 ml-[34px] pl-3
+                    "
                   >
-                    <span className="grid place-items-center rounded-md p-2 bg-red-100">
-                      <LogOut className="h-4 w-4" />
-                    </span>
-                    {!isCollapsed && (
-                      <span className="text-sm font-semibold truncate">Cerrar sesión</span>
-                    )}
-                  </button>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </div>
 
+                    {items.map((item) => {
+                      const active = isActive(item.url);
+                      return (
+                        <Link
+                          key={item.url}
+                          href={item.url}
+                          onClick={handleNavClick}
+                          className={`flex items-center gap-3 px-6 py-2.5 mx-2 rounded-lg transition-all duration-200 group ${
+                            active
+                              ? "bg-primary/20 text-white border-r-2 border-primary shadow-sm"
+                              : "text-slate-200 hover:text-white hover:bg-slate-800/70"
+                          }`}
+                        >
+                          <span className="text-lg">{item.emoji}</span>
+                          {!isCollapsed && (
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium block truncate text-slate-200 group-hover:text-white">
+                                {item.title}
+                              </span>
+                              {item.description && (
+                                <span className="text-xs text-slate-400 block truncate">
+                                  {item.description}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Usuario con logout */}
+        <div className="border-t border-slate-700/50 px-4 py-3">
+          <Collapsible>
+            <CollapsibleTrigger className="w-full flex items-center gap-3 hover:bg-slate-800/50 px-3 py-2 rounded-lg transition-colors">
+              <img src={avatar} alt={displayName} className="h-9 w-9 rounded-full object-cover" />
+              {!isCollapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-slate-200 text-sm font-medium truncate">{displayName}</p>
+                  <p className="text-slate-400 text-xs truncate">Mi cuenta</p>
+                </div>
+              )}
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <button
+                onClick={() => signOut({ callbackUrl: "/" })}
+                className="w-full mt-2 flex items-center gap-2 text-sm text-red-300 hover:text-red-200 hover:bg-red-900/25 px-3 py-2 rounded-lg transition"
+              >
+                <LogOut className="h-4 w-4" />
+                {!isCollapsed && <span>Cerrar sesión</span>}
+              </button>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+
+        {/* Soporte */}
+        <div className="border-t border-slate-700/50 p-4 flex items-center justify-between">
+          {!isCollapsed ? (
+            <>
+              <div className="flex items-center gap-3 text-slate-400">
+                <div className="text-lg">💡</div>
+                <div>
+                  <p className="text-xs font-medium">¿Necesitas ayuda?</p>
+                  <p className="text-xs">Contacta con soporte</p>
+                </div>
+              </div>
+              <SidebarTrigger className="text-slate-400 hover:text-slate-100 hover:bg-slate-700/50" />
+            </>
+          ) : (
+            <SidebarTrigger className="w-full flex justify-center text-slate-400 hover:text-slate-100 hover:bg-slate-700/50 p-2 rounded-lg" />
+          )}
+        </div>
       </SidebarContent>
 
-      <SidebarRail />
+      {/* Rail expandible */}
+      <SidebarRail onClick={() => isCollapsed && setOpen(true)} className="cursor-pointer" />
     </Sidebar>
   );
 }

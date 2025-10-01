@@ -1,0 +1,13 @@
+{
+  // Haz que VS Code trate tu CSS como Tailwind (o PostCSS)
+  "files.associations": {
+    "globals.css": "tailwindcss"
+    // si tienes más: "app/**/*.css": "tailwindcss"
+  },
+
+  // Opcional: señala dónde está el config por si tienes monorepo
+  "tailwindCSS.experimental.configFile": "tailwind.config.ts",
+
+  // (Solo si sigue marcando @tailwind) silencia ese warning del LSP de CSS
+  "css.lint.unknownAtRules": "ignore"
+}

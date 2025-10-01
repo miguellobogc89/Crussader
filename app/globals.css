@@ -148,3 +148,88 @@
   from { opacity: 1; transform: translateY(0) scale(1); }
   to   { opacity: 0; transform: translateY(100%) scale(0.95); }
 }
+@layer base {
+  :root {
+    /* === Alinear primary/accent a Lovable === */
+    --primary: 262 83% 58%;
+    --accent: 217 91% 60%;
+    --ring: 239 84% 67%; /* puedes dejar tu ring o alinearlo al accent si prefieres */
+
+    /* === Gradientes y efectos Lovable === */
+    --gradient-hero: linear-gradient(135deg, hsl(262, 83%, 58%) 0%, hsl(217, 91%, 60%) 50%, hsl(280, 100%, 70%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(262, 83%, 58%) 0%, hsl(217, 91%, 60%) 50%, hsl(280, 100%, 70%) 100%);
+    --gradient-subtle: linear-gradient(180deg, hsl(210, 20%, 98%) 0%, hsl(220, 26%, 97%) 100%);
+    --gradient-mesh: radial-gradient(ellipse at top left, hsl(262, 83%, 58% / 0.15) 0%, transparent 50%),
+                     radial-gradient(ellipse at bottom right, hsl(217, 91%, 60% / 0.15) 0%, transparent 50%);
+
+    --hero-text: 262 83% 58%;
+    --hero-accent: 217 91% 60%;
+    --kpi-bg: 0 0% 100%;
+    --kpi-border: 220 13% 91%;
+    --shadow-elegant: 0 10px 30px -10px hsl(262 83% 58% / 0.15);
+    --shadow-glow: 0 0 40px hsl(217 91% 60% / 0.10);
+    --glass-bg: rgba(255, 255, 255, 0.8);
+    --glass-border: rgba(255, 255, 255, 0.3);
+  }
+
+  .dark {
+    /* Si ya estás contento con tus valores, puedes dejarlo;
+       añado solo las llaves faltantes por consistencia: */
+    --shadow-elegant: 0 10px 30px -10px hsl(224 76% 48% / 0.20);
+    --shadow-glow: 0 0 40px hsl(224 76% 48% / 0.12);
+    --kpi-bg: 222.2 84% 4.9%;
+    --kpi-border: 217.2 32.6% 17.5%;
+    --glass-bg: rgba(16, 18, 22, 0.5);
+    --glass-border: rgba(255, 255, 255, 0.08);
+  }
+}
+
+/* === Animaciones de acordeón (shadcn) para fluidez === */
+@layer utilities {
+  @keyframes accordion-down {
+    from { height: 0; opacity: 0; }
+    to   { height: var(--radix-collapsible-content-height); opacity: 1; }
+  }
+  @keyframes accordion-up {
+    from { height: var(--radix-collapsible-content-height); opacity: 1; }
+    to   { height: 0; opacity: 0; }
+  }
+
+  .animate-accordion-down {
+    animation: accordion-down 260ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: height, opacity;
+  }
+  .animate-accordion-up {
+    animation: accordion-up 220ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: height, opacity;
+  }
+}
+
+/* Estilo scrollbar vertical para sidebar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.25); /* slate-400 con opacidad */
+  border-radius: 6px;
+  transition: background-color 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.4);
+}
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.25);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.4);
+}
