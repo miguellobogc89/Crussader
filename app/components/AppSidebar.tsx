@@ -184,7 +184,7 @@ const handleNavClick = (groupId?: string) => (event: React.MouseEvent) => {
             />
           </div>
         ) : (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 ml-7">
             <img
               src="/img/logo_crussader.png"
               alt="Crussader"
