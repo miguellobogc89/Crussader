@@ -293,17 +293,41 @@ export function AppSidebar() {
   const { data: session } = useSession();
   const user = session?.user;
 
-  // ===== DEBUG + detección de admin (múltiples señales + forzado localStorage)
-  const role = (user as any)?.role ?? (user as any)?.companyRole;
-  const rolesArr = (user as any)?.roles;
+  // ===== DEBUG + detección de admin (normalizando valores)
+  const roleRaw = (user as any)?.role ?? (user as any)?.companyRole ?? "";
+  const rolesArrRaw = (user as any)?.roles ?? [];
+  const permsArrRaw = (user as any)?.permissions ?? (user as any)?.perms ?? [];
+
+  // normaliza a minúsculas
+  const role = String(roleRaw || "").toLowerCase();
+  const rolesArr = Array.isArray(rolesArrRaw)
+    ? rolesArrRaw.map((r: any) => String(r).toLowerCase())
+    : [];
+  const permsArr = Array.isArray(permsArrRaw)
+    ? permsArrRaw.map((p: any) => String(p).toLowerCase())
+    : [];
+
+  // alias comunes de admin (añadí "system_admin", "sysadmin", etc.)
+  const ADMIN_ALIASES = new Set([
+    "admin",
+    "administrator",
+    "owner",
+    "superadmin",
+    "super_admin",
+    "system_admin",
+    "sysadmin",
+    "root",
+  ]);
 
   const adminFlags = {
     a_isAdminField: (user as any)?.isAdmin === true,
-    b_roleEqAdmin: ["ADMIN", "OWNER", "SUPERADMIN"].includes(role),
+    b_roleEqAdmin:
+      ADMIN_ALIASES.has(role) || /admin/.test(role), // si contiene "admin"
     c_rolesArrayHasAdmin:
-      Array.isArray(rolesArr) &&
-      rolesArr.some((r: string) => ["ADMIN", "OWNER", "SUPERADMIN"].includes(r)),
-    d_forceAdminLocal:
+      rolesArr.some((r) => ADMIN_ALIASES.has(r) || /admin/.test(r)),
+    d_permissionsHaveAdmin:
+      permsArr.some((p) => ADMIN_ALIASES.has(p) || /admin/.test(p)),
+    e_forceAdminLocal:
       typeof window !== "undefined" && localStorage.getItem("forceAdmin") === "1",
   };
 
@@ -312,9 +336,18 @@ export function AppSidebar() {
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
       // eslint-disable-next-line no-console
-      console.log("[Sidebar admin debug]", { user, adminFlags, isAdmin });
+      console.log("[Sidebar admin debug]", {
+        user,
+        roleRaw,
+        roleNormalized: role,
+        rolesArr,
+        permsArr,
+        adminFlags,
+        isAdmin,
+      });
     }
-  }, [user, isAdmin]);
+  }, [user, isAdmin, role, rolesArr.length, permsArr.length]);
+
 
   const userInitial =
     (user?.name?.charAt(0) || user?.email?.charAt(0) || "U").toUpperCase();
@@ -448,21 +481,6 @@ export function AppSidebar() {
             >
               <ChevronsLeft className="h-5 w-5" />
             </button>
-          )}
-
-          {/* Debug admin flags (solo dev) */}
-          {process.env.NODE_ENV !== "production" && !collapsed && (
-            <div className="ml-2 rounded-md bg-slate-800/70 px-2 py-1 text-[11px] text-slate-300">
-              admin:{" "}
-              <span className={isAdmin ? "text-green-400" : "text-red-400"}>
-                {String(isAdmin)}
-              </span>
-              {" · "}
-              <span>a:{String(adminFlags.a_isAdminField)}</span>{" "}
-              <span>b:{String(adminFlags.b_roleEqAdmin)}</span>{" "}
-              <span>c:{String(adminFlags.c_rolesArrayHasAdmin)}</span>{" "}
-              <span>d:{String(adminFlags.d_forceAdminLocal)}</span>
-            </div>
           )}
         </div>
       </div>
