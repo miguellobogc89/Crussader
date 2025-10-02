@@ -136,7 +136,7 @@ function alertDotClass(color: "destructive" | "warning" | "secondary") {
 /* =============== Página =============== */
 export default function ReportsPage() {
   return (
-    <div className="container mx-auto p-6 space-y-6 border">
+    <div className="container mx-auto p-6 space-y-6">
       {/* Header simple (sin Layout) */}
       <header className="space-y-1">
         <h1 className="text-3xl font-bold tracking-tight">Reportes y Análisis</h1>

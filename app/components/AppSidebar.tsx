@@ -2,51 +2,26 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bell,
   ChevronDown,
   ChevronsLeft,
-  ChevronsRight,
-  Settings,
-  LogOut,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-/* ================= Tipos ================= */
-type Iconish = LucideIcon | string;
-
-type NavItem = {
-  title: string;
-  href: string;
-  icon: Iconish; // emoji o icono Lucide
-  description?: string;
-  badge?: string | number;
-};
-
-type NavGroup = {
-  id: string;
-  title: string;
-  icon: Iconish; // emoji o icono Lucide
-  items: NavItem[];
-};
+// NUEVO: primitivas reutilizables de la sidebar
+import { SidebarItem } from "@/app/components/sidebar/SidebarItem";
+import { SidebarCollapse } from "@/app/components/sidebar/SidebarCollapse";
+import { SidebarIcon } from "@/app/components/sidebar/SidebarIcon";
+import type { NavItem, NavGroup, Iconish } from "@/app/components/sidebar/types";
 
 /* ================= Utilidades ================= */
 function isActivePath(pathname: string, href: string) {
   if (pathname === href) return true;
   return pathname.startsWith(href + "/");
-}
-
-function IconRenderer({ icon }: { icon: Iconish }) {
-  if (typeof icon === "string") {
-    return <span className="text-base leading-none">{icon}</span>;
-  }
-  const Icon = icon;
-  return <Icon className="h-5 w-5" />;
 }
 
 /* ================= Datos ================= */
@@ -63,7 +38,7 @@ const GROUPS: NavGroup[] = [
     title: "Dashboard",
     icon: "📊",
     items: [
-      { title: "Reviews",            href: "/dashboard/reviews",       icon: "💬", description: "Métricas y estadísticas" },
+      { title: "Reseñas",            href: "/dashboard/reviews",       icon: "💬", description: "Métricas y estadísticas" },
       { title: "Reportes",           href: "/dashboard/reports",       icon: "📋", description: "Generación de informes" },
       { title: "Gráficos",           href: "/dashboard/charts-test",   icon: "📈", description: "Visualizaciones" },
       { title: "Reportes de prueba", href: "/dashboard/reports-test",  icon: "🧪", description: "Sandbox" },
@@ -102,99 +77,6 @@ const GROUPS: NavGroup[] = [
     ],
   },
 ];
-
-/* ================= Collapse animado ================= */
-function Collapse({
-  open,
-  children,
-  className = "",
-}: {
-  open: boolean;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  const innerRef = useRef<HTMLDivElement>(null);
-  const [maxHeight, setMaxHeight] = useState<number>(0);
-
-  useEffect(() => {
-    const el = innerRef.current;
-    if (!el) return;
-    const measure = () => setMaxHeight(el.scrollHeight);
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const el = innerRef.current;
-    if (!el) return;
-    setMaxHeight(el.scrollHeight);
-  }, [open]);
-
-  return (
-    <div
-      className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out ${
-        open ? "opacity-100" : "opacity-95"
-      } ${className}`}
-      style={{ maxHeight: open ? maxHeight : 0 }}
-      aria-hidden={!open}
-    >
-      <div ref={innerRef}>{children}</div>
-    </div>
-  );
-}
-
-/* ================= Item ================= */
-function Item({
-  item,
-  active,
-  collapsed,
-  onNavigate,
-}: {
-  item: NavItem;
-  active: boolean;
-  collapsed: boolean;
-  onNavigate?: () => void;
-}) {
-  return (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      aria-current={active ? "page" : undefined}
-      className={[
-        "group relative flex rounded-lg transition-colors",
-        collapsed ? "items-center min-h-11 px-2 justify-center"
-                  : "items-start min-h-11 px-3 py-2 justify-start gap-3",
-        active
-          ? "bg-slate-800/70 text-white border-r-2 border-primary/60"
-          : "text-slate-300 hover:text-white hover:bg-slate-800/60",
-      ].join(" ")}
-      title={collapsed ? item.title : undefined}
-    >
-      <div className={collapsed ? "" : "mt-[2px]"}>
-        <IconRenderer icon={item.icon} />
-      </div>
-
-      {!collapsed && (
-        <div className="min-w-0 transition-opacity duration-300">
-          <div className="truncate text-sm font-medium">{item.title}</div>
-          {item.description && (
-            <div className="truncate text-xs text-slate-400">
-              {item.description}
-            </div>
-          )}
-        </div>
-      )}
-
-      {typeof item.badge !== "undefined" && !collapsed && (
-        <span className="ml-auto rounded-md bg-slate-700/60 px-2 py-0.5 text-xs text-slate-200">
-          {item.badge}
-        </span>
-      )}
-    </Link>
-  );
-}
 
 /* ================= Grupo ================= */
 function Group({
@@ -247,7 +129,7 @@ function Group({
         title={collapsed ? group.title : undefined}
       >
         <div className={["flex items-center", collapsed ? "" : "gap-3"].join(" ")}>
-          <IconRenderer icon={group.icon} />
+          <SidebarIcon icon={group.icon} />
           {!collapsed && (
             <span className="truncate text-sm font-medium">{group.title}</span>
           )}
@@ -264,10 +146,10 @@ function Group({
 
       {/* Contenido del grupo con animación + línea izquierda */}
       {!collapsed && (
-        <Collapse open={open} className="mt-1">
+        <SidebarCollapse open={open} className="mt-1">
           <div className="pl-3 ml-1 border-l-2 border-primary/30 space-y-1">
             {group.items.map((it) => (
-              <Item
+              <SidebarItem
                 key={it.href}
                 item={it}
                 active={isActivePath(pathname, it.href)}
@@ -276,7 +158,7 @@ function Group({
               />
             ))}
           </div>
-        </Collapse>
+        </SidebarCollapse>
       )}
     </div>
   );
@@ -307,7 +189,7 @@ export function AppSidebar() {
     ? permsArrRaw.map((p: any) => String(p).toLowerCase())
     : [];
 
-  // alias comunes de admin (añadí "system_admin", "sysadmin", etc.)
+  // alias comunes de admin
   const ADMIN_ALIASES = new Set([
     "admin",
     "administrator",
@@ -321,12 +203,9 @@ export function AppSidebar() {
 
   const adminFlags = {
     a_isAdminField: (user as any)?.isAdmin === true,
-    b_roleEqAdmin:
-      ADMIN_ALIASES.has(role) || /admin/.test(role), // si contiene "admin"
-    c_rolesArrayHasAdmin:
-      rolesArr.some((r) => ADMIN_ALIASES.has(r) || /admin/.test(r)),
-    d_permissionsHaveAdmin:
-      permsArr.some((p) => ADMIN_ALIASES.has(p) || /admin/.test(p)),
+    b_roleEqAdmin: ADMIN_ALIASES.has(role) || /admin/.test(role),
+    c_rolesArrayHasAdmin: rolesArr.some((r) => ADMIN_ALIASES.has(r) || /admin/.test(r)),
+    d_permissionsHaveAdmin: permsArr.some((p) => ADMIN_ALIASES.has(p) || /admin/.test(p)),
     e_forceAdminLocal:
       typeof window !== "undefined" && localStorage.getItem("forceAdmin") === "1",
   };
@@ -348,7 +227,6 @@ export function AppSidebar() {
     }
   }, [user, isAdmin, role, rolesArr.length, permsArr.length]);
 
-
   const userInitial =
     (user?.name?.charAt(0) || user?.email?.charAt(0) || "U").toUpperCase();
 
@@ -361,12 +239,12 @@ export function AppSidebar() {
         items: [
           { title: "Usuarios y roles",            href: "/dashboard/admin/users",        icon: "👥", description: "Altas, permisos y equipos" },
           { title: "Empresas y establecimientos", href: "/dashboard/admin/companies",    icon: "🏪", description: "Estructura, sedes y horarios" },
-          { title: "Integraciones",                href: "/dashboard/admin/integrations", icon: "🔌", description: "Conexiones externas" },
-          { title: "Finanzas",                     href: "/dashboard/admin/finance",      icon: "💰", description: "Pagos, costes y facturas" },
-          { title: "Ventas",                       href: "/dashboard/admin/sales",        icon: "🛒", description: "Canales y conversión" },
-          // plus opcionales:
-          { title: "Permisos y auditoría",         href: "/dashboard/admin/audit",        icon: "🧾", description: "Logs y cumplimiento" },
-          { title: "Estado del sistema",           href: "/dashboard/admin/system",       icon: "⚙️", description: "Salud y configuración" },
+          { title: "Integraciones",               href: "/dashboard/admin/integrations", icon: "🔌", description: "Conexiones externas" },
+          { title: "Finanzas",                    href: "/dashboard/admin/finance",      icon: "💰", description: "Pagos, costes y facturas" },
+          { title: "Ventas",                      href: "/dashboard/admin/sales",        icon: "🛒", description: "Canales y conversión" },
+          { title: "Permisos y auditoría",        href: "/dashboard/admin/audit",        icon: "🧾", description: "Logs y cumplimiento" },
+          { title: "Estado del sistema",          href: "/dashboard/admin/system",       icon: "⚙️", description: "Salud y configuración" },
+          { title: "Agentes IA",                  href: "/dashboard/admin/voiceagents",  icon: "🤖", description: "Constructor de Agentes" },
         ],
       }
     : null;
@@ -502,7 +380,7 @@ export function AppSidebar() {
         )}
 
         {/* Inicio */}
-        <Item
+        <SidebarItem
           item={HOME}
           active={isActivePath(pathname ?? "", HOME.href)}
           collapsed={collapsed}
@@ -621,7 +499,7 @@ export function AppSidebar() {
 
           {/* Submenú: aparece DEBAJO de "Usuario" */}
           {!collapsed && (
-            <Collapse open={userMenuOpen}>
+            <SidebarCollapse open={userMenuOpen}>
               <div className="px-2 pb-2 pt-1">
                 <div className="space-y-1">
                   {/* Configuración */}
@@ -630,7 +508,25 @@ export function AppSidebar() {
                     onClick={onItemNavigate}
                     className="flex items-center justify-start gap-3 rounded-lg px-3 min-h-11 text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors"
                   >
-                    <Settings className="h-5 w-5" />
+                    <svg
+                      className="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 1v2" />
+                      <path d="M12 21v2" />
+                      <path d="M4.22 4.22l1.42 1.42" />
+                      <path d="M18.36 18.36l1.42 1.42" />
+                      <path d="M1 12h2" />
+                      <path d="M21 12h2" />
+                      <path d="M4.22 19.78l1.42-1.42" />
+                      <path d="M18.36 5.64l1.42-1.42" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
                     <span className="text-sm font-medium">Configuración</span>
                   </Link>
                   {/* Cerrar sesión */}
@@ -642,12 +538,24 @@ export function AppSidebar() {
                     }}
                     className="w-full flex items-center justify-start gap-3 rounded-lg px-3 min-h-11 text-red-400 hover:text-red-300 hover:bg-red-900/20 transition-colors"
                   >
-                    <LogOut className="h-5 w-5" />
+                    <svg
+                      className="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
                     <span className="text-sm font-medium">Cerrar sesión</span>
                   </button>
                 </div>
               </div>
-            </Collapse>
+            </SidebarCollapse>
           )}
         </div>
       </div>

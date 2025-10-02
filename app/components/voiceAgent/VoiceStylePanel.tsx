@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { loadAgentSettings, saveAgentSettings } from "../../dashboard/voiceagent/actions";
+import { loadAgentSettings, saveAgentSettings } from "@app/dashboard/admin/voiceagents/actions/actions";
 import { Button } from "@/app/components/ui/button";
 import { Label } from "@/app/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/app/components/ui/radio-group";
