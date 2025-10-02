@@ -1,398 +1,638 @@
 // app/components/AppSidebar.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, User, LogOut, Settings, Bell } from "lucide-react";
-import { signOut } from "next-auth/react";
-
-// Hook (usa tu versión en app/hooks/use-mobile)
+import {
+  Bell,
+  ChevronDown,
+  ChevronsLeft,
+  ChevronsRight,
+  Settings,
+  LogOut,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarTrigger,
-  useSidebar,
-} from "@/app/components/ui/sidebar";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/app/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/app/components/ui/dropdown-menu";
+/* ================= Tipos ================= */
+type Iconish = LucideIcon | string;
 
-/* ===== Tipos ===== */
-interface MenuItem {
+type NavItem = {
   title: string;
-  url: string;
-  emoji: string;
-  description: string;
-}
+  href: string;
+  icon: Iconish; // emoji o icono Lucide
+  description?: string;
+  badge?: string | number;
+};
 
-interface MenuGroup {
+type NavGroup = {
   id: string;
   title: string;
-  emoji: string;
-  items: MenuItem[];
+  icon: Iconish; // emoji o icono Lucide
+  items: NavItem[];
+};
+
+/* ================= Utilidades ================= */
+function isActivePath(pathname: string, href: string) {
+  if (pathname === href) return true;
+  return pathname.startsWith(href + "/");
 }
 
-/* ===== Datos ===== */
-const homeItem: MenuItem = {
+function IconRenderer({ icon }: { icon: Iconish }) {
+  if (typeof icon === "string") {
+    return <span className="text-base leading-none">{icon}</span>;
+  }
+  const Icon = icon;
+  return <Icon className="h-5 w-5" />;
+}
+
+/* ================= Datos ================= */
+const HOME: NavItem = {
   title: "Inicio",
-  url: "/dashboard/home",
-  emoji: "🏠",
+  href: "/dashboard/home",
+  icon: "🏠",
   description: "Página principal",
 };
 
-const menuGroups: MenuGroup[] = [
+const GROUPS: NavGroup[] = [
   {
     id: "dashboard",
     title: "Dashboard",
-    emoji: "📊",
+    icon: "📊",
     items: [
-      { title: "Reviews",           url: "/dashboard/reviews",      emoji: "💬", description: "Métricas y estadísticas" },
-      { title: "Reportes",          url: "/dashboard/reports",      emoji: "📋", description: "Generación de informes" },
-      { title: "Gráficos",          url: "/dashboard/charts-test",  emoji: "📈", description: "Visualizaciones" },
-      { title: "Reportes de prueba",url: "/dashboard/reports-test", emoji: "🧪", description: "Sandbox" },
+      { title: "Reviews",            href: "/dashboard/reviews",       icon: "💬", description: "Métricas y estadísticas" },
+      { title: "Reportes",           href: "/dashboard/reports",       icon: "📋", description: "Generación de informes" },
+      { title: "Gráficos",           href: "/dashboard/charts-test",   icon: "📈", description: "Visualizaciones" },
+      { title: "Reportes de prueba", href: "/dashboard/reports-test",  icon: "🧪", description: "Sandbox" },
     ],
   },
   {
     id: "business",
     title: "Negocio",
-    emoji: "🏢",
+    icon: "🏢",
     items: [
-      { title: "Empresa",    url: "/dashboard/company",   emoji: "🏛️", description: "Información de la empresa" },
-      { title: "Productos",  url: "/dashboard/products",  emoji: "📦",  description: "Servicios y herramientas" },
-      { title: "Calendario", url: "/dashboard/calendar",  emoji: "📅",  description: "Gestión de reservas" },
+      { title: "Empresa",    href: "/dashboard/company",   icon: "🏛️", description: "Información de la empresa" },
+      { title: "Productos",  href: "/dashboard/products",  icon: "📦",  description: "Servicios y herramientas" },
+      { title: "Calendario", href: "/dashboard/calendar",  icon: "📅",  description: "Gestión de reservas" },
     ],
   },
   {
     id: "tools",
     title: "Herramientas",
-    emoji: "🛠️",
+    icon: "🛠️",
     items: [
-      { title: "Knowledge",      url: "/dashboard/knowledge",        emoji: "📚", description: "Base de conocimiento" },
-      { title: "Integraciones",  url: "/dashboard/integrations-test",emoji: "🔌", description: "Conecta servicios" },
-      { title: "Base de Datos",  url: "/dashboard/database",         emoji: "🗄️", description: "Conexiones y datos" },
-      { title: "Agente Voz IA",  url: "/dashboard/voiceagent",       emoji: "🎙️", description: "Agente telefónico" },
+      { title: "Knowledge",     href: "/dashboard/knowledge",          icon: "📚", description: "Base de conocimiento" },
+      { title: "Integraciones", href: "/dashboard/integrations-test",  icon: "🔌", description: "Conecta servicios" },
+      { title: "Base de Datos", href: "/dashboard/database",           icon: "🗄️", description: "Conexiones y datos" },
+      { title: "Agente Voz IA", href: "/dashboard/voiceagent",         icon: "🎙️", description: "Agente telefónico" },
     ],
   },
   {
     id: "settings",
     title: "Configuración",
-    emoji: "⚙️",
+    icon: "⚙️",
     items: [
-      { title: "Perfil de Usuario", url: "/dashboard/settings",      emoji: "👤", description: "Gestiona tu información personal" },
-      { title: "Notificaciones",    url: "/dashboard/notifications", emoji: "🔔", description: "Preferencias" },
-      { title: "Seguridad",         url: "/dashboard/security",      emoji: "🛡️", description: "Seguridad y privacidad" },
-      { title: "Facturación",       url: "/dashboard/billing",       emoji: "💳", description: "Pagos y suscripciones" },
+      { title: "Perfil de Usuario", href: "/dashboard/settings",      icon: "👤", description: "Gestiona tu información personal" },
+      { title: "Notificaciones",    href: "/dashboard/notifications", icon: "🔔", description: "Preferencias" },
+      { title: "Seguridad",         href: "/dashboard/security",      icon: "🛡️", description: "Seguridad y privacidad" },
+      { title: "Facturación",       href: "/dashboard/billing",       icon: "💳", description: "Pagos y suscripciones" },
     ],
   },
 ];
 
+/* ================= Collapse animado ================= */
+function Collapse({
+  open,
+  children,
+  className = "",
+}: {
+  open: boolean;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [maxHeight, setMaxHeight] = useState<number>(0);
+
+  useEffect(() => {
+    const el = innerRef.current;
+    if (!el) return;
+    const measure = () => setMaxHeight(el.scrollHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const el = innerRef.current;
+    if (!el) return;
+    setMaxHeight(el.scrollHeight);
+  }, [open]);
+
+  return (
+    <div
+      className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out ${
+        open ? "opacity-100" : "opacity-95"
+      } ${className}`}
+      style={{ maxHeight: open ? maxHeight : 0 }}
+      aria-hidden={!open}
+    >
+      <div ref={innerRef}>{children}</div>
+    </div>
+  );
+}
+
+/* ================= Item ================= */
+function Item({
+  item,
+  active,
+  collapsed,
+  onNavigate,
+}: {
+  item: NavItem;
+  active: boolean;
+  collapsed: boolean;
+  onNavigate?: () => void;
+}) {
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      className={[
+        "group relative flex rounded-lg transition-colors",
+        collapsed ? "items-center min-h-11 px-2 justify-center"
+                  : "items-start min-h-11 px-3 py-2 justify-start gap-3",
+        active
+          ? "bg-slate-800/70 text-white border-r-2 border-primary/60"
+          : "text-slate-300 hover:text-white hover:bg-slate-800/60",
+      ].join(" ")}
+      title={collapsed ? item.title : undefined}
+    >
+      <div className={collapsed ? "" : "mt-[2px]"}>
+        <IconRenderer icon={item.icon} />
+      </div>
+
+      {!collapsed && (
+        <div className="min-w-0 transition-opacity duration-300">
+          <div className="truncate text-sm font-medium">{item.title}</div>
+          {item.description && (
+            <div className="truncate text-xs text-slate-400">
+              {item.description}
+            </div>
+          )}
+        </div>
+      )}
+
+      {typeof item.badge !== "undefined" && !collapsed && (
+        <span className="ml-auto rounded-md bg-slate-700/60 px-2 py-0.5 text-xs text-slate-200">
+          {item.badge}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+/* ================= Grupo ================= */
+function Group({
+  group,
+  pathname,
+  collapsed,
+  onRequestExpand,
+  onItemNavigate,
+  defaultOpen,
+}: {
+  group: NavGroup;
+  pathname: string;
+  collapsed: boolean;
+  onRequestExpand: () => void;
+  onItemNavigate: () => void;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState<boolean>(!!defaultOpen);
+
+  const anyActive = useMemo(
+    () => group.items.some((it) => isActivePath(pathname, it.href)),
+    [pathname, group.items]
+  );
+
+  const headerActive = anyActive && !collapsed;
+
+  const toggle = () => {
+    if (collapsed) {
+      onRequestExpand();
+      setOpen(true);
+      return;
+    }
+    setOpen((v) => !v);
+  };
+
+  return (
+    <div className="w-full">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={!collapsed ? open : undefined}
+        className={[
+          "flex w-full items-center rounded-lg transition-colors",
+          "min-h-11 px-2",
+          collapsed ? "justify-center" : "justify-between px-3",
+          headerActive
+            ? "bg-slate-800/70 text-white border-r-2 border-primary/60"
+            : "text-slate-300 hover:text-white hover:bg-slate-800/60",
+        ].join(" ")}
+        title={collapsed ? group.title : undefined}
+      >
+        <div className={["flex items-center", collapsed ? "" : "gap-3"].join(" ")}>
+          <IconRenderer icon={group.icon} />
+          {!collapsed && (
+            <span className="truncate text-sm font-medium">{group.title}</span>
+          )}
+        </div>
+        {!collapsed && (
+          <ChevronDown
+            className={[
+              "h-4 w-4 transition-transform duration-300",
+              open ? "rotate-180" : "",
+            ].join(" ")}
+          />
+        )}
+      </button>
+
+      {/* Contenido del grupo con animación + línea izquierda */}
+      {!collapsed && (
+        <Collapse open={open} className="mt-1">
+          <div className="pl-3 ml-1 border-l-2 border-primary/30 space-y-1">
+            {group.items.map((it) => (
+              <Item
+                key={it.href}
+                item={it}
+                active={isActivePath(pathname, it.href)}
+                collapsed={false}
+                onNavigate={onItemNavigate}
+              />
+            ))}
+          </div>
+        </Collapse>
+      )}
+    </div>
+  );
+}
+
+/* ================= Sidebar principal ================= */
 export function AppSidebar() {
-  const { state, setOpen } = useSidebar();
-  const pathname = usePathname() ?? "/";
-  const isCollapsed = state === "collapsed";
+  const pathname = usePathname();
   const isMobile = useIsMobile();
+
+  const [collapsed, setCollapsed] = useState<boolean>(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const { data: session } = useSession();
   const user = session?.user;
 
-  // 👉 Nuevo useEffect: colapsar automáticamente en móviles al montar
-  useEffect(() => {
-    if (isMobile && state !== "collapsed") {
-      setOpen(false);
-    }
-  }, [isMobile, state, setOpen]);
+  // ===== DEBUG + detección de admin (múltiples señales + forzado localStorage)
+  const role = (user as any)?.role ?? (user as any)?.companyRole;
+  const rolesArr = (user as any)?.roles;
 
-  // Ya lo tenías: ajusta el ancho según estado
-  useEffect(() => {
-    const collapsed = "5rem";
-    const expanded = isMobile && !isCollapsed ? "100%" : "18rem";
-    document.documentElement.style.setProperty(
-      "--sidebar-width",
-      isCollapsed ? collapsed : expanded
-    );
-  }, [isCollapsed, isMobile]);
-
-
-  // Grupo abierto por URL actual
-  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
-    const active = menuGroups.find((g) =>
-      g.items.some((it) => pathname === it.url || pathname.startsWith(it.url + "/"))
-    );
-    return new Set(active ? [active.id] : []);
-  });
-
-  const toggleGroup = (groupId: string) => {
-    setOpenGroups((prev) => {
-      const next = new Set<string>();
-      if (!prev.has(groupId)) next.add(groupId); // solo uno abierto a la vez
-      return next;
-    });
+  const adminFlags = {
+    a_isAdminField: (user as any)?.isAdmin === true,
+    b_roleEqAdmin: ["ADMIN", "OWNER", "SUPERADMIN"].includes(role),
+    c_rolesArrayHasAdmin:
+      Array.isArray(rolesArr) &&
+      rolesArr.some((r: string) => ["ADMIN", "OWNER", "SUPERADMIN"].includes(r)),
+    d_forceAdminLocal:
+      typeof window !== "undefined" && localStorage.getItem("forceAdmin") === "1",
   };
 
-  const isActive = (path: string) =>
-    pathname === path || pathname.startsWith(path + "/");
+  const isAdmin = Object.values(adminFlags).some(Boolean);
 
-const handleNavClick = (groupId?: string) => (event: React.MouseEvent) => {
-  if (isMobile) {
-    setOpen(false);
-  } else if (isCollapsed) {
-    setOpen(true);
-    if (groupId) {
-      setOpenGroups(new Set([groupId]));
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[Sidebar admin debug]", { user, adminFlags, isAdmin });
+    }
+  }, [user, isAdmin]);
+
+  const userInitial =
+    (user?.name?.charAt(0) || user?.email?.charAt(0) || "U").toUpperCase();
+
+  // Grupo ADMIN (aparece arriba de Inicio)
+  const ADMIN_GROUP: NavGroup | null = isAdmin
+    ? {
+        id: "admin",
+        title: "Admin",
+        icon: "🛡️",
+        items: [
+          { title: "Usuarios y roles",            href: "/dashboard/admin/users",        icon: "👥", description: "Altas, permisos y equipos" },
+          { title: "Empresas y establecimientos", href: "/dashboard/admin/companies",    icon: "🏪", description: "Estructura, sedes y horarios" },
+          { title: "Integraciones",                href: "/dashboard/admin/integrations", icon: "🔌", description: "Conexiones externas" },
+          { title: "Finanzas",                     href: "/dashboard/admin/finance",      icon: "💰", description: "Pagos, costes y facturas" },
+          { title: "Ventas",                       href: "/dashboard/admin/sales",        icon: "🛒", description: "Canales y conversión" },
+          // plus opcionales:
+          { title: "Permisos y auditoría",         href: "/dashboard/admin/audit",        icon: "🧾", description: "Logs y cumplimiento" },
+          { title: "Estado del sistema",           href: "/dashboard/admin/system",       icon: "⚙️", description: "Salud y configuración" },
+        ],
+      }
+    : null;
+
+  // Overlay en móvil cuando está expandida
+  const isOverlay = isMobile && !collapsed;
+
+  // Abre por defecto el grupo que contiene la ruta activa (incluye admin si corresponde)
+  const ALL_GROUPS: NavGroup[] = ADMIN_GROUP ? [ADMIN_GROUP, ...GROUPS] : GROUPS;
+
+  const defaultOpenId = useMemo(() => {
+    const g = ALL_GROUPS.find((gg) =>
+      gg.items.some((it) => isActivePath(pathname ?? "", it.href))
+    );
+    return g?.id;
+  }, [pathname, ALL_GROUPS]);
+
+  const requestExpand = () => setCollapsed(false);
+
+  // Cerrar tras navegar (solo móvil)
+  const onItemNavigate = () => {
+    if (isMobile) setCollapsed(true);
+  };
+
+  // Ancho animado (100vw en móvil overlay)
+  const width = isOverlay ? "100vw" : collapsed ? "4rem" : "18rem";
+
+  // Bloquear scroll del body cuando el overlay móvil está abierto
+  useEffect(() => {
+    if (isOverlay) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [isOverlay]);
+
+  // Cerrar con Escape en móvil overlay
+  useEffect(() => {
+    if (!isOverlay) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCollapsed(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOverlay]);
+
+  // Accesibilidad: expandir con teclado al pulsar la marca
+  function handleBrandKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (collapsed && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      setCollapsed(false);
     }
   }
-};
-
-
-
-
-  // Texto blanco por defecto, activo destacado
-  const getNavCls = (active: boolean) =>
-    active
-      ? "bg-primary/20 text-white border-r-2 border-primary shadow-sm"
-      : "text-white hover:text-white hover:bg-slate-700/80";
 
   return (
-    <Sidebar
-      collapsible="icon"
-      className={`w-[var(--sidebar-width)] bg-slate-900 border-slate-700 ${
-        isMobile && !isCollapsed ? "fixed inset-0 z-50" : ""
-      }`}
+    <aside
+      style={{ width }}
+      className={[
+        "h-svh shrink-0 border-r border-slate-800 bg-slate-900 text-slate-200 shadow-lg flex flex-col transition-[width] duration-300 ease-in-out",
+        isOverlay ? "fixed inset-0 z-50" : "",
+      ].join(" ")}
     >
-      <SidebarContent className="bg-slate-900 border-r border-slate-700">
-      {/* Header */}
-      <div className="py-4 border-b border-slate-700/50">
-        {isCollapsed ? (
-          <div className="flex justify-center">
-            <img
-              src="/img/logo_crussader.png"
-              alt="Crussader"
-              className="w-10 h-10 object-cover rounded-md"
-            />
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <img
-              src="/img/logo_crussader.png"
-              alt="Crussader"
-              className="h-8 w-8 rounded-md object-cover shrink-0"
-            />
-            <div className="text-left">
-              <h2 className="font-bold text-white text-lg">Crussader</h2>
-              <p className="text-xs text-slate-400">Panel de control</p>
+      {/* Header fijo */}
+      <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-900">
+        <div
+          className={[
+            "flex items-center gap-2 py-3",
+            collapsed ? "px-2 justify-center" : "px-3 justify-between",
+          ].join(" ")}
+        >
+          {/* Marca (click para expandir cuando está colapsada) */}
+          <div
+            role={collapsed ? "button" : undefined}
+            tabIndex={collapsed ? 0 : -1}
+            onClick={() => collapsed && setCollapsed(false)}
+            onKeyDown={handleBrandKeyDown}
+            className={[
+              "flex items-center rounded-md",
+              collapsed ? "p-1 hover:bg-slate-800/60" : "",
+              collapsed ? "" : "gap-2",
+            ].join(" ")}
+            title={collapsed ? "Expandir" : undefined}
+          >
+            {/* Logo */}
+            <div className="flex h-8 w-8 items-center justify-center">
+              <img
+                src="/img/logo_crussader.svg"
+                alt="Crussader logo"
+                width={32}
+                height={32}
+              />
             </div>
+
+            {!collapsed && (
+              <div className="leading-tight">
+                <div className="text-sm font-semibold text-white">Crussader</div>
+                <div className="text-[11px] text-slate-400">Panel de usuario</div>
+              </div>
+            )}
+          </div>
+
+          {/* Botón contraer — visible solo cuando está expandida */}
+          {!collapsed && (
+            <button
+              type="button"
+              onClick={() => setCollapsed(true)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-300 hover:text-white hover:bg-slate-800 transition-colors ml-auto"
+              aria-label="Contraer sidebar"
+              title="Contraer"
+            >
+              <ChevronsLeft className="h-5 w-5" />
+            </button>
+          )}
+
+          {/* Debug admin flags (solo dev) */}
+          {process.env.NODE_ENV !== "production" && !collapsed && (
+            <div className="ml-2 rounded-md bg-slate-800/70 px-2 py-1 text-[11px] text-slate-300">
+              admin:{" "}
+              <span className={isAdmin ? "text-green-400" : "text-red-400"}>
+                {String(isAdmin)}
+              </span>
+              {" · "}
+              <span>a:{String(adminFlags.a_isAdminField)}</span>{" "}
+              <span>b:{String(adminFlags.b_roleEqAdmin)}</span>{" "}
+              <span>c:{String(adminFlags.c_rolesArrayHasAdmin)}</span>{" "}
+              <span>d:{String(adminFlags.d_forceAdminLocal)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Lista con scroll */}
+      <nav className="flex-1 overflow-y-auto px-2 py-2">
+        {/* ===== Grupo ADMIN (si aplica) — ARRIBA DE INICIO ===== */}
+        {ADMIN_GROUP && (
+          <div className="mb-2">
+            <Group
+              group={ADMIN_GROUP}
+              pathname={pathname ?? ""}
+              collapsed={collapsed}
+              onRequestExpand={requestExpand}
+              onItemNavigate={onItemNavigate}
+              defaultOpen={ADMIN_GROUP.id === defaultOpenId}
+            />
           </div>
         )}
 
-      </div>
+        {/* Inicio */}
+        <Item
+          item={HOME}
+          active={isActivePath(pathname ?? "", HOME.href)}
+          collapsed={collapsed}
+          onNavigate={onItemNavigate}
+        />
 
-
-
-
-
-        {/* Menú */}
-        <div className="flex-1 py-4">
-          {/* Inicio (no colapsable) */}
-          {isCollapsed ? (
-            <div className="px-2 py-2 flex justify-center mb-2">
-              <Link
-                href={homeItem.url}
-                onClick={handleNavClick()}
-                className="text-2xl hover:scale-110 transition-transform"
-                title={homeItem.title}
-              >
-                {homeItem.emoji}
-              </Link>
-            </div>
-          ) : (
-          <Link
-            href={homeItem.url}
-            onClick={handleNavClick()} // ✅ corregido aquí
-            className={`${getNavCls(isActive(homeItem.url))} flex items-center gap-3 px-6 py-2.5 mx-2 mb-2 rounded-lg transition-all duration-200 group`}
-          >
-            <span className="text-lg group-hover:scale-110 transition-transform">
-              {homeItem.emoji}
-            </span>
-            <div className="flex-1 min-w-0 text-left">
-              <span className="text-sm font-medium block truncate text-white">
-                {homeItem.title}
-              </span>
-              <span className="text-xs text-slate-400 block truncate">
-                {homeItem.description}
-              </span>
-            </div>
-          </Link>
-
-          )}
-
-          {/* Grupos */}
-          {menuGroups.map((group) => (
-            <div key={group.id} className="mb-2">
-              {isCollapsed ? (
-                // Vista colapsada: solo emoji centrado
-                <div className="px-2 py-2 flex justify-center">
-                  <div
-                    className="text-2xl cursor-pointer hover:scale-110 transition-transform"
-                    title={group.title}
-                  >
-                    {group.emoji}
-                  </div>
-                </div>
-              ) : (
-                <Collapsible
-                  open={openGroups.has(group.id)}
-                  onOpenChange={() => toggleGroup(group.id)}
-                >
-                  <CollapsibleTrigger className="w-full">
-                    <div className="flex items-center justify-between px-4 py-3 text-white hover:bg-slate-800/50 transition-colors rounded-lg mx-2">
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg">{group.emoji}</span>
-                        <span className="font-medium text-sm text-white">{group.title}</span>
-                      </div>
-                      <ChevronDown
-                        className={`h-4 w-4 transition-transform duration-200 ${
-                          openGroups.has(group.id) ? "rotate-180" : ""
-                        }`}
-                      />
-                    </div>
-                  </CollapsibleTrigger>
-
-                  <CollapsibleContent className="space-y-1 pb-2">
-                    {group.items.map((item) => (
-                      <Link
-                        key={item.url}
-                        href={item.url}
-                        onClick={handleNavClick(group.id)} // ✅ corregido aquí
-                        className={`${getNavCls(isActive(item.url))} flex items-center gap-3 px-6 py-2.5 mx-2 rounded-lg transition-all duration-200 group`}
-                      >
-                        <span className="text-lg group-hover:scale-110 transition-transform">
-                          {item.emoji}
-                        </span>
-                        <div className="flex-1 min-w-0 text-left">
-                          <span className="text-sm font-medium block truncate text-white">
-                            {item.title}
-                          </span>
-                          <span className="text-xs text-slate-400 block truncate">
-                            {item.description}
-                          </span>
-                        </div>
-                      </Link>
-                    ))}
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </div>
+        {/* Grupos */}
+        <div className="mt-2 space-y-1">
+          {GROUPS.map((g) => (
+            <Group
+              key={g.id}
+              group={g}
+              pathname={pathname ?? ""}
+              collapsed={collapsed}
+              onRequestExpand={requestExpand}
+              onItemNavigate={onItemNavigate}
+              defaultOpen={g.id === defaultOpenId}
+            />
           ))}
-
-
         </div>
+      </nav>
 
-        {/* ===== Footer (igual que tu diseño) ===== */}
-        <div className="border-t border-slate-700/50">
-          {/* Notificaciones */}
-          <div className="px-4 py-2 border-b border-slate-700/50">
-            <Link
-              href="/dashboard/notifications"
-              className={`${getNavCls(isActive("/dashboard/notifications"))} flex items-center gap-3 p-3 rounded-lg transition-all duration-200 group relative`}
-            >
-              <div className="relative">
-                <Bell className="w-5 h-5 text-white transition-colors" />
-                {/* badge pill con glow */}
-                <div className="absolute -top-1 -right-1 flex items-center justify-center">
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-primary blur-sm animate-pulse" />
-                    <div className="relative bg-gradient-to-br from-primary via-primary to-primary/80 text-white text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center border border-white/20 shadow-lg">
-                      3
-                    </div>
+      {/* ===== Footer (pegado abajo, con secciones y submenú) ===== */}
+      <div className="sticky bottom-0 z-10 bg-slate-900">
+        {/* Sección 1: Notificaciones + Soporte */}
+        <div className="border-t border-slate-800">
+          {/* Notificaciones con burbuja */}
+          <Link
+            href="/dashboard/notifications"
+            onClick={onItemNavigate}
+            className={[
+              "relative flex items-center min-h-11 transition-colors",
+              "text-slate-300 hover:text-white hover:bg-slate-800/60",
+              collapsed ? "justify-center px-2" : "justify-start gap-3 px-3",
+            ].join(" ")}
+          >
+            <div className="relative">
+              <Bell className="h-5 w-5" />
+              {/* burbuja con glow */}
+              <div className="absolute -top-1 -right-1 flex items-center justify-center">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-primary blur-sm animate-pulse" />
+                  <div className="relative bg-gradient-to-br from-primary via-primary to-primary/80 text-white text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center border border-white/20 shadow-lg">
+                    3
                   </div>
                 </div>
               </div>
-              {!isCollapsed && (
-                <div className="flex-1 text-left">
-                  <span className="text-sm font-medium block">Notificaciones</span>
-                  <span className="text-xs text-slate-400 block">3 sin leer</span>
+            </div>
+            {!collapsed && <span className="text-sm font-medium">Notificaciones</span>}
+          </Link>
+
+          {/* Soporte (💡) */}
+          <Link
+            href="/dashboard/support"
+            onClick={onItemNavigate}
+            className={[
+              "flex items-center min-h-11 transition-colors",
+              "text-slate-300 hover:text-white hover:bg-slate-800/60",
+              collapsed ? "justify-center px-2" : "justify-start gap-3 px-3",
+            ].join(" ")}
+            title={collapsed ? "Soporte" : undefined}
+          >
+            <span className="text-base">💡</span>
+            {!collapsed && <span className="text-sm font-medium">Soporte</span>}
+          </Link>
+        </div>
+
+        {/* Separador */}
+        <div className="border-t border-slate-800" />
+
+        {/* Sección 2: Usuario (abre submenú abajo) */}
+        <div className="border-b border-transparent">
+          <button
+            type="button"
+            onClick={() => setUserMenuOpen((v) => !v)}
+            className={[
+              "w-full flex items-center min-h-11 transition-colors",
+              "text-slate-300 hover:text-white hover:bg-slate-800/60",
+              collapsed ? "justify-center px-2" : "justify-between px-3",
+            ].join(" ")}
+            title={collapsed ? (user?.name ?? "Usuario") : undefined}
+            aria-expanded={!collapsed ? userMenuOpen : undefined}
+          >
+            <div className={["flex items-center", collapsed ? "" : "gap-3"].join(" ")}>
+              {/* Avatar */}
+              {user?.image ? (
+                <img
+                  src={user.image}
+                  alt={user?.name ?? "Usuario"}
+                  className="h-6 w-6 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div className="h-6 w-6 rounded-full bg-primary/20 text-primary grid place-items-center text-xs font-semibold shrink-0">
+                  {userInitial}
                 </div>
               )}
-            </Link>
-          </div>
 
-          {/* Usuario */}
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-3 w-full text-slate-300 hover:text-slate-100 hover:bg-slate-700/50 p-2 rounded-lg transition-colors">
-                {user?.image ? (
-                  <img
-                    src={user.image}
-                    alt={user.name || "Avatar"}
-                    className="w-8 h-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-primary" />
-                  </div>
-                )}
-                {!isCollapsed && (
-                  <div className="flex-1 text-left">
-                    <p className="text-sm font-medium truncate">{user?.name || "Usuario"}</p>
-                    <p className="text-xs text-slate-400 truncate">{user?.email || "Mi cuenta"}</p>
-                  </div>
-                )}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-48 bg-slate-800 border-slate-700"
-              side={isCollapsed ? "right" : "top"}
-            >
-              <DropdownMenuItem className="text-slate-300 hover:text-slate-100 hover:bg-slate-700/50">
-                <Settings className="w-4 h-4 mr-2" />
-                Mi perfil
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-slate-700" />
-              <DropdownMenuItem
-                onClick={() => signOut({ callbackUrl: "/" })}
-                className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Cerrar sesión
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              {/* Nombre (solo en expandido) */}
+              {!collapsed && (
+                <span className="text-sm font-medium truncate max-w-[12rem]">
+                  {user?.name ?? "Usuario"}
+                </span>
+              )}
+            </div>
 
-
-          {/* Soporte */}
-          <div className="p-4 flex items-center justify-between">
-            {!isCollapsed ? (
-              <>
-                <div className="flex items-center gap-3 text-slate-400">
-                  <div className="text-lg">💡</div>
-                  <div>
-                    <p className="text-xs font-medium">¿Necesitas ayuda?</p>
-                    <p className="text-xs">Contacta con soporte</p>
-                  </div>
-                </div>
-                <SidebarTrigger className="text-slate-400 hover:text-slate-100 hover:bg-slate-700/50" />
-              </>
-            ) : (
-              <SidebarTrigger className="w-full flex justify-center text-slate-400 hover:text-slate-100 hover:bg-slate-700/50 p-2 rounded-lg" />
+            {/* Chevron (solo en expandido) */}
+            {!collapsed && (
+              <ChevronDown
+                className={[
+                  "h-4 w-4 transition-transform duration-300",
+                  userMenuOpen ? "rotate-180" : "",
+                ].join(" ")}
+              />
             )}
-          </div>
+          </button>
+
+          {/* Submenú: aparece DEBAJO de "Usuario" */}
+          {!collapsed && (
+            <Collapse open={userMenuOpen}>
+              <div className="px-2 pb-2 pt-1">
+                <div className="space-y-1">
+                  {/* Configuración */}
+                  <Link
+                    href="/dashboard/settings"
+                    onClick={onItemNavigate}
+                    className="flex items-center justify-start gap-3 rounded-lg px-3 min-h-11 text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors"
+                  >
+                    <Settings className="h-5 w-5" />
+                    <span className="text-sm font-medium">Configuración</span>
+                  </Link>
+                  {/* Cerrar sesión */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onItemNavigate();
+                      signOut({ callbackUrl: "/" });
+                    }}
+                    className="w-full flex items-center justify-start gap-3 rounded-lg px-3 min-h-11 text-red-400 hover:text-red-300 hover:bg-red-900/20 transition-colors"
+                  >
+                    <LogOut className="h-5 w-5" />
+                    <span className="text-sm font-medium">Cerrar sesión</span>
+                  </button>
+                </div>
+              </div>
+            </Collapse>
+          )}
         </div>
-      </SidebarContent>
-    </Sidebar>
+      </div>
+    </aside>
   );
 }

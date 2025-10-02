@@ -50,21 +50,19 @@ export const authOptions: NextAuthOptions = {
       },
     }),
 
-    // --- Google OAuth (opcional) ---
+    // --- Google OAuth ---
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          // scopes mínimos y suficientes para listar calendarios y crear/leer eventos
           scope: [
             "openid",
             "email",
-            "profile",
+            "profile", // ⬅ necesario para name + picture
             "https://www.googleapis.com/auth/calendar.events",
             "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
           ].join(" "),
-          // imprescindible para obtener refresh_token persistente
           access_type: "offline",
           prompt: "consent",
         },
@@ -80,13 +78,25 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
 
-    async jwt({ token, user, account }) {
+    // ⬇ Añadimos 'profile' para poder leer picture/name de Google
+    async jwt({ token, user, account, profile }) {
       // ====== lo tuyo (roles/uid) ======
       if (user && (user as any).role) (token as any).role = (user as any).role;
       if (!(token as any).role && token?.email) {
         (token as any).role = token.email === adminEmail ? "system_admin" : "user";
       }
       if (user && (user as any).id) (token as any).uid = (user as any).id;
+
+      // ====== NUEVO: al conectar con Google, guarda nombre/email/foto ======
+      if (account?.provider === "google" && profile) {
+        token.name = (profile as any).name ?? token.name;                 // ⬅ NEW
+        token.email = (profile as any).email ?? token.email;              // ⬅ NEW
+        token.picture =
+          (profile as any).picture ??
+          (profile as any).avatar_url ??
+          token.picture;                                                  // ⬅ NEW
+        token.sub = token.sub ?? (profile as any).sub;                    // ⬅ NEW
+      }
 
       // ====== NUEVO: guardar tokens de Google al conectar ======
       if (account?.provider === "google") {
@@ -112,7 +122,6 @@ export const authOptions: NextAuthOptions = {
             ? Math.floor(credentials.expiry_date / 1000)
             : undefined;
         } catch (e) {
-          // marca error (si quieres forzar re-login, lo podrás leer en session)
           (token as any).google_token_error = "RefreshAccessTokenError";
         }
       }
@@ -121,18 +130,23 @@ export const authOptions: NextAuthOptions = {
     },
 
     async session({ session, token }) {
-      // lo tuyo
+      // lo tuyo (role/id)
       if (session.user) {
         (session.user as any).role = (token as any).role || "user";
         if ((token as any).uid) (session.user as any).id = (token as any).uid;
+
+        // ⬅ NEW: propaga nombre / email / foto a la sesión (sidebar)
+        session.user.name = (token.name as string) ?? session.user.name;       // ⬅ NEW
+        session.user.email = (token.email as string) ?? session.user.email;    // ⬅ NEW
+        session.user.image = (token.picture as string) ?? session.user.image;  // ⬅ NEW
       }
-      // NUEVO: expón el access token para usarlo en rutas server-side
+
+      // tokens de Google a session (por si los usas server-side)
       (session as any).googleAccessToken = (token as any).google_access_token;
       (session as any).googleTokenError = (token as any).google_token_error;
       return session;
     },
   },
-
 };
 
 const handler = NextAuth(authOptions);

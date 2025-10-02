@@ -39,33 +39,35 @@ export type TabIconName = keyof typeof ICONS;
 export type TabItem = {
   href: string;       // admite /ruta, /ruta?tab=foo, ?tab=foo, /ruta#foo, #foo
   label: string;
-  icon?: TabIconName; // ahora opcional para usar tabs sin icono
+  icon?: TabIconName; // opcional
   beta?: boolean;
 };
 
 export type TabsMenuProps = {
-  // --- Modo "full page" (retrocompatible con tu API) ---
+  // --- Modo "full page" (retrocompatible) ---
   title?: string;
   description?: string;
   mainIcon?: TabIconName;
-  tabs?: TabItem[];               // <— nombre original
+  tabs?: TabItem[];
   children?: ReactNode;
-  /** Matcher opcional para activar tabs */
   isActive?: (
     ctx: { pathname: string; search: URLSearchParams; hash: string },
     tab: TabItem
   ) => boolean;
 
-  // --- Modo "nav suelto" (nuevo) ---
-  items?: TabItem[];              // <— alias de tabs
+  // --- Modo "nav suelto" ---
+  items?: TabItem[];           // alias de tabs
   activeHref?: string;
   loading?: boolean;
   emptyLabel?: string;
   onItemClick?: (item: TabItem) => void;
   className?: string;
-
-  /** Forzar modo de render: "full" usa header + children; "nav-only" solo la barra */
   renderMode?: "full" | "nav-only";
+
+  // --- NUEVO: Apariencia y densidad (para Admin/Vercel-like) ---
+  appearance?: "default" | "admin"; // default = morado pill; admin = gris sobrio
+  dense?: boolean;                   // reduce separaciones/padding
+  itemClassName?: string;            // override fino si hace falta
 };
 
 export function TabsMenu(props: TabsMenuProps) {
@@ -85,8 +87,12 @@ export function TabsMenu(props: TabsMenuProps) {
     emptyLabel = "Sin elementos",
     onItemClick,
     className,
-
     renderMode,
+
+    // nuevo
+    appearance = "default",
+    dense = false,
+    itemClassName,
   } = props;
 
   const pathname = usePathname();
@@ -119,7 +125,7 @@ export function TabsMenu(props: TabsMenuProps) {
       const hrefHash = url.hash ? url.hash.replace(/^#/, "") : "";
       const hashMatch = hrefHash ? hrefHash === ctx.hash : true;
 
-      // Si nos pasan activeHref (modo nav suelto), priorízalo
+      // activeHref prioriza
       if (activeHref) {
         const activeUrl = new URL(
           activeHref.startsWith("?") || activeHref.startsWith("#")
@@ -127,9 +133,11 @@ export function TabsMenu(props: TabsMenuProps) {
             : activeHref,
           "http://dummy.local"
         );
-        return activeUrl.pathname === url.pathname &&
-               activeUrl.search === url.search &&
-               activeUrl.hash === url.hash;
+        return (
+          activeUrl.pathname === url.pathname &&
+          activeUrl.search === url.search &&
+          activeUrl.hash === url.hash
+        );
       }
 
       return samePath && queriesMatch && hashMatch;
@@ -141,68 +149,81 @@ export function TabsMenu(props: TabsMenuProps) {
   const matcher = customMatcher ?? defaultMatcher;
   const MainIcon = mainIcon ? ICONS[mainIcon] : null;
 
-  // Determina modo de render si no se fuerza
+  // Determina modo de render
   const mode: "full" | "nav-only" =
-    renderMode ??
-    (title || description || children ? "full" : "nav-only");
+    renderMode ?? (title || description || children ? "full" : "nav-only");
 
-const Nav = (
-  <nav className={cn("flex gap-2 overflow-x-auto pb-2", className)}>
-    {loading && (
-      <span className="text-sm text-muted-foreground">Cargando…</span>
-    )}
+  // ===== Apariencia / estilo =====
+  const gap = dense ? "gap-1.5" : "gap-2";
+  const padX = dense ? "px-3" : "px-4";
+  const padY = dense ? "py-1.5" : "py-2";
+  const radius = appearance === "admin" ? "rounded-md" : "rounded-xl";
 
-    {!loading && data.length === 0 && (
-      <span className="text-sm text-muted-foreground">{emptyLabel}</span>
-    )}
+  // Base: igual altura y borde SIEMPRE para evitar “saltos”
+  const baseItem =
+    `inline-flex items-center ${gap} ${padX} ${padY} ${radius} ` +
+    `text-sm font-medium border transition-colors`;
 
-    {!loading &&
-      data.map((tab, idx) => {
-        const Icon = tab.icon ? ICONS[tab.icon] : null;
-        let active = matcher({ pathname, search, hash }, tab);
+  const activeItem =
+    appearance === "admin"
+      ? "bg-zinc-100 text-foreground border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700"
+      : "bg-primary text-primary-foreground border-transparent shadow-sm";
 
-        // 👇 fallback: si ninguno está activo, forzamos el primero
-        if (!data.some((t) => matcher({ pathname, search, hash }, t)) && idx === 0) {
-          active = true;
-        }
+  const inactiveItem =
+    appearance === "admin"
+      ? "bg-transparent text-muted-foreground border-transparent hover:bg-zinc-50 hover:text-foreground dark:hover:bg-zinc-800/50"
+      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border-transparent";
 
-        return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            onClick={(e) => {
-              if (onItemClick) {
-                e.preventDefault();
-                onItemClick(tab);
-              }
-            }}
-            className={cn(
-              "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition",
-              active
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-            )}
-          >
-            {Icon ? <Icon className="h-4 w-4" /> : null}
-            <span>{tab.label}</span>
-            {tab.beta ? (
-              <span className="ml-1 rounded-md bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-800">
-                Beta
-              </span>
-            ) : null}
-          </Link>
-        );
-      })}
-  </nav>
-);
+  const navClass = cn("flex overflow-x-auto pb-2", gap, className);
 
+  const Nav = (
+    <nav className={navClass}>
+      {loading && <span className="text-sm text-muted-foreground">Cargando…</span>}
+
+      {!loading && data.length === 0 && (
+        <span className="text-sm text-muted-foreground">{emptyLabel}</span>
+      )}
+
+      {!loading &&
+        data.map((tab, idx) => {
+          const Icon = tab.icon ? ICONS[tab.icon] : null;
+          let active = matcher({ pathname, search, hash }, tab);
+
+          // fallback: si ninguno activo, marcar primero
+          if (!data.some((t) => matcher({ pathname, search, hash }, t)) && idx === 0) {
+            active = true;
+          }
+
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              onClick={(e) => {
+                if (onItemClick) {
+                  e.preventDefault();
+                  onItemClick(tab);
+                }
+              }}
+              className={cn(baseItem, active ? activeItem : inactiveItem, itemClassName)}
+            >
+              {Icon ? <Icon className="h-4 w-4" /> : null}
+              <span>{tab.label}</span>
+              {tab.beta ? (
+                <span className="ml-1 rounded-sm bg-neutral-200 px-1.5 py-0.5 text-[10px] font-medium text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
+                  Beta
+                </span>
+              ) : null}
+            </Link>
+          );
+        })}
+    </nav>
+  );
 
   if (mode === "nav-only") {
-    // Solo la barra (para usar dentro de Section headers, etc.)
     return <div>{Nav}</div>;
   }
 
-  // Modo full page (tu layout original)
+  // Modo full page (retro)
   return (
     <div className="flex min-h-screen flex-col">
       {/* Header */}
@@ -225,5 +246,4 @@ const Nav = (
       <main className="flex-1 px-6 py-8">{children}</main>
     </div>
   );
-
 }

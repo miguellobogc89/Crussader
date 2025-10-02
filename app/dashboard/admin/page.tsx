@@ -1,4 +1,3 @@
-// app/dashboard/admin/page.tsx
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
@@ -8,6 +7,8 @@ import CompaniesTable from "@/app/components/admin/CompaniesTable";
 import LocationsTable from "@/app/components/admin/LocationsTable";
 import { TabsMenu, type TabItem } from "@/app/components/TabsMenu";
 import PreloadAdminBuffer from "@/app/components/buffer/PreloadAdminBuffer";
+
+import PageShell from "@/app/components/layouts/PageShell";
 
 export const dynamic = "force-dynamic";
 
@@ -45,38 +46,38 @@ export default async function AdminPage({
 
   const tab = (searchParams?.tab ?? "locations") as "locations" | "users" | "companies";
 
-  return (
-    <>
-      <PreloadAdminBuffer
-        lq={lq} lpage={lpage}
-        cq={cq} cpage={cpage}
-        uq={uq} upage={upage}
-      />
-
+// app/dashboard/admin/page.tsx (fragmento clave)
+return (
+  <PageShell
+    title="Administración"
+    description="Gestión de ubicaciones, usuarios y empresas"
+    headerBand={
       <TabsMenu
-        title="Administración"
-        description="Gestión de ubicaciones, usuarios y empresas"
-        mainIcon="database"
         tabs={ADMIN_TABS}
-      >
-        {tab === "locations" && (
-          <section id="locations">
-            <LocationsTable lq={lq} lpage={lpage} uq={uq} upage={upage} cq={cq} cpage={cpage} />
-          </section>
-        )}
+        renderMode="nav-only"
+        appearance="admin"
+        dense
+      />
+    }
+  >
+    <PreloadAdminBuffer
+      lq={lq} lpage={lpage}
+      cq={cq} cpage={cpage}
+      uq={uq} upage={upage}
+    />
 
-        {tab === "users" && (
-          <section id="users">
-            <UsersTable />
-          </section>
-        )}
+    {tab === "locations" && (
+      <section id="locations">
+        <LocationsTable
+          lq={lq} lpage={lpage}
+          uq={uq} upage={upage}
+          cq={cq} cpage={cpage}
+        />
+      </section>
+    )}
+    {tab === "users" && <section id="users"><UsersTable /></section>}
+    {tab === "companies" && <section id="companies"><CompaniesTable /></section>}
+  </PageShell>
+);
 
-        {tab === "companies" && (
-          <section id="companies">
-            <CompaniesTable />
-          </section>
-        )}
-      </TabsMenu>
-    </>
-  );
 }
