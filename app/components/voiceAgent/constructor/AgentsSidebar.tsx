@@ -2,9 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import {
-  Plus,
   Search,
-  MoreVertical,
   Copy,
   Trash2,
   Edit2,
@@ -22,6 +20,8 @@ export type AgentListItem = {
   isActive: boolean;
   companyCount?: number;
   updatedAt?: string; // ISO
+  /** Nombre de la empresa (admin) */
+  companyName?: string | null;
 };
 
 type Props = {
@@ -29,20 +29,22 @@ type Props = {
   selectedId?: string;
   onSelect: (id: string) => void;
 
-  onCreate: () => void;
+  // siguen siendo opcionales; este sidebar no muestra "Nuevo"
+  onCreate?: () => void;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onToggleActive: (id: string, next: boolean) => void;
 };
 
-const cx = (...xs: Array<string | false | undefined>) => xs.filter(Boolean).join(" ");
+const cx = (...xs: Array<string | false | undefined>) =>
+  xs.filter(Boolean).join(" ");
 
 export default function AgentsSidebar({
   agents,
   selectedId,
   onSelect,
-  onCreate,
+  onCreate, // eslint-disable-line @typescript-eslint/no-unused-vars
   onDuplicate,
   onDelete,
   onRename,
@@ -58,7 +60,8 @@ export default function AgentsSidebar({
     return agents.filter(
       (a) =>
         a.name.toLowerCase().includes(q) ||
-        (a.slug ?? "").toLowerCase().includes(q)
+        (a.slug ?? "").toLowerCase().includes(q) ||
+        (a.companyName ?? "").toLowerCase().includes(q)
     );
   }, [agents, query]);
 
@@ -87,14 +90,7 @@ export default function AgentsSidebar({
           <h2 className="text-base font-semibold text-slate-800">Agentes</h2>
           <p className="text-xs text-slate-500">Constructor y librería</p>
         </div>
-        <button
-          onClick={onCreate}
-          className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-3 py-2 text-sm text-white shadow hover:bg-emerald-600"
-          title="Crear nuevo agente"
-        >
-          <Plus className="h-4 w-4" />
-          Nuevo
-        </button>
+        {/* Botón "Nuevo" retirado en el constructor (admin) */}
       </div>
 
       {/* Search */}
@@ -103,7 +99,7 @@ export default function AgentsSidebar({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nombre o slug…"
+          placeholder="Buscar por nombre, slug o empresa…"
           className="w-full bg-transparent text-sm outline-none"
         />
       </div>
@@ -143,17 +139,23 @@ export default function AgentsSidebar({
 
               {/* Main block */}
               <div className="min-w-0 flex-1">
-                {/* Name (or inline edit) */}
+                {/* Name / edit */}
                 {!isEditing ? (
-                  <div className="flex items-center gap-2">
-                    <div className="truncate text-sm font-medium text-slate-800">
-                      {a.name}
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                      <div className="truncate text-sm font-medium text-slate-800">
+                        {a.name}
+                      </div>
+                      {a.isActive && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                          <BadgeCheck className="h-3 w-3" /> activo
+                        </span>
+                      )}
                     </div>
-                    {a.isActive && (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                        <BadgeCheck className="h-3 w-3" /> activo
-                      </span>
-                    )}
+                    {/* Subtítulo: empresa */}
+                    <div className="text-[11px] text-slate-500">
+                      {a.companyName ?? "—"}
+                    </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
@@ -184,15 +186,25 @@ export default function AgentsSidebar({
                   </div>
                 )}
 
-                {/* Meta */}
+                {/* Meta (dejamos slug y companyCount si te son útiles) */}
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
-                  {a.slug ? <span>/{a.slug}</span> : <span className="italic text-slate-400">sin slug</span>}
+                  {a.slug ? (
+                    <span>/{a.slug}</span>
+                  ) : (
+                    <span className="italic text-slate-400">sin slug</span>
+                  )}
                   {typeof a.companyCount === "number" && (
-                    <span>{a.companyCount} empresa{a.companyCount === 1 ? "" : "s"}</span>
+                    <span>
+                      {a.companyCount} empresa{a.companyCount === 1 ? "" : "s"}
+                    </span>
                   )}
                   {a.updatedAt && (
                     <span>
-                      act. {new Date(a.updatedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" })}
+                      act.{" "}
+                      {new Date(a.updatedAt).toLocaleDateString("es-ES", {
+                        day: "2-digit",
+                        month: "2-digit",
+                      })}
                     </span>
                   )}
                 </div>
@@ -241,7 +253,7 @@ export default function AgentsSidebar({
 
       {/* Footer hint */}
       <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-500">
-        Selecciona un agente para editar su flujo y ajustes. Crea o duplica para experimentar sin miedo.
+        Selecciona un agente para editar su flujo y ajustes.
       </div>
     </aside>
   );

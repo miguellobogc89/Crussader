@@ -48,7 +48,6 @@ export default function AgentsListPanel({
     try {
       const list = await listCompanyVoiceAgents(companyId);
       setAgents(list);
-      // si no hay selección aún, selecciona el primero
       if (!selectedAgentId && list.length > 0) onSelect(list[0].voiceAgentId);
     } catch (e: any) {
       setError(e?.message ?? "No se pudo cargar la lista de agentes.");
@@ -62,7 +61,6 @@ export default function AgentsListPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
 
-  // Filtro client-side
   const filtered = useMemo(() => {
     const norm = (s: string) => (s || "").toLowerCase().normalize("NFKD");
     const q = norm(qDeb);
@@ -70,7 +68,6 @@ export default function AgentsListPanel({
     return agents.filter((a) => norm(a.name).includes(q));
   }, [agents, qDeb]);
 
-  // feedback visual de “búsqueda”
   useEffect(() => {
     if (!loading) {
       setLoadingSearch(true);
@@ -93,6 +90,7 @@ export default function AgentsListPanel({
     if (!companyId || busy) return;
     const name = prompt("Nombre para el nuevo agente:");
     if (!name || !name.trim()) return;
+
     setBusy("create");
     setError(null);
     try {
@@ -110,7 +108,6 @@ export default function AgentsListPanel({
     }
   }
 
-  // formateo de fecha
   const fmtDate = (iso?: string) =>
     iso ? new Date(iso).toLocaleDateString("es-ES") : "—";
 
@@ -187,17 +184,6 @@ export default function AgentsListPanel({
             companyId &&
             filtered.map((a) => {
               const active = a.voiceAgentId === selectedAgentId;
-              const externalTag =
-                a.isAssignedDefault && a.isExternalAssigned ? (
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                    Asignado (externo)
-                  </span>
-                ) : a.isAssignedDefault ? (
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                    Asignado
-                  </span>
-                ) : null;
-
               return (
                 <button
                   key={a.voiceAgentId}
@@ -210,8 +196,14 @@ export default function AgentsListPanel({
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-sm font-medium text-slate-900">{a.name}</div>
                     <div className="flex items-center gap-2">
-                      {externalTag}
-                      <div className="text-xs text-slate-600">{statusLabel(a.status)}</div>
+                      {a.isAssignedDefault ? (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                          Asignado
+                        </span>
+                      ) : null}
+                      <div className="text-xs text-slate-600">
+                        {a.status === "ACTIVE" ? "Activo" : a.status === "PAUSED" ? "Pausado" : "Deshabilitado"}
+                      </div>
                     </div>
                   </div>
                   <div className="text-xs text-slate-500">

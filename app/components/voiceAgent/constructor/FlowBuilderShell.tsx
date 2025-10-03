@@ -1,11 +1,13 @@
+
+//app/components/voiceAgent/Constructor/FlowBuilderShell.tsx
 "use client";
 
 import React from "react";
 import AgentsSidebar, {
   type AgentListItem as SidebarAgentListItem, // 👈 usa el tipo real del sidebar
-} from "@/app/components/voiceAgent/AgentsSidebar";
-import FlowEditor, { type FlowStage } from "@/app/components/voiceAgent/FlowEditor";
-import PhaseList from "@/app/components/voiceAgent/PhaseList";
+} from "@/app/components/voiceAgent/constructor/AgentsSidebar";
+import FlowEditor, { type FlowStage } from "@/app/components/voiceAgent/constructor/FlowEditor";
+import PhaseList from "@/app/components/voiceAgent/constructor/PhaseList";
 
 export default function FlowBuilderShell({
   agents,

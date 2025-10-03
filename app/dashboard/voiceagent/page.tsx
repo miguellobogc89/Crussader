@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import FlowBuilderShell from "@/app/components/voiceAgent/FlowBuilderShell";
+import FlowBuilderShell from "@/app/components/voiceAgent/constructor/FlowBuilderShell";
 import {
   listVoiceAgents,
   createVoiceAgent,
@@ -13,7 +13,7 @@ import {
 } from "./agents.actions";
 import { listStages, saveFlowForAgent, type Stage } from "./flow.actions";
 import { getVoiceAgentIdByAgent } from "./agents.helpers";
-import ChatConfigurationShell from "@/app/components/voiceAgent/ChatConfigurationShell";
+import ChatConfigurationShell from "@/app/components/voiceAgent/constructor/ChatConfigurationShell";
 import { loadCompanyMeta } from "./actions";
 
 type Phase = "INTRO" | "INTENT" | "COLLECT" | "CONFIRM" | "END";

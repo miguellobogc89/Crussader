@@ -186,6 +186,7 @@ model Company {
   knowledgeSpaces      KnowledgeSpace[]
   voiceAgentId         String?
   voiceAgent           VoiceAgent?        @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id], onDelete: SetNull)
+  knowledgeSections KnowledgeSection[]
 
   @@index([name])
   @@index([activity])
@@ -1269,6 +1270,7 @@ model KnowledgeSpace {
   company Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
   docs    KnowledgeDoc[]
   agents  AgentKnowledgeSpace[]
+  knowledgeSections KnowledgeSection[]
 
   @@index([companyId, scope, isActive])
 }
@@ -1314,4 +1316,25 @@ model AgentKnowledgeSpace {
 
   @@unique([agentId, spaceId])
   @@index([spaceId])
+}
+
+model KnowledgeSection {
+  id          String             @id @default(cuid())
+  companyId   String
+  spaceId     String?            // opcional: si quieres agrupar en un KnowledgeSpace existente
+  title       String
+  slug        String             // único dentro de la empresa
+  content     String             @db.Text
+  visibility  KnowledgeVisibility @default(PUBLIC)
+  position    Int                @default(0)
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  company     Company            @relation(fields: [companyId], references: [id])
+  space       KnowledgeSpace?    @relation(fields: [spaceId], references: [id])
+
+  @@index([companyId])
+  @@index([spaceId])
+  @@unique([companyId, slug])    // evita duplicados por empresa
 }

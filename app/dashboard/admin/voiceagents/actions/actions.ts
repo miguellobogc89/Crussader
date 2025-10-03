@@ -113,81 +113,40 @@ export async function getCompanyCalendarSummary(companyId: string) {
   return { locationsCount, servicesCount };
 }
 
-// === LISTA DE AGENTES DE UNA EMPRESA (incluye el asignado por defecto, aunque sea externo) ===
+// === LISTA DE AGENTES (solo propios de la empresa) ===
 export async function listCompanyVoiceAgents(companyId: string) {
   if (!companyId) return [];
 
-  // Empresa + agente asignado por defecto
+  // Obtenemos el agente por defecto de la empresa (para marcar "Asignado" si coincide)
   const company = await prisma.company.findUnique({
     where: { id: companyId },
-    select: {
-      id: true,
-      voiceAgentId: true,
-      voiceAgent: {
-        select: {
-          id: true,
-          agent: {
-            select: {
-              id: true,
-              name: true,
-              status: true,
-              createdAt: true,
-              companyId: true,
-            },
-          },
-          _count: { select: { phases: true } },
-        },
-      },
-    },
+    select: { id: true, voiceAgentId: true },
   });
 
-  // Agentes PROPIOS de la empresa (VOICE)
+  // SOLO agentes VOICE cuyo agent.companyId === companyId
   const owned = await prisma.voiceAgent.findMany({
     where: { agent: { companyId, channel: "VOICE" } },
     select: {
       id: true,
       agent: {
-        select: {
-          id: true,
-          name: true,
-          status: true,
-          createdAt: true,
-        },
+        select: { id: true, name: true, status: true, createdAt: true },
       },
       _count: { select: { phases: true } },
     },
     orderBy: { agent: { name: "asc" } },
   });
 
-  const ownedRows = owned.map((v) => ({
+  return owned.map((v) => ({
     voiceAgentId: v.id,
     agentId: v.agent.id,
     name: v.agent.name,
     status: v.agent.status as "ACTIVE" | "PAUSED" | "DISABLED",
     createdAt: v.agent.createdAt.toISOString(),
     phasesCount: v._count.phases,
-    isAssignedDefault: company?.voiceAgentId === v.id,
-    isExternalAssigned: false,
+    isAssignedDefault: company?.voiceAgentId === v.id, // true solo si es el por defecto de ESA empresa
   }));
-
-  // Si hay agente asignado y NO es propio, inclúyelo (marcado como externo)
-  const rows = [...ownedRows];
-  const assigned = company?.voiceAgent;
-  if (assigned && !ownedRows.find((r) => r.voiceAgentId === assigned.id)) {
-    rows.unshift({
-      voiceAgentId: assigned.id,
-      agentId: assigned.agent.id,
-      name: assigned.agent.name,
-      status: assigned.agent.status as "ACTIVE" | "PAUSED" | "DISABLED",
-      createdAt: assigned.agent.createdAt.toISOString(),
-      phasesCount: assigned._count.phases,
-      isAssignedDefault: true,
-      isExternalAssigned: assigned.agent.companyId !== companyId,
-    });
-  }
-
-  return rows;
 }
+
 
 
 /** === CREAR agente VOICE para una empresa === */

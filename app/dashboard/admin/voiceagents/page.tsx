@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { loadCompanyMeta } from "./actions/actions"; // server action (cabecera)
+import { loadCompanyMeta } from "./actions/actions";
 
 type TabKey = "constructor" | "tel" | "assign" | "monitor";
 
@@ -16,29 +16,28 @@ const MENU: Array<{ key: TabKey; name: string; href: string }> = [
   { key: "monitor",     name: "Monitorización",  href: "/dashboard/admin/voiceagents?tab=monitor" },
 ];
 
-// Dynamic imports (un componente por pestaña)
-const ConstructorTab = dynamic(
-  () => import("@/app/components/voiceAgent/constructor/ConstructorTab").then(m => m.default),
+// Dynamic imports de los componentes de cada tab
+const TabPageConstructor = dynamic(
+  () => import("@/app/components/voiceAgent/constructor/TabPageConstructor").then(m => m.default),
   { ssr: false, loading: () => <div className="rounded-2xl border bg-white p-6 shadow-sm text-sm text-slate-500">Cargando constructor…</div> }
 );
 
-const OrgAgentAssignment = dynamic(
-  () => import("@/app/components/voiceAgent/assign/OrgAgentAssignment").then(m => m.default),
+const TabPageAssign = dynamic(
+  () => import("@/app/components/voiceAgent/assign/TabPageAssign").then(m => m.default),
   { ssr: false, loading: () => <div className="rounded-2xl border bg-white p-6 shadow-sm text-sm text-slate-500">Cargando asignación…</div> }
 );
 
-const TelephonyTab = dynamic(
-  () => import("@/app/components/voiceAgent/tel/TelephonyTab").then(m => m.default),
+const TabPageTel = dynamic(
+  () => import("@/app/components/voiceAgent/tel/TabPageTel").then(m => m.default),
   { ssr: false, loading: () => <div className="rounded-2xl border bg-white p-6 shadow-sm text-sm text-slate-500">Cargando telefonía…</div> }
 );
 
-const MonitorTab = dynamic(
-  () => import("@/app/components/voiceAgent/monitor/MonitorTab").then(m => m.default),
+const TabPageMonitor = dynamic(
+  () => import("@/app/components/voiceAgent/monitor/TabPageMonitor").then(m => m.default),
   { ssr: false, loading: () => <div className="rounded-2xl border bg-white p-6 shadow-sm text-sm text-slate-500">Cargando monitorización…</div> }
 );
 
 export default function VoiceAgentAdminPage() {
-  // En tu proyecto este ID lo tendrás del contexto/org actual
   const [companyId] = useState<string>("cmfmxqxqx0000i5i4ph2bb3ij");
   const [companyName, setCompanyName] = useState<string>("—");
 
@@ -68,11 +67,13 @@ export default function VoiceAgentAdminPage() {
               const current = m.key === tab;
               return (
                 <Link
-                  key={m.name}
+                  key={m.key}
                   href={m.href}
                   className={[
                     "inline-flex items-center gap-2 py-2 text-sm",
-                    current ? "font-medium text-slate-900 border-b-2 border-slate-900" : "text-slate-500 hover:text-slate-900",
+                    current
+                      ? "font-medium text-slate-900 border-b-2 border-slate-900"
+                      : "text-slate-500 hover:text-slate-900",
                   ].join(" ")}
                 >
                   {m.name}
@@ -83,10 +84,10 @@ export default function VoiceAgentAdminPage() {
         </div>
 
         {/* Tabs */}
-        {tab === "constructor" && <ConstructorTab defaultCompanyId={companyId} />}
-        {tab === "tel"         && <TelephonyTab defaultCompanyId={companyId} />}
-        {tab === "assign"      && <OrgAgentAssignment defaultCompanyId={companyId} />}
-        {tab === "monitor"     && <MonitorTab defaultCompanyId={companyId} />}
+        {tab === "constructor" && <TabPageConstructor defaultCompanyId={companyId} />}
+        {tab === "tel"         && <TabPageTel defaultCompanyId={companyId} />}
+        {tab === "assign"      && <TabPageAssign defaultCompanyId={companyId} />}
+        {tab === "monitor"     && <TabPageMonitor defaultCompanyId={companyId} />}
       </div>
     </div>
   );

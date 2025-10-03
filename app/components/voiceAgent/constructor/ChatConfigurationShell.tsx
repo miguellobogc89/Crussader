@@ -1,9 +1,9 @@
-// app/components/voiceAgent/ChatConfigurationShell.tsx
+// app/components/voiceAgent/Constructor/ChatConfigurationShell.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import ChatPanelWithCall, { type ChatMessage } from "@/app/components/voiceAgent/ChatCallTestingPanel";
-import { useVoiceCallManager } from "@/app/components/voiceAgent/VoiceCallManager";
+import ChatPanelWithCall, { type ChatMessage } from "@/app/components/voiceAgent/constructor/ChatCallTestingPanel";
+import { useVoiceCallManager } from "@/app/components/voiceAgent/constructor/VoiceCallManager";
 
 type Phase = "INTRO" | "INTENT" | "COLLECT" | "CONFIRM" | "END";
 

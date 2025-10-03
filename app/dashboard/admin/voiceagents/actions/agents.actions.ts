@@ -11,6 +11,10 @@ export type AgentListItem = {
   isActive: boolean;
   companyCount?: number;
   updatedAt?: string; // ISO
+  // NUEVO en admin:
+  companyId?: string;
+  companyName?: string | null;
+  channel?: AgentChannel;
 };
 
 function metaGetSlug(meta: any): string | null {
@@ -33,7 +37,7 @@ function withDefaultSlug(name: string) {
     .slice(0, 48);
 }
 
-/** Lista agentes de voz. Si pasas companyId, filtra por esa empresa. */
+/** Lista agentes de voz. Si pasas companyId, filtra por esa empresa. (se usa fuera de admin) */
 export async function listVoiceAgents(companyId?: string): Promise<AgentListItem[]> {
   const agents = await prisma.agent.findMany({
     where: {
@@ -47,13 +51,10 @@ export async function listVoiceAgents(companyId?: string): Promise<AgentListItem
       status: true,
       updatedAt: true,
       meta: true,
-      voice: {
-        select: { id: true }, // para contar companies.voiceAgentId
-      },
+      voice: { select: { id: true } },
     },
   });
 
-  // cuenta cuántas compañías tienen asignado ese VoiceAgent
   const voiceIds = agents.map((a) => a.voice?.id).filter(Boolean) as string[];
   const counts =
     voiceIds.length === 0
@@ -87,7 +88,7 @@ export async function createVoiceAgent(companyId: string): Promise<AgentListItem
 
   const created = await prisma.agent.create({
     data: {
-      company: { connect: { id: companyId } }, // ⬅️ obligatorio
+      company: { connect: { id: companyId } },
       name,
       channel: AgentChannel.VOICE,
       status: AgentStatus.PAUSED,
@@ -96,7 +97,8 @@ export async function createVoiceAgent(companyId: string): Promise<AgentListItem
         create: {
           defaultModel: "gpt-4o-mini",
           defaultTemperature: 0.3,
-          defaultPrompt: "Eres una recepcionista cercana, clara y profesional. Hablas en español neutro.",
+          defaultPrompt:
+            "Eres una recepcionista cercana, clara y profesional. Hablas en español neutro.",
           language: "es-ES",
           provider: "mock",
         },
@@ -132,6 +134,7 @@ export async function duplicateVoiceAgent(agentId: string): Promise<AgentListIte
       status: true,
       meta: true,
       companyId: true,
+      channel: true,
       voice: {
         select: {
           defaultModel: true,
@@ -152,26 +155,32 @@ export async function duplicateVoiceAgent(agentId: string): Promise<AgentListIte
     .toString(36)
     .slice(2, 4)}`;
 
+  const isVoice = src.channel === AgentChannel.VOICE;
+
   const created = await prisma.agent.create({
     data: {
-      company: { connect: { id: src.companyId } }, // ⬅️ mismo company
+      company: { connect: { id: src.companyId } },
       name: baseName,
-      channel: AgentChannel.VOICE,
+      channel: src.channel, // respeta el canal original
       status: AgentStatus.PAUSED,
       meta: { slug },
-      voice: {
-        create: {
-          defaultModel: src.voice?.defaultModel ?? "gpt-4o-mini",
-          defaultTemperature: src.voice?.defaultTemperature ?? 0.3,
-          defaultPrompt:
-            src.voice?.defaultPrompt ??
-            "Eres una recepcionista cercana, clara y profesional. Hablas en español neutro.",
-          provider: src.voice?.provider ?? "mock",
-          providerConfig: src.voice?.providerConfig ?? {},
-          voiceName: src.voice?.voiceName ?? null,
-          language: src.voice?.language ?? "es-ES",
-        },
-      },
+      ...(isVoice
+        ? {
+            voice: {
+              create: {
+                defaultModel: src.voice?.defaultModel ?? "gpt-4o-mini",
+                defaultTemperature: src.voice?.defaultTemperature ?? 0.3,
+                defaultPrompt:
+                  src.voice?.defaultPrompt ??
+                  "Eres una recepcionista cercana, clara y profesional. Hablas en español neutro.",
+                provider: src.voice?.provider ?? "mock",
+                providerConfig: src.voice?.providerConfig ?? {},
+                voiceName: src.voice?.voiceName ?? null,
+                language: src.voice?.language ?? "es-ES",
+              },
+            },
+          }
+        : {}),
     },
     select: {
       id: true,
@@ -193,7 +202,7 @@ export async function duplicateVoiceAgent(agentId: string): Promise<AgentListIte
   };
 }
 
-/** Elimina un Agent (cascade a VoiceAgent por FK) */
+/** Elimina un Agent (cascade a VoiceAgent por FK si aplica) */
 export async function deleteVoiceAgent(agentId: string): Promise<{ ok: true }> {
   await prisma.agent.delete({ where: { id: agentId } });
   return { ok: true };
@@ -215,4 +224,58 @@ export async function toggleVoiceAgent(agentId: string, nextActive: boolean): Pr
     data: { status: nextActive ? AgentStatus.ACTIVE : AgentStatus.PAUSED },
   });
   return { ok: true };
+}
+
+/* =========================
+   ADMIN: listar TODOS los agentes (CHAT + VOICE) con empresa
+   ========================= */
+
+export type AdminAgentListItem = AgentListItem & {
+  companyId: string;
+  companyName: string | null;
+  channel: AgentChannel;
+};
+
+/** Admin: lista todos los agentes (sin filtrar por empresa ni canal) */
+export async function listAllAgentsAdmin(): Promise<AdminAgentListItem[]> {
+  const agents = await prisma.agent.findMany({
+    where: {}, // sin filtro: todos los canales y empresas
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      updatedAt: true,
+      meta: true,
+      channel: true,
+      company: { select: { id: true, name: true } },
+      voice: { select: { id: true } },
+    },
+  });
+
+  const voiceIds = agents.map((a) => a.voice?.id).filter(Boolean) as string[];
+  const counts =
+    voiceIds.length === 0
+      ? {}
+      : Object.fromEntries(
+          (
+            await prisma.company.groupBy({
+              by: ["voiceAgentId"],
+              _count: { _all: true },
+              where: { voiceAgentId: { in: voiceIds } },
+            })
+          ).map((g) => [g.voiceAgentId, g._count._all])
+        );
+
+  return agents.map((a) => ({
+    id: a.id,
+    name: a.name,
+    slug: metaGetSlug(a.meta) ?? undefined,
+    isActive: a.status === AgentStatus.ACTIVE,
+    companyCount: a.voice?.id ? counts[a.voice.id] ?? 0 : 0,
+    updatedAt: a.updatedAt.toISOString(),
+    companyId: a.company?.id ?? "",
+    companyName: a.company?.name ?? null,
+    channel: a.channel,
+  }));
 }

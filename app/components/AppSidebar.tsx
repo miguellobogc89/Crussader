@@ -50,19 +50,19 @@ const GROUPS: NavGroup[] = [
     icon: "🏢",
     items: [
       { title: "Empresa",    href: "/dashboard/company",   icon: "🏛️", description: "Información de la empresa" },
-      { title: "Productos",  href: "/dashboard/products",  icon: "📦",  description: "Servicios y herramientas" },
+      { title: "Usuarios",  href: "/dashboard/products",  icon: "📦",  description: "gestión de usuarios" },
       { title: "Calendario", href: "/dashboard/calendar",  icon: "📅",  description: "Gestión de reservas" },
     ],
   },
   {
-    id: "tools",
-    title: "Herramientas",
-    icon: "🛠️",
+    id: "products",
+    title: "Productos y Servicios",
+    icon: "📦",
     items: [
-      { title: "Knowledge",     href: "/dashboard/knowledge",          icon: "📚", description: "Base de conocimiento" },
-      { title: "Integraciones", href: "/dashboard/integrations-test",  icon: "🔌", description: "Conecta servicios" },
-      { title: "Base de Datos", href: "/dashboard/database",           icon: "🗄️", description: "Conexiones y datos" },
-      { title: "Agente Voz IA", href: "/dashboard/voiceagent",         icon: "🎙️", description: "Agente telefónico" },
+      { title: "Contestador de reviews",     href: "/dashboard/knowledge",          icon: "📚", description: "Base de conocimiento" },
+      { title: "Agentes de voz IA", href: "/dashboard/integrations-test",  icon: "🎙️", description: "Conecta servicios" },
+      { title: "WebChat IA", href: "/dashboard/database",           icon: "🗄️", description: "Conexiones y datos" },
+      { title: "Crussader Pulse", href: "/dashboard/voiceagent",         icon: "🎙️", description: "Agente telefónico" },
     ],
   },
   {

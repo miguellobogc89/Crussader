@@ -1,40 +1,53 @@
+// app/components/voiceAgent/constructor/TabPageConstructor.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import FlowBuilderShell from "@/app/components/voiceAgent/FlowBuilderShell";
-import ChatConfigurationShell from "@/app/components/voiceAgent/ChatConfigurationShell";
+import FlowBuilderShell from "@/app/components/voiceAgent/constructor/FlowBuilderShell";
+import ChatConfigurationShell from "@/app/components/voiceAgent/constructor/ChatConfigurationShell";
 
 import {
-  listVoiceAgents,
+  // ⬇️ usamos el listado ADMIN (todos los agentes con companyName)
+  listAllAgentsAdmin,
   createVoiceAgent,
   duplicateVoiceAgent,
   deleteVoiceAgent,
   renameVoiceAgent,
   toggleVoiceAgent,
-  type AgentListItem as DbAgentListItem,
+  type AdminAgentListItem as DbAgentListItem, // <- ahora usamos el tipo admin (con companyName)
 } from "@/app/dashboard/admin/voiceagents/actions/agents.actions";
 
-import { listStages, saveFlowForAgent, type Stage } from "@/app/dashboard/admin/voiceagents/actions/flow.actions";
+import {
+  listStages,
+  saveFlowForAgent,
+  type Stage,
+} from "@/app/dashboard/admin/voiceagents/actions/flow.actions";
+
 import { getVoiceAgentIdByAgent } from "@/app/dashboard/admin/voiceagents/actions/agents.helpers";
 import { loadCompanyMeta } from "@/app/dashboard/admin/voiceagents/actions/actions";
 
 type Phase = "INTRO" | "INTENT" | "COLLECT" | "CONFIRM" | "END";
 
-export default function ConstructorTab({ defaultCompanyId }: { defaultCompanyId: string }) {
-  // Empresa
+export default function TabPageConstructor({
+  defaultCompanyId,
+}: {
+  defaultCompanyId: string;
+}) {
+  // Empresa "contexto" (solo para el header y para crear nuevos si decides hacerlo desde aquí)
   const [companyId] = useState<string>(defaultCompanyId);
   const [companyName, setCompanyName] = useState<string>("—");
 
-  // Agentes
+  // Agentes (ADMIN: todos los agentes, sin filtrar por empresa)
   const [agents, setAgents] = useState<DbAgentListItem[]>([]);
-  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(undefined);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(
+    undefined
+  );
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
 
   // Flujo del agente
   const [stages, setStages] = useState<Stage[]>([]);
   const [loadingStages, setLoadingStages] = useState(false);
 
-  // Cargar meta empresa
+  // Cargar meta empresa (solo para el bloque de preview)
   useEffect(() => {
     (async () => {
       const meta = await loadCompanyMeta(companyId);
@@ -42,14 +55,14 @@ export default function ConstructorTab({ defaultCompanyId }: { defaultCompanyId:
     })();
   }, [companyId]);
 
-  // Cargar agentes
+  // 🔁 Cargar TODOS los agentes (admin) —> así aparecerán los 5 (incluido el de otra empresa y sin slug)
   useEffect(() => {
     (async () => {
-      const list = await listVoiceAgents(companyId);
+      const list = await listAllAgentsAdmin();
       setAgents(list);
-      setSelectedAgentId(list[0]?.id ?? undefined);
+      setSelectedAgentId((prev) => prev ?? list[0]?.id ?? undefined);
     })();
-  }, [companyId]);
+  }, []);
 
   // Cargar fases al cambiar de agente
   useEffect(() => {
@@ -72,7 +85,9 @@ export default function ConstructorTab({ defaultCompanyId }: { defaultCompanyId:
         if (alive) setLoadingStages(false);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [selectedAgentId]);
 
   // Ordenar stages
@@ -83,8 +98,11 @@ export default function ConstructorTab({ defaultCompanyId }: { defaultCompanyId:
 
   // Prompts por fase para el banner
   const promptsByPhase = useMemo(() => {
-    const pick = (t: Phase) => orderedStages.find((s) => s.type === t)?.prompt?.trim();
-    const firstNonIntro = orderedStages.find((s) => s.type !== "INTRO")?.prompt?.trim();
+    const pick = (t: Phase) =>
+      orderedStages.find((s) => s.type === t)?.prompt?.trim();
+    const firstNonIntro = orderedStages
+      .find((s) => s.type !== "INTRO")
+      ?.prompt?.trim();
     return {
       INTRO: pick("INTRO"),
       INTENT: pick("INTENT") ?? firstNonIntro,
@@ -103,39 +121,50 @@ export default function ConstructorTab({ defaultCompanyId }: { defaultCompanyId:
 
   return (
     <div className="space-y-6">
-      {/* Constructor del flow (sin panel de fases a la derecha) */}
+      {/* Shell principal del constructor */}
       <FlowBuilderShell
+        // ✅ ahora el sidebar recibe TODOS los agentes y ya pinta companyName debajo
         agents={agents as any}
         selectedAgentId={selectedAgentId}
         onSelectAgent={(id) => setSelectedAgentId(id)}
+        // Si no quieres crear desde aquí, puedes no pasar onCreateAgent o dejarlo como no-op.
         onCreateAgent={async () => {
           const created = await createVoiceAgent(companyId);
-          setAgents((xs) => [created, ...xs]);
+          setAgents((xs) => [created as any, ...xs]);
           setSelectedAgentId(created.id);
         }}
         onDuplicateAgent={async (id) => {
           const dup = await duplicateVoiceAgent(id);
-          setAgents((xs) => [dup, ...xs]);
+          setAgents((xs) => [dup as any, ...xs]);
           setSelectedAgentId(dup.id);
         }}
         onDeleteAgent={async (id) => {
           await deleteVoiceAgent(id);
           setAgents((prev) => {
             const next = prev.filter((a) => a.id !== id);
-            if (selectedAgentId === id) setSelectedAgentId(next[0]?.id ?? undefined);
+            if (selectedAgentId === id)
+              setSelectedAgentId(next[0]?.id ?? undefined);
             return next;
           });
         }}
         onRenameAgent={async (id, name) => {
           await renameVoiceAgent(id, name);
           setAgents((xs) =>
-            xs.map((a) => (a.id === id ? { ...a, name, updatedAt: new Date().toISOString() } : a))
+            xs.map((a) =>
+              a.id === id
+                ? { ...a, name, updatedAt: new Date().toISOString() }
+                : a
+            )
           );
         }}
         onToggleActive={async (id, next) => {
           await toggleVoiceAgent(id, next);
           setAgents((xs) =>
-            xs.map((a) => (a.id === id ? { ...a, isActive: next, updatedAt: new Date().toISOString() } : a))
+            xs.map((a) =>
+              a.id === id
+                ? { ...a, isActive: next, updatedAt: new Date().toISOString() }
+                : a
+            )
           );
         }}
         stages={orderedStages}

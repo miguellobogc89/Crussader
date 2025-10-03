@@ -205,14 +205,13 @@ declare global {
           const plan = boot.company?.plan ?? "free";
           const locs = boot.counts?.locations ?? 0;
           const rs = boot.responseSettings?.configured ? "✅ voz de marca configurada" : "⚠️ voz de marca sin configurar";
-          open();
           addMsg("bot", `¡Hola ${name}! 👋`);
           addMsg("bot", `Estás en ${boot.company?.name ?? "tu empresa"} · plan: ${plan} · ubicaciones: ${locs} · ${rs}.`);
           addMsg("bot", `¿En qué te ayudo? Puedo guiarte para configurar el webchat o tus respuestas.`);
         } else {
           // Landing (anónimo)
           const greeting = boot.site?.settings?.greeting as string | undefined;
-          if (greeting) { open(); addMsg("bot", greeting); }
+          if (greeting) { addMsg("bot", greeting); }
         }
       } catch (err) {
         console.error("[webchat] init error:", err);
