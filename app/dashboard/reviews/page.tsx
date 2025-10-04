@@ -1,18 +1,14 @@
 // app/dashboard/reviews/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Building2, ChevronDown, MessageSquare, Check } from "lucide-react";
-import SectionLayout from "@/app/components/layouts/SectionLayout";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Building2, ChevronDown, Check } from "lucide-react";
+import PageShell from "@/app/components/layouts/PageShell";
 import ReviewsToolbar from "@/app/components/reviews/ReviewsToolbar";
-import {
-  EstablishmentTabs,
-  type Establishment,
-} from "@/app/components/establishments/EstablishmentTabs";
+import { type Establishment } from "@/app/components/establishments/EstablishmentTabs";
 import EstablishmentKpis from "@/app/components/establishments/EstablishmentKpis";
 import { ReviewCard } from "@/app/components/reviews/ReviewCard";
 import EstablishmentCard from "@/app/components/establishments/EstablishmentCard";
-
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,77 +18,66 @@ import {
   DropdownMenuTrigger,
 } from "@/app/components/ui/dropdown-menu";
 
-type ReviewForCard = {
-  id: string;
-  author: string;
-  content: string;
-  rating: number;
-  date: string;
-};
+import { usePersistentSelection } from "@/hooks/usePersistentSelection";
+import { useSectionLoading } from "@/hooks/useSectionLoading";
+import { scrollToRef } from "@/lib/ui/scrollToRef";
 
-/* ===== Company types (ligeros) ===== */
-type CompanyLite = {
-  id: string;
-  name: string;
-  color?: string; // e.g. "#8E44AD"
-};
-
-/* ===== Location (lo que devuelve /api/locations) ===== */
+/* ===== Types ===== */
+type ReviewForCard = { id: string; author: string; content: string; rating: number; date: string; };
+type CompanyLite = { id: string; name: string; color?: string };
 type LocationRow = {
-  id: string;
-  title: string;
-  city: string | null;
-  featuredImageUrl: string | null;
-  reviewsAvg: number | null;
-  reviewsCount: number;
-  status?: string | null;
+  id: string; title: string; city: string | null; featuredImageUrl: string | null;
+  reviewsAvg: number | null; reviewsCount: number; status?: string | null;
 };
 
-/* ===== Helper: mapea LocationRow -> Establishment con tipos correctos ===== */
+/* ===== Helper: LocationRow -> Establishment ===== */
 function makeEstablishmentFromLocation(loc: LocationRow): Establishment {
-  // Ajusta estos defaults si tus tipos reales difieren (enum/date, etc.)
-  const lastReviewDateDefault = "" as unknown as Establishment["lastReviewDate"];
-  const statusDefault = "active" as unknown as Establishment["status"];
-  const categoryDefault = "General" as unknown as Establishment["category"];
-  const weeklyTrendDefault = 0 as unknown as Establishment["weeklyTrend"]; // <- número, no array
-
-  const est: Establishment = {
+  return {
     id: loc.id,
     name: loc.title,
     location: loc.city ?? "",
-    avatar: loc.featuredImageUrl ?? "", // string, no null
+    avatar: loc.featuredImageUrl ?? "",
     rating: loc.reviewsAvg ?? 0,
     totalReviews: loc.reviewsCount ?? 0,
     pendingResponses: 0,
-    lastReviewDate: lastReviewDateDefault,
-    status: statusDefault,
-    category: categoryDefault,
-    weeklyTrend: weeklyTrendDefault,
+    lastReviewDate: "" as any,
+    status: "active" as any,
+    category: "General" as any,
+    weeklyTrend: 0 as any,
   };
-  return est;
 }
 
 export default function ReviewsPage() {
-  const [activeEst, setActiveEst] = useState<Establishment | null>(null);
   const [reviews, setReviews] = useState<ReviewForCard[]>([]);
-  const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
-  const size = 9;
   const [totalPages, setTotalPages] = useState(1);
+  const size = 9;
 
-  // ===== Companies =====
+  // ===== Persistencia de selecciones =====
+  const [savedCompanyId, setSavedCompanyId] = usePersistentSelection<string>("reviews:companyId");
+  const [savedLocationId, setSavedLocationId] = usePersistentSelection<string>("reviews:locationId");
+
+  // ===== Estado de empresas / ubicaciones / selección =====
   const [companies, setCompanies] = useState<CompanyLite[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+
+  const [locations, setLocations] = useState<LocationRow[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(false);
+
+  const [activeEst, setActiveEst] = useState<Establishment | null>(null);
+
   const selectedCompany = useMemo(
     () => companies.find((c) => c.id === selectedCompanyId) ?? companies[0],
     [companies, selectedCompanyId]
   );
 
-  // ===== Locations para la empresa seleccionada =====
-  const [locations, setLocations] = useState<LocationRow[]>([]);
-  const [locationsLoading, setLocationsLoading] = useState(false);
+  // ===== Loading de la sección de REVIEWS (overlay + blur) =====
+  const { loading, setLoading, SectionWrapper } = useSectionLoading(false);
 
-  // Load accessible companies (first)
+  // Ref al comienzo del grid, para que el spinner se vea siempre
+  const gridTopRef = useRef<HTMLDivElement | null>(null);
+
+  /* ==== Cargar empresas y fijar selección (usa persistencia si existe) ==== */
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -100,51 +85,50 @@ export default function ReviewsPage() {
         const res = await fetch("/api/companies/accessible", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
-        const list: CompanyLite[] = Array.isArray(json?.companies)
-          ? json.companies
-          : [];
+        const list: CompanyLite[] = Array.isArray(json?.companies) ? json.companies : [];
         if (cancelled) return;
+
         setCompanies(list);
-        if (json?.defaultCompanyId) {
-          setSelectedCompanyId(json.defaultCompanyId);
-        } else if (list.length > 0) {
-          setSelectedCompanyId(list[0].id);
-        }
+
+        // Escoge empresa: prioriza persistida; si no, default de API; si no, la primera
+        const defaultId =
+          (savedCompanyId && list.some((c) => c.id === savedCompanyId) && savedCompanyId) ||
+          (json?.defaultCompanyId && list.some((c) => c.id === json.defaultCompanyId) && json.defaultCompanyId) ||
+          (list[0]?.id ?? null);
+
+        setSelectedCompanyId(defaultId);
+        if (defaultId) setSavedCompanyId(defaultId);
       } catch (e) {
         if (!cancelled) {
-          const mock: CompanyLite[] = [
-            { id: "mock-1", name: "Mi Empresa", color: "#7C3AED" },
-          ];
+          const mock: CompanyLite[] = [{ id: "mock-1", name: "Mi Empresa", color: "#7C3AED" }];
           setCompanies(mock);
           setSelectedCompanyId(mock[0].id);
+          setSavedCompanyId(mock[0].id);
           console.warn("companies fetch fallback (mock)", e);
         }
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fetch locations por companyId
+  /* ==== Al cambiar de empresa, cargar ubicaciones y restaurar la guardada si existe ==== */
   useEffect(() => {
     let cancelled = false;
     if (!selectedCompanyId) {
-      setLocations([]);
+      setLocations([]); setActiveEst(null);
       return;
     }
     (async () => {
       try {
         setLocationsLoading(true);
-        const res = await fetch(`/api/locations?companyId=${selectedCompanyId}`, {
-          cache: "no-store",
-        });
+        const res = await fetch(`/api/locations?companyId=${selectedCompanyId}`, { cache: "no-store" });
         const json = await res.json();
         if (cancelled) return;
 
         if (!res.ok || json?.ok === false) {
           console.warn("[locations] error:", json);
-          setLocations([]);
+          setLocations([]); setActiveEst(null);
           return;
         }
 
@@ -154,10 +138,7 @@ export default function ReviewsPage() {
             title: String(l.title ?? "Sin nombre"),
             city: l.city ?? null,
             featuredImageUrl: l.featuredImageUrl ?? null,
-            reviewsAvg:
-              l.reviewsAvg === null || l.reviewsAvg === undefined
-                ? null
-                : Number(l.reviewsAvg),
+            reviewsAvg: l.reviewsAvg == null ? null : Number(l.reviewsAvg),
             reviewsCount: typeof l.reviewsCount === "number" ? l.reviewsCount : 0,
             status: l.status ?? null,
           })
@@ -165,24 +146,68 @@ export default function ReviewsPage() {
 
         setLocations(rows);
 
-        // Selección inicial si no hay una activa
-        if (!activeEst && rows[0]) {
-          setActiveEst(makeEstablishmentFromLocation(rows[0]));
+        // Restaura ubicación persistida para esta empresa si existe
+        const nextLocationId =
+          (savedLocationId && rows.some((r) => r.id === savedLocationId) && savedLocationId) ||
+          rows[0]?.id || null;
+
+        if (nextLocationId) {
+          const picked = rows.find((x) => x.id === nextLocationId)!;
+          setActiveEst(makeEstablishmentFromLocation(picked));
+          setSavedLocationId(nextLocationId);
+        } else {
+          setActiveEst(null);
+          setSavedLocationId(null as any);
         }
       } catch (e) {
         console.error("[locations] exception", e);
-        setLocations([]);
+        setLocations([]); setActiveEst(null);
       } finally {
         if (!cancelled) setLocationsLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCompanyId]);
 
-  // Reviews for active establishment
+  /* ==== Cargar reviews del establecimiento activo ==== */
+  useEffect(() => {
+    if (!activeEst?.id) {
+      setReviews([]); setTotalPages(1); setLoading(false);
+      return;
+    }
+
+    // Persist ubicación, limpieza y spinner visible
+    setSavedLocationId(activeEst.id);
+    setReviews([]); setTotalPages(1); setPage(1); setLoading(true);
+    scrollToRef(gridTopRef, 80);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/reviews?locationId=${activeEst.id}&page=1&size=${size}`,
+          { cache: "no-store" }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        if (cancelled) return;
+        const rows: ReviewForCard[] = Array.isArray(json?.reviews) ? json.reviews : [];
+        setReviews(rows);
+        setTotalPages(json?.totalPages ?? 1);
+      } catch (e) {
+        console.error("reviews fetch error:", e);
+        setReviews([]); setTotalPages(1);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEst?.id]);
+
+  /* ==== Paginación (mantiene overlay local) ==== */
   useEffect(() => {
     if (!activeEst?.id) return;
     let cancelled = false;
@@ -201,110 +226,115 @@ export default function ReviewsPage() {
         setTotalPages(json?.totalPages ?? 1);
       } catch (e) {
         console.error("reviews fetch error:", e);
-        setReviews([]);
-        setTotalPages(1);
+        setReviews([]); setTotalPages(1);
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeEst?.id, page]);
+    return () => { cancelled = true; };
+  }, [page, activeEst?.id]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [activeEst?.id]);
+  /* ===== Toolbar del PageShell ===== */
+  const shellToolbar = (
+    <div className="flex flex-col gap-4 w-full">
+      {/* Company Picker */}
+      <div className="flex items-center justify-between">
+        <CompanyPicker
+          companies={companies}
+          selectedCompanyId={selectedCompany?.id}
+          onSelect={(id) => {
+            // al cambiar de empresa, reinicia la ubicación guardada
+            setSavedCompanyId(id);
+            setSavedLocationId(null as any);
+            setSelectedCompanyId(id);
+          }}
+        />
+      </div>
+
+      {/* Grid de ubicaciones */}
+      {locationsLoading ? (
+        <div className="text-xs text-muted-foreground">Cargando ubicaciones…</div>
+      ) : locations.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          {locations.map((loc) => (
+            <EstablishmentCard
+              key={loc.id}
+              id={loc.id}
+              title={loc.title}
+              city={loc.city ?? undefined}
+              reviewsAvg={loc.reviewsAvg ?? undefined}
+              reviewsCount={loc.reviewsCount}
+              selected={activeEst?.id === loc.id}
+              onSelect={(id) => {
+                const picked = locations.find((x) => x.id === id)!;
+                // limpieza visual inmediata antes de cambiar establecimiento
+                setSavedLocationId(id);
+                setReviews([]); setTotalPages(1); setLoading(true);
+                setActiveEst(makeEstablishmentFromLocation(picked));
+              }}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-sm text-muted-foreground">Esta empresa no tiene ubicaciones.</div>
+      )}
+    </div>
+  );
 
   return (
-    <SectionLayout
-      icon={MessageSquare}
+    <PageShell
       title="Reseñas"
-      subtitle="Lee y responde a las reseñas de tus establecimientos"
-      headerContent={
-        <div className="flex flex-col gap-4 w-full">
-          {/* ===== Company Picker (Stripe-like pill) ===== */}
-          <div className="flex items-center justify-between">
-            <CompanyPicker
-              companies={companies}
-              selectedCompanyId={selectedCompany?.id}
-              onSelect={setSelectedCompanyId}
-            />
-          </div>
-
-          {/* ===== Grid de ubicaciones (cards) ===== */}
-          {locationsLoading ? (
-            <div className="text-xs text-muted-foreground">Cargando ubicaciones…</div>
-          ) : locations.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {locations.map((loc) => (
-                <EstablishmentCard
-                  key={loc.id}
-                  id={loc.id}
-                  title={loc.title}
-                  city={loc.city ?? undefined}
-                  reviewsAvg={loc.reviewsAvg ?? undefined}
-                  reviewsCount={loc.reviewsCount}
-                  selected={activeEst?.id === loc.id}
-                  onSelect={(id) => {
-                    const picked = locations.find((x) => x.id === id)!;
-                    setActiveEst(makeEstablishmentFromLocation(picked));
-                  }}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              Esta empresa no tiene ubicaciones.
-            </div>
-          )}
-
- 
-        </div>
-      }
+      description="Lee y responde a las reseñas de tus establecimientos"
+      toolbar={shellToolbar}
     >
-      {/* KPIs del establecimiento */}
-      {activeEst && (
-        <div className="mb-8">
-          <EstablishmentKpis establishment={activeEst} />
-        </div>
-      )}
-
-      {/* Barra de filtros/busqueda/orden */}
-      <div className="mb-8">
-        <ReviewsToolbar />
-      </div>
-
-      {/* Grid de reseñas */}
-      <div className="grid gap-6 grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3">
-        {reviews.map((r) => (
-          <ReviewCard key={r.id} review={r} />
-        ))}
-        {!loading && reviews.length === 0 && (
-          <div className="col-span-full text-muted-foreground">
-            No hay reseñas.
+      {/* wrapper responsive */}
+      <div className="mx-auto w-full max-w-screen-2xl px-3 sm:px-6">
+        {/* KPIs del establecimiento */}
+        {activeEst && (
+          <div className="mb-6 sm:mb-8">
+            <EstablishmentKpis establishment={activeEst} />
           </div>
         )}
-      </div>
 
-      {/* Paginación */}
-      <div className="flex items-center justify-end gap-2 pt-6">
-        <button
-          className="rounded-md border px-3 py-1.5 text-sm text-foreground disabled:opacity-50"
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={loading || page <= 1}
-        >
-          Anterior
-        </button>
-        <button
-          className="rounded-md border px-3 py-1.5 text-sm text-foreground disabled:opacity-50"
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          disabled={loading || page >= totalPages}
-        >
-          Siguiente
-        </button>
+        {/* Ancla de inicio del grid */}
+        <div ref={gridTopRef} />
+
+        {/* Barra de filtros/búsqueda/orden */}
+        <div className="mb-6 sm:mb-8">
+          <ReviewsToolbar />
+        </div>
+
+        {/* Grid de reseñas con overlay LOCAL (hook) */}
+        <SectionWrapper topPadding="pt-6 sm:pt-10">
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+            {reviews.map((r) => (
+              <ReviewCard key={r.id} review={r} />
+            ))}
+            {!loading && reviews.length === 0 && (
+              <div className="col-span-full text-muted-foreground">No hay reseñas.</div>
+            )}
+          </div>
+        </SectionWrapper>
+
+        {/* Paginación */}
+        <div className="flex items-center justify-end gap-2 pt-6">
+          <button
+            className="rounded-md border px-3 py-1.5 text-sm text-foreground disabled:opacity-50"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={loading || page <= 1}
+          >
+            Anterior
+          </button>
+          <button
+            className="rounded-md border px-3 py-1.5 text-sm text-foreground disabled:opacity-50"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={loading || page >= totalPages}
+          >
+            Siguiente
+          </button>
+        </div>
       </div>
-    </SectionLayout>
+    </PageShell>
   );
 }
 
@@ -364,9 +394,7 @@ function CompanyPicker({
           Tus empresas
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {companies.length === 0 && (
-          <DropdownMenuItem disabled>Sin empresas</DropdownMenuItem>
-        )}
+        {companies.length === 0 && <DropdownMenuItem disabled>Sin empresas</DropdownMenuItem>}
         {companies.map((c) => {
           const isActive = c.id === selected?.id;
           return (

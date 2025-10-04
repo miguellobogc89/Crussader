@@ -7,7 +7,6 @@ import { Badge } from "@/app/components/ui/badge";
 import { Card, CardContent } from "@/app/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 
-
 interface Review {
   id: string;
   author: string;
@@ -31,7 +30,7 @@ interface BusinessResponse {
 interface ReviewCardProps {
   review: Review;
   businessResponse?: BusinessResponse;
-  responses?: BusinessResponse[]; // ⬅️ opcional: si ya las traes, las usamos
+  responses?: BusinessResponse[];
 }
 
 const StarRating = ({ rating }: { rating: number }) => (
@@ -62,14 +61,11 @@ const StatusBadge = ({
 }) => {
   const variants: Record<UIStatus, string> = {
     pending: "bg-[hsl(var(--pending))] text-[hsl(var(--pending-foreground))]",
-    published:
-      "bg-[hsl(var(--published))] text-[hsl(var(--published-foreground))]",
+    published: "bg-[hsl(var(--published))] text-[hsl(var(--published-foreground))]",
     draft: "bg-[hsl(var(--draft))] text-[hsl(var(--draft-foreground))]",
   };
   return (
-    <Badge
-      className={`capitalize font-medium ${variants[status]} whitespace-nowrap`}
-    >
+    <Badge className={`capitalize font-medium ${variants[status]} whitespace-nowrap`}>
       {status}
       {edited ? " · edited" : ""}
     </Badge>
@@ -134,12 +130,11 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
   // 1) Carga inicial si no vienen responses por props
   useEffect(() => {
     let cancelled = false;
-    if (responses?.length) return; // ya vino provisto
-    if (businessResponse) return;  // ya vino al menos 1
+    if (responses?.length) return;
+    if (businessResponse) return;
 
     (async () => {
       try {
-        // Intento traer todas
         const resAll = await fetch(`/api/reviews/${review.id}/responses`, { cache: "no-store" });
         if (resAll.ok) {
           const json = await resAll.json();
@@ -196,7 +191,7 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
 
       if (created?.content) {
         setList((prev) => [created!, ...prev]);
-        setIdx(0); // nos movemos a la recién creada
+        setIdx(0);
       }
     } catch (e) {
       console.error("generate error", e);
@@ -224,14 +219,10 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
       }
       const updated: BusinessResponse | undefined = json?.response;
 
-      // Actualizamos la lista en el índice actual
       setList((prev) =>
         prev.map((r, i) =>
           i === idx
-            ? {
-                ...r,
-                ...(updated ?? { content: respText, edited: true, status: "draft" }),
-              }
+            ? { ...r, ...(updated ?? { content: respText, edited: true, status: "draft" }) }
             : r
         )
       );
@@ -259,16 +250,13 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
         headers: { "Content-Type": "application/json" },
       });
 
-      // intenta leer mensaje del servidor
       let serverMsg = "";
       let data: any = null;
       try {
         const text = await res.text();
         serverMsg = text;
         data = text ? JSON.parse(text) : null;
-      } catch {
-        // si no es JSON, queda el texto crudo
-      }
+      } catch {}
 
       if (!res.ok) {
         const reason =
@@ -286,7 +274,6 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
         return;
       }
 
-      // éxito: actualiza lista y flags
       setList((prev) =>
         prev.map((r, i) =>
           i === idx ? { ...r, status: "published", published: true } : r
@@ -313,7 +300,6 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
     }
   };
 
-
   // 5) Navegación entre respuestas
   const goPrev = () => {
     if (isEditing || list.length === 0) return;
@@ -325,33 +311,33 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
   };
 
   return (
-    <Card className="group hover:shadow-[var(--shadow-hover)] transition-all duration-300 border-border/50 bg-gradient-to-br from-card to-muted/20">
-      <CardContent className="p-6 space-y-4">
+    <Card className="group hover:shadow-[var(--shadow-hover)] transition-all duration-300 border-border/50 bg-gradient-to-br from-card to-muted/20 w-full">
+      <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-5">
         {/* Review */}
-        <div className="space-y-3">
+        <div className="space-y-2.5 sm:space-y-3">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center text-primary font-semibold text-sm">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center text-primary font-semibold text-xs sm:text-sm">
                 {review.author.charAt(0).toUpperCase()}
               </div>
               <div>
-                <h4 className="font-semibold text-foreground">{review.author}</h4>
-                <div className="flex items-center gap-2 mt-1">
+                <h4 className="font-semibold text-foreground text-sm sm:text-base">{review.author}</h4>
+                <div className="flex items-center gap-2 mt-0.5 sm:mt-1">
                   <StarRating rating={review.rating} />
-                  <span className="text-xs text-muted-foreground">{review.date}</span>
+                  <span className="text-[11px] sm:text-xs text-muted-foreground">{review.date}</span>
                 </div>
               </div>
             </div>
             <Button
               variant="ghost"
               size="icon"
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
+              className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 sm:h-9 sm:w-9"
             >
               <MoreHorizontal size={16} />
             </Button>
           </div>
 
-          <p className="text-sm text-foreground/80 leading-relaxed">
+          <p className="text-[13px] sm:text-sm text-foreground/80 leading-relaxed">
             {review.content}
           </p>
         </div>
@@ -360,27 +346,23 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
         <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
         {/* Respuesta del negocio */}
-        <div className="space-y-3">
+        <div className="space-y-2.5 sm:space-y-3">
           <div className="flex items-center justify-between">
-            <h5 className="text-sm font-medium text-foreground">
-              Respuesta del negocio
-            </h5>
-            {hasResponse && (
-              <StatusBadge status={respStatus} edited={respEdited} />
-            )}
+            <h5 className="text-sm font-medium text-foreground">Respuesta del negocio</h5>
+            {hasResponse && <StatusBadge status={respStatus} edited={respEdited} />}
           </div>
 
           {list.length > 0 ? (
             <>
               {/* Textarea (editable si isEditing) */}
               <textarea
-                className="w-full min-h-[112px] rounded-lg border border-border/30 bg-muted/50 p-3 text-sm text-foreground/90 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+                className="w-full min-h-[96px] sm:min-h-[112px] rounded-lg border border-border/30 bg-muted/50 p-2.5 sm:p-3 text-[13px] sm:text-sm text-foreground/90 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
                 value={respText}
                 onChange={(e) => setRespText(e.target.value)}
                 disabled={!isEditing || buttonsDisabled}
               />
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-2 pt-1.5 sm:pt-2">
                 {/* Publicar */}
                 <Button
                   size="sm"
@@ -393,7 +375,6 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
                     {published ? "Publicado" : "Publicar"}
                   </span>
                 </Button>
-
 
                 {/* Regenerar */}
                 <Button
@@ -408,7 +389,6 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
                     {loading ? "Generando…" : list.length > 0 ? "Regenerar" : "Generar"}
                   </span>
                 </Button>
-
 
                 {/* Editar / Guardar */}
                 {!isEditing ? (
@@ -434,12 +414,11 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
                     <span className="hidden sm:inline">Guardar</span>
                   </Button>
                 )}
-
               </div>
 
               {/* Footer: paginación de respuestas */}
-              <div className="flex items-center justify-between pt-3">
-                <div className="text-xs text-muted-foreground">
+              <div className="flex items-center justify-between pt-2.5 sm:pt-3">
+                <div className="text-[11px] sm:text-xs text-muted-foreground">
                   {list.length ? `${idx + 1} / ${list.length}` : "0 / 0"}
                 </div>
                 <div className="flex items-center gap-2">
@@ -472,9 +451,7 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
             </>
           ) : (
             <div className="bg-muted/30 rounded-lg p-4 border border-dashed border-border/50 text-center">
-              <p className="text-sm text-muted-foreground mb-3">
-                Sin respuesta generada
-              </p>
+              <p className="text-sm text-muted-foreground mb-3">Sin respuesta generada</p>
               <Button
                 size="sm"
                 className="bg-gradient-to-r from-primary to-accent text-white disabled:opacity-60 disabled:cursor-not-allowed"

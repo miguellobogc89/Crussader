@@ -1,138 +1,142 @@
 "use client";
 
 import { type Establishment } from "@/app/components/establishments/EstablishmentTabs";
-import { MessageSquare, Clock, MessageCircleReply } from "lucide-react";
 
-type Props = {
-  establishment: Establishment;
-};
+type Props = { establishment: Establishment };
+
+// SVG estrella redondeada (icono consistente)
+function RoundedStar({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+      <path
+        d="M12 2.8c.27 0 .53.15.66.41l2.08 4.55 4.99.44c.6.05.85.8.39 1.2l-3.84 3.33 1.15 4.83c.14.58-.49 1.06-.99.76L12 16.8l-4.44 2.52c-.5.3-1.13-.18-.99-.76l1.15-4.83L3.88 8.9c-.46-.4-.2-1.15.39-1.2l4.99-.44 2.08-4.55c.12-.26.39-.41.66-.41Z"
+        style={{ strokeLinejoin: "round" }}
+      />
+    </svg>
+  );
+}
 
 export default function EstablishmentKpis({ establishment }: Props) {
-  // Datos directamente del establecimiento (sin fetch ni cache)
+  const rating = typeof establishment?.rating === "number" ? establishment.rating : null;
   const totalReviews = establishment?.totalReviews ?? 0;
-  const avg = typeof establishment?.rating === "number" ? establishment.rating : null;
+  const weeklyNew = (establishment as any)?.weeklyNewReviews ?? 0;
+  const deltaPctRaw = (establishment as any)?.ratingDelta30dPct;
+  const deltaPct =
+    typeof deltaPctRaw === "number" ? Math.round(deltaPctRaw * 10) / 10 : 0;
   const pending = establishment?.pendingResponses ?? 0;
-  const last = establishment?.lastReviewDate || "—";
-  const trend = typeof establishment?.weeklyTrend === "number" ? establishment.weeklyTrend : 0;
+
+  const Delta = () => (
+    <span
+      className={
+        deltaPct > 0
+          ? "text-emerald-700"
+          : deltaPct < 0
+          ? "text-rose-700"
+          : "text-neutral-600"
+      }
+    >
+      {deltaPct > 0 ? "▲" : deltaPct < 0 ? "▼" : "•"} {Math.abs(deltaPct)}%
+    </span>
+  );
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* 1) Rating promedio (mueve esta card al primer lugar) */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-white shadow-sm">
-        <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-amber-100/70" />
-        <div className="flex items-center justify-between p-4">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-              Rating promedio
-            </div>
-            <div className="mt-2 flex items-end gap-2">
-              <div className="text-3xl font-bold text-neutral-900">
-                {avg != null ? avg.toFixed(1) : "—"}
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+      {/* Card 1 — Rating promedio */}
+      <div className="rounded-2xl p-[0.5px] sm:p-[1px] bg-gradient-to-r from-amber-400 to-amber-600">
+        <div className="rounded-[14px] bg-white shadow-sm h-full">
+          <div className="flex items-center justify-between p-3 sm:p-4">
+            <div>
+              <div className="text-[11px] sm:text-xs font-medium uppercase tracking-wide text-neutral-500">
+                Rating promedio
               </div>
-              {/* Estrella SVG “bonita” */}
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                className="h-6 w-6"
-                fill="currentColor"
-                style={{ color: "hsl(var(--amber-500, 45 100% 51%))" }}
-              >
-                <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.62L12 2 9.19 8.62 2 9.24l5.46 4.73L5.82 21z" />
-              </svg>
+              <div className="mt-1 sm:mt-2 flex items-end gap-2">
+                <div className="text-2xl sm:text-3xl font-bold text-neutral-900">
+                  {rating != null ? rating.toFixed(1) : "—"}
+                </div>
+                <RoundedStar className="h-5 w-5 sm:h-6 sm:w-6 text-amber-500" />
+              </div>
+              <div className="mt-1 text-[11px] sm:text-xs text-neutral-500">
+                Basado en{" "}
+                <span className="font-medium text-amber-700">{totalReviews}</span>{" "}
+                {totalReviews === 1 ? "reseña" : "reseñas"}
+              </div>
             </div>
-            <div className="mt-1 text-xs text-neutral-500">
-              Basado en {totalReviews} {totalReviews === 1 ? "review" : "reviews"}
-            </div>
+            <div className="text-2xl sm:text-3xl select-none" aria-hidden>⭐️</div>
           </div>
-          <div className="grid h-12 w-12 place-items-center rounded-xl bg-yellow-100 text-yellow-600">
-            {/* estrella hueca decorativa */}
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <path d="M12 17.3 18.2 21l-1.7-7 5.5-4.8-7.2-.6L12 2 9.2 8.6 2 9.2l5.5 4.8-1.7 7z" />
-            </svg>
-          </div>
-        </div>
-        {/* ⬇️ sin footer en esta card */}
-      </div>
-
-      {/* 2) Reviews totales (antes estaba primera) */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-white shadow-sm">
-        <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-primary/10" />
-        <div className="flex items-center justify-between p-4">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-              Reviews totales
-            </div>
-            <div className="mt-2 text-3xl font-bold text-neutral-900">
-              {totalReviews}
-            </div>
-            <div className="mt-1 text-xs text-neutral-500">
-              {establishment?.name ?? "—"}
-            </div>
-          </div>
-          <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
-            <MessageSquare size={20} />
-          </div>
-        </div>
-        <div className="border-t bg-neutral-50/60 px-4 py-2 text-xs text-neutral-600">
-          {trend === 0 ? "Sin variación semanal" : (
-            <span className={trend > 0 ? "text-emerald-600" : "text-rose-600"}>
-              {trend > 0 ? "▲" : "▼"} {Math.abs(trend)}% esta semana
-            </span>
-          )}
         </div>
       </div>
 
-      {/* 3) Pendientes de respuesta */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-white shadow-sm">
-        <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-sky-100" />
-        <div className="flex items-center justify-between p-4">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-              Pendientes de respuesta
+      {/* Card 2 — Nuevas esta semana (valor) */}
+      <div className="rounded-2xl p-[0.5px] sm:p-[1px] bg-gradient-to-r from-emerald-400 to-emerald-600">
+        <div className="rounded-[14px] bg-white shadow-sm h-full">
+          <div className="flex items-center justify-between p-3 sm:p-4">
+            <div>
+              <div className="text-[11px] sm:text-xs font-medium uppercase tracking-wide text-neutral-500">
+                Nuevas esta semana
+              </div>
+              <div className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold text-emerald-700">
+                {weeklyNew}
+              </div>
+              <div className="mt-1 text-[11px] sm:text-xs text-neutral-500">
+                Últimos 7 días
+              </div>
             </div>
-            <div className="mt-2 text-3xl font-bold text-neutral-900">
-              {pending ?? 0}
-            </div>
-            <div className="mt-1 text-xs text-neutral-500">
-              {pending > 0 ? "Revisa el buzón de reseñas" : "Todo al día"}
-            </div>
+            <div className="text-2xl sm:text-3xl select-none" aria-hidden>💬</div>
           </div>
-          <div className="grid h-12 w-12 place-items-center rounded-xl bg-sky-100 text-sky-700">
-            <MessageCircleReply size={20} />
-          </div>
-        </div>
-        <div className="border-t bg-neutral-50/60 px-4 py-2 text-xs text-neutral-600">
-          {pending > 0 ? "Te recomendamos responderlas" : "Sin pendientes"}
         </div>
       </div>
 
-      {/* 4) Última reseña */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-white shadow-sm">
-        <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-neutral-200" />
-        <div className="flex items-center justify-between p-4">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-              Última reseña
+      {/* Card 3 — % mejora rating 30d */}
+      <div className="rounded-2xl p-[0.5px] sm:p-[1px] bg-gradient-to-r from-indigo-400 to-indigo-600">
+        <div className="rounded-[14px] bg-white shadow-sm h-full">
+          <div className="flex items-center justify-between p-3 sm:p-4">
+            <div>
+              <div className="text-[11px] sm:text-xs font-medium uppercase tracking-wide text-neutral-500">
+                Mejora rating (30 días)
+              </div>
+              <div className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">
+                <span
+                  className={
+                    deltaPct > 0
+                      ? "text-emerald-700"
+                      : deltaPct < 0
+                      ? "text-rose-700"
+                      : "text-neutral-700"
+                  }
+                >
+                  <Delta />
+                </span>
+              </div>
+              <div className="mt-1 text-[11px] sm:text-xs text-neutral-500">
+                vs. media de hace 30 días
+              </div>
             </div>
-            <div className="mt-2 text-2xl font-bold text-neutral-900">
-              {last}
-            </div>
-            <div className="mt-1 text-xs text-neutral-500">
-              actualizado automáticamente
-            </div>
-          </div>
-          <div className="grid h-12 w-12 place-items-center rounded-xl bg-neutral-200 text-neutral-700">
-            <Clock size={20} />
+            <div className="text-2xl sm:text-3xl select-none" aria-hidden>🚀</div>
           </div>
         </div>
-        <div className="border-t bg-neutral-50/60 px-4 py-2 text-xs text-neutral-600">
-          Estado: {establishment?.status === "inactive" ? "Inactivo" : "Activo"}
+      </div>
+
+      {/* Card 4 — Pendientes de respuesta */}
+      <div className="rounded-2xl p-[0.5px] sm:p-[1px] bg-gradient-to-r from-sky-400 to-sky-600">
+        <div className="rounded-[14px] bg-white shadow-sm h-full">
+          <div className="flex items-center justify-between p-3 sm:p-4">
+            <div>
+              <div className="text-[11px] sm:text-xs font-medium uppercase tracking-wide text-neutral-500">
+                Pendientes de respuesta
+              </div>
+              <div className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold text-sky-700">
+                {pending}
+              </div>
+              <div className="mt-1 text-[11px] sm:text-xs">
+                {pending > 0 ? (
+                  <span className="text-sky-700">Revisa el buzón</span>
+                ) : (
+                  <span className="text-emerald-700">Todo al día</span>
+                )}
+              </div>
+            </div>
+            <div className="text-2xl sm:text-3xl select-none" aria-hidden>📨</div>
+          </div>
         </div>
       </div>
     </div>
