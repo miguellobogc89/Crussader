@@ -1,7 +1,7 @@
 // app/dashboard/reports/page.tsx
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   BarChart3,
@@ -15,11 +15,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import SectionLayout from "@/app/components/layouts/SectionLayout";
+import PageShell from "@/app/components/layouts/PageShell";
 import { TabsMenu, type TabItem } from "@/app/components/TabsMenu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 
-/* ── Tus charts (exports con nombre) ── */
+/* ── Charts ── */
 import { RatingLineChart } from "@/app/components/charts/RatingLineChart";
 import { ReviewsAreaChart } from "@/app/components/charts/ReviewsAreaChart";
 import { StarDistribution } from "@/app/components/charts/StarDistribution";
@@ -32,6 +32,10 @@ import { CompetitiveRadar } from "@/app/components/charts/CompetitiveRadar";
 import { KpiTargetsProgress } from "@/app/components/charts/KpiTargetsProgress";
 import { AlertsList, type AlertItem } from "@/app/components/charts/AlertsList";
 import { MonthlyHighlights } from "@/app/components/charts/MonthlyHighlights";
+
+/* ── Hooks reutilizables ── */
+import { usePersistentSelection } from "@/hooks/usePersistentSelection";
+import { useSectionLoading } from "@/hooks/useSectionLoading";
 
 const TAB_KEY = "tab";
 
@@ -53,7 +57,7 @@ const overviewMetrics: Metric[] = [
   { title: "Ubicaciones activas",   value: "12",      change: "0%",   trend: "up",   icon: MapPin,        color: "text-orange-600" },
 ];
 
-/* ── Datasets “mínimos” para props requeridas (ajusta a tu API) ── */
+/* ── Datasets mínimos para props requeridas (ajusta a tu API) ── */
 const monthlySeries = [
   { month: "Ene", reviews: 80, rating: 4.2 },
   { month: "Feb", reviews: 95, rating: 4.1 },
@@ -130,8 +134,25 @@ export default function ReportsAndAnalyticsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
-  const activeTab = search.get(TAB_KEY) ?? "favorites";
 
+  // === Persistimos el último tab abierto ===
+  const [savedTab, setSavedTab] = usePersistentSelection<string>("reports:lastTab");
+  const queryTab = search.get(TAB_KEY);
+  const activeTab: string = (queryTab ?? savedTab ?? "favorites");
+
+  // Sincroniza URL <-> memoria persistida
+  useEffect(() => {
+    if (!queryTab && savedTab) {
+      const sp = new URLSearchParams(search.toString());
+      sp.set(TAB_KEY, savedTab);
+      router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
+    } else if (queryTab && queryTab !== savedTab) {
+      setSavedTab(queryTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryTab, savedTab]);
+
+  // Tabs (hrefs siempre escriben ?tab=.. en la URL)
   const TABS: TabItem[] = useMemo(() => {
     const makeHref = (v: string) => {
       const sp = new URLSearchParams(search.toString());
@@ -152,177 +173,203 @@ export default function ReportsAndAnalyticsPage() {
     return current?.href;
   }, [TABS, activeTab]);
 
+  // === Overlay/blur suave al cambiar de tab (reutilizable) ===
+  const { loading, setLoading, SectionWrapper } = useSectionLoading(false);
+  useEffect(() => {
+    // pequeño velo para transiciones de panel (ajusta o quita si no lo quieres)
+    setLoading(true);
+    const id = setTimeout(() => setLoading(false), 150);
+    return () => clearTimeout(id);
+  }, [activeTab, setLoading]);
+
+  /* ====== Toolbar del PageShell: KPIs en cabecera ====== */
+  const shellToolbar = (
+    <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+      {overviewMetrics.map((metric, index) => {
+        const Icon = metric.icon;
+        const isPositive = metric.trend === "up";
+        return (
+          <Card key={index} className="relative overflow-hidden">
+            <CardContent className="h-full p-6">
+              <div
+                aria-hidden="true"
+                className={`pointer-events-none absolute right-3 top-3 rounded-full bg-muted/60 p-2 ${metric.color}`}
+              >
+                <Icon className="h-5 w-5 opacity-90" />
+              </div>
+              <div className="flex h-full flex-col">
+                <p className="text-sm font-medium text-muted-foreground pr-12">
+                  {metric.title}
+                </p>
+                <div className="mt-auto flex items-baseline gap-2">
+                  <p className="text-2xl font-bold leading-none">{metric.value}</p>
+                  <div
+                    className={`flex items-center gap-1 text-sm font-medium ${
+                      isPositive ? "text-success" : "text-destructive"
+                    }`}
+                  >
+                    {isPositive ? (
+                      <TrendingUp className="h-4 w-4" />
+                    ) : (
+                      <TrendingDown className="h-4 w-4" />
+                    )}
+                    <span>{metric.change}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </section>
+  );
+
+  /* ====== Banda de header del PageShell: Tabs ====== */
+  const shellHeaderBand = (
+    <TabsMenu
+      items={TABS}
+      activeHref={activeHref}
+      renderMode="nav-only"
+      onItemClick={(item) => {
+        // extrae el valor del tab desde el href
+        const url = new URL(item.href, "http://x");
+        const next = url.searchParams.get(TAB_KEY) ?? "favorites";
+        setSavedTab(next);
+        router.replace(item.href, { scroll: false });
+      }}
+    />
+  );
+
   return (
-    <SectionLayout
-      icon={BarChart3}
-      title="Métricas completas de rendimiento y tendencias"
-      headerContent={
-        <>
-          {/* KPIs en la cabecera */}
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
-            {overviewMetrics.map((metric, index) => {
-              const Icon = metric.icon;
-              const isPositive = metric.trend === "up";
-              return (
-                <Card key={index} className="relative overflow-hidden">
-                  <CardContent className="h-full p-6">
-                    <div
-                      aria-hidden="true"
-                      className={`pointer-events-none absolute right-3 top-3 rounded-full bg-muted/60 p-2 ${metric.color}`}
-                    >
-                      <Icon className="h-5 w-5 opacity-90" />
-                    </div>
-                    <div className="flex h-full flex-col">
-                      <p className="text-sm font-medium text-muted-foreground pr-12">
-                        {metric.title}
-                      </p>
-                      <div className="mt-auto flex items-baseline gap-2">
-                        <p className="text-2xl font-bold leading-none">{metric.value}</p>
-                        <div
-                          className={`flex items-center gap-1 text-sm font-medium ${
-                            isPositive ? "text-success" : "text-destructive"
-                          }`}
-                        >
-                          {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                          <span>{metric.change}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </section>
-
-          {/* Tabs del panel */}
-          <TabsMenu
-            items={TABS}
-            activeHref={activeHref}
-            renderMode="nav-only"
-            onItemClick={(item) => router.replace(item.href, { scroll: false })}
-          />
-        </>
-      }
+    <PageShell
+      title="Informes y analítica"
+      description="Métricas completas de rendimiento y tendencias"
+      toolbar={shellToolbar}
+      headerBand={shellHeaderBand}
+      // showShellBadge // (true por defecto)
     >
-      {/* FAVORITOS: vacío */}
-      {activeTab === "favorites" && (
-        <div className="py-16 text-center text-muted-foreground">
-          (Vacío) Aquí podrás fijar tus paneles favoritos.
-        </div>
-      )}
+      {/* Contenido de los paneles con transición suave */}
+      <SectionWrapper topPadding="pt-6" minH="min-h-[60vh]">
+        {/* FAVORITOS */}
+        {activeTab === "favorites" && (
+          <div className="py-16 text-center text-muted-foreground">
+            (Vacío) Aquí podrás fijar tus paneles favoritos.
+          </div>
+        )}
 
-      {/* TENDENCIAS */}
-      {activeTab === "trends" && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader><CardTitle>Evolución del Rating</CardTitle></CardHeader>
-            <CardContent className="h-80">
-              <RatingLineChart {...({ data: monthlySeries, xKey: "month", yKey: "rating" } as any)} />
-            </CardContent>
-          </Card>
+        {/* TENDENCIAS */}
+        {activeTab === "trends" && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader><CardTitle>Evolución del Rating</CardTitle></CardHeader>
+              <CardContent className="h-80">
+                <RatingLineChart {...({ data: monthlySeries, xKey: "month", yKey: "rating" } as any)} />
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Distribución de Estrellas</CardTitle></CardHeader>
-            <CardContent className="h-80">
-              <StarDistribution {...({ data: starsData } as any)} />
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader><CardTitle>Distribución de Estrellas</CardTitle></CardHeader>
+              <CardContent className="h-80">
+                <StarDistribution {...({ data: starsData } as any)} />
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Tendencia de Reseñas</CardTitle></CardHeader>
-            <CardContent className="h-80">
-              <ReviewsAreaChart {...({ data: monthlySeries, xKey: "month", yKey: "reviews" } as any)} />
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader><CardTitle>Tendencia de Reseñas</CardTitle></CardHeader>
+              <CardContent className="h-80">
+                <ReviewsAreaChart {...({ data: monthlySeries, xKey: "month", yKey: "reviews" } as any)} />
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Fuentes de Reseñas</CardTitle></CardHeader>
-            <CardContent className="h-80">
-              <ReviewSourcesPie {...({ data: sourcesData } as any)} />
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            <Card>
+              <CardHeader><CardTitle>Fuentes de Reseñas</CardTitle></CardHeader>
+              <CardContent className="h-80">
+                <ReviewSourcesPie {...({ data: sourcesData } as any)} />
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-      {/* ANÁLISIS */}
-      {activeTab === "analysis" && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader><CardTitle>Análisis de Sentimientos</CardTitle></CardHeader>
-            <CardContent className="h-80">
-              <SentimentDonut {...({ data: sentimentData } as any)} />
-            </CardContent>
-          </Card>
+        {/* ANÁLISIS */}
+        {activeTab === "analysis" && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader><CardTitle>Análisis de Sentimientos</CardTitle></CardHeader>
+              <CardContent className="h-80">
+                <SentimentDonut {...({ data: sentimentData } as any)} />
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Palabras Más Repetidas</CardTitle></CardHeader>
-            <CardContent className="h-80">
-              <TopKeywordsBars {...({ data: keywordsData } as any)} />
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader><CardTitle>Palabras Más Repetidas</CardTitle></CardHeader>
+              <CardContent className="h-80">
+                <TopKeywordsBars {...({ data: keywordsData } as any)} />
+              </CardContent>
+            </Card>
 
-          <Card className="lg:col-span-2">
-            <CardHeader><CardTitle>Volumen de Reseñas por Mes</CardTitle></CardHeader>
-            <CardContent className="h-80">
-              <ReviewsAreaChart {...({ data: monthlySeries, xKey: "month", yKey: "reviews" } as any)} />
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            <Card className="lg:col-span-2">
+              <CardHeader><CardTitle>Volumen de Reseñas por Mes</CardTitle></CardHeader>
+              <CardContent className="h-80">
+                <ReviewsAreaChart {...({ data: monthlySeries, xKey: "month", yKey: "reviews" } as any)} />
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-      {/* UBICACIONES */}
-      {activeTab === "locations" && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader><CardTitle>Tiempo de Respuesta por Ubicación</CardTitle></CardHeader>
-            <CardContent className="h-80">
-              <ResponseTimeCompare
-                {...({ data: responseCompareData, xKey: "label", avgKey: "avg", targetKey: "target" } as any)}
-              />
-            </CardContent>
-          </Card>
+        {/* UBICACIONES */}
+        {activeTab === "locations" && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader><CardTitle>Tiempo de Respuesta por Ubicación</CardTitle></CardHeader>
+              <CardContent className="h-80">
+                <ResponseTimeCompare
+                  {...({ data: responseCompareData, xKey: "label", avgKey: "avg", targetKey: "target" } as any)}
+                />
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Dispositivos de Origen</CardTitle></CardHeader>
-            <CardContent className="h-80">
-              <DeviceOriginList {...({ data: deviceData } as any)} />
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            <Card>
+              <CardHeader><CardTitle>Dispositivos de Origen</CardTitle></CardHeader>
+              <CardContent className="h-80">
+                <DeviceOriginList {...({ data: deviceData } as any)} />
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-      {/* RENDIMIENTO */}
-      {activeTab === "performance" && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-1">
-            <CardHeader><CardTitle>KPIs Objetivo</CardTitle></CardHeader>
-            <CardContent className="h-80">
-              <KpiTargetsProgress items={kpiTargets as any} />
-            </CardContent>
-          </Card>
+        {/* RENDIMIENTO */}
+        {activeTab === "performance" && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <Card className="lg:col-span-1">
+              <CardHeader><CardTitle>KPIs Objetivo</CardTitle></CardHeader>
+              <CardContent className="h-80">
+                <KpiTargetsProgress items={kpiTargets as any} />
+              </CardContent>
+            </Card>
 
-          <Card className="lg:col-span-1">
-            <CardHeader><CardTitle>Alertas Activas</CardTitle></CardHeader>
-            <CardContent className="h-80 overflow-auto">
-              <AlertsList items={alertItems} />
-            </CardContent>
-          </Card>
+            <Card className="lg:col-span-1">
+              <CardHeader><CardTitle>Alertas Activas</CardTitle></CardHeader>
+              <CardContent className="h-80 overflow-auto">
+                <AlertsList items={alertItems} />
+              </CardContent>
+            </Card>
 
-          <Card className="lg:col-span-1">
-            <CardHeader><CardTitle>Resumen del Mes</CardTitle></CardHeader>
-            <CardContent className="h-80">
-              <MonthlyHighlights items={monthlyHighlightsItems} />
-            </CardContent>
-          </Card>
+            <Card className="lg:col-span-1">
+              <CardHeader><CardTitle>Resumen del Mes</CardTitle></CardHeader>
+              <CardContent className="h-80">
+                <MonthlyHighlights items={monthlyHighlightsItems} />
+              </CardContent>
+            </Card>
 
-          <Card className="lg:col-span-3">
-            <CardHeader><CardTitle>Análisis Competitivo</CardTitle></CardHeader>
-            <CardContent className="h-96">
-              <CompetitiveRadar {...({ data: competitiveData } as any)} />
-            </CardContent>
-          </Card>
-        </div>
-      )}
-    </SectionLayout>
+            <Card className="lg:col-span-3">
+              <CardHeader><CardTitle>Análisis Competitivo</CardTitle></CardHeader>
+              <CardContent className="h-96">
+                <CompetitiveRadar {...({ data: competitiveData } as any)} />
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </SectionWrapper>
+    </PageShell>
   );
 }

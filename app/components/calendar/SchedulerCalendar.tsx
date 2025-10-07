@@ -6,7 +6,8 @@ import { Calendar as CalendarComponent } from "@/app/components/ui/calendar";
 import { Badge } from "@/app/components/ui/badge";
 import { Calendar as CalIcon, Clock } from "lucide-react";
 import { useMemo } from "react";
-import type { Appointment } from "@/app/dashboard/calendar/page"; // ajusta si tu ruta es distinta
+import type { Appointment } from "@/app/components/calendar/types";
+
 
 type Props = {
   selectedView: "month" | "week" | "day";

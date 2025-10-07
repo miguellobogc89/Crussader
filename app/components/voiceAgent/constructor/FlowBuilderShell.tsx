@@ -1,13 +1,16 @@
-
-//app/components/voiceAgent/Constructor/FlowBuilderShell.tsx
+// app/components/voiceAgent/Constructor/FlowBuilderShell.tsx
 "use client";
 
 import React from "react";
 import AgentsSidebar, {
-  type AgentListItem as SidebarAgentListItem, // 👈 usa el tipo real del sidebar
+  type AgentListItem as SidebarAgentListItem,
 } from "@/app/components/voiceAgent/constructor/AgentsSidebar";
 import FlowEditor, { type FlowStage } from "@/app/components/voiceAgent/constructor/FlowEditor";
-import PhaseList from "@/app/components/voiceAgent/constructor/PhaseList";
+
+// Nueva barra inferior desplegable (controlada)
+import AgentGeneralSettingsDock, {
+  type AgentGeneralSettings,
+} from "@/app/components/voiceAgent/constructor/AgentGeneralSettingsDock";
 
 export default function FlowBuilderShell({
   agents,
@@ -23,8 +26,11 @@ export default function FlowBuilderShell({
   onSaveStages,
   agentName,
   loadingStages,
+
+  // Ajustes globales controlados desde el padre
+  generalSettings,
+  onGeneralSettingsChange,
 }: {
-  // 👇 acepta un array “parecido” y dentro lo normalizamos
   agents: Array<SidebarAgentListItem & { isActive?: boolean }>;
   selectedAgentId?: string;
   onSelectAgent: (id: string) => void;
@@ -38,18 +44,21 @@ export default function FlowBuilderShell({
   onSaveStages: (flow: FlowStage[]) => Promise<void>;
   agentName?: string;
   loadingStages?: boolean;
+
+  generalSettings: AgentGeneralSettings;
+  onGeneralSettingsChange: (next: AgentGeneralSettings) => void;
 }) {
-  // 🔧 Normaliza isActive a boolean estricto
   const sidebarAgents: SidebarAgentListItem[] = agents.map((a) => ({
     ...a,
     isActive: !!a.isActive,
   }));
 
   return (
-    <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-[320px_1fr_320px]">
+    <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-[320px_1fr]">
+      {/* Columna izquierda: agentes */}
       <div className="min-h-[560px]">
         <AgentsSidebar
-          agents={sidebarAgents}                   
+          agents={sidebarAgents}
           selectedId={selectedAgentId}
           onSelect={onSelectAgent}
           onCreate={onCreateAgent}
@@ -60,6 +69,7 @@ export default function FlowBuilderShell({
         />
       </div>
 
+      {/* Columna derecha: editor */}
       <div className="min-h-[560px]">
         <FlowEditor
           key={selectedAgentId || "no-agent"}
@@ -71,8 +81,12 @@ export default function FlowBuilderShell({
         />
       </div>
 
-      <div className="min-h-[560px]">
-        <PhaseList onSelect={(_tpl) => { /* pendiente: insertar plantilla */ }} />
+      {/* Barra inferior (ocupa ancho de las dos columnas) */}
+      <div className="md:col-span-2">
+        <AgentGeneralSettingsDock
+          settings={generalSettings}
+          onChange={onGeneralSettingsChange}
+        />
       </div>
     </div>
   );

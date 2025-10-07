@@ -1,14 +1,10 @@
 // app/components/AppSidebar.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Bell,
-  ChevronDown,
-  ChevronsLeft,
-} from "lucide-react";
+import { Bell, ChevronDown, ChevronsLeft } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -16,7 +12,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { SidebarItem } from "@/app/components/sidebar/SidebarItem";
 import { SidebarCollapse } from "@/app/components/sidebar/SidebarCollapse";
 import { SidebarIcon } from "@/app/components/sidebar/SidebarIcon";
-import type { NavItem, NavGroup, Iconish } from "@/app/components/sidebar/types";
+import type { NavItem, NavGroup } from "@/app/components/sidebar/types";
 
 /* ================= Utilidades ================= */
 function isActivePath(pathname: string, href: string) {
@@ -38,10 +34,10 @@ const GROUPS: NavGroup[] = [
     title: "Dashboard",
     icon: "📊",
     items: [
-      { title: "Reseñas",            href: "/dashboard/reviews",       icon: "💬", description: "Métricas y estadísticas" },
-      { title: "Reportes",           href: "/dashboard/reports",       icon: "📋", description: "Generación de informes" },
-      { title: "Gráficos",           href: "/dashboard/charts-test",   icon: "📈", description: "Visualizaciones" },
-      { title: "Reportes de prueba", href: "/dashboard/reports-test",  icon: "🧪", description: "Sandbox" },
+      { title: "Reseñas", href: "/dashboard/reviews", icon: "💬", description: "Métricas y estadísticas" },
+      { title: "Reportes", href: "/dashboard/reports", icon: "📋", description: "Generación de informes" },
+      { title: "Gráficos", href: "/dashboard/charts-test", icon: "📈", description: "Visualizaciones" },
+      { title: "Reportes de prueba", href: "/dashboard/reports-test", icon: "🧪", description: "Sandbox" },
     ],
   },
   {
@@ -49,9 +45,9 @@ const GROUPS: NavGroup[] = [
     title: "Negocio",
     icon: "🏢",
     items: [
-      { title: "Empresa",    href: "/dashboard/company",   icon: "🏛️", description: "Información de la empresa" },
-      { title: "Usuarios",  href: "/dashboard/products",  icon: "📦",  description: "gestión de usuarios" },
-      { title: "Calendario", href: "/dashboard/calendar",  icon: "📅",  description: "Gestión de reservas" },
+      { title: "Empresa", href: "/dashboard/company", icon: "🏛️", description: "Información de la empresa" },
+      { title: "Empleados", href: "/dashboard/myusers", icon: "👥", description: "Empleados y roles" },
+      { title: "Calendario", href: "/dashboard/calendar", icon: "📅", description: "Gestión de reservas" },
     ],
   },
   {
@@ -59,10 +55,9 @@ const GROUPS: NavGroup[] = [
     title: "Productos y Servicios",
     icon: "📦",
     items: [
-      { title: "Contestador de reviews",     href: "/dashboard/knowledge",          icon: "📚", description: "Base de conocimiento" },
-      { title: "Agentes de voz IA", href: "/dashboard/integrations-test",  icon: "🎙️", description: "Conecta servicios" },
-      { title: "WebChat IA", href: "/dashboard/database",           icon: "🗄️", description: "Conexiones y datos" },
-      { title: "Crussader Pulse", href: "/dashboard/voiceagent",         icon: "🎙️", description: "Agente telefónico" },
+      { title: "Contestador de reviews", href: "/dashboard/knowledge", icon: "📚", description: "Base de conocimiento" },
+      { title: "Agentes de voz IA", href: "/dashboard/integrations-test", icon: "🎙️", description: "Conecta servicios" },
+      { title: "WebChat IA", href: "/dashboard/database", icon: "🗄️", description: "Conexiones y datos" },
     ],
   },
   {
@@ -70,53 +65,50 @@ const GROUPS: NavGroup[] = [
     title: "Configuración",
     icon: "⚙️",
     items: [
-      { title: "Perfil de Usuario", href: "/dashboard/settings",      icon: "👤", description: "Gestiona tu información personal" },
-      { title: "Notificaciones",    href: "/dashboard/notifications", icon: "🔔", description: "Preferencias" },
-      { title: "Seguridad",         href: "/dashboard/security",      icon: "🛡️", description: "Seguridad y privacidad" },
-      { title: "Facturación",       href: "/dashboard/billing",       icon: "💳", description: "Pagos y suscripciones" },
+      { title: "Perfil de Usuario", href: "/dashboard/settings", icon: "👤", description: "Gestiona tu información personal" },
+      { title: "Notificaciones", href: "/dashboard/notifications", icon: "🔔", description: "Preferencias" },
+      { title: "Seguridad", href: "/dashboard/security", icon: "🛡️", description: "Seguridad y privacidad" },
+      { title: "Facturación", href: "/dashboard/billing", icon: "💳", description: "Pagos y suscripciones" },
     ],
   },
 ];
 
-/* ================= Grupo ================= */
+/* ================= Grupo (controlado por props) ================= */
 function Group({
   group,
   pathname,
   collapsed,
+  open,
+  onHeaderClick,
   onRequestExpand,
   onItemNavigate,
-  defaultOpen,
 }: {
   group: NavGroup;
   pathname: string;
   collapsed: boolean;
+  open: boolean; // controlado desde el padre
+  onHeaderClick: () => void; // pedir abrir/cerrar este grupo
   onRequestExpand: () => void;
   onItemNavigate: () => void;
-  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState<boolean>(!!defaultOpen);
-
   const anyActive = useMemo(
     () => group.items.some((it) => isActivePath(pathname, it.href)),
     [pathname, group.items]
   );
-
   const headerActive = anyActive && !collapsed;
 
-  const toggle = () => {
+  const onClickHeader = () => {
     if (collapsed) {
       onRequestExpand();
-      setOpen(true);
-      return;
     }
-    setOpen((v) => !v);
+    onHeaderClick(); // el padre decide si abre este y cierra otros
   };
 
   return (
     <div className="w-full">
       <button
         type="button"
-        onClick={toggle}
+        onClick={onClickHeader}
         aria-expanded={!collapsed ? open : undefined}
         className={[
           "flex w-full items-center rounded-lg transition-colors",
@@ -130,24 +122,30 @@ function Group({
       >
         <div className={["flex items-center", collapsed ? "" : "gap-3"].join(" ")}>
           <SidebarIcon icon={group.icon} />
-          {!collapsed && (
-            <span className="truncate text-sm font-medium">{group.title}</span>
-          )}
+          {!collapsed && <span className="truncate text-sm font-medium">{group.title}</span>}
         </div>
         {!collapsed && (
           <ChevronDown
-            className={[
-              "h-4 w-4 transition-transform duration-300",
-              open ? "rotate-180" : "",
-            ].join(" ")}
+            className={["h-4 w-4 transition-transform duration-300", open ? "rotate-180" : ""].join(" ")}
           />
         )}
       </button>
 
-      {/* Contenido del grupo con animación + línea izquierda */}
+      {/* Contenido del grupo */}
       {!collapsed && (
         <SidebarCollapse open={open} className="mt-1">
-          <div className="pl-3 ml-1 border-l-2 border-primary/30 space-y-1">
+          <div
+            className={[
+              // Espacio a la izquierda un poco mayor para que quepa la línea centrada bajo el icono
+              "relative ml-0 pl-7 space-y-1",
+              // Línea fina, clara y más a la derecha (como cayendo del centro del icono)
+              "before:content-[''] before:absolute before:top-2 before:bottom-2",
+              // Ajusta este left para afinar el centrado bajo el icono del header (≈ 1.6–1.8rem)
+              "before:left-[1.4rem]",
+              // 1px de ancho y color más claro
+              "before:w-px before:bg-white/35",
+            ].join(" ")}
+          >
             {group.items.map((it) => (
               <SidebarItem
                 key={it.href}
@@ -166,7 +164,7 @@ function Group({
 
 /* ================= Sidebar principal ================= */
 export function AppSidebar() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const isMobile = useIsMobile();
 
   const [collapsed, setCollapsed] = useState<boolean>(false);
@@ -179,56 +177,27 @@ export function AppSidebar() {
   const roleRaw = (user as any)?.role ?? (user as any)?.companyRole ?? "";
   const rolesArrRaw = (user as any)?.roles ?? [];
   const permsArrRaw = (user as any)?.permissions ?? (user as any)?.perms ?? [];
-
-  // normaliza a minúsculas
   const role = String(roleRaw || "").toLowerCase();
-  const rolesArr = Array.isArray(rolesArrRaw)
-    ? rolesArrRaw.map((r: any) => String(r).toLowerCase())
-    : [];
-  const permsArr = Array.isArray(permsArrRaw)
-    ? permsArrRaw.map((p: any) => String(p).toLowerCase())
-    : [];
-
-  // alias comunes de admin
-  const ADMIN_ALIASES = new Set([
-    "admin",
-    "administrator",
-    "owner",
-    "superadmin",
-    "super_admin",
-    "system_admin",
-    "sysadmin",
-    "root",
-  ]);
-
+  const rolesArr = Array.isArray(rolesArrRaw) ? rolesArrRaw.map((r: any) => String(r).toLowerCase()) : [];
+  const permsArr = Array.isArray(permsArrRaw) ? permsArrRaw.map((p: any) => String(p).toLowerCase()) : [];
+  const ADMIN_ALIASES = new Set(["admin", "administrator", "owner", "superadmin", "super_admin", "system_admin", "sysadmin", "root"]);
   const adminFlags = {
     a_isAdminField: (user as any)?.isAdmin === true,
     b_roleEqAdmin: ADMIN_ALIASES.has(role) || /admin/.test(role),
     c_rolesArrayHasAdmin: rolesArr.some((r) => ADMIN_ALIASES.has(r) || /admin/.test(r)),
     d_permissionsHaveAdmin: permsArr.some((p) => ADMIN_ALIASES.has(p) || /admin/.test(p)),
-    e_forceAdminLocal:
-      typeof window !== "undefined" && localStorage.getItem("forceAdmin") === "1",
+    e_forceAdminLocal: typeof window !== "undefined" && localStorage.getItem("forceAdmin") === "1",
   };
-
   const isAdmin = Object.values(adminFlags).some(Boolean);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
       // eslint-disable-next-line no-console
-      console.log("[Sidebar admin debug]", {
-        user,
-        roleRaw,
-        roleNormalized: role,
-        rolesArr,
-        permsArr,
-        adminFlags,
-        isAdmin,
-      });
+      console.log("[Sidebar admin debug]", { user, roleRaw, roleNormalized: role, rolesArr, permsArr, adminFlags, isAdmin });
     }
   }, [user, isAdmin, role, rolesArr.length, permsArr.length]);
 
-  const userInitial =
-    (user?.name?.charAt(0) || user?.email?.charAt(0) || "U").toUpperCase();
+  const userInitial = (user?.name?.charAt(0) || user?.email?.charAt(0) || "U").toUpperCase();
 
   // Grupo ADMIN (aparece arriba de Inicio)
   const ADMIN_GROUP: NavGroup | null = isAdmin
@@ -237,30 +206,35 @@ export function AppSidebar() {
         title: "Admin",
         icon: "🛡️",
         items: [
-          { title: "Usuarios y roles",            href: "/dashboard/admin/users",        icon: "👥", description: "Altas, permisos y equipos" },
-          { title: "Empresas y establecimientos", href: "/dashboard/admin/companies",    icon: "🏪", description: "Estructura, sedes y horarios" },
-          { title: "Integraciones",               href: "/dashboard/admin/integrations", icon: "🔌", description: "Conexiones externas" },
-          { title: "Finanzas",                    href: "/dashboard/admin/finance",      icon: "💰", description: "Pagos, costes y facturas" },
-          { title: "Ventas",                      href: "/dashboard/admin/sales",        icon: "🛒", description: "Canales y conversión" },
-          { title: "Permisos y auditoría",        href: "/dashboard/admin/audit",        icon: "🧾", description: "Logs y cumplimiento" },
-          { title: "Estado del sistema",          href: "/dashboard/admin/system",       icon: "⚙️", description: "Salud y configuración" },
-          { title: "Agentes IA",                  href: "/dashboard/admin/voiceagents",  icon: "🤖", description: "Constructor de Agentes" },
+          { title: "Usuarios y roles", href: "/dashboard/admin/users", icon: "👥", description: "Altas, permisos y equipos" },
+          { title: "UI & Dessign", href: "/dashboard/UI_and_Dessign", icon: "🤖", description: "Diseño de la interfaz" },
+          { title: "Empresas y establecimientos", href: "/dashboard/admin/companies", icon: "🏪", description: "Estructura, sedes y negocios" },
+          { title: "Integraciones", href: "/dashboard/admin/integrations", icon: "🔌", description: "Conexiones externas" },
+          { title: "Finanzas", href: "/dashboard/admin/finance", icon: "💰", description: "Pagos, costes y facturas" },
+          { title: "Ventas", href: "/dashboard/admin/sales", icon: "🛒", description: "Canales y conversión" },
+          { title: "Permisos y auditoría", href: "/dashboard/admin/audit", icon: "🧾", description: "Logs y cumplimiento" },
+          { title: "Estado del sistema", href: "/dashboard/admin/system", icon: "⚙️", description: "Salud y configuración" },
+          { title: "Agentes IA", href: "/dashboard/admin/voiceagents", icon: "🤖", description: "Constructor de Agentes" },
         ],
       }
     : null;
 
-  // Overlay en móvil cuando está expandida
   const isOverlay = isMobile && !collapsed;
-
-  // Abre por defecto el grupo que contiene la ruta activa (incluye admin si corresponde)
   const ALL_GROUPS: NavGroup[] = ADMIN_GROUP ? [ADMIN_GROUP, ...GROUPS] : GROUPS;
 
+  // Grupo que contiene la ruta activa (para abrir por defecto)
   const defaultOpenId = useMemo(() => {
-    const g = ALL_GROUPS.find((gg) =>
-      gg.items.some((it) => isActivePath(pathname ?? "", it.href))
-    );
-    return g?.id;
+    const g = ALL_GROUPS.find((gg) => gg.items.some((it) => isActivePath(pathname, it.href)));
+    return g?.id ?? null;
   }, [pathname, ALL_GROUPS]);
+
+  // === NUEVO: estado controlado para "solo un abierto"
+  const [openGroupId, setOpenGroupId] = useState<string | null>(defaultOpenId);
+
+  // Si cambia la ruta o el set de grupos, actualiza el abierto por defecto
+  useEffect(() => {
+    setOpenGroupId(defaultOpenId);
+  }, [defaultOpenId]);
 
   const requestExpand = () => setCollapsed(false);
 
@@ -301,6 +275,12 @@ export function AppSidebar() {
     }
   }
 
+  // Handler de clic en cabecera de grupo — garantiza 1 abierto
+  function handleGroupHeaderClick(id: string) {
+    setUserMenuOpen(false); // cierra el menú usuario si abres un grupo
+    setOpenGroupId((prev) => (prev === id ? null : id));
+  }
+
   return (
     <aside
       style={{ width }}
@@ -311,33 +291,19 @@ export function AppSidebar() {
     >
       {/* Header fijo */}
       <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-900">
-        <div
-          className={[
-            "flex items-center gap-2 py-3",
-            collapsed ? "px-2 justify-center" : "px-3 justify-between",
-          ].join(" ")}
-        >
+        <div className={["flex items-center gap-2 py-3", collapsed ? "px-2 justify-center" : "px-3 justify-between"].join(" ")}>
           {/* Marca (click para expandir cuando está colapsada) */}
           <div
             role={collapsed ? "button" : undefined}
             tabIndex={collapsed ? 0 : -1}
             onClick={() => collapsed && setCollapsed(false)}
             onKeyDown={handleBrandKeyDown}
-            className={[
-              "flex items-center rounded-md",
-              collapsed ? "p-1 hover:bg-slate-800/60" : "",
-              collapsed ? "" : "gap-2",
-            ].join(" ")}
+            className={["flex items-center rounded-md", collapsed ? "p-1 hover:bg-slate-800/60" : "", collapsed ? "" : "gap-2"].join(" ")}
             title={collapsed ? "Expandir" : undefined}
           >
             {/* Logo */}
             <div className="flex h-8 w-8 items-center justify-center">
-              <img
-                src="/img/logo_crussader.svg"
-                alt="Crussader logo"
-                width={32}
-                height={32}
-              />
+              <img src="/img/logo_crussader.svg" alt="Crussader logo" width={32} height={32} />
             </div>
 
             {!collapsed && (
@@ -370,22 +336,18 @@ export function AppSidebar() {
           <div className="mb-2">
             <Group
               group={ADMIN_GROUP}
-              pathname={pathname ?? ""}
+              pathname={pathname}
               collapsed={collapsed}
+              open={openGroupId === ADMIN_GROUP.id}
+              onHeaderClick={() => handleGroupHeaderClick(ADMIN_GROUP.id)}
               onRequestExpand={requestExpand}
               onItemNavigate={onItemNavigate}
-              defaultOpen={ADMIN_GROUP.id === defaultOpenId}
             />
           </div>
         )}
 
         {/* Inicio */}
-        <SidebarItem
-          item={HOME}
-          active={isActivePath(pathname ?? "", HOME.href)}
-          collapsed={collapsed}
-          onNavigate={onItemNavigate}
-        />
+        <SidebarItem item={HOME} active={isActivePath(pathname, HOME.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
 
         {/* Grupos */}
         <div className="mt-2 space-y-1">
@@ -393,11 +355,12 @@ export function AppSidebar() {
             <Group
               key={g.id}
               group={g}
-              pathname={pathname ?? ""}
+              pathname={pathname}
               collapsed={collapsed}
+              open={openGroupId === g.id}
+              onHeaderClick={() => handleGroupHeaderClick(g.id)}
               onRequestExpand={requestExpand}
               onItemNavigate={onItemNavigate}
-              defaultOpen={g.id === defaultOpenId}
             />
           ))}
         </div>
@@ -455,7 +418,11 @@ export function AppSidebar() {
         <div className="border-b border-transparent">
           <button
             type="button"
-            onClick={() => setUserMenuOpen((v) => !v)}
+            onClick={() => {
+              // Al abrir el menú de usuario, cerramos cualquier grupo abierto
+              setOpenGroupId(null);
+              setUserMenuOpen((v) => !v);
+            }}
             className={[
               "w-full flex items-center min-h-11 transition-colors",
               "text-slate-300 hover:text-white hover:bg-slate-800/60",
@@ -467,11 +434,7 @@ export function AppSidebar() {
             <div className={["flex items-center", collapsed ? "" : "gap-3"].join(" ")}>
               {/* Avatar */}
               {user?.image ? (
-                <img
-                  src={user.image}
-                  alt={user?.name ?? "Usuario"}
-                  className="h-6 w-6 rounded-full object-cover shrink-0"
-                />
+                <img src={user.image} alt={user?.name ?? "Usuario"} className="h-6 w-6 rounded-full object-cover shrink-0" />
               ) : (
                 <div className="h-6 w-6 rounded-full bg-primary/20 text-primary grid place-items-center text-xs font-semibold shrink-0">
                   {userInitial}
@@ -479,21 +442,12 @@ export function AppSidebar() {
               )}
 
               {/* Nombre (solo en expandido) */}
-              {!collapsed && (
-                <span className="text-sm font-medium truncate max-w-[12rem]">
-                  {user?.name ?? "Usuario"}
-                </span>
-              )}
+              {!collapsed && <span className="text-sm font-medium truncate max-w-[12rem]">{user?.name ?? "Usuario"}</span>}
             </div>
 
             {/* Chevron (solo en expandido) */}
             {!collapsed && (
-              <ChevronDown
-                className={[
-                  "h-4 w-4 transition-transform duration-300",
-                  userMenuOpen ? "rotate-180" : "",
-                ].join(" ")}
-              />
+              <ChevronDown className={["h-4 w-4 transition-transform duration-300", userMenuOpen ? "rotate-180" : ""].join(" ")} />
             )}
           </button>
 
@@ -505,7 +459,10 @@ export function AppSidebar() {
                   {/* Configuración */}
                   <Link
                     href="/dashboard/settings"
-                    onClick={onItemNavigate}
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      onItemNavigate();
+                    }}
                     className="flex items-center justify-start gap-3 rounded-lg px-3 min-h-11 text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors"
                   >
                     <svg
@@ -529,10 +486,12 @@ export function AppSidebar() {
                     </svg>
                     <span className="text-sm font-medium">Configuración</span>
                   </Link>
+
                   {/* Cerrar sesión */}
                   <button
                     type="button"
                     onClick={() => {
+                      setUserMenuOpen(false);
                       onItemNavigate();
                       signOut({ callbackUrl: "/" });
                     }}

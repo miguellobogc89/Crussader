@@ -1,59 +1,65 @@
+// app/components/layouts/RouteTransitionOverlay.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 /**
- * Overlay de transición de ruta:
- * - Muestra un spinner al cambiar pathname
- * - También responde a eventos manuales:
+ * Overlay de transición:
+ * - scope="viewport" -> fixed fullscreen (por defecto)
+ * - scope="container" -> absolute al contenedor padre (que debe ser relative)
+ *
+ * También responde a:
  *   window.dispatchEvent(new CustomEvent("crussader:navigate-start"))
  *   window.dispatchEvent(new CustomEvent("crussader:navigate-end"))
  */
-export default function RouteTransitionOverlay() {
+export default function RouteTransitionOverlay({
+  scope = "viewport",
+  className = "",
+  minMs = 250,
+}: {
+  scope?: "viewport" | "container";
+  className?: string;
+  /** tiempo mínimo visible (anti-parpadeo) */
+  minMs?: number;
+}) {
   const pathname = usePathname();
   const [visible, setVisible] = useState(false);
   const prevPathRef = useRef(pathname);
   const timerRef = useRef<number | null>(null);
 
-  // Mínimo tiempo visible para evitar parpadeos
-  const MIN_MS = 250;
-
   const start = () => {
-    if (timerRef.current) return; // ya activo
+    if (timerRef.current) return;
     setVisible(true);
-    // guardamos un timer para asegurar mínimo tiempo
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
-    }, MIN_MS);
+    }, minMs);
   };
 
   const end = () => {
     const hide = () => setVisible(false);
     if (timerRef.current) {
-      // si no pasó el mínimo, esperamos a que termine
       const t = timerRef.current;
       timerRef.current = null;
-      window.setTimeout(hide, Math.max(0, MIN_MS));
+      window.setTimeout(hide, Math.max(0, minMs));
     } else {
       hide();
     }
   };
 
-  // Reacciona a cambios reales de ruta
+  // Cambios reales de ruta
   useEffect(() => {
     if (pathname !== prevPathRef.current) {
       start();
-      // pequeño delay para dejar que la nueva ruta hydrate
       const after = window.setTimeout(() => {
         end();
         prevPathRef.current = pathname;
       }, 350);
       return () => window.clearTimeout(after);
     }
-  }, [pathname]);
+  }, [pathname, minMs]);
 
-  // Eventos manuales (ej. desde Sidebar onClick)
+  // Eventos manuales
   useEffect(() => {
     const onStart = () => start();
     const onEnd = () => end();
@@ -67,10 +73,15 @@ export default function RouteTransitionOverlay() {
 
   if (!visible) return null;
 
+  const positioning =
+    scope === "viewport"
+      ? "fixed inset-0 z-[60]"
+      : "absolute inset-0 z-[30]"; // menor que sidebar, mayor que el contenido
+
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed inset-0 z-[60] bg-background/40 backdrop-blur-sm transition-opacity"
+      className={`pointer-events-none ${positioning} bg-background/40 backdrop-blur-sm transition-opacity ${className}`}
     >
       <div className="flex h-full w-full items-center justify-center">
         <Spinner />

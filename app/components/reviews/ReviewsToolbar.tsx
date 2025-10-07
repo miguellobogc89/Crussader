@@ -2,98 +2,52 @@
 "use client";
 
 import { useState } from "react";
-import { Star, MessageCircleOff, Image as ImageIcon, ArrowUpDown, Check } from "lucide-react";
+import { ArrowUpDown, Check } from "lucide-react";
+import ReviewsFilters, {
+  type ReviewsFiltersValue,
+} from "@/app/components/reviews/controls/ReviewsFilters";
 
 export type ReviewsToolbarProps = {
   className?: string;
+  // opcional: exponer cambios al padre (por si quieres disparar query)
+  onFiltersChange?: (value: ReviewsFiltersValue) => void;
+  onSearchChange?: (q: string) => void;
+  onOrderChange?: (order: "recent" | "oldest" | "highest" | "lowest") => void;
 };
 
-function IconToggle({
-  active,
-  onClick,
-  children,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  label?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`flex items-center gap-1 rounded-md border px-2 py-1 text-sm ${
-        active ? "bg-muted/30" : "bg-white"
-      }`}
-    >
-      {children}
-      {label ? <span className="select-none">{label}</span> : null}
-    </button>
-  );
-}
+export default function ReviewsToolbar({
+  className,
+  onFiltersChange,
+  onSearchChange,
+  onOrderChange,
+}: ReviewsToolbarProps) {
+  // estado local (puedes quitarlo si solo lo manejas desde props callbacks)
+  const [filters, setFilters] = useState<ReviewsFiltersValue>({
+    stars: [],
+    unanswered: false,
+    withPhotos: false,
+  });
 
-export default function ReviewsToolbar({ className }: ReviewsToolbarProps) {
-  const [selectedStars, setSelectedStars] = useState<Set<number>>(new Set());
-  const [filterUnanswered, setFilterUnanswered] = useState(false);
-  const [filterWithPhotos, setFilterWithPhotos] = useState(false);
   const [search, setSearch] = useState("");
-
-  // 🔽 ordenar
   const [orderOpen, setOrderOpen] = useState(false);
   const [orderBy, setOrderBy] = useState<"recent" | "oldest" | "highest" | "lowest">("recent");
 
-  const toggleStar = (n: number) => {
-    setSelectedStars((prev) => {
-      const next = new Set(prev);
-      if (next.has(n)) next.delete(n);
-      else next.add(n);
-      return next;
-    });
+  const handleFiltersChange = (v: ReviewsFiltersValue) => {
+    setFilters(v);
+    onFiltersChange?.(v);
   };
 
   const handleOrder = (val: "recent" | "oldest" | "highest" | "lowest") => {
     setOrderBy(val);
     setOrderOpen(false);
+    onOrderChange?.(val);
   };
 
   return (
     <div className={className}>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         {/* (izquierda) filtros */}
-        <div className="flex items-center gap-2">
-          {[1, 2, 3, 4, 5].map((n) => {
-            const active = selectedStars.has(n);
-            return (
-              <IconToggle key={n} active={active} onClick={() => toggleStar(n)} label={String(n)}>
-                <Star size={16} className={active ? "text-amber-600" : "text-muted-foreground"} />
-              </IconToggle>
-            );
-          })}
-
-          <IconToggle
-            active={filterUnanswered}
-            onClick={() => setFilterUnanswered((v) => !v)}
-            label="Sin responder"
-          >
-            <MessageCircleOff
-              size={16}
-              className={filterUnanswered ? "text-emerald-600" : "text-muted-foreground"}
-            />
-          </IconToggle>
-
-          <IconToggle
-            active={filterWithPhotos}
-            onClick={() => setFilterWithPhotos((v) => !v)}
-            label="Con foto"
-          >
-            <ImageIcon
-              size={16}
-              className={filterWithPhotos ? "text-rose-700" : "text-muted-foreground"}
-            />
-          </IconToggle>
-        </div>
+        <ReviewsFilters defaultValue={filters} onChange={handleFiltersChange} />
 
         {/* (derecha) búsqueda + ordenar */}
         <div className="flex items-center gap-2 relative">
@@ -101,7 +55,11 @@ export default function ReviewsToolbar({ className }: ReviewsToolbarProps) {
             type="text"
             placeholder="Buscar por texto, autor…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              const q = e.target.value;
+              setSearch(q);
+              onSearchChange?.(q);
+            }}
             className="w-64 rounded-md border bg-white px-3 py-2 text-sm outline-none"
           />
 
@@ -159,6 +117,12 @@ export default function ReviewsToolbar({ className }: ReviewsToolbarProps) {
           )}
         </div>
       </div>
+
+      {/* Debug opcional (quitar en prod)
+      <pre className="mt-2 text-xs text-muted-foreground">
+        {JSON.stringify({ filters, search, orderBy }, null, 2)}
+      </pre>
+      */}
     </div>
   );
 }

@@ -6,14 +6,13 @@ import FlowBuilderShell from "@/app/components/voiceAgent/constructor/FlowBuilde
 import ChatConfigurationShell from "@/app/components/voiceAgent/constructor/ChatConfigurationShell";
 
 import {
-  // ⬇️ usamos el listado ADMIN (todos los agentes con companyName)
   listAllAgentsAdmin,
   createVoiceAgent,
   duplicateVoiceAgent,
   deleteVoiceAgent,
   renameVoiceAgent,
   toggleVoiceAgent,
-  type AdminAgentListItem as DbAgentListItem, // <- ahora usamos el tipo admin (con companyName)
+  type AdminAgentListItem as DbAgentListItem,
 } from "@/app/dashboard/admin/voiceagents/actions/agents.actions";
 
 import {
@@ -25,6 +24,12 @@ import {
 import { getVoiceAgentIdByAgent } from "@/app/dashboard/admin/voiceagents/actions/agents.helpers";
 import { loadCompanyMeta } from "@/app/dashboard/admin/voiceagents/actions/actions";
 
+// ⬇️ Importa los ajustes globales (compartidos en vivo)
+import {
+  DEFAULT_AGENT_GENERAL_SETTINGS,
+  type AgentGeneralSettings,
+} from "@/app/components/voiceAgent/constructor/AgentGeneralSettingsPanel";
+
 type Phase = "INTRO" | "INTENT" | "COLLECT" | "CONFIRM" | "END";
 
 export default function TabPageConstructor({
@@ -32,22 +37,25 @@ export default function TabPageConstructor({
 }: {
   defaultCompanyId: string;
 }) {
-  // Empresa "contexto" (solo para el header y para crear nuevos si decides hacerlo desde aquí)
+  // Empresa (header / contexto)
   const [companyId] = useState<string>(defaultCompanyId);
   const [companyName, setCompanyName] = useState<string>("—");
 
-  // Agentes (ADMIN: todos los agentes, sin filtrar por empresa)
+  // Agentes (ADMIN: todos)
   const [agents, setAgents] = useState<DbAgentListItem[]>([]);
-  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(
-    undefined
-  );
+  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(undefined);
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
 
   // Flujo del agente
   const [stages, setStages] = useState<Stage[]>([]);
   const [loadingStages, setLoadingStages] = useState(false);
 
-  // Cargar meta empresa (solo para el bloque de preview)
+  // 🔗 Ajustes globales del agente — compartidos entre constructor y chat (sin persistir)
+  const [generalSettings, setGeneralSettings] = useState<AgentGeneralSettings>(
+    DEFAULT_AGENT_GENERAL_SETTINGS
+  );
+
+  // Cargar meta empresa (sólo para el bloque de preview)
   useEffect(() => {
     (async () => {
       const meta = await loadCompanyMeta(companyId);
@@ -55,7 +63,7 @@ export default function TabPageConstructor({
     })();
   }, [companyId]);
 
-  // 🔁 Cargar TODOS los agentes (admin) —> así aparecerán los 5 (incluido el de otra empresa y sin slug)
+  // Cargar TODOS los agentes (admin)
   useEffect(() => {
     (async () => {
       const list = await listAllAgentsAdmin();
@@ -64,7 +72,7 @@ export default function TabPageConstructor({
     })();
   }, []);
 
-  // Cargar fases al cambiar de agente
+  // Cargar stages del agente seleccionado
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -90,19 +98,16 @@ export default function TabPageConstructor({
     };
   }, [selectedAgentId]);
 
-  // Ordenar stages
+  // Ordenar stages por order
   const orderedStages = useMemo(
     () => [...stages].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     [stages]
   );
 
-  // Prompts por fase para el banner
+  // Prompts por fase (para el chat)
   const promptsByPhase = useMemo(() => {
-    const pick = (t: Phase) =>
-      orderedStages.find((s) => s.type === t)?.prompt?.trim();
-    const firstNonIntro = orderedStages
-      .find((s) => s.type !== "INTRO")
-      ?.prompt?.trim();
+    const pick = (t: Phase) => orderedStages.find((s) => s.type === t)?.prompt?.trim();
+    const firstNonIntro = orderedStages.find((s) => s.type !== "INTRO")?.prompt?.trim();
     return {
       INTRO: pick("INTRO"),
       INTENT: pick("INTENT") ?? firstNonIntro,
@@ -123,11 +128,10 @@ export default function TabPageConstructor({
     <div className="space-y-6">
       {/* Shell principal del constructor */}
       <FlowBuilderShell
-        // ✅ ahora el sidebar recibe TODOS los agentes y ya pinta companyName debajo
+        // Sidebar (admin)
         agents={agents as any}
         selectedAgentId={selectedAgentId}
         onSelectAgent={(id) => setSelectedAgentId(id)}
-        // Si no quieres crear desde aquí, puedes no pasar onCreateAgent o dejarlo como no-op.
         onCreateAgent={async () => {
           const created = await createVoiceAgent(companyId);
           setAgents((xs) => [created as any, ...xs]);
@@ -142,31 +146,25 @@ export default function TabPageConstructor({
           await deleteVoiceAgent(id);
           setAgents((prev) => {
             const next = prev.filter((a) => a.id !== id);
-            if (selectedAgentId === id)
-              setSelectedAgentId(next[0]?.id ?? undefined);
+            if (selectedAgentId === id) setSelectedAgentId(next[0]?.id ?? undefined);
             return next;
           });
         }}
         onRenameAgent={async (id, name) => {
           await renameVoiceAgent(id, name);
           setAgents((xs) =>
-            xs.map((a) =>
-              a.id === id
-                ? { ...a, name, updatedAt: new Date().toISOString() }
-                : a
-            )
+            xs.map((a) => (a.id === id ? { ...a, name, updatedAt: new Date().toISOString() } : a))
           );
         }}
         onToggleActive={async (id, next) => {
           await toggleVoiceAgent(id, next);
           setAgents((xs) =>
             xs.map((a) =>
-              a.id === id
-                ? { ...a, isActive: next, updatedAt: new Date().toISOString() }
-                : a
+              a.id === id ? { ...a, isActive: next, updatedAt: new Date().toISOString() } : a
             )
           );
         }}
+        // Flow
         stages={orderedStages}
         setStages={(flow) => setStages(flow)}
         onSaveStages={async (flow) => {
@@ -177,9 +175,12 @@ export default function TabPageConstructor({
         }}
         agentName={selectedAgent?.name}
         loadingStages={loadingStages}
+        // ⬇️ Ajustes globales controlados (compartidos con el Chat)
+        generalSettings={generalSettings}
+        onGeneralSettingsChange={setGeneralSettings}
       />
 
-      {/* Preview rápido */}
+      {/* Preview / pruebas en tiempo real (usa los mismos ajustes) */}
       <div className="mt-2">
         <ChatConfigurationShell
           companyId={companyId}
@@ -187,6 +188,8 @@ export default function TabPageConstructor({
           agentName={selectedAgent?.name}
           promptsByPhase={promptsByPhase}
           firstPromptFallback={firstPromptFallback}
+          // ⬇️ Aquí viajan los ajustes (sin persistir)
+          generalSettings={generalSettings}
         />
       </div>
     </div>

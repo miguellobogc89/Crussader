@@ -6,6 +6,7 @@ import PageContainer from "@/app/components/PageContainer";
 import { getBootstrapData } from "@/lib/bootstrap";
 import BootstrapProvider from "@/app/providers/BootstrapProvider";
 import { Toaster } from "@/app/components/ui/toaster";
+import RouteTransitionOverlay from "@/app/components/layouts/RouteTransitionOverlay";
 
 export default async function DashboardLayout({
   children,
@@ -19,9 +20,7 @@ export default async function DashboardLayout({
       <BootstrapProvider initialData={initialData} autoFetchIfEmpty={false}>
         {/* ====== Soft-lock orientación: estilos globales ====== */}
         <style>{`
-          /* Por defecto: overlay oculto */
           .orientation-guard { display: none; }
-          /* Si está en apaisado y con poca altura, bloqueamos la app y mostramos overlay */
           @media (orientation: landscape) and (max-height: 480px) {
             .app-root { display: none !important; }
             .orientation-guard { display: flex !important; }
@@ -44,13 +43,18 @@ export default async function DashboardLayout({
           {/* Sidebar (izquierda) */}
           <AppSidebar />
 
-          {/* Contenido (derecha): ocupa el espacio restante y tiene su propio scroll */}
-          <div className="flex h-svh min-w-0 flex-1 overflow-y-auto">
+          {/* Contenido (derecha): ahora es el "scope" del overlay */}
+          <div className="relative flex h-svh min-w-0 flex-1 overflow-y-auto">
+            {/* 👇 Overlay limitado al área de página, NO tapa la sidebar */}
+            <RouteTransitionOverlay scope="container" />
+
             <main className="flex-1 bg-background">
               <PageContainer>{children}</PageContainer>
             </main>
           </div>
-         </div>
+        </div>
+
+        <Toaster />
       </BootstrapProvider>
     </SidebarProvider>
   );

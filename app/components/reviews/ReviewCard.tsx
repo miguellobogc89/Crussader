@@ -451,7 +451,6 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
             </>
           ) : (
             <div className="bg-muted/30 rounded-lg p-4 border border-dashed border-border/50 text-center">
-              <p className="text-sm text-muted-foreground mb-3">Sin respuesta generada</p>
               <Button
                 size="sm"
                 className="bg-gradient-to-r from-primary to-accent text-white disabled:opacity-60 disabled:cursor-not-allowed"

@@ -1,23 +1,18 @@
+// app/dashboard/home/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+
+import PageShell from "@/app/components/layouts/PageShell";
 import { useBootstrapData, useBootstrapStatus } from "@/app/providers/bootstrap-store";
 import { useCompanyKpis } from "@/hooks/useCompanyKpis";
 import KpiCards from "@/app/components/kpis/KpiCards";
-import {
-  Building2,
-  Package,
-  Database,
-  Calendar,
-  BookOpen,
-  Settings,
-  Plug,
-  BarChart3,
-  ArrowRight,
-} from "lucide-react";
-import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/app/components/ui/card";
 
+import { ArrowRight } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/app/components/ui/card";
+
+/* ===== Tarjeta feature con emoji 3D ===== */
 const FeatureCard = ({
   icon: Icon,
   title,
@@ -25,19 +20,19 @@ const FeatureCard = ({
   href,
   color,
 }: {
-  icon: any;
+  icon: string;      // emoji
   title: string;
   description: string;
   href: string;
-  color: string;
+  color: string;     // tailwind bg-*
 }) => (
   <Link href={href}>
-    <Card className="h-full hover:shadow-lg transition-all duration-300 hover:-translate-y-1 group border-border bg-card">
+    <Card className="h-full hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group border-border bg-card">
       <CardHeader>
         <div
-          className={`w-12 h-12 rounded-lg ${color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}
+          className={`w-14 h-14 rounded-2xl ${color} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}
         >
-          <Icon className="w-6 h-6 text-white" />
+          <span className="text-3xl" aria-hidden="true">{Icon}</span>
         </div>
         <CardTitle className="flex items-center justify-between">
           {title}
@@ -113,105 +108,56 @@ export default function HomePage() {
   }, [phase, fullRecap]);
 
   if (status !== "ready" || !data) {
-    return <div className="p-6 text-sm text-neutral-500">Cargando…</div>;
+    return (
+      <PageShell title=" " description="">
+        <div className="p-6 text-sm text-neutral-500">Cargando…</div>
+      </PageShell>
+    );
   }
 
   const features = [
-    {
-      icon: Building2,
-      title: "Empresa",
-      description: "Gestiona la información de tu empresa y establecimientos",
-      href: "/dashboard/company",
-      color: "bg-blue-500",
-    },
-    {
-      icon: Package,
-      title: "Productos",
-      description: "Administra tu catálogo de productos y servicios",
-      href: "/dashboard/products",
-      color: "bg-purple-500",
-    },
-    {
-      icon: Database,
-      title: "Base de Datos",
-      description: "Gestiona y organiza toda tu información",
-      href: "/dashboard/database",
-      color: "bg-green-500",
-    },
-    {
-      icon: Calendar,
-      title: "Calendario",
-      description: "Planifica y visualiza eventos importantes",
-      href: "/dashboard/calendar",
-      color: "bg-orange-500",
-    },
-    {
-      icon: BookOpen,
-      title: "Conocimiento",
-      description: "Base de conocimiento y documentación",
-      href: "/dashboard/knowledge",
-      color: "bg-pink-500",
-    },
-    {
-      icon: Plug,
-      title: "Integraciones",
-      description: "Conecta con servicios externos",
-      href: "/dashboard/integrations-test",
-      color: "bg-cyan-500",
-    },
-    {
-      icon: BarChart3,
-      title: "Reportes",
-      description: "Analiza el rendimiento con reportes detallados",
-      href: "/dashboard/reports",
-      color: "bg-indigo-500",
-    },
-    {
-      icon: Settings,
-      title: "Configuración",
-      description: "Ajusta las preferencias del sistema",
-      href: "/dashboard/settings",
-      color: "bg-gray-500",
-    },
+    { icon: "🏢", title: "Empresa", description: "Gestiona la información de tu empresa y establecimientos", href: "/dashboard/company", color: "bg-blue-500" },
+    { icon: "📦", title: "Productos", description: "Administra tu catálogo de productos y servicios", href: "/dashboard/products", color: "bg-purple-500" },
+    { icon: "🗄️", title: "Base de Datos", description: "Gestiona y organiza toda tu información", href: "/dashboard/database", color: "bg-green-500" },
+    { icon: "📅", title: "Calendario", description: "Planifica y visualiza eventos importantes", href: "/dashboard/calendar", color: "bg-orange-500" },
+    { icon: "📚", title: "Conocimiento", description: "Base de conocimiento y documentación", href: "/dashboard/knowledge", color: "bg-pink-500" },
+    { icon: "🔌", title: "Integraciones", description: "Conecta con servicios externos", href: "/dashboard/integrations-test", color: "bg-cyan-500" },
+    { icon: "📊", title: "Reportes", description: "Analiza el rendimiento con reportes detallados", href: "/dashboard/reports", color: "bg-indigo-500" },
+    { icon: "⚙️", title: "Configuración", description: "Ajusta las preferencias del sistema", href: "/dashboard/settings", color: "bg-gray-500" },
   ];
 
+  const headerGreeting = greeting || "Bienvenido a Crussader";
+
   return (
-    <div className="space-y-12">
-      {/* Hero: saludo + recap */}
-      <section className="rounded-xl border p-6 bg-gradient-to-br from-muted/30 via-background to-background">
-        <div className="text-2xl md:text-3xl font-semibold text-neutral-900 min-h-[2.5rem]">
-          {greeting}
+    <PageShell
+      title=" "                 // mantenemos vacío para que no estorbe
+      description=""
+      /* 👇 metemos el saludo DENTRO del header usando 'toolbar' */
+      toolbar={
+        <div className="w-full flex items-center justify-center text-center">
+          <h1 className="text-4xl md:text-6xl font-extrabold leading-tight tracking-tight py-6">
+            <span className="bg-gradient-to-r from-fuchsia-500 via-purple-500 to-sky-500 bg-clip-text text-transparent">
+              {headerGreeting}
+            </span>
+          </h1>
         </div>
-        {recap && (
-          <p className="mt-3 text-base md:text-lg text-neutral-600 animate-fade-in">{recap}</p>
-        )}
-      </section>
+      }
+    >
+      {/* Body */}
+      <div className="space-y-12 mt-16">
+        {/* Tarjetas funcionales */}
+        <section>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {features.map((feature, index) => (
+              <div key={feature.href} className="animate-fade-in" style={{ animationDelay: `${index * 0.05}s` }}>
+                <FeatureCard {...feature} />
+              </div>
+            ))}
+          </div>
+        </section>
 
-      {/* Tarjetas funcionales */}
-      <section>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map((feature, index) => (
-            <div
-              key={feature.href}
-              className="animate-fade-in"
-              style={{ animationDelay: `${index * 0.05}s` }}
-            >
-              <FeatureCard {...feature} />
-            </div>
-          ))}
-        </div>
-      </section>
 
-      {/* KPIs */}
-      <section className="rounded-xl border p-6">
-        <h3 className="mb-3 text-lg font-semibold">Indicadores</h3>
-        {kpisLoading && <div className="text-sm text-muted-foreground">Calculando…</div>}
-        {kpisError && <div className="text-sm text-red-600">Error al cargar KPIs: {kpisError}</div>}
-        {!kpisLoading && !kpisError && kpis && <KpiCards kpis={kpis} />}
-        {!kpisLoading && !kpisError && !kpis && (
-          <div className="text-sm text-muted-foreground">Sin datos de KPIs aún.</div>
-        )}
-      </section>
-    </div>
+      </div>
+    </PageShell>
   );
 }

@@ -1,298 +1,413 @@
+// app/components/calendar/CalendarOnly.tsx
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, CalendarDays, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
-import { Calendar as CalIcon, ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useState } from "react";
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isToday, addDays } from "date-fns";
-import { es } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+
+export type CalendarAppt = {
+  id: string;
+  startAt: string; // ISO
+  endAt: string;   // ISO
+  serviceName?: string | null;
+  serviceColor?: string | null;
+  employeeName?: string | null;
+  resourceName?: string | null;
+};
+
+type View = "day" | "week" | "month";
 
 type Props = {
-  selectedView: "month" | "week" | "day";
-  onChangeView: (v: "month" | "week" | "day") => void;
-  selectedDate?: Date;
-  onChangeDate: (d?: Date) => void;
+  selectedView: View;
+  onChangeView: (v: View) => void;
+  selectedDate: Date;
+  onChangeDate: (d: Date) => void;
+  appointments?: CalendarAppt[];
+  onSelectAppointment?: (id: string) => void;
 };
 
-type MockEvent = {
-  id: number;
-  date: Date;
-  title: string;
-  time: string;  // "HH:mm"
-  type: "appointment" | "checkup" | "surgery" | "cleaning" | string;
-};
-
-// Mock events (solo demo visual)
-const mockEvents: MockEvent[] = [
-  { id: 1, date: new Date(), title: "Consulta Dr. López", time: "09:00", type: "appointment" },
-  { id: 2, date: new Date(), title: "Revisión dental", time: "14:30", type: "checkup" },
-  { id: 3, date: addDays(new Date(), 1), title: "Cirugía menor", time: "11:00", type: "surgery" },
-  { id: 4, date: addDays(new Date(), 2), title: "Limpieza", time: "16:00", type: "cleaning" },
-];
-
-export default function EnhancedCalendar({
+export default function CalendarOnly({
   selectedView,
   onChangeView,
   selectedDate,
   onChangeDate,
+  appointments = [],
+  onSelectAppointment,
 }: Props) {
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
-  const today = new Date();
+  // estado interno sincronizado con la prop (controlado)
+  const [view, setView] = useState<View>(selectedView);
+  useEffect(() => setView(selectedView), [selectedView]);
 
-  // Si el padre cambia selectedDate, mantenemos el periodo visible coherente (mes/semana/día)
-  useEffect(() => {
-    if (selectedDate) setCurrentDate(selectedDate);
-  }, [selectedDate]);
-
-  const getEventsForDate = (date: Date): MockEvent[] => {
-    return mockEvents.filter((event: MockEvent) => isSameDay(event.date, date));
+  // helpers fecha
+  const startOfWeekMon = (d: Date) => {
+    const x = new Date(d);
+    const day = x.getDay(); // 0=Dom
+    const delta = (day === 0 ? -6 : 1 - day);
+    x.setHours(0, 0, 0, 0);
+    x.setDate(x.getDate() + delta);
+    return x;
   };
-
-  const navigatePrevious = () => {
-    const newDate = new Date(currentDate);
-    if (selectedView === "month") newDate.setMonth(newDate.getMonth() - 1);
-    else if (selectedView === "week") newDate.setDate(newDate.getDate() - 7);
-    else newDate.setDate(newDate.getDate() - 1);
-    setCurrentDate(newDate);
+  const addDays = (d: Date, n: number) => {
+    const x = new Date(d);
+    x.setDate(x.getDate() + n);
+    return x;
   };
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
-  const navigateNext = () => {
-    const newDate = new Date(currentDate);
-    if (selectedView === "month") newDate.setMonth(newDate.getMonth() + 1);
-    else if (selectedView === "week") newDate.setDate(newDate.getDate() + 7);
-    else newDate.setDate(newDate.getDate() + 1);
-    setCurrentDate(newDate);
-  };
+  // rango semana visible
+  const weekStart = useMemo(() => startOfWeekMon(selectedDate), [selectedDate]);
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
-  const goToToday = () => {
-    setCurrentDate(today);
-    onChangeDate(today);
-  };
+  // navegación por vista
+  function goPrev() {
+    const d = new Date(selectedDate);
+    if (view === "day") d.setDate(d.getDate() - 1);
+    else if (view === "week") d.setDate(d.getDate() - 7);
+    else d.setMonth(d.getMonth() - 1);
+    onChangeDate(d);
+  }
+  function goNext() {
+    const d = new Date(selectedDate);
+    if (view === "day") d.setDate(d.getDate() + 1);
+    else if (view === "week") d.setDate(d.getDate() + 7);
+    else d.setMonth(d.getMonth() + 1);
+    onChangeDate(d);
+  }
+  function goToday() {
+    const now = new Date();
+    onChangeDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+  }
+  function handleChangeView(v: View) {
+    setView(v);
+    onChangeView?.(v);
+    // al pasar a semana, alinear a lunes
+    if (v === "week") onChangeDate(startOfWeekMon(selectedDate));
+  }
 
-  const renderMonthView = () => {
-    const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    const startDate = startOfWeek(firstDayOfMonth, { weekStartsOn: 1 });
-    const endDate = endOfWeek(lastDayOfMonth, { weekStartsOn: 1 });
+  // formateadores
+  const fmtDay = useMemo(
+    () => new Intl.DateTimeFormat("es-ES", { weekday: "short", day: "2-digit", month: "short" }),
+    []
+  );
+  const fmtHour = useMemo(
+    () => new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }),
+    []
+  );
+  const monthTitle = useMemo(
+    () => new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" }).format(selectedDate),
+    [selectedDate]
+  );
 
-    const days: Date[] = eachDayOfInterval({ start: startDate, end: endDate });
-    const weekDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-7 gap-2">
-          {weekDays.map((dayLabel: string) => (
-            <div key={dayLabel} className="text-center text-sm font-medium text-muted-foreground py-2">
-              {dayLabel}
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-7 gap-2">
-          {days.map((day: Date) => {
-            const dayEvents = getEventsForDate(day);
-            const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-            const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
-            const isTodayDate = isToday(day);
-
-            return (
-              <div
-                key={day.toISOString()}
-                onClick={() => onChangeDate(day)}
-                className={cn(
-                  "relative min-h-[120px] p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md",
-                  "flex flex-col bg-card/50 backdrop-blur-sm",
-                  isCurrentMonth ? "opacity-100" : "opacity-40",
-                  isTodayDate && "ring-2 ring-primary/50 bg-primary/5",
-                  isSelected && "border-primary bg-primary/10 shadow-lg shadow-primary/20",
-                  !isSelected && "border-border/50 hover:border-primary/30"
-                )}
-              >
-                <div
-                  className={cn(
-                    "text-sm font-medium mb-2",
-                    isTodayDate && "text-primary font-bold",
-                    isSelected && "text-primary"
-                  )}
-                >
-                  {day.getDate()}
-                </div>
-
-                <div className="flex-1 space-y-1">
-                  {dayEvents.slice(0, 3).map((event: MockEvent) => (
-                    <div key={event.id} className="text-xs p-1 rounded bg-accent/20 text-accent-foreground truncate">
-                      <div className="font-medium">{event.time}</div>
-                      <div className="opacity-75">{event.title}</div>
-                    </div>
-                  ))}
-                  {dayEvents.length > 3 && (
-                    <div className="text-xs text-muted-foreground">+{dayEvents.length - 3} más</div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  const renderWeekView = () => {
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-    const weekDays: Date[] = eachDayOfInterval({
-      start: weekStart,
-      end: endOfWeek(weekStart, { weekStartsOn: 1 }),
-    });
-
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-7 gap-4">
-          {weekDays.map((day: Date) => {
-            const dayEvents = getEventsForDate(day);
-            const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
-            const isTodayDate = isToday(day);
-
-            return (
-              <div
-                key={day.toISOString()}
-                onClick={() => onChangeDate(day)}
-                className={cn(
-                  "relative min-h-[200px] p-4 rounded-lg border-2 cursor-pointer transition-all duration-200",
-                  "flex flex-col bg-card/50 backdrop-blur-sm hover:shadow-lg",
-                  isTodayDate && "ring-2 ring-primary/50 bg-primary/5",
-                  isSelected && "border-primary bg-primary/10 shadow-lg shadow-primary/20",
-                  !isSelected && "border-border/50 hover:border-primary/30"
-                )}
-              >
-                <div className="text-center mb-3">
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide">
-                    {format(day, "EEE", { locale: es })}
-                  </div>
-                  <div className={cn("text-lg font-bold", isTodayDate && "text-primary", isSelected && "text-primary")}>
-                    {day.getDate()}
-                  </div>
-                </div>
-
-                <div className="flex-1 space-y-2">
-                  {dayEvents.map((event: MockEvent) => (
-                    <div key={event.id} className="p-2 rounded-md bg-accent/20 text-accent-foreground">
-                      <div className="font-medium text-sm">{event.time}</div>
-                      <div className="text-xs opacity-90">{event.title}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  const renderDayView = () => {
-    const dayEvents = getEventsForDate(currentDate);
-    const hours: number[] = Array.from({ length: 24 }, (_, i) => i);
-
-    return (
-      <div className="space-y-4">
-        <div
-          className={cn(
-            "text-center p-6 rounded-lg border-2 bg-card/50 backdrop-blur-sm",
-            isToday(currentDate) && "ring-2 ring-primary/50 bg-primary/5",
-            "border-primary/30"
-          )}
-        >
-          <div className="text-2xl font-bold mb-2">{format(currentDate, "EEEE, d MMMM yyyy", { locale: es })}</div>
-          <div className="text-muted-foreground">
-            {dayEvents.length} {dayEvents.length === 1 ? "cita" : "citas"} programadas
-          </div>
-        </div>
-
-        <div className="space-y-2 max-h-[600px] overflow-y-auto">
-          {hours.map((hour: number) => {
-            const hourEvents = dayEvents.filter((event: MockEvent) => parseInt(event.time.split(":")[0] || "0", 10) === hour);
-
-            return (
-              <div key={hour} className="flex border-b border-border/30 pb-2">
-                <div className="w-16 text-sm text-muted-foreground font-medium">
-                  {hour.toString().padStart(2, "0")}:00
-                </div>
-                <div className="flex-1 ml-4 space-y-1">
-                  {hourEvents.map((event: MockEvent) => (
-                    <div key={event.id} className="p-3 rounded-md bg-accent/20 text-accent-foreground border-l-4 border-primary">
-                      <div className="font-medium">{event.title}</div>
-                      <div className="text-sm opacity-75">{event.time}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  const getCurrentPeriodText = () => {
-    if (selectedView === "month") {
-      return format(currentDate, "MMMM yyyy", { locale: es });
-    } else if (selectedView === "week") {
-      const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
-      return `${format(weekStart, "d MMM", { locale: es })} - ${format(weekEnd, "d MMM yyyy", { locale: es })}`;
-    } else {
-      return format(currentDate, "EEEE, d MMMM yyyy", { locale: es });
+  // citas por día (para día/semana)
+  const apptsByDay = useMemo(() => {
+    const map = new Map<string, CalendarAppt[]>();
+    const keyOf = (d: Date) => d.toISOString().slice(0, 10);
+    for (const a of appointments) {
+      const d = new Date(a.startAt);
+      const k = keyOf(d);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(a);
     }
-  };
+    for (const [k, list] of map) {
+      list.sort((A, B) => +new Date(A.startAt) - +new Date(B.startAt));
+      map.set(k, list);
+    }
+    return map;
+  }, [appointments]);
 
+  // ============ UI HEADER ============
   return (
-    <div className="w-full max-w-none">
-      <Card className="shadow-lg border-0 bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm">
-        <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <CardTitle className="flex items-center gap-2">
-              <CalIcon className="h-5 w-5 text-primary" />
-              Agenda
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Tabs value={selectedView} onValueChange={(v) => onChangeView(v as "month" | "week" | "day")}>
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="month">Mes</TabsTrigger>
-                  <TabsTrigger value="week">Semana</TabsTrigger>
-                  <TabsTrigger value="day">Día</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-          </div>
+    <div className="flex h-full w-full flex-col">
+      {/* Controles */}
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={goPrev}><ChevronLeft className="h-4 w-4" /></Button>
+          <Button variant="outline" onClick={goToday}>Hoy</Button>
+          <Button variant="outline" size="icon" onClick={goNext}><ChevronRight className="h-4 w-4" /></Button>
+          <div className="ml-3 text-sm font-medium capitalize">{monthTitle}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={view === "day" ? "default" : "outline"}
+            onClick={() => handleChangeView("day")}
+          >
+            Día
+          </Button>
+          <Button
+            variant={view === "week" ? "default" : "outline"}
+            onClick={() => handleChangeView("week")}
+          >
+            Semana
+          </Button>
+          <Button
+            variant={view === "month" ? "default" : "outline"}
+            onClick={() => handleChangeView("month")}
+          >
+            Mes
+          </Button>
+        </div>
+      </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={navigatePrevious}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={navigateNext}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+      {/* Contenido */}
+      <div className="min-h-0 flex-1 rounded-lg border bg-background p-3">
+        {view === "day" && (
+          <DayView
+            date={selectedDate}
+            appts={apptsByDay.get(selectedDate.toISOString().slice(0, 10)) ?? []}
+            onSelect={onSelectAppointment}
+            fmtHour={fmtHour}
+          />
+        )}
 
-            <h2 className="text-lg font-semibold text-center flex-1 capitalize">{getCurrentPeriodText()}</h2>
+        {view === "week" && (
+          <WeekView
+            days={weekDays}
+            apptsByDay={apptsByDay}
+            onSelect={onSelectAppointment}
+            fmtDay={fmtDay}
+            fmtHour={fmtHour}
+            isToday={(d) => sameDay(d, new Date())}
+          />
+        )}
 
-            <Button variant="outline" size="sm" onClick={goToToday}>
-              Hoy
-            </Button>
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-6">
-          <div className="w-full">
-            {selectedView === "month" && renderMonthView()}
-            {selectedView === "week" && renderWeekView()}
-            {selectedView === "day" && renderDayView()}
-          </div>
-        </CardContent>
-      </Card>
+        {view === "month" && (
+          <MonthView
+            anchor={selectedDate}
+            appts={appointments}
+            onSelect={onSelectAppointment}
+            fmtDay={fmtDay}
+          />
+        )}
+      </div>
     </div>
   );
+}
+
+/* ===================== Día ===================== */
+
+function DayView({
+  date,
+  appts,
+  onSelect,
+  fmtHour,
+}: {
+  date: Date;
+  appts: CalendarAppt[];
+  onSelect?: (id: string) => void;
+  fmtHour: Intl.DateTimeFormat;
+}) {
+  const hours = Array.from({ length: 12 }, (_, i) => 8 + i); // 08..19
+  const apptsSorted = [...appts].sort((a, b) => +new Date(a.startAt) - +new Date(b.startAt));
+
+  return (
+    <div className="grid grid-cols-[64px_1fr] gap-2 h-full">
+      <div className="flex flex-col">
+        {hours.map((h) => (
+          <div key={h} className="h-16 text-xs text-muted-foreground">{String(h).padStart(2, "0")}:00</div>
+        ))}
+      </div>
+      <div className="relative">
+        {/* líneas de hora */}
+        {hours.map((h) => (
+          <div key={h} className="h-16 border-t border-dashed border-border/60" />
+        ))}
+        {/* tarjetas */}
+        <div className="absolute inset-0 p-1">
+          {apptsSorted.map((a) => (
+            <ApptCard key={a.id} appt={a} onSelect={onSelect} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ===================== Semana ===================== */
+
+function WeekView({
+  days,
+  apptsByDay,
+  onSelect,
+  fmtDay,
+  fmtHour,
+  isToday,
+}: {
+  days: Date[];
+  apptsByDay: Map<string, CalendarAppt[]>;
+  onSelect?: (id: string) => void;
+  fmtDay: Intl.DateTimeFormat;
+  fmtHour: Intl.DateTimeFormat;
+  isToday: (d: Date) => boolean;
+}) {
+  const hours = Array.from({ length: 12 }, (_, i) => 8 + i); // 08..19
+
+  return (
+    <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] gap-2 h-full">
+      {/* columna horas */}
+      <div className="flex flex-col">
+        <div className="h-10" />
+        {hours.map((h) => (
+          <div key={h} className="h-16 text-xs text-muted-foreground">{String(h).padStart(2, "0")}:00</div>
+        ))}
+      </div>
+
+      {days.map((d) => {
+        const key = d.toISOString().slice(0, 10);
+        const list = (apptsByDay.get(key) ?? []).sort((a, b) => +new Date(a.startAt) - +new Date(b.startAt));
+        return (
+          <div key={key} className="min-w-0">
+            {/* header día */}
+            <div className={`h-10 flex items-center justify-center rounded-md text-xs font-medium ${isToday(d) ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}>
+              {fmtDay.format(d)}
+            </div>
+            {/* grid del día */}
+            <div className="relative">
+              {hours.map((h) => (
+                <div key={h} className="h-16 border-t border-dashed border-border/60" />
+              ))}
+              <div className="absolute inset-0 p-1 space-y-2">
+                {list.map((a) => (
+                  <ApptCard key={a.id} appt={a} onSelect={onSelect} />
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ===================== Mes ===================== */
+
+function MonthView({
+  anchor,
+  appts,
+  onSelect,
+  fmtDay,
+}: {
+  anchor: Date;
+  appts: CalendarAppt[];
+  onSelect?: (id: string) => void;
+  fmtDay: Intl.DateTimeFormat;
+}) {
+  // construir matriz 6x7 (estándar)
+  const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const start = (() => {
+    const s = new Date(first);
+    const dow = s.getDay(); // 0=Dom
+    const delta = (dow === 0 ? -6 : 1 - dow);
+    s.setDate(s.getDate() + delta);
+    s.setHours(0, 0, 0, 0);
+    return s;
+  })();
+  const days = Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    return d;
+  });
+
+  const byKey = new Map<string, CalendarAppt[]>();
+  for (const a of appts) {
+    const k = a.startAt.slice(0, 10);
+    if (!byKey.has(k)) byKey.set(k, []);
+    byKey.get(k)!.push(a);
+  }
+  for (const [k, list] of byKey) {
+    list.sort((A, B) => +new Date(A.startAt) - +new Date(B.startAt));
+    byKey.set(k, list);
+  }
+
+  const inMonth = (d: Date) => d.getMonth() === anchor.getMonth();
+  const todayKey = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div className="grid grid-cols-7 gap-[6px]">
+      {["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map((h)=>(
+        <div key={h} className="text-xs text-muted-foreground px-1 py-1">{h}</div>
+      ))}
+      {days.map((d) => {
+        const k = d.toISOString().slice(0, 10);
+        const list = byKey.get(k) ?? [];
+        const isToday = k === todayKey;
+        return (
+          <div
+            key={k}
+            className={`min-h-24 rounded-md border p-1 ${inMonth(d) ? "" : "opacity-60"} ${isToday ? "ring-2 ring-primary/40" : ""}`}
+          >
+            <div className="mb-1 flex items-center justify-between">
+              <div className={`text-[11px] ${isToday ? "text-primary font-semibold" : "text-muted-foreground"}`}>
+                {d.getDate()}
+              </div>
+            </div>
+            <div className="space-y-1">
+              {list.slice(0, 3).map((a) => (
+                <MiniAppt key={a.id} appt={a} onSelect={onSelect} />
+              ))}
+              {list.length > 3 && (
+                <div className="text-[11px] text-muted-foreground">+{list.length - 3} más</div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ===================== Tarjetas ===================== */
+
+function ApptCard({ appt, onSelect }: { appt: CalendarAppt; onSelect?: (id: string) => void }) {
+  const start = new Date(appt.startAt);
+  const end = new Date(appt.endAt);
+  const time = `${pad2(start.getHours())}:${pad2(start.getMinutes())}–${pad2(end.getHours())}:${pad2(end.getMinutes())}`;
+  const bg =
+    appt.serviceColor && appt.serviceColor.startsWith("#")
+      ? appt.serviceColor
+      : undefined;
+
+  return (
+    <button
+      onClick={() => onSelect?.(appt.id)}
+      className="w-full rounded-xl px-3 py-2 text-left text-xs shadow-sm ring-1 ring-black/5 hover:opacity-95 transition"
+      style={{
+        background: appt.serviceColor && !appt.serviceColor.startsWith("#")
+          ? appt.serviceColor
+          : undefined,
+        backgroundColor: bg ?? "rgba(124,58,237,0.12)", // fallback morado suave
+      }}
+      title={appt.serviceName ?? "Cita"}
+    >
+      <div className="font-medium truncate">{appt.serviceName ?? "Cita"}</div>
+      <div className="opacity-80">{time}</div>
+      {appt.employeeName && <div className="opacity-70 truncate">{appt.employeeName}</div>}
+      {appt.resourceName && <div className="opacity-60 truncate">{appt.resourceName}</div>}
+    </button>
+  );
+}
+
+function MiniAppt({ appt, onSelect }: { appt: CalendarAppt; onSelect?: (id: string) => void }) {
+  const start = new Date(appt.startAt);
+  const time = `${pad2(start.getHours())}:${pad2(start.getMinutes())}`;
+  return (
+    <button
+      onClick={() => onSelect?.(appt.id)}
+      className="w-full rounded-md px-2 py-1 text-left text-[11px] ring-1 ring-black/5 hover:opacity-95"
+      style={{
+        background: appt.serviceColor && !appt.serviceColor.startsWith("#")
+          ? appt.serviceColor
+          : undefined,
+        backgroundColor: appt.serviceColor?.startsWith("#") ? appt.serviceColor : "rgba(124,58,237,0.12)",
+      }}
+      title={appt.serviceName ?? "Cita"}
+    >
+      <span className="font-medium">{time}</span>{" "}
+      <span className="truncate">{appt.serviceName ?? "Cita"}</span>
+    </button>
+  );
+}
+
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
 }
