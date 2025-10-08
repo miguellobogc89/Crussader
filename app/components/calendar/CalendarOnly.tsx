@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, CalendarDays, Calendar as CalendarIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 
 export type CalendarAppt = {
@@ -24,6 +24,7 @@ type Props = {
   onChangeDate: (d: Date) => void;
   appointments?: CalendarAppt[];
   onSelectAppointment?: (id: string) => void;
+  onEditAppointmentId?: (id: string) => void;
 };
 
 export default function CalendarOnly({
@@ -33,8 +34,8 @@ export default function CalendarOnly({
   onChangeDate,
   appointments = [],
   onSelectAppointment,
+  onEditAppointmentId,
 }: Props) {
-  // estado interno sincronizado con la prop (controlado)
   const [view, setView] = useState<View>(selectedView);
   useEffect(() => setView(selectedView), [selectedView]);
 
@@ -81,7 +82,6 @@ export default function CalendarOnly({
   function handleChangeView(v: View) {
     setView(v);
     onChangeView?.(v);
-    // al pasar a semana, alinear a lunes
     if (v === "week") onChangeDate(startOfWeekMon(selectedDate));
   }
 
@@ -116,46 +116,56 @@ export default function CalendarOnly({
     return map;
   }, [appointments]);
 
-  // ============ UI HEADER ============
+  // ============ LAYOUT: header fijo + grid con scroll ============
+
   return (
-    <div className="flex h-full w-full flex-col">
-      {/* Controles */}
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={goPrev}><ChevronLeft className="h-4 w-4" /></Button>
-          <Button variant="outline" onClick={goToday}>Hoy</Button>
-          <Button variant="outline" size="icon" onClick={goNext}><ChevronRight className="h-4 w-4" /></Button>
-          <div className="ml-3 text-sm font-medium capitalize">{monthTitle}</div>
+    <div className="cal-shell h-full flex flex-col">
+      {/* CABECERA FIJA: controles + cabecera días (semana/mes) */}
+      <div className="cal-header sticky top-0 z-20 bg-white border-b border-border">
+        {/* Controles */}
+        <div className="px-3 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={goPrev}><ChevronLeft className="h-4 w-4" /></Button>
+            <Button variant="outline" onClick={goToday}>Hoy</Button>
+            <Button variant="outline" size="icon" onClick={goNext}><ChevronRight className="h-4 w-4" /></Button>
+            <div className="ml-3 text-sm font-medium capitalize">{monthTitle}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant={view === "day" ? "default" : "outline"} onClick={() => handleChangeView("day")}>Día</Button>
+            <Button variant={view === "week" ? "default" : "outline"} onClick={() => handleChangeView("week")}>Semana</Button>
+            <Button variant={view === "month" ? "default" : "outline"} onClick={() => handleChangeView("month")}>Mes</Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={view === "day" ? "default" : "outline"}
-            onClick={() => handleChangeView("day")}
-          >
-            Día
-          </Button>
-          <Button
-            variant={view === "week" ? "default" : "outline"}
-            onClick={() => handleChangeView("week")}
-          >
-            Semana
-          </Button>
-          <Button
-            variant={view === "month" ? "default" : "outline"}
-            onClick={() => handleChangeView("month")}
-          >
-            Mes
-          </Button>
-        </div>
+
+        {/* Cabecera de días (semana) */}
+        {view === "week" && (
+          <div className="px-3 pb-3">
+            <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] gap-2">
+              <div />{/* hueco para la columna de horas */}
+              {weekDays.map((d) => (
+                <div
+                  key={d.toISOString()}
+                  className={`h-10 flex items-center justify-center rounded-md text-xs font-medium ${
+                    sameDay(d, new Date()) ? "bg-primary/10 text-primary" : "text-muted-foreground"
+                  }`}
+                  title={fmtDay.format(d)}
+                >
+                  {fmtDay.format(d)}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Contenido */}
-      <div className="min-h-0 flex-1 rounded-lg border bg-background p-3">
+      {/* GRID SCROLLABLE */}
+      <div className="cal-grid flex-1 overflow-auto px-3 pb-3">
         {view === "day" && (
           <DayView
             date={selectedDate}
             appts={apptsByDay.get(selectedDate.toISOString().slice(0, 10)) ?? []}
             onSelect={onSelectAppointment}
+            onEdit={onEditAppointmentId}
             fmtHour={fmtHour}
           />
         )}
@@ -165,9 +175,8 @@ export default function CalendarOnly({
             days={weekDays}
             apptsByDay={apptsByDay}
             onSelect={onSelectAppointment}
-            fmtDay={fmtDay}
+            onEdit={onEditAppointmentId}
             fmtHour={fmtHour}
-            isToday={(d) => sameDay(d, new Date())}
           />
         )}
 
@@ -176,7 +185,7 @@ export default function CalendarOnly({
             anchor={selectedDate}
             appts={appointments}
             onSelect={onSelectAppointment}
-            fmtDay={fmtDay}
+            onEdit={onEditAppointmentId}
           />
         )}
       </div>
@@ -190,11 +199,13 @@ function DayView({
   date,
   appts,
   onSelect,
+  onEdit,
   fmtHour,
 }: {
   date: Date;
   appts: CalendarAppt[];
   onSelect?: (id: string) => void;
+  onEdit?: (id: string) => void;
   fmtHour: Intl.DateTimeFormat;
 }) {
   const hours = Array.from({ length: 12 }, (_, i) => 8 + i); // 08..19
@@ -202,12 +213,15 @@ function DayView({
 
   return (
     <div className="grid grid-cols-[64px_1fr] gap-2 h-full">
+      {/* Columna horas */}
       <div className="flex flex-col">
         {hours.map((h) => (
           <div key={h} className="h-16 text-xs text-muted-foreground">{String(h).padStart(2, "0")}:00</div>
         ))}
       </div>
-      <div className="relative">
+
+      {/* Columna del día */}
+      <div className="relative overflow-hidden">
         {/* líneas de hora */}
         {hours.map((h) => (
           <div key={h} className="h-16 border-t border-dashed border-border/60" />
@@ -215,7 +229,7 @@ function DayView({
         {/* tarjetas */}
         <div className="absolute inset-0 p-1">
           {apptsSorted.map((a) => (
-            <ApptCard key={a.id} appt={a} onSelect={onSelect} />
+            <ApptCard key={a.id} appt={a} onSelect={onSelect} onEdit={onEdit} />
           ))}
         </div>
       </div>
@@ -229,16 +243,14 @@ function WeekView({
   days,
   apptsByDay,
   onSelect,
-  fmtDay,
+  onEdit,
   fmtHour,
-  isToday,
 }: {
   days: Date[];
   apptsByDay: Map<string, CalendarAppt[]>;
   onSelect?: (id: string) => void;
-  fmtDay: Intl.DateTimeFormat;
+  onEdit?: (id: string) => void;
   fmtHour: Intl.DateTimeFormat;
-  isToday: (d: Date) => boolean;
 }) {
   const hours = Array.from({ length: 12 }, (_, i) => 8 + i); // 08..19
 
@@ -246,29 +258,27 @@ function WeekView({
     <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] gap-2 h-full">
       {/* columna horas */}
       <div className="flex flex-col">
+        {/* hueco de cabecera ya está arriba (sticky) */}
         <div className="h-10" />
         {hours.map((h) => (
           <div key={h} className="h-16 text-xs text-muted-foreground">{String(h).padStart(2, "0")}:00</div>
         ))}
       </div>
 
+      {/* columnas de días (sin header aquí, ya está sticky arriba) */}
       {days.map((d) => {
         const key = d.toISOString().slice(0, 10);
         const list = (apptsByDay.get(key) ?? []).sort((a, b) => +new Date(a.startAt) - +new Date(b.startAt));
         return (
           <div key={key} className="min-w-0">
-            {/* header día */}
-            <div className={`h-10 flex items-center justify-center rounded-md text-xs font-medium ${isToday(d) ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}>
-              {fmtDay.format(d)}
-            </div>
             {/* grid del día */}
-            <div className="relative">
+            <div className="relative overflow-hidden">
               {hours.map((h) => (
                 <div key={h} className="h-16 border-t border-dashed border-border/60" />
               ))}
               <div className="absolute inset-0 p-1 space-y-2">
                 {list.map((a) => (
-                  <ApptCard key={a.id} appt={a} onSelect={onSelect} />
+                  <ApptCard key={a.id} appt={a} onSelect={onSelect} onEdit={onEdit} />
                 ))}
               </div>
             </div>
@@ -285,12 +295,12 @@ function MonthView({
   anchor,
   appts,
   onSelect,
-  fmtDay,
+  onEdit,
 }: {
   anchor: Date;
   appts: CalendarAppt[];
   onSelect?: (id: string) => void;
-  fmtDay: Intl.DateTimeFormat;
+  onEdit?: (id: string) => void;
 }) {
   // construir matriz 6x7 (estándar)
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
@@ -324,7 +334,7 @@ function MonthView({
 
   return (
     <div className="grid grid-cols-7 gap-[6px]">
-      {["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map((h)=>(
+      {["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map((h)=>( // cabecera mes (no sticky necesaria)
         <div key={h} className="text-xs text-muted-foreground px-1 py-1">{h}</div>
       ))}
       {days.map((d) => {
@@ -343,7 +353,7 @@ function MonthView({
             </div>
             <div className="space-y-1">
               {list.slice(0, 3).map((a) => (
-                <MiniAppt key={a.id} appt={a} onSelect={onSelect} />
+                <MiniAppt key={a.id} appt={a} onSelect={onSelect} onEdit={onEdit} />
               ))}
               {list.length > 3 && (
                 <div className="text-[11px] text-muted-foreground">+{list.length - 3} más</div>
@@ -358,7 +368,9 @@ function MonthView({
 
 /* ===================== Tarjetas ===================== */
 
-function ApptCard({ appt, onSelect }: { appt: CalendarAppt; onSelect?: (id: string) => void }) {
+function ApptCard({
+  appt, onSelect, onEdit,
+}: { appt: CalendarAppt; onSelect?: (id: string) => void; onEdit?: (id: string) => void; }) {
   const start = new Date(appt.startAt);
   const end = new Date(appt.endAt);
   const time = `${pad2(start.getHours())}:${pad2(start.getMinutes())}–${pad2(end.getHours())}:${pad2(end.getMinutes())}`;
@@ -370,6 +382,7 @@ function ApptCard({ appt, onSelect }: { appt: CalendarAppt; onSelect?: (id: stri
   return (
     <button
       onClick={() => onSelect?.(appt.id)}
+      onDoubleClick={() => onEdit?.(appt.id)}
       className="w-full rounded-xl px-3 py-2 text-left text-xs shadow-sm ring-1 ring-black/5 hover:opacity-95 transition"
       style={{
         background: appt.serviceColor && !appt.serviceColor.startsWith("#")
@@ -387,12 +400,15 @@ function ApptCard({ appt, onSelect }: { appt: CalendarAppt; onSelect?: (id: stri
   );
 }
 
-function MiniAppt({ appt, onSelect }: { appt: CalendarAppt; onSelect?: (id: string) => void }) {
+function MiniAppt({
+  appt, onSelect, onEdit,
+}: { appt: CalendarAppt; onSelect?: (id: string) => void; onEdit?: (id: string) => void; }) {
   const start = new Date(appt.startAt);
   const time = `${pad2(start.getHours())}:${pad2(start.getMinutes())}`;
   return (
     <button
       onClick={() => onSelect?.(appt.id)}
+      onDoubleClick={() => onEdit?.(appt.id)}
       className="w-full rounded-md px-2 py-1 text-left text-[11px] ring-1 ring-black/5 hover:opacity-95"
       style={{
         background: appt.serviceColor && !appt.serviceColor.startsWith("#")

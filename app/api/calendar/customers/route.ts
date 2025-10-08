@@ -89,40 +89,51 @@ export async function POST(req: NextRequest) {
 
     if (!companyId || !firstName || !lastName || !phone) {
       return NextResponse.json(
-        {
-          ok: false,
-          error: "companyId, firstName, lastName y phone son obligatorios",
-        },
+        { ok: false, error: "companyId, firstName, lastName y phone son obligatorios" },
         { status: 400 }
       );
     }
 
-    // Crea el cliente + relación con la company
-    const customer = await prisma.customer.create({
-      data: {
-        firstName,
-        lastName,
-        phone,
-        email: email || null,
-        companies: {
-          create: {
-            companyId,
-          },
-        },
+    const emailNorm = (email || "").trim().toLowerCase();
+    const phoneNorm = (phone || "").trim();
+
+    // 1) Buscar existente por email o por phone
+    const existing = await prisma.customer.findFirst({
+      where: {
+        OR: [
+          ...(emailNorm ? [{ email: emailNorm }] : []),
+          ...(phoneNorm ? [{ phone: phoneNorm }] : []),
+        ],
       },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        email: true,
-      },
+      select: { id: true, firstName: true, lastName: true, phone: true, email: true },
     });
 
-    return NextResponse.json({ ok: true, customer });
+    let customer = existing;
+
+    if (!customer) {
+      // 2) Crear si no existe
+      customer = await prisma.customer.create({
+        data: {
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          phone: phoneNorm,
+          email: emailNorm || null,
+        },
+        select: { id: true, firstName: true, lastName: true, phone: true, email: true },
+      });
+    }
+
+    // 3) Asegurar vínculo con la company (N:M)
+    await prisma.companyCustomer.upsert({
+      where: { companyId_customerId: { companyId, customerId: customer.id } },
+      update: {},
+      create: { companyId, customerId: customer.id },
+    });
+
+    return NextResponse.json({ ok: true, customer, existed: !!existing });
   } catch (e: any) {
     return NextResponse.json(
-      { ok: false, error: e.message || "Error al crear cliente" },
+      { ok: false, error: e.message || "Error al crear/recuperar cliente" },
       { status: 500 }
     );
   }

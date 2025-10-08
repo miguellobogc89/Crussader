@@ -1,3 +1,5 @@
+// app/components/calendar/EmployeeList.tsx
+
 "use client";
 
 import { Badge } from "@/app/components/ui/badge";

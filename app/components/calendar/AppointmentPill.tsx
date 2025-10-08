@@ -7,12 +7,13 @@ type PillProps = {
   subtitle?: string;          // p.ej. profesional o sillón
   color?: string | null;      // color del servicio si lo tienes
   onClick?: () => void;
+  onDoubleClick?: () => void;
 };
 const fmtTime = (iso: string) =>
   new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" })
     .format(new Date(iso));
 
-export default function AppointmentPill({ startAtISO, title, subtitle, color, onClick }: PillProps) {
+export default function AppointmentPill({ startAtISO, title, subtitle, color, onClick,onDoubleClick, }: PillProps) {
   const bg = color?.startsWith("#")
     ? { backgroundColor: color }
     : { backgroundImage: "linear-gradient(135deg, #7C3AED, #A78BFA)" }; // morado por defecto
@@ -20,6 +21,7 @@ export default function AppointmentPill({ startAtISO, title, subtitle, color, on
   return (
     <button
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
       className="w-full rounded-xl px-2.5 py-1.5 text-left shadow-sm hover:shadow transition
                  ring-1 ring-black/5 focus:outline-none focus-visible:ring-2"
       style={bg}

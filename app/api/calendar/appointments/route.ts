@@ -1,3 +1,5 @@
+// app/api/calendar/route.ts
+
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
@@ -137,6 +139,10 @@ export async function POST(req: Request) {
       notes,
       employeeId,
       resourceId,
+
+      // NUEVO: relación con cliente
+      customerId,
+      customer, // { firstName, lastName, phone, email? }
     } = body ?? {};
 
     if (!locationId || !serviceId || !startAt) {
@@ -215,29 +221,129 @@ export async function POST(req: Request) {
       }
     }
 
-    const safeStatus: AppointmentStatus =
-      Object.values(AppointmentStatus).includes(status) ? status : AppointmentStatus.BOOKED;
+    // =========================
+    // NUEVO: Resolver/crear cliente y vincular a la company
+    // =========================
+    let resolvedCustomerId: string | null = null;
+    let resolvedName: string | null = customerName ?? null;
+    let resolvedPhone: string | null = customerPhone ?? null;
+    let resolvedEmail: string | null = (customerEmail || null) as string | null;
 
-    const created = await prisma.appointment.create({
-      data: {
-        locationId,
-        serviceId,
-        startAt: start,
-        endAt: end,
-        status: safeStatus,
-        employeeId: employeeId || null,
-        resourceId: resourceId || null,
-        customerName: customerName || null,
-        customerPhone: customerPhone || null,
-        customerEmail: customerEmail || null,
-        notes: notes || null,
-      },
-      select: { id: true, startAt: true, endAt: true, status: true },
+    await prisma.$transaction(async (tx) => {
+      if (customerId) {
+        // Asegurar vínculo N:M con company
+        await tx.companyCustomer.upsert({
+          where: { companyId_customerId: { companyId: loc.companyId, customerId } },
+          update: {},
+          create: { companyId: loc.companyId, customerId },
+        });
+        resolvedCustomerId = customerId;
+
+        // Completar datos visuales si no vinieron en body
+        if (!resolvedName || !resolvedPhone || !resolvedEmail) {
+          const c = await tx.customer.findUnique({
+            where: { id: customerId },
+            select: { firstName: true, lastName: true, phone: true, email: true },
+          });
+          if (c) {
+            if (!resolvedName) resolvedName = `${c.firstName} ${c.lastName}`.trim();
+            if (!resolvedPhone) resolvedPhone = c.phone ?? null;
+            if (!resolvedEmail) resolvedEmail = c.email ?? null;
+          }
+        }
+      } else if (customer?.firstName && customer?.lastName && customer?.phone) {
+        const emailNorm = (customer.email || "").trim().toLowerCase();
+        const phoneNorm = customer.phone.trim();
+
+        const existing = await tx.customer.findFirst({
+          where: {
+            OR: [
+              ...(emailNorm ? [{ email: emailNorm }] : []),
+              ...(phoneNorm ? [{ phone: phoneNorm }] : []),
+            ],
+          },
+          select: { id: true, firstName: true, lastName: true, phone: true, email: true },
+        });
+
+        if (existing) {
+          resolvedCustomerId = existing.id;
+          // Usar datos del existente si no vinieron en body
+          if (!resolvedName) resolvedName = `${existing.firstName} ${existing.lastName}`.trim();
+          if (!resolvedPhone) resolvedPhone = existing.phone ?? null;
+          if (!resolvedEmail) resolvedEmail = existing.email ?? null;
+        } else {
+          const created = await tx.customer.create({
+            data: {
+              firstName: customer.firstName.trim(),
+              lastName: customer.lastName.trim(),
+              phone: phoneNorm,
+              email: emailNorm || null,
+            },
+            select: { id: true, firstName: true, lastName: true, phone: true, email: true },
+          });
+          resolvedCustomerId = created.id;
+          if (!resolvedName) resolvedName = `${created.firstName} ${created.lastName}`.trim();
+          if (!resolvedPhone) resolvedPhone = created.phone ?? null;
+          if (!resolvedEmail) resolvedEmail = created.email ?? null;
+        }
+
+        // Vincular a la company
+        await tx.companyCustomer.upsert({
+          where: { companyId_customerId: { companyId: loc.companyId, customerId: resolvedCustomerId } },
+          update: {},
+          create: { companyId: loc.companyId, customerId: resolvedCustomerId },
+        });
+      } else {
+        // Back-compat: si no hay customerId ni bloque customer, seguimos con los campos sueltos
+        // (customerName/Phone/Email ya vienen en el body)
+      }
+
+      // =========================
+      // Crear la cita (con FK y campos "plano" para la UI actual)
+      // =========================
+      const safeStatus: AppointmentStatus =
+        Object.values(AppointmentStatus).includes(status) ? status : AppointmentStatus.BOOKED;
+
+      const created = await tx.appointment.create({
+        data: {
+          locationId,
+          serviceId,
+          startAt: start,
+          endAt: end,
+          status: safeStatus,
+          employeeId: employeeId || null,
+          resourceId: resourceId || null,
+
+          // NUEVO: FK a Customer
+          customerId: resolvedCustomerId,
+
+          // Back-compat para tu UI actual
+          customerName: resolvedName || null,
+          customerPhone: resolvedPhone || null,
+          customerEmail: resolvedEmail || null,
+
+          notes: notes || null,
+        },
+        select: { id: true, startAt: true, endAt: true, status: true },
+      });
+
+      // Respuesta
+      return created;
     });
 
-    return NextResponse.json({ ok: true, item: created });
+    // Nota: la transacción devuelve el último "return created"; pero como no lo capturamos fuera,
+    // hacemos una ligera consulta para responder igual que antes (opcional)
+    // Para mantener tu shape actual:
+    const createdLookup = await prisma.appointment.findFirst({
+      where: { locationId, startAt: start, endAt: end },
+      select: { id: true, startAt: true, endAt: true, status: true },
+      orderBy: { id: "desc" },
+    });
+
+    return NextResponse.json({ ok: true, item: createdLookup });
   } catch (err: any) {
     console.error("[calendar.appointments.POST] error", err);
     return NextResponse.json({ ok: false, error: err?.message || "Internal error" }, { status: 500 });
   }
 }
+
