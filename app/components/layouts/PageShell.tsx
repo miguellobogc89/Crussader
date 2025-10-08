@@ -1,4 +1,3 @@
-// app/components/layouts/PageShell.tsx
 "use client";
 
 import { ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -18,7 +17,7 @@ function BodySkeleton() {
   );
 }
 
-/** Barra superior mínima con botón "volver" (izq) y badge (dcha). */
+/** Barra superior superpuesta (overlay): flecha + badge. */
 function TopBackBar({
   fallbackHref = "/dashboard",
   className = "",
@@ -42,25 +41,22 @@ function TopBackBar({
   );
 
   const onBack = () => {
-    if (canGoBack) {
-      router.back();
-      return;
-    }
-    if (pathname !== fallbackHref) {
-      router.push(fallbackHref);
-    }
+    if (canGoBack) return router.back();
+    if (pathname !== fallbackHref) router.push(fallbackHref);
   };
 
   return (
     <div
-      className={`sticky top-0 z-20 w-full bg-white ${className}`}
+      className={[
+        // overlay absoluto, no ocupa alto
+        "pointer-events-none absolute inset-x-0 top-0 z-40",
+        className,
+      ].join(" ")}
       role="navigation"
       aria-label="Barra de navegación superior"
     >
-      {/* full-bleed para pegar la flecha al borde izquierdo */}
       <div className="px-2 sm:px-3">
         <div className="h-10 flex items-center justify-between">
-          {/* Flecha volver (izquierda) */}
           <button
             type="button"
             onClick={onBack}
@@ -68,19 +64,19 @@ function TopBackBar({
             aria-label={canGoBack ? "Volver" : "Ir al panel"}
             title={canGoBack ? "Volver" : "Ir al panel"}
             className={[
-              "inline-flex h-9 w-9 items-center justify-center rounded-md",
-              "hover:bg-foreground/5 focus:outline-none focus:ring-2 focus:ring-ring",
+              "pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-md",
+              "bg-white/80 backdrop-blur shadow-sm",
+              "hover:bg-white focus:outline-none focus:ring-2 focus:ring-ring",
               "disabled:opacity-40 disabled:cursor-not-allowed",
             ].join(" ")}
           >
             <ArrowLeft className="h-5 w-5" strokeWidth={2.25} />
           </button>
 
-          {/* Badge discreta para identificar páginas con PageShell (derecha) */}
           {showShellBadge && (
             <span
               className="pointer-events-none select-none inline-flex h-6 items-center rounded-full border px-2 text-xs font-medium
-                         border-emerald-200 bg-emerald-50 text-emerald-700"
+                         border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm"
               title="Esta página usa PageShell"
               aria-label="Usa PageShell"
             >
@@ -103,7 +99,9 @@ export default function PageShell({
   children,
   variant = "default",
   backFallback = "/dashboard",
-  showShellBadge = true, // puedes ponerlo a false por página si quieres ocultarlo
+  showShellBadge = true,
+  /** ➕ permite ocultar la cabecera grande del shell */
+  hideHeaderArea = false,
 }: {
   title: string;
   description?: string;
@@ -115,35 +113,26 @@ export default function PageShell({
   variant?: "default" | "full" | "narrow";
   backFallback?: string;
   showShellBadge?: boolean;
+  hideHeaderArea?: boolean;
 }) {
   const router = useRouter();
   const shellRef = useRef<HTMLDivElement | null>(null);
 
-  // Prefetch en hover / primer toque para enlaces internos dentro del shell
   useEffect(() => {
     const el = shellRef.current;
     if (!el) return;
-
     const handler = (evt: Event) => {
       const target = evt.target as HTMLElement | null;
       const a = target?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!a) return;
-
       const href = a.getAttribute("href") || "";
       if (!href.startsWith("/")) return;
       if ((a as any).__prefetched) return;
       (a as any).__prefetched = true;
-
-      try {
-        router.prefetch(href);
-      } catch {
-        // best-effort
-      }
+      try { router.prefetch(href); } catch {}
     };
-
     el.addEventListener("mouseover", handler, { passive: true });
     el.addEventListener("touchstart", handler, { passive: true });
-
     return () => {
       el.removeEventListener("mouseover", handler as any);
       el.removeEventListener("touchstart", handler as any);
@@ -151,27 +140,25 @@ export default function PageShell({
   }, [router]);
 
   return (
-    <div ref={shellRef} className="relative w-full">
-      {/* === BARRA SUPERIOR TRANSPARENTE: flecha + badge === */}
+    <div ref={shellRef} className="relative w-full h-full">
       <TopBackBar fallbackHref={backFallback} showShellBadge={showShellBadge} />
 
-      {/* === Spinner limitado al contenedor de página === */}
-      <RouteTransitionOverlay scope="container" className="z-30" />
+      <RouteTransitionOverlay scope="container" className="z-50" />
 
-      {/* HEADER superior (translúcido), contenido centrado */}
-      <div className="w-full bg-white backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <PageHeader
-            title={title}
-            description={description}
-            breadcrumbs={breadcrumbs}
-            actions={actions}
-          />
-          {toolbar && <div className="mt-4">{toolbar}</div>}
+      {!hideHeaderArea && (
+        <div className="w-full bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <PageHeader
+              title={title}
+              description={description}
+              breadcrumbs={breadcrumbs}
+              actions={actions}
+            />
+            {toolbar && <div className="mt-4">{toolbar}</div>}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* BANDA FULL-WIDTH: blanco sólido + borde inferior */}
       {headerBand && (
         <div className="w-full bg-white border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
@@ -180,7 +167,6 @@ export default function PageShell({
         </div>
       )}
 
-      {/* BODY */}
       <Suspense
         fallback={
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

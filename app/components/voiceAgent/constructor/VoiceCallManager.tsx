@@ -294,8 +294,8 @@ export function useVoiceCallManager(): ManagerReturn {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: opts.model ?? "gpt-4o-realtime-preview",
-            voice: opts.voice ?? "alloy",
+            model: opts.model ?? "gpt-realtime",
+            voice: opts.voice ?? "marin",
             instructions: opts.instructions,
             temperature: 0.6,
           }),

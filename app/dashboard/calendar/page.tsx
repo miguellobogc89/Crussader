@@ -1,10 +1,12 @@
-// app/dashboard/calendar/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 
 import PageShell from "@/app/components/layouts/PageShell";
 import { SidebarProvider } from "@/app/components/ui/sidebar";
+import { Button } from "@/app/components/ui/button";
+import { Plus, Settings } from "lucide-react";
+import Link from "next/link";
 
 import ResourceStatus, { type Employee, type Resource } from "@/app/components/calendar/ResourceStatus";
 import CalendarHeader from "@/app/components/calendar/CalendarHeader";
@@ -171,9 +173,7 @@ export default function CalendarPage() {
       if (!res.ok || data.error) { setListMsg(`❌ ${data.error || "Error"}`); setAppointments([]); return; }
       const items = Array.isArray(data.items) ? data.items : [];
       setAppointments(items); setSelectedReserva(items[0] ?? null); setListMsg(`✅ ${items.length} citas`);
-    } catch (e: any) {
-      if (!ac.signal.aborted) { setListMsg(`❌ ${e.message}`); setAppointments([]); }
-    }
+    } catch (e: any) { if (!ac.signal.aborted) { setListMsg(`❌ ${e.message}`); setAppointments([]); } }
   }
 
   async function fetchEmployees() {
@@ -230,32 +230,50 @@ export default function CalendarPage() {
     if (full) { setEditingAppt(full); setShowEdit(true); }
   };
 
+  /* ===== Acciones del encabezado de página (PageHeader) ===== */
+  const headerActions = (
+    <div className="flex items-center gap-2">
+      <Button
+        className="bg-gradient-to-r from-primary to-accent hover:opacity-90 shadow"
+        onClick={() => setShowCreate(true)}
+        disabled={!locationId}
+        title={locationId ? "Nueva cita" : "Selecciona una ubicación"}
+      >
+        <Plus className="h-4 w-4 mr-2" />
+        Nueva cita
+      </Button>
+      <Button asChild variant="outline" size="icon" title="Ajustes">
+        <Link href="/dashboard/calendar/settings">
+          <Settings className="h-4 w-4" />
+        </Link>
+      </Button>
+    </div>
+  );
+
   return (
     <SidebarProvider>
-      <PageShell title="Calendario" description="" variant="full">
-        {/* GRID: header (auto) + contenido (1fr) → sin scroll por header */}
-        <div className="grid h-[100dvh] grid-rows-[auto_1fr] min-h-0">
-          {/* Header dentro de la grid */}
-          <CalendarHeader
-            companies={companies}
-            selectedCompanyId={selectedCompanyId}
-            onSelectCompany={(id) => {
-              setSavedCompanyId(id);
-              setSavedLocationId(null as any);
-              setSelectedCompanyId(id);
-              setAppointments([]); setEmployees([]); setResources([]); setServices([]); setListMsg("");
-            }}
-            locations={locations}
-            locationsLoading={locationsLoading}
-            locationId={locationId}
-            onChangeLocation={(v) => { setLocationId(v); setSavedLocationId(v); }}
-            onCreateAppointment={() => setShowCreate(true)}
-            settingsHref="/dashboard/calendar/settings"
-            disableCreate={!locationId}
-          />
+      {/* PageHeader muestra: título + botones (actions) */}
+      <PageShell title="Calendario" description="" actions={headerActions} variant="full" showShellBadge={false}>
+        {/* Banda debajo del PageHeader: empresa + ubicación (sin botones) */}
+        <CalendarHeader
+          companies={companies}
+          selectedCompanyId={selectedCompanyId}
+          onSelectCompany={(id) => {
+            setSavedCompanyId(id);
+            setSavedLocationId(null as any);
+            setSelectedCompanyId(id);
+            setAppointments([]); setEmployees([]); setResources([]); setServices([]); setListMsg("");
+          }}
+          locations={locations}
+          locationsLoading={locationsLoading}
+          locationId={locationId}
+          onChangeLocation={(v) => { setLocationId(v); setSavedLocationId(v); }}
+          showActions={false}          // ⬅️ botones ya están en PageHeader
+        />
 
-          {/* Contenido ocupa exactamente pantalla - header */}
-          <div className="min-h-0 overflow-hidden px-0">
+        {/* Contenido a pantalla: manejamos scrolls internos */}
+        <div className="grid h-[calc(100dvh-140px)] grid-rows-[1fr] min-h-0">
+          <div className="min-h-0 overflow-hidden">
             <div className="flex h-full gap-4 overflow-hidden">
               {/* Izquierda — panel unificado colapsable */}
               <div className="shrink-0">
@@ -295,7 +313,6 @@ export default function CalendarPage() {
                   onSelectAppointmentId={handleSelectAppointmentId}
                   onEditAppointmentId={handleEditAppointmentId}
                 />
-
                 <CalendarRight appointment={selectedReserva} services={services} />
               </div>
             </div>

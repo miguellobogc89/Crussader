@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useLayoutEffect, useRef } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { Building2, ChevronDown, Plus, Settings } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
@@ -8,9 +8,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/app/components/ui/dropdown-menu";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/app/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
 
 export type CompanyLite = {
   id: string;
@@ -31,12 +29,12 @@ type Props = {
   locationId: string;
   onChangeLocation: (v: string) => void;
 
-  onCreateAppointment: () => void;
+  onCreateAppointment?: () => void;
   settingsHref?: string;
   disableCreate?: boolean;
 
-  /** ➕ nuevo: notifica la altura real del header (en px) */
-  onMeasureHeight?: (px: number) => void;
+  /** Si es true, muestra los botones (Nueva cita + engranaje). Por defecto false */
+  showActions?: boolean;
 };
 
 export default function CalendarHeader({
@@ -50,27 +48,8 @@ export default function CalendarHeader({
   onCreateAppointment,
   settingsHref = "/dashboard/calendar/settings",
   disableCreate = false,
-  onMeasureHeight,
+  showActions = false,
 }: Props) {
-  const rootRef = useRef<HTMLDivElement | null>(null);
-
-  // mide altura al montar y al redimensionar
-  useLayoutEffect(() => {
-    function measure() {
-      if (!rootRef.current) return;
-      const h = rootRef.current.getBoundingClientRect().height;
-      onMeasureHeight?.(Math.round(h));
-    }
-    measure();
-    // re-medir en resize (y fuentes/cambios de zoom)
-    window.addEventListener("resize", measure);
-    const id = window.setInterval(measure, 400); // fallback por si cambia contenido
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.clearInterval(id);
-    };
-  }, [onMeasureHeight]);
-
   const selectedCompany = useMemo(
     () => companies.find((c) => c.id === selectedCompanyId) ?? companies[0],
     [companies, selectedCompanyId]
@@ -81,10 +60,9 @@ export default function CalendarHeader({
     "linear-gradient(135deg, #A78BFA 0%, #F472B6 100%)";
 
   return (
-    <div ref={rootRef} className="w-full border ">
-      {/* línea única */}
+    <div className="w-full bg-white border-b border-border">
       <div className="flex items-center justify-between py-2 gap-3">
-        {/* IZQ: empresa + ubicación (select largo) */}
+        {/* IZQ: empresa + ubicación */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <CompanyPickerCompact
             companies={companies}
@@ -103,30 +81,32 @@ export default function CalendarHeader({
           />
         </div>
 
-        {/* DER: acciones */}
-        <div className="flex items-center gap-2 shrink-0">
-          <Button
-            className="bg-gradient-to-r from-primary to-accent hover:opacity-90 shadow"
-            onClick={onCreateAppointment}
-            disabled={disableCreate}
-            title={disableCreate ? "Selecciona una ubicación" : "Nueva cita"}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nueva cita
-          </Button>
+        {/* DER: acciones (opcionales) */}
+        {showActions && (
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              className="bg-gradient-to-r from-primary to-accent hover:opacity-90 shadow"
+              onClick={onCreateAppointment}
+              disabled={disableCreate}
+              title={disableCreate ? "Selecciona una ubicación" : "Nueva cita"}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva cita
+            </Button>
 
-          <Button asChild variant="outline" size="icon" title="Ajustes">
-            <Link href={settingsHref}>
-              <Settings className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
+            <Button asChild variant="outline" size="icon" title="Ajustes">
+              <Link href={settingsHref}>
+                <Settings className="h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-/* --------- Subcomponentes compactos --------- */
+/* --------- Subcomponentes --------- */
 
 function CompanyPickerCompact({
   companies, selected, onSelect, dotStyle,
