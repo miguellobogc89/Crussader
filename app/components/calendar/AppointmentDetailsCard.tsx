@@ -1,13 +1,14 @@
+// app/components/calendar/AppointmentDetailsCard.tsx
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Label } from "@/app/components/ui/label";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
-import { Calendar as CalIcon, Phone, Tag, MapPin, Clock, Mail, Users, Boxes } from "lucide-react";
+import { Calendar as CalIcon, Phone, MapPin, Clock, Mail, Users, Boxes } from "lucide-react";
 import { useMemo } from "react";
 
-/** Tipos locales para no depender de la page */
+/** Tipos locales */
 type EmployeeLite = { id: string; name?: string | null };
 type ResourceLite = { id: string; name?: string | null };
 
@@ -17,16 +18,12 @@ type AppointmentAny = {
   startAt: string;
   endAt: string;
   status?: "PENDING" | "BOOKED" | "COMPLETED" | "CANCELLED" | "NO_SHOW" | string | null;
-  // cliente
   customerName?: string | null;
   customerPhone?: string | null;
   customerEmail?: string | null;
-  // notas/comentario
   notes?: string | null;
-  // variantes de servicio
   serviceId?: string | null;
   service?: { id: string; name: string; durationMin: number; color?: string | null } | null;
-  // asignaciones
   employees?: EmployeeLite[];
   resources?: ResourceLite[];
 };
@@ -35,7 +32,7 @@ type ServiceLite = { id: string; name: string; durationMin: number; color?: stri
 
 type Props = {
   appointment: AppointmentAny | null;
-  services: ServiceLite[]; // catálogo para resolver serviceId si no viene appointment.service
+  services: ServiceLite[];
 };
 
 function AppointmentDetailsCard({ appointment, services }: Props) {
@@ -68,7 +65,7 @@ function AppointmentDetailsCard({ appointment, services }: Props) {
 
   if (!appointment) {
     return (
-      <Card className="shadow-lg border-0 bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm">
+      <Card className="bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CalIcon className="h-5 w-5 text-primary" />
@@ -88,7 +85,6 @@ function AppointmentDetailsCard({ appointment, services }: Props) {
   const start = safeDate(appointment.startAt);
   const end = safeDate(appointment.endAt);
 
-  // Resolver servicio: primero el embebido, si no, por serviceId en catálogo
   const service =
     appointment.service ||
     (appointment.serviceId ? services.find((s) => s.id === appointment.serviceId) || null : null);
@@ -97,11 +93,13 @@ function AppointmentDetailsCard({ appointment, services }: Props) {
   const resources = appointment.resources ?? [];
 
   return (
-    <Card className="shadow-lg border-0 bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm">
+    <Card className="bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <CalIcon className="h-5 w-5 text-primary" />
-          Detalles de la Reserva
+          <span className="truncate font-semibold">
+            {service ? service.name : "Reserva sin servicio"}
+          </span>
         </CardTitle>
       </CardHeader>
 
@@ -116,33 +114,18 @@ function AppointmentDetailsCard({ appointment, services }: Props) {
           {/* Inicio / Fin */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-sm font-medium text-muted-foreground">Hora de inicio</Label>
+              <Label className="text-sm font-medium text-muted-foreground">Inicio</Label>
               <p className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
                 <span className="font-semibold">{start ? fmtTime.format(start) : "—"}</span>
               </p>
             </div>
             <div>
-              <Label className="text-sm font-medium text-muted-foreground">Hora de fin</Label>
+              <Label className="text-sm font-medium text-muted-foreground">Fin</Label>
               <p className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
                 <span className="font-semibold">{end ? fmtTime.format(end) : "—"}</span>
               </p>
-            </div>
-          </div>
-
-          {/* Servicio */}
-          <div>
-            <Label className="text-sm font-medium text-muted-foreground">Servicio</Label>
-            <div className="flex items-center gap-2">
-              <Tag className="h-4 w-4" />
-              {service ? (
-                <span className="font-semibold">
-                  {service.name} · {service.durationMin} min
-                </span>
-              ) : (
-                <span className="font-semibold">{appointment.serviceId || "—"}</span>
-              )}
             </div>
           </div>
 
@@ -155,32 +138,33 @@ function AppointmentDetailsCard({ appointment, services }: Props) {
             </div>
           </div>
 
-          {/* Comentario (usa notes) */}
+          {/* Recursos y Empleados en horizontal */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <Label className="text-sm font-medium text-muted-foreground">Recursos</Label>
+              <p className="text-sm flex items-center gap-2">
+                <Boxes className="h-4 w-4" />
+                {resources.length
+                  ? resources.map((r) => r.name || r.id).join(", ")
+                  : "—"}
+              </p>
+            </div>
+
+            <div className="flex-1">
+              <Label className="text-sm font-medium text-muted-foreground">Empleados</Label>
+              <p className="text-sm flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                {employees.length
+                  ? employees.map((e) => e.name || e.id).join(", ")
+                  : "—"}
+              </p>
+            </div>
+          </div>
+
+          {/* Comentario */}
           <div>
             <Label className="text-sm font-medium text-muted-foreground">Comentario</Label>
             <p className="text-sm">{appointment.notes?.trim() || "—"}</p>
-          </div>
-
-          {/* Recursos */}
-          <div>
-            <Label className="text-sm font-medium text-muted-foreground">Recursos</Label>
-            <p className="text-sm flex items-center gap-2">
-              <Boxes className="h-4 w-4" />
-              {resources.length
-                ? resources.map((r) => r.name || r.id).join(", ")
-                : "—"}
-            </p>
-          </div>
-
-          {/* Empleados */}
-          <div>
-            <Label className="text-sm font-medium text-muted-foreground">Empleados</Label>
-            <p className="text-sm flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              {employees.length
-                ? employees.map((e) => e.name || e.id).join(", ")
-                : "—"}
-            </p>
           </div>
 
           {/* Cliente */}

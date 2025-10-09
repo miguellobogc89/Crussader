@@ -1,4 +1,3 @@
-// app/dashboard/finance/kam-simulator/page.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -14,12 +13,39 @@ import { BarChart3, Coins, Users, TrendingUp, Calendar } from "lucide-react";
 import {
   LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from "recharts";
+import ResultsTable from "@/app/components/admin/finance/ResultsTable";
 
-/* ---- Tooltip personalizado ---- */
+const formatEUR = (value: number) =>
+  value.toLocaleString("es-IS", { // <- typo deliberado? NO! usar es-ES:
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: true,
+  });
+// corregimos:
+const formatEUR2 = (value: number) =>
+  value.toLocaleString("es-ES", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: true,
+  });
+
+const formatEUR0 = (value: number) =>
+  value.toLocaleString("es-ES", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+    useGrouping: true,
+  });
+
+/* ---- Tooltip gráfico ---- */
 function KamTooltip({ active, payload, label }: any) {
   if (!active || !payload || payload.length === 0) return null;
   const d = payload[0].payload;
-
   return (
     <div className="rounded-lg border bg-white/95 p-3 shadow-md text-sm">
       <div className="font-semibold mb-2">{label}</div>
@@ -31,97 +57,184 @@ function KamTooltip({ active, payload, label }: any) {
         <span className="text-right">{d.paiaUnits.toLocaleString("es-ES")}</span>
 
         <span className="text-slate-500">Facturación mes</span>
-        <span className="text-right">
-          {d.fact.toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })}
-        </span>
+        <span className="text-right">{formatEUR2(d.fact)}</span>
 
         <span className="text-slate-500 font-medium">KAM cobra (mes)</span>
         <span className="text-right font-semibold text-pink-600">
-          {d.kamEarn.toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })}
+          {formatEUR0(d.kamEarn)}
         </span>
       </div>
     </div>
   );
 }
 
+function Indicators({
+  totalImporte,
+  totalEmpresaMes,
+  totalBeneficioEmpresaMes,
+  totalKam,
+}: {
+  totalImporte: number;
+  totalEmpresaMes: number;
+  totalBeneficioEmpresaMes: number;
+  totalKam: number;
+}) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-4">
+      <div className="p-4 border rounded-xl bg-indigo-50 text-indigo-700">
+        <p className="text-sm font-semibold uppercase flex gap-2 items-center">
+          <BarChart3 className="w-4 h-4" /> Importe anual total (ventas nuevas)
+        </p>
+        <p className="text-2xl font-bold mt-2">{formatEUR2(totalImporte)}</p>
+      </div>
+      <div className="p-4 border rounded-xl bg-emerald-50 text-emerald-700">
+        <p className="text-sm font-semibold uppercase flex gap-2 items-center">
+          <BarChart3 className="w-4 h-4" /> Empresa (anual)
+        </p>
+        <p className="text-2xl font-bold mt-2">{formatEUR2(totalEmpresaMes)}</p>
+      </div>
+      <div className="p-4 border rounded-xl bg-blue-50 text-blue-700">
+        <p className="text-sm font-semibold uppercase flex gap-2 items-center">
+          <BarChart3 className="w-4 h-4" /> Beneficio empresa (anual, -25%)
+        </p>
+        <p className="text-2xl font-bold mt-2">{formatEUR2(totalBeneficioEmpresaMes)}</p>
+      </div>
+      <div className="p-4 border rounded-xl bg-pink-50 text-pink-700">
+        <p className="text-sm font-semibold uppercase flex gap-2 items-center">
+          <Users className="w-4 h-4" /> Renta KAM total (año)
+        </p>
+        <p className="text-2xl font-bold mt-2">{formatEUR0(totalKam)}</p>
+      </div>
+    </div>
+  );
+}
+
+function KamChart({ data }: { data: any[] }) {
+  return (
+    <div className="h-80 mt-8">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
+          <XAxis dataKey="name" />
+          <YAxis tickFormatter={(v) => formatEUR0(Number(v))} width={80} />
+          <Tooltip content={<KamTooltip />} />
+          <Line
+            type="monotone"
+            dataKey="kamEarn"
+            stroke="#EC4899"
+            strokeWidth={3}
+            dot={false}
+            name="KAM cobra (mes)"
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 export default function KamSimulatorPage() {
-  /* ===== Estados base ===== */
+  // Estados
   const [pvpPCR, setPvpPCR] = useState(39);
   const [pvpPAIA, setPvpPAIA] = useState(149);
-  const [salesPCR, setSalesPCR] = useState(20); // uds/mes base
-  const [salesPAIA, setSalesPAIA] = useState(5); // uds/mes base
-  const [growth, setGrowth] = useState(8); // % mensual (num)
-  const [vacationMonth, setVacationMonth] = useState("none"); // ese mes ventas=0
+  const [salesPCR, setSalesPCR] = useState(20);
+  const [salesPAIA, setSalesPAIA] = useState(5);
+  const [growth, setGrowth] = useState(8);
+  const [vacationMonth, setVacationMonth] = useState("none");
 
   const months = [
     "Enero","Febrero","Marzo","Abril","Mayo","Junio",
     "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
   ];
 
-  /* ===== Cálculo mensual con comisión 1/3 + 1/3 + 1/3 ===== */
+  // Cálculos
   const data = useMemo(() => {
-    // 1) Primero calculamos unidades, importes y facturación mensual "pura"
+    // 1) Ventas del mes (unidades enteras) y facturación del mes
     const base = months.map((m, i) => {
       const isVacation = vacationMonth !== "none" && months.indexOf(vacationMonth) === i;
       const mult = isVacation ? 0 : 1 + (growth / 100) * i;
 
-      // Unidades enteras
-      const pcrUnits = Math.round(salesPCR * mult);
+      const pcrUnits  = Math.round(salesPCR  * mult);
       const paiaUnits = Math.round(salesPAIA * mult);
 
-      const importePCR = pcrUnits * pvpPCR;
+      const importePCR  = pcrUnits  * pvpPCR;
       const importePAIA = paiaUnits * pvpPAIA;
-      const fact = importePCR + importePAIA;
+      const fact = importePCR + importePAIA; // ventas NUEVAS del mes
 
-      return {
-        name: m,
-        pcrUnits,
-        paiaUnits,
-        importePCR,
-        importePAIA,
-        fact,
-      };
+      return { name: m, pcrUnits, paiaUnits, importePCR, importePAIA, fact };
     });
 
-    // 2) Ahora aplicamos la renta del KAM como 17% de la suma de 1/3 de los 3 últimos meses
-    const COMM = 0.17;
+    // 2) Renta KAM (1/3 del mes + 1/3 del mes-1 + 1/3 del mes-2)
     const rows = base.map((row, i) => {
-      const f0 = base[i]?.fact ?? 0;        // mes actual
-      const f1 = base[i - 1]?.fact ?? 0;    // mes anterior
-      const f2 = base[i - 2]?.fact ?? 0;    // dos meses antes
-
-      const kamEarn = COMM * ((f0 / 3) + (f1 / 3) + (f2 / 3));
-
-      return {
-        ...row,
-        kamEarn,
-      };
+      const f0 = base[i]?.fact ?? 0;
+      const f1 = base[i - 1]?.fact ?? 0;
+      const f2 = base[i - 2]?.fact ?? 0;
+      const kamEarn = (f0 + f1 + f2) / 3;
+      return { ...row, kamEarn };
     });
 
-    // 3) Acumulados
+    // 3) Acumulados y cálculo de MRR (Importe acumulado) + Empresa (mes)
+    let accPCRUnits = 0;
+    let accPAIAUnits = 0;
     let accUnits = 0;
-    let accImporte = 0;
-    let accKAM = 0;
 
     return rows.map((row) => {
-      const monthUnits = row.pcrUnits + row.paiaUnits;
-      accUnits += monthUnits;
-      accImporte += row.fact;
-      accKAM += row.kamEarn;
+      accPCRUnits += row.pcrUnits;
+      accPAIAUnits += row.paiaUnits;
+      accUnits     += row.pcrUnits + row.paiaUnits;
+
+      // ⚠️ Importe acumulado = MRR del mes = (acum PCR * PVP PCR) + (acum PAIA * PVP PAIA)
+      const accImporte = accPCRUnits * pvpPCR + accPAIAUnits * pvpPAIA;
+
+      // ✅ Empresa (mes) = Importe acumulado - Renta KAM (mes)
+      const empresaMes = accImporte - row.kamEarn;
+
+      // ✅ Beneficio empresa (mes) = Empresa (mes) * 0.75
+      const beneficioEmpresaMes = empresaMes * 0.75;
+
+      const pctKamOverBeneficio =
+        beneficioEmpresaMes > 0 ? row.kamEarn / beneficioEmpresaMes : 0;
 
       return {
         ...row,
         accUnits,
-        accImporte,
-        accKAM,
+        accImporte,              // esto es lo que enseñas en "Importe acumulado"
+        empresaMes,
+        beneficioEmpresaMes,
+        pctKamOverBeneficio,
       };
     });
-  }, [pvpPCR, pvpPAIA, salesPCR, salesPAIA, growth, vacationMonth, months]);
+  }, [pvpPCR, pvpPAIA, salesPCR, salesPAIA, growth, vacationMonth]);
 
-  const totalImporte = useMemo(() => data.reduce((a, b) => a + b.fact, 0), [data]);
-  const totalKAM = useMemo(() => data.reduce((a, b) => a + b.kamEarn, 0), [data]);
 
-  /* ===== Render ===== */
+  const totals = useMemo(() => {
+    const totalPcrUnits       = data.reduce((a, b) => a + b.pcrUnits, 0);
+    const totalPaiaUnits      = data.reduce((a, b) => a + b.paiaUnits, 0);
+    const totalImportePCR     = data.reduce((a, b) => a + b.importePCR, 0);
+    const totalImportePAIA    = data.reduce((a, b) => a + b.importePAIA, 0);
+    const totalAccUnits       = data.length ? data[data.length - 1].accUnits : 0;
+    const totalAccImporte     = data.length ? data[data.length - 1].accImporte : 0; // <-- MRR final
+    const totalEmpresaMes     = data.reduce((a, b) => a + b.empresaMes, 0);
+    const totalBeneficioEmp   = data.reduce((a, b) => a + b.beneficioEmpresaMes, 0);
+    const totalKam            = data.reduce((a, b) => a + b.kamEarn, 0);
+    const pctKamOverBeneficio = totalBeneficioEmp > 0 ? totalKam / totalBeneficioEmp : 0;
+
+    return {
+      totalPcrUnits,
+      totalPaiaUnits,
+      totalImportePCR,
+      totalImportePAIA,
+      totalAccUnits,
+      totalAccImporte,
+      totalEmpresaMes,
+      totalBeneficioEmpresaMes: totalBeneficioEmp,
+      totalKam,
+      pctKamOverBeneficio,
+    };
+  }, [data]);
+
+
+  const totalImporte = totals.totalAccImporte;
+
   return (
     <div className="p-8 space-y-10">
       <Card className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 border border-indigo-100 shadow-lg">
@@ -133,8 +246,8 @@ export default function KamSimulatorPage() {
                 Simulador de Rentabilidad por KAM
               </CardTitle>
               <CardDescription>
-                La gráfica muestra <b>lo que cobra el KAM cada mes</b> con <b>pago 1/3+1/3+1/3</b>.
-                En vacaciones, aunque no haya ventas, el KAM cobra los tercios pendientes.
+                Gráfica: renta mensual del KAM con regla <b>1/3 + 1/3 + 1/3</b>.  
+                En vacaciones, si hay tercios pendientes, el KAM sigue cobrando.
               </CardDescription>
             </div>
           </div>
@@ -143,7 +256,7 @@ export default function KamSimulatorPage() {
         <CardContent className="space-y-8">
           {/* Parámetros */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Precio PCR */}
+            {/* PCR */}
             <div className="p-4 border rounded-xl bg-white/60 shadow-sm space-y-3">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
@@ -155,7 +268,7 @@ export default function KamSimulatorPage() {
               <Slider value={[pvpPCR]} onValueChange={(v) => setPvpPCR(v[0])} min={10} max={100} step={1} />
             </div>
 
-            {/* Precio PAIA */}
+            {/* PAIA */}
             <div className="p-4 border rounded-xl bg-white/60 shadow-sm space-y-3">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
@@ -167,23 +280,18 @@ export default function KamSimulatorPage() {
               <Slider value={[pvpPAIA]} onValueChange={(v) => setPvpPAIA(v[0])} min={50} max={300} step={1} />
             </div>
 
-            {/* % Incremento mensual */}
+            {/* % incremento */}
             <div className="p-4 border rounded-xl bg-white/60 shadow-sm space-y-3">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="text-green-500" />
                   <h3 className="font-medium">% Incremento mensual</h3>
                 </div>
-                <Input
-                  type="number"
-                  value={growth}
-                  onChange={(e) => setGrowth(Number(e.target.value))}
-                  className="w-24 text-right"
-                />
+                <Input type="number" value={growth} onChange={(e) => setGrowth(Number(e.target.value))} className="w-24 text-right" />
               </div>
             </div>
 
-            {/* Ventas base PCR */}
+            {/* Ventas PCR */}
             <div className="p-4 border rounded-xl bg-white/60 shadow-sm space-y-3">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
@@ -195,7 +303,7 @@ export default function KamSimulatorPage() {
               <Slider value={[salesPCR]} onValueChange={(v) => setSalesPCR(v[0])} min={0} max={100} step={1} />
             </div>
 
-            {/* Ventas base PAIA */}
+            {/* Ventas PAIA */}
             <div className="p-4 border rounded-xl bg-white/60 shadow-sm space-y-3">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
@@ -229,37 +337,21 @@ export default function KamSimulatorPage() {
             </div>
           </div>
 
-          {/* KPIs totales */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-            <div className="p-4 border rounded-xl bg-indigo-50 text-indigo-700">
-              <p className="text-sm font-semibold uppercase flex gap-2 items-center">
-                <BarChart3 className="w-4 h-4" /> Importe anual total
-              </p>
-              <p className="text-2xl font-bold mt-2">
-                {totalImporte.toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })}
-              </p>
-            </div>
-            <div className="p-4 border rounded-xl bg-pink-50 text-pink-700">
-              <p className="text-sm font-semibold uppercase flex gap-2 items-center">
-                <Users className="w-4 h-4" /> Comisión KAM total (año)
-              </p>
-              <p className="text-2xl font-bold mt-2">
-                {totalKAM.toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })}
-              </p>
-            </div>
-          </div>
+          {/* Indicadores */}
+          <Indicators
+            totalImporte={totalImporte}
+            totalEmpresaMes={totals.totalEmpresaMes}
+            totalBeneficioEmpresaMes={totals.totalBeneficioEmpresaMes}
+            totalKam={totals.totalKam}
+          />
 
-          {/* Gráfica: renta mensual KAM con 1/3+1/3+1/3 */}
+          {/* Gráfico */}
           <div className="h-80 mt-8">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
                 <XAxis dataKey="name" />
-                <YAxis
-                  tickFormatter={(v) =>
-                    Number(v).toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })
-                  }
-                />
+                <YAxis tickFormatter={(v) => formatEUR0(Number(v))} width={80} />
                 <Tooltip content={<KamTooltip />} />
                 <Line
                   type="monotone"
@@ -273,71 +365,8 @@ export default function KamSimulatorPage() {
             </ResponsiveContainer>
           </div>
 
-          {/* Tabla completa */}
-          <div className="overflow-x-auto mt-10">
-            <table className="min-w-full text-sm border-collapse">
-              <thead className="bg-indigo-100 text-indigo-800">
-                <tr>
-                  <th className="px-3 py-2 text-left">Mes</th>
-                  <th className="px-3 py-2 text-right">uds PCR</th>
-                  <th className="px-3 py-2 text-right">Importe PCR</th>
-                  <th className="px-3 py-2 text-right">uds PAIA</th>
-                  <th className="px-3 py-2 text-right">Importe PAIA</th>
-                  <th className="px-3 py-2 text-right">uds Acumuladas</th>
-                  <th className="px-3 py-2 text-right">Importe acumulado</th>
-                  <th className="px-3 py-2 text-right">Renta KAM (mes)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((r) => (
-                  <tr key={r.name} className="odd:bg-white even:bg-indigo-50/50">
-                    <td className="px-3 py-2">{r.name}</td>
-                    <td className="px-3 py-2 text-right">{r.pcrUnits.toLocaleString("es-ES")}</td>
-                    <td className="px-3 py-2 text-right">
-                      {r.importePCR.toLocaleString("es-ES", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-3 py-2 text-right">{r.paiaUnits.toLocaleString("es-ES")}</td>
-                    <td className="px-3 py-2 text-right">
-                      {r.importePAIA.toLocaleString("es-ES", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-3 py-2 text-right">{r.accUnits.toLocaleString("es-ES")}</td>
-                    <td className="px-3 py-2 text-right">
-                      {r.accImporte.toLocaleString("es-ES", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-3 py-2 text-right text-pink-600 font-medium">
-                      {r.kamEarn.toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-indigo-100 font-semibold text-indigo-800">
-                <tr>
-                  <td className="px-3 py-2">TOTAL</td>
-                  <td className="px-3 py-2 text-right">
-                    {data.reduce((a, b) => a + b.pcrUnits, 0).toLocaleString("es-ES")}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    {data.reduce((a, b) => a + b.importePCR, 0).toLocaleString("es-ES", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    {data.reduce((a, b) => a + b.paiaUnits, 0).toLocaleString("es-ES")}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    {data.reduce((a, b) => a + b.importePAIA, 0).toLocaleString("es-ES", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    {data[data.length - 1]?.accUnits.toLocaleString("es-ES")}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    {data[data.length - 1]?.accImporte.toLocaleString("es-ES", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    {totalKAM.toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          {/* Tabla */}
+          <ResultsTable data={data as any[]} totals={totals as any} />
         </CardContent>
       </Card>
     </div>

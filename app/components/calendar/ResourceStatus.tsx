@@ -101,7 +101,7 @@ export default function ResourceStatus({
       </div>
 
       {/* Contenido */}
-      <div className="flex-1 overflow-auto px-2 py-3">
+      <div className="flex-1 overflow-auto px-5 py-3">
         {/* Empleados */}
         <SectionHeader icon={<Users className="h-4 w-4 text-primary" />} title="Empleados" collapsed={collapsed}>
           {!collapsed && employeeStatusText && (

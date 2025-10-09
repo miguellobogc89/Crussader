@@ -1,6 +1,8 @@
+// app/dashboard/products/page.tsx
 "use client";
 
 import { useState } from "react";
+import PageShell from "@/app/components/layouts/PageShell";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/app/components/ui/card";
@@ -9,8 +11,8 @@ import { Badge } from "@/app/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
 import {
   FaRobot, FaComments, FaPhone, FaClock, FaShare, FaHeart, FaWhatsapp, FaHeadset,
-  FaPenAlt, FaEye, FaEnvelope, FaChartLine, FaCalendarPlus, FaUserTie, FaCrown,
-  FaPlus, FaCog, FaShoppingCart, FaUsers, FaCalendarAlt, FaCreditCard, FaCheck, FaStar, FaBoxOpen,
+  FaPenAlt, FaEye, FaEnvelope, FaChartLine, FaCalendarPlus, FaUserTie,
+  FaPlus, FaCog, FaUsers, FaCalendarAlt, FaCreditCard, FaCheck, FaStar,
 } from "react-icons/fa";
 
 interface Product {
@@ -140,22 +142,17 @@ const categoryColors = {
   automation: "bg-blue-100 text-blue-800",
   analytics: "bg-green-100 text-green-800",
   communication: "bg-orange-100 text-orange-800",
-};
+} as const;
 
 const categoryNames = {
   ai: "Inteligencia Artificial",
   automation: "Automatización",
   analytics: "Análisis",
   communication: "Comunicación",
-};
+} as const;
 
-export default function ProductsPage() {
-  const [selectedTab, setSelectedTab] = useState("contracted");
-
-  const contractedProducts = products.filter(p => p.isContracted);
-  const availableProducts = products.filter(p => !p.isContracted);
-
-  const ProductCard = ({ product, isContracted }: { product: Product; isContracted: boolean }) => (
+function ProductCard({ product, isContracted }: { product: Product; isContracted: boolean }) {
+  return (
     <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-card via-card to-muted/20">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
@@ -193,57 +190,79 @@ export default function ProductsPage() {
             <FaCog className="h-4 w-4 mr-2" />
             {isContracted ? "Configurar" : "Contratar"}
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" aria-label={isContracted ? "Gestionar usuarios" : "Destacar"}>
             {isContracted ? <FaUsers className="h-4 w-4" /> : <FaStar className="h-4 w-4" />}
           </Button>
         </div>
       </CardContent>
     </Card>
   );
+}
+
+export default function ProductsPage() {
+  const [selectedTab, setSelectedTab] = useState<"contracted" | "available">("contracted");
+
+  const contractedProducts = products.filter((p) => p.isContracted);
+  const availableProducts = products.filter((p) => !p.isContracted);
 
   return (
-    <div className="p-6 space-y-6">
-      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-        <div className="flex justify-between items-center mb-6">
-          <TabsList className="grid w-auto grid-cols-2">
-            <TabsTrigger value="contracted" className="flex items-center gap-2">
-              <FaCheck className="h-4 w-4" />
-              Mis Productos ({contractedProducts.length})
-            </TabsTrigger>
-            <TabsTrigger value="available" className="flex items-center gap-2">
-              <FaPlus className="h-4 w-4" />
-              Disponibles ({availableProducts.length})
-            </TabsTrigger>
-          </TabsList>
+    <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as any)} className="w-full">
+      <PageShell
+        title="Productos"
+        description="Gestiona tus módulos contratados y descubre nuevas capacidades para tu negocio."
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Productos" },
+        ]}
+        /* Toolbar con los tabs y las acciones a la derecha */
+        toolbar={
+          <div className="flex justify-between items-center">
+            <TabsList className="grid w-auto grid-cols-2">
+              <TabsTrigger value="contracted" className="flex items-center gap-2">
+                <FaCheck className="h-4 w-4" />
+                Mis Productos ({contractedProducts.length})
+              </TabsTrigger>
+              <TabsTrigger value="available" className="flex items-center gap-2">
+                <FaPlus className="h-4 w-4" />
+                Disponibles ({availableProducts.length})
+              </TabsTrigger>
+            </TabsList>
 
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <FaCalendarAlt className="h-4 w-4 mr-2" />
-              Historial
-            </Button>
-            <Button variant="outline" size="sm">
-              <FaCreditCard className="h-4 w-4 mr-2" />
-              Facturación
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm">
+                <FaCalendarAlt className="h-4 w-4 mr-2" />
+                Historial
+              </Button>
+              <Button variant="outline" size="sm">
+                <FaCreditCard className="h-4 w-4 mr-2" />
+                Facturación
+              </Button>
+            </div>
           </div>
+        }
+        variant="default"
+        backFallback="/dashboard"
+        showShellBadge={true}
+      >
+        {/* BODY */}
+        <div className="space-y-6">
+          <TabsContent value="contracted" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              {contractedProducts.map((product) => (
+                <ProductCard key={product.id} product={product} isContracted />
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="available" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              {availableProducts.map((product) => (
+                <ProductCard key={product.id} product={product} isContracted={false} />
+              ))}
+            </div>
+          </TabsContent>
         </div>
-
-        <TabsContent value="contracted" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {contractedProducts.map(product => (
-              <ProductCard key={product.id} product={product} isContracted={true} />
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="available" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {availableProducts.map(product => (
-              <ProductCard key={product.id} product={product} isContracted={false} />
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
-    </div>
+      </PageShell>
+    </Tabs>
   );
 }

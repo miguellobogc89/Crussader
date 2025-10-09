@@ -2,16 +2,14 @@
 
 import CalendarOnly, { type CalendarAppt } from "@/app/components/calendar/CalendarOnly";
 
+type View = "day" | "threeDays" | "workingWeek" | "week" | "month";
+
 type Props = {
-  selectedView: "month" | "week" | "day";
-  setSelectedView: (v: "month" | "week" | "day") => void;
+  selectedView: View;
+  setSelectedView: (v: View) => void;
   selectedDate: Date;
   setSelectedDate: (d: Date) => void;
-  // ya no usamos la lista inferior, pero mantenemos los tipos por compat
-  appointments: any[];
   calendarAppts: CalendarAppt[];
-  fmtDayTitle: Intl.DateTimeFormat;
-  onSelectAppointment: (a: { id: string }) => void;
   onSelectAppointmentId: (id: string) => void;
   onEditAppointmentId: (id: string) => void;
 };
@@ -26,19 +24,24 @@ export default function CalendarCenter({
   onEditAppointmentId,
 }: Props) {
   return (
-    <div className="flex-1 min-w-0 flex flex-col">
+    // ocupa todo el alto disponible de su padre
+    <div className="flex-1 min-w-0 flex flex-col h-full">
       {/* Marco exterior único */}
-      <div className="flex-1 min-h-0 bg-white border border-border rounded-xl overflow-hidden">
-        {/* Solo calendario, sin lista inferior */}
-        <CalendarOnly
-          selectedView={selectedView}
-          onChangeView={setSelectedView}
-          selectedDate={selectedDate}
-          onChangeDate={(d) => d && setSelectedDate(d)}
-          appointments={calendarAppts}
-          onSelectAppointment={onSelectAppointmentId}
-          onEditAppointmentId={onEditAppointmentId}
-        />
+      <div className="relative flex-1 min-h-0 bg-white border border-border rounded-xl overflow-hidden">
+        {/* Capa de relleno a 100% alto; si sobra, scroll interno */}
+        <div className="absolute inset-0 overflow-auto">
+          <div className="h-full min-h-0 flex flex-col p-3">
+            <CalendarOnly
+              selectedView={selectedView}
+              onChangeView={(v: View) => setSelectedView(v)}
+              selectedDate={selectedDate}
+              onChangeDate={(d: Date) => setSelectedDate(d)}
+              appointments={calendarAppts}
+              onSelectAppointment={onSelectAppointmentId}
+              onEditAppointmentId={onEditAppointmentId}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

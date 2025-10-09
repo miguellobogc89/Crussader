@@ -4,14 +4,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import ChatPanelWithCall, { type ChatMessage } from "@/app/components/voiceAgent/constructor/ChatCallTestingPanel";
 import { useVoiceCallManager } from "@/app/components/voiceAgent/constructor/VoiceCallManager";
 import type { AgentGeneralSettings } from "@/app/components/voiceAgent/constructor/AgentGeneralSettingsPanel";
+import VoiceSettingsPanel, { type VoiceSettings } from "@/app/components/voiceAgent/constructor/VoiceSettingsPanel";
 
 type Phase = "INTRO" | "INTENT" | "COLLECT" | "CONFIRM" | "END";
-
-type VoiceSettings = {
-  model: string;
-  voice: string;
-  persona: string;
-};
 
 export default function ChatConfigurationShell({
   companyId,
@@ -67,7 +62,9 @@ export default function ChatConfigurationShell({
     let to: ReturnType<typeof setTimeout> | null = null;
     if (userTalkingRaw) {
       setAiTalkingSmooth(false);
-      return () => { if (to) clearTimeout(to); };
+      return () => {
+        if (to) clearTimeout(to);
+      };
     }
     if (aiTalkingRaw) {
       setAiTalkingSmooth(true);
@@ -76,7 +73,9 @@ export default function ChatConfigurationShell({
       to = setTimeout(() => setAiTalkingSmooth(false), 1000);
       aiGateUntil.current = Date.now() + 400;
     }
-    return () => { if (to) clearTimeout(to); };
+    return () => {
+      if (to) clearTimeout(to);
+    };
   }, [aiTalkingRaw, userTalkingRaw]);
 
   const gateActive = Date.now() < aiGateUntil.current;
@@ -116,16 +115,27 @@ export default function ChatConfigurationShell({
   const instructions = useMemo(() => {
     const lines: string[] = [];
     lines.push(`Eres un agente telefónico para la empresa "${companyName}".`);
-    lines.push(`Identidad: ${agentName || "Agente"}; estilo: ${settings.persona || "profesional y claro"}.`);
-    lines.push(`Sigue este flujo: INTRO → INTENT → COLLECT → CONFIRM → END. Frases breves y confirmación de datos.`);
+    lines.push(
+      `Identidad: ${agentName || "Agente"}; estilo: ${settings.persona || "profesional y claro"}.`
+    );
+    lines.push(
+      `Sigue este flujo: INTRO → INTENT → COLLECT → CONFIRM → END. Frases breves y confirmación de datos.`
+    );
     if (promptsByPhase?.INTRO) lines.push(`INTRO: ${promptsByPhase.INTRO}`);
     if (promptsByPhase?.INTENT) lines.push(`INTENT: ${promptsByPhase.INTENT}`);
     if (promptsByPhase?.COLLECT) lines.push(`COLLECT: ${promptsByPhase.COLLECT}`);
     if (promptsByPhase?.CONFIRM) lines.push(`CONFIRM: ${promptsByPhase.CONFIRM}`);
     if (promptsByPhase?.END) lines.push(`END: ${promptsByPhase.END}`);
-    if (!promptsByPhase?.INTRO && firstPromptFallback) lines.push(`Mensaje inicial sugerido: ${firstPromptFallback}`);
-    if (generalSettings.stickToKnowledge) lines.push(`CÍÑETE al knowledge de la empresa; si no dispones de la información, dilo y pregunta o deriva.`);
-    if (generalSettings.refusalGuard) lines.push(`No inventes datos. Si no estás seguro, dilo y solicita aclaración. Prioriza precisión a creatividad.`);
+    if (!promptsByPhase?.INTRO && firstPromptFallback)
+      lines.push(`Mensaje inicial sugerido: ${firstPromptFallback}`);
+    if (generalSettings.stickToKnowledge)
+      lines.push(
+        `CÍÑETE al knowledge de la empresa; si no dispones de la información, dilo y pregunta o deriva.`
+      );
+    if (generalSettings.refusalGuard)
+      lines.push(
+        `No inventes datos. Si no estás seguro, dilo y solicita aclaración. Prioriza precisión a creatividad.`
+      );
     lines.push(`Transcribe y responde en ${generalSettings.lang || "es-ES"} con puntuación correcta.`);
     return lines.join("\n");
   }, [companyName, agentName, settings.persona, promptsByPhase, firstPromptFallback, generalSettings]);
@@ -138,7 +148,12 @@ export default function ChatConfigurationShell({
         {/* Badges de estado (ya con suavizado/gate) */}
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white/70 px-3 py-2">
           <StatusBadge active={aiTalkingSmooth} label={aiTalkingSmooth ? "IA hablando" : "IA en silencio"} />
-          <StatusBadge active={!aiTalkingSmooth && !gateActive && (callState === "connected" && (micLevel ?? 0) > USER_THR)} label={"Usuario (VAD)"} />
+          <StatusBadge
+            active={
+              !aiTalkingSmooth && !gateActive && callState === "connected" && (micLevel ?? 0) > USER_THR
+            }
+            label={"Usuario (VAD)"}
+          />
         </div>
 
         <ChatPanelWithCall
@@ -183,7 +198,7 @@ export default function ChatConfigurationShell({
               voice: settings.voice,
               instructions,
               autoGreetText: intro,
-              tts: { rate: generalSettings.ttsRate }, // ⬅️ APLICAMOS RATE
+              tts: { rate: generalSettings.ttsRate },
               vad: {
                 mode: generalSettings.vadMode || "strict",
                 endOfSpeechMs: generalSettings.endOfSpeechMs || 800,
@@ -206,13 +221,9 @@ export default function ChatConfigurationShell({
         />
       </div>
 
-      {/* Ajustes mínimos de modelo/voz/persona (inline) */}
+      {/* Panel de ajustes de voz/modelo/persona (separado en componente) */}
       <div className="space-y-3">
-        <VoiceSettingsPanelInline
-          value={settings}
-          onChange={setSettings}
-          disabled={callBusy}
-        />
+        <VoiceSettingsPanel value={settings} onChange={setSettings} disabled={callBusy} />
       </div>
     </div>
   );
@@ -228,59 +239,5 @@ function StatusBadge({ active, label }: { active: boolean; label: string }) {
       <span className={`h-2 w-2 rounded-full ${active ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
       {label}
     </span>
-  );
-}
-
-function VoiceSettingsPanelInline({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: { model: string; voice: string; persona: string };
-  onChange: (v: { model: string; voice: string; persona: string }) => void;
-  disabled?: boolean;
-}) {
-  const set = (patch: Partial<typeof value>) => onChange({ ...value, ...patch });
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white/70 p-3 shadow-sm">
-      <div className="mb-2 text-sm font-semibold text-slate-900">Ajustes del agente</div>
-
-      <label className="mb-2 block text-xs font-medium text-slate-700">Modelo (Realtime)</label>
-      <select
-        className="mb-3 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm disabled:opacity-60"
-        value={value.model}
-        onChange={(e) => set({ model: e.target.value })}
-        disabled={disabled}
-      >
-        <option value="gpt-4o-realtime-preview">gpt-4o-realtime-preview</option>
-        <option value="gpt-4o-realtime-latest">gpt-4o-realtime-latest</option>
-      </select>
-
-      <label className="mb-2 block text-xs font-medium text-slate-700">Voz</label>
-      <select
-        className="mb-3 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm disabled:opacity-60"
-        value={value.voice}
-        onChange={(e) => set({ voice: e.target.value })}
-        disabled={disabled}
-      >
-        <option value="alloy">alloy</option>
-        <option value="verse">verse</option>
-        <option value="aria">aria</option>
-      </select>
-
-      <label className="mb-2 block text-xs font-medium text-slate-700">Persona / estilo</label>
-      <textarea
-        className="mb-2 h-24 w-full resize-none rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm disabled:opacity-60"
-        value={value.persona}
-        onChange={(e) => set({ persona: e.target.value })}
-        disabled={disabled}
-        placeholder="Tono de voz, actitud, formalidad…"
-      />
-
-      <p className="mt-2 text-[11px] leading-snug text-slate-500">
-        Los cambios aplican en la próxima llamada. Durante una llamada, los controles se bloquean.
-      </p>
-    </div>
   );
 }
