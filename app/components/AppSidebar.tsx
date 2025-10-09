@@ -55,7 +55,7 @@ const GROUPS: NavGroup[] = [
     title: "Productos y Servicios",
     icon: "📦",
     items: [
-      { title: "Contestador de reviews", href: "/dashboard/knowledge", icon: "📚", description: "Base de conocimiento" },
+      { title: "Conocimientos", href: "/dashboard/knowledge", icon: "📚", description: "Base de conocimiento" },
       { title: "Agentes de voz IA", href: "/dashboard/integrations-test", icon: "🎙️", description: "Conecta servicios" },
       { title: "Todos los productos", href: "/dashboard/products", icon: "📦", description: "Productos y servicios" },
       { title: "WebChat IA", href: "/dashboard/database", icon: "🗄️", description: "Conexiones y datos" },

@@ -1,6 +1,5 @@
 // app/components/calendar/CalendarOnly/types.ts
 
-// ✅ Tipo de cita que usamos en las vistas
 export type CalendarAppt = {
   id: string;
   startAt: string; // ISO
@@ -9,7 +8,14 @@ export type CalendarAppt = {
   serviceColor?: string | null;
   employeeName?: string | null;
   resourceName?: string | null;
+
+  // 👇 añadidos para SchedulerCalendar
+  status?: string | null;
+  serviceId?: string | null;
+  customerName?: string | null;
 };
 
-// ✅ Tipo de vista (lo usan ViewControls y el wrapper)
+// Alias para compatibilidad
+export type Appointment = CalendarAppt;
+
 export type View = "day" | "threeDays" | "workingWeek" | "week" | "month";

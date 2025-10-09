@@ -1,3 +1,4 @@
+// app/components/voiceAgent/constructor/ChatConfigurationShell.tsx
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -30,7 +31,11 @@ export default function ChatConfigurationShell({
     model: "gpt-4o-realtime-preview",
     voice: "alloy",
     persona: "Recepcionista cercana, clara y profesional.",
+    rate: 1.0,
   });
+
+  // Texto parcial de la IA (streaming)
+  const [aiPartial, setAiPartial] = useState<string>("");
 
   const {
     state,
@@ -50,7 +55,7 @@ export default function ChatConfigurationShell({
     state === "connected" ? "connected" : state === "connecting" ? "ringing" : "idle";
   const callBusy = state === "connecting" || state === "connected";
 
-  // --------- GATE anti-eco: bloquea STT mientras habla la IA y 400ms después
+  // Anti-eco UI
   const aiGateUntil = useRef<number>(0);
   const [aiTalkingSmooth, setAiTalkingSmooth] = useState(false);
 
@@ -62,9 +67,7 @@ export default function ChatConfigurationShell({
     let to: ReturnType<typeof setTimeout> | null = null;
     if (userTalkingRaw) {
       setAiTalkingSmooth(false);
-      return () => {
-        if (to) clearTimeout(to);
-      };
+      return () => { if (to) clearTimeout(to); };
     }
     if (aiTalkingRaw) {
       setAiTalkingSmooth(true);
@@ -73,40 +76,16 @@ export default function ChatConfigurationShell({
       to = setTimeout(() => setAiTalkingSmooth(false), 1000);
       aiGateUntil.current = Date.now() + 400;
     }
-    return () => {
-      if (to) clearTimeout(to);
-    };
+    return () => { if (to) clearTimeout(to); };
   }, [aiTalkingRaw, userTalkingRaw]);
 
-  const gateActive = Date.now() < aiGateUntil.current;
-
-  // --------- Filtro de “instrucciones disfrazadas de usuario”
-  function isInstructionyNoise(text: string) {
-    const t = (text || "").trim().toLowerCase();
-    if (!t) return true;
-    if (t.length <= 2) return true;
-    if (t.includes("transcribe en español")) return true;
-    if (t.includes("no traduzcas")) return true;
-    if (t.includes("usa puntuación")) return true;
-    if (/^usuario:/.test(t)) return true;
-    return false;
-  }
-
-  // --------- Mensajes visibles: aplicamos filtros
+  // Mostrar todo sin filtros
   const viewMessages = useMemo<ChatMessage[]>(
-    () =>
-      transcript
-        .filter((e) => {
-          if (e.who !== "user") return true;
-          if (gateActive || aiTalkingSmooth) return false;
-          if (isInstructionyNoise(e.text)) return false;
-          return true;
-        })
-        .map((e) => ({ who: e.who, text: e.text })),
-    [transcript, gateActive, aiTalkingSmooth]
+    () => transcript.map((e) => ({ who: e.who, text: e.text })),
+    [transcript]
   );
 
-  // --------- Prompts / instrucciones
+  // Prompts / instrucciones
   const intro = useMemo(
     () => promptsByPhase?.INTRO?.trim() || firstPromptFallback?.trim() || "Hola, soy su asistente.",
     [promptsByPhase, firstPromptFallback]
@@ -115,27 +94,16 @@ export default function ChatConfigurationShell({
   const instructions = useMemo(() => {
     const lines: string[] = [];
     lines.push(`Eres un agente telefónico para la empresa "${companyName}".`);
-    lines.push(
-      `Identidad: ${agentName || "Agente"}; estilo: ${settings.persona || "profesional y claro"}.`
-    );
-    lines.push(
-      `Sigue este flujo: INTRO → INTENT → COLLECT → CONFIRM → END. Frases breves y confirmación de datos.`
-    );
+    lines.push(`Identidad: ${agentName || "Agente"}; estilo: ${settings.persona || "profesional y claro"}.`);
+    lines.push(`Sigue este flujo: INTRO → INTENT → COLLECT → CONFIRM → END. Frases breves y confirmación de datos.`);
     if (promptsByPhase?.INTRO) lines.push(`INTRO: ${promptsByPhase.INTRO}`);
     if (promptsByPhase?.INTENT) lines.push(`INTENT: ${promptsByPhase.INTENT}`);
     if (promptsByPhase?.COLLECT) lines.push(`COLLECT: ${promptsByPhase.COLLECT}`);
     if (promptsByPhase?.CONFIRM) lines.push(`CONFIRM: ${promptsByPhase.CONFIRM}`);
     if (promptsByPhase?.END) lines.push(`END: ${promptsByPhase.END}`);
-    if (!promptsByPhase?.INTRO && firstPromptFallback)
-      lines.push(`Mensaje inicial sugerido: ${firstPromptFallback}`);
-    if (generalSettings.stickToKnowledge)
-      lines.push(
-        `CÍÑETE al knowledge de la empresa; si no dispones de la información, dilo y pregunta o deriva.`
-      );
-    if (generalSettings.refusalGuard)
-      lines.push(
-        `No inventes datos. Si no estás seguro, dilo y solicita aclaración. Prioriza precisión a creatividad.`
-      );
+    if (!promptsByPhase?.INTRO && firstPromptFallback) lines.push(`Mensaje inicial sugerido: ${firstPromptFallback}`);
+    if (generalSettings.stickToKnowledge) lines.push(`CÍÑETE al knowledge de la empresa; si no dispones de la información, dilo y pregunta o deriva.`);
+    if (generalSettings.refusalGuard) lines.push(`No inventes datos. Si no estás seguro, dilo y solicita aclaración. Prioriza precisión a creatividad.`);
     lines.push(`Transcribe y responde en ${generalSettings.lang || "es-ES"} con puntuación correcta.`);
     return lines.join("\n");
   }, [companyName, agentName, settings.persona, promptsByPhase, firstPromptFallback, generalSettings]);
@@ -145,15 +113,10 @@ export default function ChatConfigurationShell({
       <div className="space-y-4">
         <audio ref={audioRef} autoPlay playsInline />
 
-        {/* Badges de estado (ya con suavizado/gate) */}
+        {/* Badges de estado */}
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white/70 px-3 py-2">
           <StatusBadge active={aiTalkingSmooth} label={aiTalkingSmooth ? "IA hablando" : "IA en silencio"} />
-          <StatusBadge
-            active={
-              !aiTalkingSmooth && !gateActive && callState === "connected" && (micLevel ?? 0) > USER_THR
-            }
-            label={"Usuario (VAD)"}
-          />
+          <StatusBadge active={!aiTalkingSmooth && (callState === "connected" && (micLevel ?? 0) > USER_THR)} label={"Usuario (VAD)"} />
         </div>
 
         <ChatPanelWithCall
@@ -161,11 +124,7 @@ export default function ChatConfigurationShell({
           mode={mode}
           onModeChange={(m) => !callBusy && setMode(m)}
           messages={viewMessages}
-          draftUserText={
-            !generalSettings.showInterim || gateActive || isInstructionyNoise(partialText || "")
-              ? ""
-              : partialText || ""
-          }
+          draftUserText={partialText || ""}
           input={input}
           onInputChange={setInput}
           onSend={() => setInput("")}
@@ -177,7 +136,9 @@ export default function ChatConfigurationShell({
           lastError={error}
           aiSpeaking={aiTalkingSmooth}
           micLevel={micLevel}
+          aiPartialText={aiPartial}
           onStartCall={() => {
+            setAiPartial("");
             if (mode === "mic") {
               return connect({
                 localOnly: true,
@@ -191,6 +152,7 @@ export default function ChatConfigurationShell({
                   echoCancellation: true,
                   lang: generalSettings.lang || "es-ES",
                 },
+                onAiDelta: (txt: string) => setAiPartial(txt), // ✅ tipado
               } as any);
             }
             return connect({
@@ -198,7 +160,7 @@ export default function ChatConfigurationShell({
               voice: settings.voice,
               instructions,
               autoGreetText: intro,
-              tts: { rate: generalSettings.ttsRate },
+              tts: { rate: typeof settings.rate === "number" ? settings.rate : generalSettings.ttsRate },
               vad: {
                 mode: generalSettings.vadMode || "strict",
                 endOfSpeechMs: generalSettings.endOfSpeechMs || 800,
@@ -215,13 +177,17 @@ export default function ChatConfigurationShell({
                 refusalGuard: generalSettings.refusalGuard,
                 hallucinationGuard: generalSettings.hallucinationGuard,
               },
+              onAiDelta: (txt: string) => setAiPartial(txt), // ✅ tipado
             } as any);
           }}
-          onHangUp={disconnect}
+          onHangUp={() => {
+            setAiPartial("");
+            disconnect();
+          }}
         />
       </div>
 
-      {/* Panel de ajustes de voz/modelo/persona (separado en componente) */}
+      {/* Panel de ajustes de voz/modelo/persona */}
       <div className="space-y-3">
         <VoiceSettingsPanel value={settings} onChange={setSettings} disabled={callBusy} />
       </div>

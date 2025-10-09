@@ -1,15 +1,27 @@
 // app/components/reviews/ReviewsToolbar.tsx
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ArrowUpDown, Check } from "lucide-react";
-import ReviewsFilters, {
-  type ReviewsFiltersValue,
-} from "@/app/components/reviews/controls/ReviewsFilters";
+import ReviewsFilters, { type ReviewsFiltersValue } from "@/app/components/reviews/controls/ReviewsFilters";
+
+/** Comparación simple sin dependencias externas */
+function shallowArrayEqual(a: number[], b: number[]) {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+function filtersEqual(a: ReviewsFiltersValue, b: ReviewsFiltersValue) {
+  return (
+    a.unanswered === b.unanswered &&
+    a.withPhotos === b.withPhotos &&
+    shallowArrayEqual(a.stars, b.stars)
+  );
+}
 
 export type ReviewsToolbarProps = {
   className?: string;
-  // opcional: exponer cambios al padre (por si quieres disparar query)
   onFiltersChange?: (value: ReviewsFiltersValue) => void;
   onSearchChange?: (q: string) => void;
   onOrderChange?: (order: "recent" | "oldest" | "highest" | "lowest") => void;
@@ -21,7 +33,6 @@ export default function ReviewsToolbar({
   onSearchChange,
   onOrderChange,
 }: ReviewsToolbarProps) {
-  // estado local (puedes quitarlo si solo lo manejas desde props callbacks)
   const [filters, setFilters] = useState<ReviewsFiltersValue>({
     stars: [],
     unanswered: false,
@@ -30,27 +41,42 @@ export default function ReviewsToolbar({
 
   const [search, setSearch] = useState("");
   const [orderOpen, setOrderOpen] = useState(false);
-  const [orderBy, setOrderBy] = useState<"recent" | "oldest" | "highest" | "lowest">("recent");
+  const [orderBy, setOrderBy] =
+    useState<"recent" | "oldest" | "highest" | "lowest">("recent");
 
-  const handleFiltersChange = (v: ReviewsFiltersValue) => {
-    setFilters(v);
-    onFiltersChange?.(v);
-  };
+  /** Callback estable que evita setState redundante (corta el bucle) */
+  const handleFiltersChange = useCallback(
+    (v: ReviewsFiltersValue) => {
+      setFilters((prev) => {
+        if (filtersEqual(prev, v)) return prev; // no cambies estado si es igual
+        return v;
+      });
+      onFiltersChange?.(v);
+    },
+    [onFiltersChange]
+  );
 
-  const handleOrder = (val: "recent" | "oldest" | "highest" | "lowest") => {
-    setOrderBy(val);
-    setOrderOpen(false);
-    onOrderChange?.(val);
-  };
+  const handleOrder = useCallback(
+    (val: "recent" | "oldest" | "highest" | "lowest") => {
+      setOrderBy(val);
+      setOrderOpen(false);
+      onOrderChange?.(val);
+    },
+    [onOrderChange]
+  );
 
   return (
     <div className={className}>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         {/* (izquierda) filtros */}
-        <ReviewsFilters defaultValue={filters} onChange={handleFiltersChange} />
+        <ReviewsFilters
+          /** Si tu componente soporta 'value', mejor usar 'value' en vez de 'defaultValue' */
+          defaultValue={filters}
+          onChange={handleFiltersChange}
+        />
 
         {/* (derecha) búsqueda + ordenar */}
-        <div className="flex items-center gap-2 relative">
+        <div className="relative flex items-center gap-2">
           <input
             type="text"
             placeholder="Buscar por texto, autor…"
@@ -63,7 +89,6 @@ export default function ReviewsToolbar({
             className="w-64 rounded-md border bg-white px-3 py-2 text-sm outline-none"
           />
 
-          {/* botón de ordenar */}
           <button
             type="button"
             onClick={() => setOrderOpen((v) => !v)}
@@ -74,7 +99,7 @@ export default function ReviewsToolbar({
           </button>
 
           {orderOpen && (
-            <div className="absolute right-0 top-full mt-2 w-48 rounded-md border bg-white shadow-lg z-10">
+            <div className="absolute right-0 top-full z-10 mt-2 w-48 rounded-md border bg-white shadow-lg">
               <ul className="py-1 text-sm">
                 <li>
                   <button
@@ -117,12 +142,6 @@ export default function ReviewsToolbar({
           )}
         </div>
       </div>
-
-      {/* Debug opcional (quitar en prod)
-      <pre className="mt-2 text-xs text-muted-foreground">
-        {JSON.stringify({ filters, search, orderBy }, null, 2)}
-      </pre>
-      */}
     </div>
   );
 }

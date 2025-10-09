@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Star, MoreHorizontal, Send, RotateCcw, Edit3, ChevronLeft, ChevronRight } from "lucide-react";
+import { Star, Send, RotateCcw, Edit3, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
 import { Card, CardContent } from "@/app/components/ui/card";
@@ -12,7 +12,7 @@ interface Review {
   author: string;
   rating: number;
   content: string;
-  date: string;
+  date: string; // ISO recomendado
   avatar?: string;
 }
 
@@ -31,6 +31,25 @@ interface ReviewCardProps {
   review: Review;
   businessResponse?: BusinessResponse;
   responses?: BusinessResponse[];
+}
+
+/** “hace X”: días -> semanas (1-3) -> 1 mes */
+function timeAgo(dateStr: string) {
+  const dt = new Date(dateStr);
+  if (isNaN(dt.getTime())) return ""; // si no parsea, no mostramos nada
+  const now = new Date();
+  const diffMs = now.getTime() - dt.getTime();
+  const d = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (d <= 0) return "hoy";
+  if (d === 1) return "hace 1 día";
+  if (d < 7) return `hace ${d} días`;
+
+  const w = Math.floor(d / 7);
+  if (w === 1) return "hace 1 semana";
+  if (w <= 3) return `hace ${w} semanas`;
+
+  return "hace 1 mes"; // simplificado tal y como pediste
 }
 
 const StarRating = ({ rating }: { rating: number }) => (
@@ -120,7 +139,7 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
     }
     setResponseId(current.id ?? null);
     setRespText(String(current.content ?? ""));
-    setRespStatus(current.published ? "published" : current.status ?? "draft");
+    setRespStatus(current.published ? "published" : (current.status ?? "draft"));
     setRespEdited(Boolean(current.edited));
     setPublished(Boolean(current.published || current.status === "published"));
     setIsEditing(false);
@@ -179,10 +198,22 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
           templateId: "default-v1",
         }),
       });
-      const json = await res.json();
 
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        toast({
+          variant: "error",
+          title: "No se pudo generar",
+          description: text || `HTTP ${res.status}`,
+        });
+        return;
+      }
+
+      const json = await res.json().catch(() => ({}));
       let created: BusinessResponse | null = json?.response ?? null;
+
       if (!created?.content) {
+        // Fallback a latest si el backend no devolvió la respuesta creada
         const last = await fetch(`/api/reviews/${review.id}/responses?latest=1`, { cache: "no-store" })
           .then((r) => (r.ok ? r.json() : null))
           .catch(() => null);
@@ -190,11 +221,29 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
       }
 
       if (created?.content) {
+        if (/⚠️\s*Modo demo/i.test(created.content)) {
+          toast({
+            variant: "info",
+            title: "Modo demo activo",
+            description: "Se ha generado una respuesta de demostración. Revisa AI_MOCK, settings y el modelo.",
+          });
+        }
         setList((prev) => [created!, ...prev]);
         setIdx(0);
+      } else {
+        toast({
+          variant: "error",
+          title: "No se pudo generar",
+          description: "El servidor no devolvió contenido de respuesta.",
+        });
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("generate error", e);
+      toast({
+        variant: "error",
+        title: "Error generando",
+        description: String(e?.message || e),
+      });
     } finally {
       setLoading(false);
     }
@@ -229,8 +278,14 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
       setRespStatus("draft");
       setRespEdited(true);
       setIsEditing(false);
-    } catch (e) {
+      toast({ variant: "success", title: "Guardado", description: "Los cambios se han guardado." });
+    } catch (e: any) {
       console.error("save error", e);
+      toast({
+        variant: "error",
+        title: "No se pudo guardar",
+        description: String(e?.message || e),
+      });
     } finally {
       setLoading(false);
     }
@@ -310,6 +365,8 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
     setIdx((i) => (i >= list.length - 1 ? 0 : i + 1));
   };
 
+  const relative = timeAgo(review.date);
+
   return (
     <Card className="group hover:shadow-[var(--shadow-hover)] transition-all duration-300 border-border/50 bg-gradient-to-br from-card to-muted/20 w-full">
       <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-5">
@@ -324,17 +381,15 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
                 <h4 className="font-semibold text-foreground text-sm sm:text-base">{review.author}</h4>
                 <div className="flex items-center gap-2 mt-0.5 sm:mt-1">
                   <StarRating rating={review.rating} />
-                  <span className="text-[11px] sm:text-xs text-muted-foreground">{review.date}</span>
+                  {/* quitamos la fecha en texto plano aquí */}
                 </div>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 sm:h-9 sm:w-9"
-            >
-              <MoreHorizontal size={16} />
-            </Button>
+
+            {/* ESQUINA SUPERIOR DERECHA -> “hace X” */}
+            <div className="text-[11px] sm:text-xs text-muted-foreground whitespace-nowrap">
+              {relative}
+            </div>
           </div>
 
           <p className="text-[13px] sm:text-sm text-foreground/80 leading-relaxed">
@@ -370,22 +425,38 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
                   onClick={publish}
                   disabled={buttonsDisabled || isEditing}
                 >
-                  <Send size={14} className="mr-0 sm:mr-1" />
+                  {loading ? (
+                    <Loader2 size={14} className="mr-0 sm:mr-1 animate-spin" />
+                  ) : (
+                    <Send size={14} className="mr-0 sm:mr-1" />
+                  )}
                   <span className="hidden sm:inline">
                     {published ? "Publicado" : "Publicar"}
                   </span>
                 </Button>
 
-                {/* Regenerar */}
+                {/* Regenerar con icono borroso + spinner superpuesto */}
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="flex-1 disabled:opacity-60 disabled:cursor-not-allowed relative"
                   onClick={handleGenerate}
                   disabled={loading || published}
                 >
-                  <RotateCcw size={14} className="mr-0 sm:mr-1" />
-                  <span className="hidden sm:inline">
+                  <span className="relative inline-flex items-center">
+                    {/* Icono base que se vuelve borroso cuando loading */}
+                    <RotateCcw
+                      size={14}
+                      className={`mr-0 sm:mr-1 transition ${loading ? "opacity-60 blur-[1px]" : ""}`}
+                    />
+                    {/* Spinner superpuesto centrado sobre el icono */}
+                    {loading && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 mr-0 sm:mr-1">
+                        <Loader2 size={14} className="animate-spin" />
+                      </span>
+                    )}
+                  </span>
+                  <span className="hidden sm:inline ml-1">
                     {loading ? "Generando…" : list.length > 0 ? "Regenerar" : "Generar"}
                   </span>
                 </Button>
@@ -410,7 +481,11 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
                     onClick={saveEdit}
                     disabled={buttonsDisabled || respText.trim().length === 0}
                   >
-                    <Edit3 size={14} className="mr-0 sm:mr-1" />
+                    {loading ? (
+                      <Loader2 size={14} className="mr-0 sm:mr-1 animate-spin" />
+                    ) : (
+                      <Edit3 size={14} className="mr-0 sm:mr-1" />
+                    )}
                     <span className="hidden sm:inline">Guardar</span>
                   </Button>
                 )}
@@ -457,7 +532,11 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
                 onClick={handleGenerate}
                 disabled={loading}
               >
-                <RotateCcw size={14} className="mr-1" />
+                {loading ? (
+                  <Loader2 size={14} className="mr-1 animate-spin" />
+                ) : (
+                  <RotateCcw size={14} className="mr-1" />
+                )}
                 {loading ? "Generando…" : "Generar respuesta"}
               </Button>
             </div>

@@ -1,4 +1,3 @@
-// app/components/voiceAgent/ChatCallTestingPanel.tsx
 "use client";
 
 import React, { useEffect, useRef } from "react";
@@ -44,6 +43,7 @@ export default function ChatPanelWithCall({
   lastError,
   aiSpeaking,
   micLevel,
+  aiPartialText, // 🔹 nuevo prop
   onStartCall,
   onHangUp,
 
@@ -68,6 +68,7 @@ export default function ChatPanelWithCall({
   lastError?: string | null;
   aiSpeaking?: boolean;
   micLevel?: number;
+  aiPartialText?: string | null; // 🔹
   onStartCall: () => void;
   onHangUp: () => void;
 
@@ -75,17 +76,17 @@ export default function ChatPanelWithCall({
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
 
-  // Autoscroll
+  // Autoscroll incluyendo cambios de parciales
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, draftUserText, partialText]);
+  }, [messages, draftUserText, partialText, aiPartialText]);
 
   // Duración
   const pad = (n: number) => n.toString().padStart(2, "0");
   const mm = pad(Math.floor((durationSec || 0) / 60));
   const ss = pad((durationSec || 0) % 60);
 
-  // Sólo mostramos errores reales (no el close 1000)
+  // Sólo errores reales (no close 1000)
   const showError = lastError && !/1000/.test(lastError) ? lastError : null;
 
   // Cambios de modo
@@ -94,7 +95,7 @@ export default function ChatPanelWithCall({
   const toMic = () => onModeChange("mic");
 
   const isCalling = callState === "ringing" || callState === "connected";
-  const inMicSession = mode === "mic" && callState === "connected"; // prueba micro
+  const inMicSession = mode === "mic" && callState === "connected";
 
   const headerButton =
     mode === "voice" ? (
@@ -214,22 +215,39 @@ export default function ChatPanelWithCall({
           );
         })}
 
-        {/* Burbuja efímera del usuario (voz) */}
-        {mode === "voice" && callState === "connected" && draftUserText && draftUserText.trim() !== "" && (
+        {/* 🔵 Draft del usuario — SIEMPRE que haya llamada */}
+        {callState === "connected" && draftUserText && draftUserText.trim() !== "" && (
           <div className="flex w-full justify-end">
             <div className="max-w-[80%] rounded-2xl bg-gradient-to-r from-sky-200 to-indigo-200 px-3 py-2 text-sm text-slate-800 ring-1 ring-sky-100">
-              <span className="opacity-70">Hablando… </span>
+              <span className="opacity-70">Usuario (draft)… </span>
               <span className="italic">{draftUserText}</span>
               <span className="ml-1 inline-block animate-pulse">▌</span>
             </div>
           </div>
         )}
 
-        {/* Parcial STT (voz o mic test) */}
-        {(mode === "voice" || mode === "mic") && callState === "connected" && partialText && (
+        {/* 🟡 Parcial STT crudo — SIEMPRE que haya llamada */}
+        {callState === "connected" && partialText && partialText.trim() !== "" && (
           <div className="flex w-full justify-end">
-            <div className="max-w-[80%] rounded-2xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Escuchando… {partialText}
+            <div className="max-w-[80%] rounded-2xl bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-100">
+              <span className="opacity-80 font-medium">Usuario (parcial):</span> {partialText}
+            </div>
+          </div>
+        )}
+
+        {/* 🤖 Parcial de IA (streaming) — SIEMPRE que haya llamada */}
+        {callState === "connected" && aiPartialText?.trim() && (
+          <div className="flex w-full justify-start">
+            <div
+              className="mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm"
+              title={agentName || "Agente"}
+            >
+              <span role="img" aria-label="robot">🤖</span>
+            </div>
+            <div className="max-w-[80%] rounded-2xl bg-slate-100 px-3 py-2 text-sm text-slate-800 ring-1 ring-slate-200">
+              <span className="opacity-70">IA (parcial)… </span>
+              <span className="italic">{aiPartialText}</span>
+              <span className="ml-1 inline-block animate-pulse">▌</span>
             </div>
           </div>
         )}
@@ -340,6 +358,26 @@ export default function ChatPanelWithCall({
             </div>
           )}
         </div>
+
+        {/* 📜 Transcripción en vivo (usuario): visible si hay parciales/draft */}
+        {callState === "connected" && (draftUserText?.trim() || partialText?.trim()) && (
+          <div className="mt-2 rounded-md border border-slate-200 bg-white/60 p-2">
+            <div className="mb-1 text-[11px] font-semibold text-slate-700">Transcripción en vivo</div>
+            {draftUserText?.trim() && (
+              <div className="text-[12px] text-slate-700">
+                <span className="mr-1 rounded-sm bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-800 ring-1 ring-sky-200">Usuario (draft)</span>
+                <span className="italic">{draftUserText}</span>
+                <span className="ml-1 inline-block animate-pulse">▌</span>
+              </div>
+            )}
+            {partialText?.trim() && (
+              <div className="mt-1 text-[12px] text-slate-700">
+                <span className="mr-1 rounded-sm bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 ring-1 ring-amber-200">Usuario (parcial)</span>
+                {partialText}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
