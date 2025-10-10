@@ -3,13 +3,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { PrismaClient } from "@prisma/client";
+import { todayUtcStart } from "@/lib/kpis";
 
 export const dynamic = "force-dynamic";
 const prisma = new PrismaClient();
 
 /**
  * GET /api/locations?companyId=...
- * Devuelve las ubicaciones visibles del usuario en esa empresa.
+ * Devuelve las ubicaciones visibles del usuario en esa empresa,
+ * incluyendo los KPIs mínimos que espera la ReviewsPage:
+ * - reviewsAvg
+ * - reviewsCount
+ * (Opcionalmente pendingResponses si quieres pintarlo también)
  */
 export async function GET(req: NextRequest) {
   try {
@@ -48,7 +53,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Mismo comportamiento que el endpoint funcional
+    // Ubicaciones base
     const locations = await prisma.location.findMany({
       where: { companyId },
       select: {
@@ -61,7 +66,52 @@ export async function GET(req: NextRequest) {
       orderBy: { title: "asc" },
     });
 
-    return NextResponse.json({ ok: true, locations });
+    if (locations.length === 0) {
+      return NextResponse.json({ ok: true, locations: [] });
+    }
+
+    // KPIs del snapshot de hoy (para rellenar reviewsAvg y reviewsCount)
+    const snapshotDate = todayUtcStart();
+    const ids = locations.map((l) => l.id);
+
+    const kpis = await prisma.locationKpiDaily.findMany({
+      where: { companyId, locationId: { in: ids }, snapshotDate },
+      select: {
+        locationId: true,
+        totalReviews: true,
+        avgAll: true,
+        unansweredCount: true, // útil si quieres "pendingResponses"
+      },
+    });
+
+    const kpimap = new Map(
+      kpis.map((k) => [
+        k.locationId,
+        {
+          reviewsCount: k.totalReviews ?? 0,
+          reviewsAvg: k.avgAll != null ? Number(k.avgAll) : null,
+          pendingResponses: k.unansweredCount ?? 0,
+        },
+      ])
+    );
+
+    // Mezclar datos base + KPIs mínimos que espera la UI
+    const enriched = locations.map((l) => {
+      const k = kpimap.get(l.id);
+      return {
+        id: l.id,
+        title: l.title,
+        city: l.city,
+        featuredImageUrl: l.featuredImageUrl,
+        status: l.status,
+        reviewsAvg: k?.reviewsAvg ?? null,
+        reviewsCount: k?.reviewsCount ?? 0,
+        // Si no quieres usarlo aún, no pasa nada por enviarlo:
+        pendingResponses: k?.pendingResponses ?? 0,
+      };
+    });
+
+    return NextResponse.json({ ok: true, locations: enriched });
   } catch (e) {
     console.error("[GET /api/locations]", e);
     return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });

@@ -133,7 +133,7 @@ export default function DataTable<T>({
           </div>
         )}
 
-        <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+        <table className="w-full text-sm border-t" style={{ tableLayout: "fixed" }}>
           {usePerc && (
             <colgroup>
               {columns.map((c) => (

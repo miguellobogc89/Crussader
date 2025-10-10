@@ -40,6 +40,7 @@ model User {
   updatedAt          DateTime             @updatedAt
   Account            Account[]
   ExternalConnection ExternalConnection[]
+  phasesCreated      Phase[]              @relation("UserPhasesCreated")
   responsesCreated   Response[]           @relation("ResponseCreatedBy")
   responsesEdited    Response[]           @relation("ResponseEditedBy")
   Session            Session[]
@@ -47,7 +48,6 @@ model User {
   UserLocation       UserLocation[]
   UserLogin          UserLogin[]
   UserStatusEvent    UserStatusEvent[]
-  phasesCreated      Phase[]              @relation("UserPhasesCreated")
 
   @@index([role])
   @@index([isActive, isSuspended])
@@ -136,57 +136,62 @@ model ExternalConnection {
 }
 
 model Company {
-  id                   String             @id @default(cuid())
+  id                   String                @id @default(cuid())
   name                 String
   createdById          String
-  createdAt            DateTime           @default(now())
-  activity             String?            @db.VarChar(64)
-  cif                  String?            @db.VarChar(32)
-  employeesBand        String?            @db.VarChar(32)
+  createdAt            DateTime              @default(now())
+  activity             String?               @db.VarChar(64)
+  cif                  String?               @db.VarChar(32)
+  employeesBand        String?               @db.VarChar(32)
   logoUrl              String?
   address              String?
-  brandColor           String?            @db.VarChar(16)
+  brandColor           String?               @db.VarChar(16)
   city                 String?
   country              String?
-  countryCode          String?            @db.VarChar(2)
+  countryCode          String?               @db.VarChar(2)
   description          String?
   email                String?
   facebookUrl          String?
   instagramUrl         String?
   lastSyncAt           DateTime?
   linkedinUrl          String?
-  matrix               String?            @db.VarChar(128)
+  matrix               String?               @db.VarChar(128)
   phone                String?
   postalCode           String?
   region               String?
-  registryId           String?            @db.VarChar(64)
-  reviewsAvg           Decimal?           @db.Decimal(3, 2)
-  reviewsCount         Int                @default(0)
+  registryId           String?               @db.VarChar(64)
+  reviewsAvg           Decimal?              @db.Decimal(3, 2)
+  reviewsCount         Int                   @default(0)
   twitterUrl           String?
-  updatedAt            DateTime           @default(now()) @updatedAt
-  vatNumber            String?            @db.VarChar(32)
+  updatedAt            DateTime              @default(now()) @updatedAt
+  vatNumber            String?               @db.VarChar(32)
   website              String?
-  plan                 String?            @default("free")
+  plan                 String?               @default("free")
   planRenewsAt         DateTime?
   stripeCustomerId     String?
   stripeSubscriptionId String?
   agentSettings        Json?
+  voiceAgentId         String?
+  Agents               Agent[]
+  AgentSessions        AgentSession[]
+  voiceAgent           VoiceAgent?           @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id])
   customers            CompanyCustomer[]
   jobs                 Job[]
   knowledgeItems       KnowledgeItem[]
+  knowledgeSections    KnowledgeSection[]
+  knowledgeSpaces      KnowledgeSpace[]
   Lead                 Lead[]
   Location             Location[]
-  LocationKpiDaily     LocationKpiDaily[] @relation("CompanyToKpiDaily")
+  LocationKpiDaily     LocationKpiDaily[]    @relation("CompanyToKpiDaily")
   responseSettings     ResponseSettings?
-  Reviews              Review[]           @relation("CompanyReviews")
+  Reviews              Review[]              @relation("CompanyReviews")
   UserCompany          UserCompany[]
-  WebchatSites         WebchatSite[]      @relation("CompanyToWebchatSite")
-  Agents               Agent[]
-  AgentSessions        AgentSession[]
-  knowledgeSpaces      KnowledgeSpace[]
-  voiceAgentId         String?
-  voiceAgent           VoiceAgent?        @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id], onDelete: SetNull)
-  knowledgeSections    KnowledgeSection[]
+  WebchatSites         WebchatSite[]         @relation("CompanyToWebchatSite")
+  billing_account      billing_account[]
+  discount_redemption  discount_redemption[]
+  entitlement          entitlement[]
+  invoice              invoice[]
+  subscription         subscription[]
 
   @@index([name])
   @@index([activity])
@@ -257,28 +262,28 @@ model Location {
   reviewsAvg           Decimal?            @db.Decimal(3, 2)
   reviewsCount         Int                 @default(0)
   slug                 String?             @unique
+  status               LocationStatus?     @default(DRAFT)
   timezone             String?
-  exceptions           Json? // jsonb
   isFeatured           Boolean             @default(false)
   activityId           String?
   typeId               String?
-  status               LocationStatus?     @default(DRAFT)
+  exceptions           Json?
+  agentSessions        AgentSession[]
+  appointments         Appointment[]
+  employeeLinks        EmployeeLocation[]
+  employeeTimeOffs     EmployeeTimeOff[]
   jobs                 Job[]
   activity             Activity?           @relation(fields: [activityId], references: [id])
   company              Company             @relation(fields: [companyId], references: [id])
   ExternalConnection   ExternalConnection? @relation(fields: [externalConnectionId], references: [id])
   type                 Type?               @relation(fields: [typeId], references: [id])
   KpiDaily             LocationKpiDaily[]  @relation("LocationToKpiDaily")
+  resources            Resource[]
+  resourceTimeOffs     ResourceTimeOff[]
   Reviews              Review[]            @relation("LocationReviews")
+  services             Service[]
   UserLocation         UserLocation[]
   WebchatSites         WebchatSite[]       @relation("LocationToWebchatSite")
-  employeeLinks        EmployeeLocation[]
-  resources            Resource[]
-  services             Service[]
-  appointments         Appointment[]
-  employeeTimeOffs     EmployeeTimeOff[]
-  resourceTimeOffs     ResourceTimeOff[]
-  agentSessions        AgentSession[]
 
   @@index([companyId])
   @@index([googleAccountId])
@@ -551,6 +556,840 @@ model KnowledgeItem {
   @@index([visibility])
 }
 
+model Employee {
+  id           String             @id @default(cuid())
+  name         String
+  notes        String?
+  color        String?
+  active       Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  exceptions   Json?
+  openingHours Json?
+  timezone     String             @default("Europe/Madrid")
+  appointments Appointment[]
+  locations    EmployeeLocation[]
+  roles        EmployeeRole[]
+  timeOffs     EmployeeTimeOff[]
+
+  @@index([active])
+}
+
+model StaffRole {
+  id        String         @id @default(cuid())
+  name      String
+  slug      String         @unique
+  color     String?
+  active    Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  employees EmployeeRole[]
+  services  Service[]
+}
+
+model EmployeeRole {
+  id         String    @id @default(cuid())
+  employeeId String
+  roleId     String
+  isPrimary  Boolean   @default(false)
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  role       StaffRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, roleId])
+  @@index([employeeId])
+  @@index([roleId])
+}
+
+model EmployeeLocation {
+  id                        String   @id @default(cuid())
+  employeeId                String
+  locationId                String
+  isPrimary                 Boolean  @default(false)
+  visibleInLocation         Boolean  @default(true)
+  allowCrossLocationBooking Boolean  @default(false)
+  employee                  Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  location                  Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, locationId])
+  @@index([employeeId])
+  @@index([locationId])
+}
+
+model ResourceType {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  resources Resource[]
+}
+
+model Resource {
+  id           String                  @id @default(cuid())
+  locationId   String
+  name         String
+  notes        String?
+  capacity     Int?
+  active       Boolean                 @default(true)
+  typeId       String?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  appointments Appointment[]
+  location     Location                @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  type         ResourceType?           @relation(fields: [typeId], references: [id])
+  tags         ResourceTagOnResource[]
+  timeOffs     ResourceTimeOff[]
+}
+
+model ResourceTag {
+  id        String                  @id @default(cuid())
+  name      String
+  slug      String                  @unique
+  color     String?
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+  resources ResourceTagOnResource[]
+  services  Service[]               @relation("ServiceToResourceTag")
+}
+
+model ResourceTagOnResource {
+  id            String      @id @default(cuid())
+  resourceId    String
+  resourceTagId String
+  resource      Resource    @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  tag           ResourceTag @relation(fields: [resourceTagId], references: [id], onDelete: Cascade)
+
+  @@unique([resourceId, resourceTagId])
+}
+
+model Service {
+  id                    String         @id @default(cuid())
+  locationId            String
+  name                  String
+  description           String?
+  durationMin           Int            @default(30)
+  bufferBeforeMin       Int            @default(0)
+  bufferAfterMin        Int            @default(0)
+  color                 String?
+  requiredRoleId        String?
+  requiredResourceTagId String?
+  active                Boolean        @default(true)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  priceCents            Int            @default(0)
+  price                 Decimal        @default(0) @db.Decimal(10, 2)
+  agentSessions         AgentSession[]
+  appointments          Appointment[]
+  location              Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  requiredTag           ResourceTag?   @relation("ServiceToResourceTag", fields: [requiredResourceTagId], references: [id])
+  requiredRole          StaffRole?     @relation(fields: [requiredRoleId], references: [id])
+
+  @@index([locationId])
+  @@index([active])
+  @@index([requiredRoleId])
+  @@index([requiredResourceTagId])
+}
+
+model Appointment {
+  id                 String            @id @default(cuid())
+  locationId         String
+  serviceId          String
+  startAt            DateTime
+  endAt              DateTime
+  status             AppointmentStatus @default(PENDING)
+  employeeId         String?
+  resourceId         String?
+  customerName       String?
+  customerPhone      String?
+  customerEmail      String?
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  customerId         String?
+  createdByAgentId   String?
+  createdInSessionId String?
+  createdByAgent     Agent?            @relation("AppointmentCreatedByAgent", fields: [createdByAgentId], references: [id])
+  createdInSession   AgentSession?     @relation("AppointmentCreatedInSession", fields: [createdInSessionId], references: [id])
+  customer           Customer?         @relation(fields: [customerId], references: [id])
+  employee           Employee?         @relation(fields: [employeeId], references: [id])
+  location           Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  resource           Resource?         @relation(fields: [resourceId], references: [id])
+  service            Service           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, startAt])
+  @@index([locationId, startAt])
+  @@index([createdByAgentId])
+  @@index([createdInSessionId])
+}
+
+model EmployeeTimeOff {
+  id         String   @id @default(cuid())
+  employeeId String
+  locationId String
+  reason     String?
+  startAt    DateTime
+  endAt      DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  type       String   @default("BLOCK")
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, startAt])
+  @@index([locationId, startAt])
+  @@index([employeeId, startAt], map: "EmployeeTimeOff_employee_start_idx")
+  @@index([locationId, startAt], map: "EmployeeTimeOff_location_start_idx")
+}
+
+model ResourceTimeOff {
+  id         String   @id @default(cuid())
+  resourceId String
+  locationId String
+  reason     String?
+  startAt    DateTime
+  endAt      DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  type       String   @default("BLOCK")
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([resourceId, startAt])
+  @@index([locationId, startAt])
+  @@index([locationId, startAt], map: "ResourceTimeOff_location_start_idx")
+  @@index([resourceId, startAt], map: "ResourceTimeOff_resource_start_idx")
+}
+
+model Customer {
+  id                 String            @id @default(cuid())
+  firstName          String
+  lastName           String
+  phone              String
+  email              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  createdByAgentId   String?
+  createdInSessionId String?
+  appointments       Appointment[]
+  companies          CompanyCustomer[]
+  createdByAgent     Agent?            @relation("CustomerCreatedByAgent", fields: [createdByAgentId], references: [id])
+  createdInSession   AgentSession?     @relation("CustomerCreatedInSession", fields: [createdInSessionId], references: [id])
+
+  @@index([phone])
+  @@index([createdInSessionId])
+  @@index([createdByAgentId])
+}
+
+model CompanyCustomer {
+  id         String   @id @default(cuid())
+  companyId  String
+  customerId String
+  createdAt  DateTime @default(now())
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, customerId])
+  @@index([customerId, companyId])
+}
+
+model Agent {
+  id                  String                @id @default(cuid())
+  companyId           String
+  name                String
+  channel             AgentChannel
+  status              AgentStatus           @default(ACTIVE)
+  meta                Json?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  company             Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  knowledgeSpaces     AgentKnowledgeSpace[]
+  sessions            AgentSession[]
+  appointmentsCreated Appointment[]         @relation("AppointmentCreatedByAgent")
+  chat                ChatAgent?
+  customersCreated    Customer[]            @relation("CustomerCreatedByAgent")
+  voice               VoiceAgent?
+
+  @@index([companyId, channel, status])
+  @@index([name])
+}
+
+model VoiceAgent {
+  id                 String               @id @default(cuid())
+  agentId            String               @unique
+  defaultModel       String?
+  defaultTemperature Float?               @default(0.4)
+  defaultPrompt      String?
+  provider           String?
+  providerConfig     Json?
+  voiceName          String?
+  language           String?              @default("es-ES")
+  phases             AgentPhase[]         @relation("VoiceAgentPhases")
+  companies          Company[]            @relation("CompanyVoiceAgent")
+  agent              Agent                @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  settings           VoiceAgentSettings[]
+}
+
+model VoiceAgentSettings {
+  id           String     @id @default(cuid())
+  agentId      String
+  version      Int        @default(1)
+  isActive     Boolean    @default(true)
+  prompt       String
+  model        String?
+  temperature  Float?     @default(0.4)
+  policy       Json?
+  capabilities Json?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  agent        VoiceAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, isActive, version])
+}
+
+model ChatAgent {
+  id                 String              @id @default(cuid())
+  agentId            String              @unique
+  defaultModel       String?
+  defaultTemperature Float?              @default(0.3)
+  defaultPrompt      String?
+  agent              Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  settings           ChatAgentSettings[]
+}
+
+model ChatAgentSettings {
+  id           String    @id @default(cuid())
+  agentId      String
+  version      Int       @default(1)
+  isActive     Boolean   @default(true)
+  prompt       String
+  model        String?
+  temperature  Float?    @default(0.3)
+  policy       Json?
+  capabilities Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  agent        ChatAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, isActive, version])
+}
+
+model AgentSession {
+  id                  String             @id @default(cuid())
+  agentId             String
+  companyId           String
+  channel             AgentChannel
+  status              AgentSessionStatus @default(INIT)
+  endedAt             DateTime?
+  durationSec         Int?
+  caller              String?
+  callee              String?
+  locationId          String?
+  serviceId           String?
+  settings            Json?              @map("meta")
+  startedAt           DateTime           @default(now()) @map("createdAt")
+  updatedAt           DateTime           @updatedAt @map("updatedAt")
+  clientIp            String?
+  environment         AgentEnvironment   @default(TEST)
+  instructions        String?
+  language            String?            @default("es")
+  model               String?
+  source              String?            @default("constructor")
+  temperature         Float?
+  userAgent           String?
+  voice               String?
+  logs                AgentLog[]
+  agent               Agent              @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  company             Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location            Location?          @relation(fields: [locationId], references: [id])
+  service             Service?           @relation(fields: [serviceId], references: [id])
+  turns               AgentTurn[]
+  createdAppointments Appointment[]      @relation("AppointmentCreatedInSession")
+  createdCustomers    Customer[]         @relation("CustomerCreatedInSession")
+
+  @@index([agentId, companyId, channel, status])
+  @@index([environment, startedAt])
+  @@index([startedAt])
+}
+
+model AgentTurn {
+  id        String        @id @default(cuid())
+  sessionId String
+  role      AgentTurnRole
+  text      String?
+  audioUrl  String?
+  payload   Json?
+  createdAt DateTime      @default(now())
+  session   AgentSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@index([role])
+}
+
+model AgentLog {
+  id        String        @id @default(cuid())
+  sessionId String
+  level     AgentLogLevel @default(INFO)
+  message   String
+  payload   Json?
+  createdAt DateTime      @default(now())
+  session   AgentSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, level, createdAt])
+}
+
+/// ==============================
+/// Fases reutilizables
+/// ==============================
+model Phase {
+  id          String       @id @default(cuid())
+  key         String       @unique
+  label       String
+  type        PhaseType    @default(CUSTOM)
+  prompt      String
+  meta        Json?
+  createdById String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  agents      AgentPhase[]
+  createdBy   User?        @relation("UserPhasesCreated", fields: [createdById], references: [id])
+}
+
+/// ==============================
+/// Pivot N–N con orden/prioridad/overrides
+/// ==============================
+model AgentPhase {
+  id        String     @id @default(cuid())
+  agentId   String
+  phaseId   String
+  order     Int
+  priority  Int?
+  overrides Json?
+  isEnabled Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  agent     VoiceAgent @relation("VoiceAgentPhases", fields: [agentId], references: [id], onDelete: Cascade)
+  phase     Phase      @relation(fields: [phaseId], references: [id])
+
+  @@unique([agentId, phaseId])
+  @@index([agentId, order])
+}
+
+model KnowledgeSpace {
+  id                String                @id @default(cuid())
+  companyId         String
+  name              String
+  scope             KnowledgeScope        @default(COMPANY)
+  isActive          Boolean               @default(true)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  agents            AgentKnowledgeSpace[]
+  docs              KnowledgeDoc[]
+  knowledgeSections KnowledgeSection[]
+  company           Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, scope, isActive])
+}
+
+model KnowledgeDoc {
+  id         String           @id @default(cuid())
+  spaceId    String
+  title      String
+  sourceUrl  String?
+  mime       String?
+  text       String
+  tokens     Int?
+  chunkCount Int?
+  updatedAt  DateTime         @default(now()) @updatedAt
+  createdAt  DateTime         @default(now())
+  chunks     KnowledgeChunk[]
+  space      KnowledgeSpace   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId, updatedAt])
+}
+
+model KnowledgeChunk {
+  id      String       @id @default(cuid())
+  docId   String
+  idx     Int
+  content String
+  doc     KnowledgeDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@unique([docId, idx])
+  @@index([docId])
+}
+
+model AgentKnowledgeSpace {
+  id      String         @id @default(cuid())
+  agentId String
+  spaceId String
+  agent   Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  space   KnowledgeSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, spaceId])
+  @@index([spaceId])
+}
+
+model KnowledgeSection {
+  id         String              @id @default(cuid())
+  companyId  String
+  spaceId    String?
+  title      String
+  slug       String
+  content    String
+  visibility KnowledgeVisibility @default(PUBLIC)
+  position   Int                 @default(0)
+  isActive   Boolean             @default(true)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  company    Company             @relation(fields: [companyId], references: [id])
+  space      KnowledgeSpace?     @relation(fields: [spaceId], references: [id])
+
+  @@unique([companyId, slug])
+  @@index([companyId])
+  @@index([spaceId])
+}
+
+model billing_account {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id     String
+  name           String
+  billing_email  String?
+  phone          String?
+  tax_id         String?
+  currency       String           @default("EUR") @db.Char(3)
+  address_line1  String?
+  address_line2  String?
+  city           String?
+  region         String?
+  postal_code    String?
+  country_code   String?          @db.Char(2)
+  meta           Json?
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime         @default(now()) @db.Timestamptz(6)
+  Company        Company          @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ba_company")
+  invoice        invoice[]
+  payment_method payment_method[]
+  subscription   subscription[]
+
+  @@index([company_id], map: "idx_billing_account_company")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model discount {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                   String?                  @unique
+  name                   String?
+  percent_off            Decimal?                 @db.Decimal(5, 2)
+  amount_off_cents       BigInt?
+  currency               String?                  @db.Char(3)
+  duration               discount_duration        @default(ONCE)
+  duration_in_months     Int?
+  starts_at              DateTime?                @db.Timestamptz(6)
+  ends_at                DateTime?                @db.Timestamptz(6)
+  max_redemptions        Int?
+  is_active              Boolean                  @default(true)
+  applies_once_per_user  Boolean                  @default(true)
+  meta                   Json?
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  discount_applicability discount_applicability[]
+  discount_redemption    discount_redemption[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model discount_applicability {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  discount_id String   @db.Uuid
+  product_id  String?  @db.Uuid
+  price_id    String?  @db.Uuid
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  discount    discount @relation(fields: [discount_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_discapp_discount")
+  price       price?   @relation(fields: [price_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_discapp_price")
+  product     product? @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_discapp_product")
+
+  @@index([discount_id], map: "idx_discapp_discount")
+  @@index([price_id], map: "idx_discapp_price")
+  @@index([product_id], map: "idx_discapp_product")
+}
+
+model discount_redemption {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  discount_id     String   @db.Uuid
+  company_id      String
+  subscription_id String?  @db.Uuid
+  invoice_id      String?  @db.Uuid
+  redeemed_at     DateTime @default(now()) @db.Timestamptz(6)
+  meta            Json?
+  Company         Company  @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_red_company")
+  discount        discount @relation(fields: [discount_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_red_disc")
+
+  @@index([company_id], map: "idx_red_company")
+  @@index([discount_id], map: "idx_red_discount")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model entitlement {
+  id         String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id String
+  product_id String             @db.Uuid
+  source     entitlement_source @default(SUBSCRIPTION)
+  quantity   Int                @default(1)
+  active     Boolean            @default(true)
+  start_at   DateTime           @default(now()) @db.Timestamptz(6)
+  end_at     DateTime?          @db.Timestamptz(6)
+  meta       Json?
+  created_at DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at DateTime           @default(now()) @db.Timestamptz(6)
+  Company    Company            @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ent_company")
+  product    product            @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ent_product")
+
+  @@index([company_id, product_id, active], map: "idx_ent_company_product")
+}
+
+model invoice {
+  id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id         String
+  billing_account_id String          @db.Uuid
+  number             String?         @unique
+  status             invoice_status  @default(DRAFT)
+  issued_at          DateTime?       @db.Timestamptz(6)
+  due_at             DateTime?       @db.Timestamptz(6)
+  currency           String          @default("EUR") @db.Char(3)
+  subtotal_cents     BigInt          @default(0)
+  tax_cents          BigInt          @default(0)
+  discount_cents     BigInt          @default(0)
+  total_cents        BigInt          @default(0)
+  meta               Json?
+  created_at         DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime        @default(now()) @db.Timestamptz(6)
+  billing_account    billing_account @relation(fields: [billing_account_id], references: [id], onUpdate: NoAction, map: "fk_inv_ba")
+  Company            Company         @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_inv_company")
+  invoice_item       invoice_item[]
+  payment            payment[]
+
+  @@index([company_id, status], map: "idx_invoice_company_status")
+  @@index([issued_at, due_at], map: "idx_invoice_dates")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model invoice_item {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoice_id           String             @db.Uuid
+  subscription_item_id String?            @db.Uuid
+  product_id           String?            @db.Uuid
+  price_id             String?            @db.Uuid
+  description          String?
+  quantity             Int                @default(1)
+  unit_amount_cents    BigInt             @default(0)
+  amount_cents         BigInt             @default(0)
+  meta                 Json?
+  created_at           DateTime           @default(now()) @db.Timestamptz(6)
+  invoice              invoice            @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_iitem_invoice")
+  price                price?             @relation(fields: [price_id], references: [id], onUpdate: NoAction, map: "fk_iitem_price")
+  product              product?           @relation(fields: [product_id], references: [id], onUpdate: NoAction, map: "fk_iitem_product")
+  subscription_item    subscription_item? @relation(fields: [subscription_item_id], references: [id], onUpdate: NoAction, map: "fk_iitem_sitem")
+
+  @@index([invoice_id], map: "idx_iitem_invoice")
+}
+
+model location_stats {
+  location_id      String    @id
+  reviews_count    Int       @default(0)
+  rating_sum       Int       @default(0)
+  avg_rating       Decimal?  @default(dbgenerated("\nCASE\n    WHEN (reviews_count > 0) THEN round(((rating_sum)::numeric / (reviews_count)::numeric), 2)\n    ELSE NULL::numeric\nEND")) @db.Decimal(3, 2)
+  unanswered_count Int       @default(0)
+  last_review_at   DateTime? @db.Timestamptz(6)
+  updated_at       DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([avg_rating], map: "idx_location_stats_avg_rating")
+  @@index([last_review_at], map: "idx_location_stats_last_review_at")
+  @@index([unanswered_count], map: "idx_location_stats_unanswered")
+}
+
+model payment {
+  id                   String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoice_id           String          @db.Uuid
+  payment_method_id    String?         @db.Uuid
+  status               payment_status  @default(PENDING)
+  amount_cents         BigInt          @default(0)
+  currency             String          @default("EUR") @db.Char(3)
+  provider             String?
+  provider_payment_ref String?
+  paid_at              DateTime?       @db.Timestamptz(6)
+  meta                 Json?
+  created_at           DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime        @default(now()) @db.Timestamptz(6)
+  invoice              invoice         @relation(fields: [invoice_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pay_invoice")
+  payment_method       payment_method? @relation(fields: [payment_method_id], references: [id], onUpdate: NoAction, map: "fk_pay_method")
+
+  @@index([invoice_id, status], map: "idx_payment_invoice")
+}
+
+model payment_method {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  billing_account_id String              @db.Uuid
+  type               payment_method_type
+  provider           String?
+  provider_ref       String?
+  brand              String?
+  last4              String?
+  exp_month          Int?
+  exp_year           Int?
+  is_default         Boolean             @default(false)
+  active             Boolean             @default(true)
+  meta               Json?
+  created_at         DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime            @default(now()) @db.Timestamptz(6)
+  payment            payment[]
+  billing_account    billing_account     @relation(fields: [billing_account_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pm_ba")
+
+  @@index([billing_account_id], map: "idx_payment_method_ba")
+  @@index([billing_account_id, is_default], map: "idx_payment_method_default")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model price {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id             String                   @db.Uuid
+  billing_period         billing_period           @default(MONTH)
+  amount_cents           BigInt
+  currency               String                   @default("EUR") @db.Char(3)
+  is_active              Boolean                  @default(true)
+  started_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  ended_at               DateTime?                @db.Timestamptz(6)
+  is_metered             Boolean                  @default(false)
+  usage_unit             String?
+  meta                   Json?
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  discount_applicability discount_applicability[]
+  invoice_item           invoice_item[]
+  product                product                  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_price_product")
+  subscription_item      subscription_item[]
+
+  @@index([billing_period], map: "idx_price_period")
+  @@index([product_id, is_active], map: "idx_price_product_active")
+  @@index([product_id, started_at, ended_at], map: "idx_price_window")
+}
+
+model product {
+  id                                                                   String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sku                                                                  String?                  @unique
+  name                                                                 String
+  slug                                                                 String?                  @unique
+  description                                                          String?
+  type                                                                 product_type             @default(STANDALONE)
+  visibility                                                           product_visibility       @default(PUBLIC)
+  active                                                               Boolean                  @default(true)
+  visible                                                              Boolean                  @default(true)
+  launch_at                                                            DateTime?                @db.Timestamptz(6)
+  trial_days                                                           Int                      @default(0)
+  meta                                                                 Json?
+  created_at                                                           DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at                                                           DateTime                 @default(now()) @db.Timestamptz(6)
+  discount_applicability                                               discount_applicability[]
+  entitlement                                                          entitlement[]
+  invoice_item                                                         invoice_item[]
+  price                                                                price[]
+  product_attribute                                                    product_attribute[]
+  product_bundle_product_bundle_child_product_idToproduct              product_bundle[]         @relation("product_bundle_child_product_idToproduct")
+  product_bundle_product_bundle_parent_product_idToproduct             product_bundle[]         @relation("product_bundle_parent_product_idToproduct")
+  product_requirement_product_requirement_product_idToproduct          product_requirement[]    @relation("product_requirement_product_idToproduct")
+  product_requirement_product_requirement_required_product_idToproduct product_requirement[]    @relation("product_requirement_required_product_idToproduct")
+  subscription_item                                                    subscription_item[]
+
+  @@index([active, visible], map: "idx_product_active_visible")
+  @@index([launch_at], map: "idx_product_launch")
+  @@index([type], map: "idx_product_type")
+}
+
+model product_attribute {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id String   @db.Uuid
+  key        String
+  value      String?
+  meta       Json?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  product    product  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_attr_product")
+
+  @@unique([product_id, key], map: "uq_attr_unique")
+  @@index([product_id], map: "idx_attr_product")
+}
+
+model product_bundle {
+  id                                                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  parent_product_id                                 String   @db.Uuid
+  child_product_id                                  String   @db.Uuid
+  quantity                                          Int      @default(1)
+  created_at                                        DateTime @default(now()) @db.Timestamptz(6)
+  product_product_bundle_child_product_idToproduct  product  @relation("product_bundle_child_product_idToproduct", fields: [child_product_id], references: [id], onUpdate: NoAction, map: "fk_bundle_child")
+  product_product_bundle_parent_product_idToproduct product  @relation("product_bundle_parent_product_idToproduct", fields: [parent_product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_bundle_parent")
+
+  @@unique([parent_product_id, child_product_id], map: "uq_bundle")
+  @@index([parent_product_id], map: "idx_bundle_parent")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model product_requirement {
+  id                                                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id                                               String   @db.Uuid
+  required_product_id                                      String   @db.Uuid
+  per_units                                                Int      @default(1)
+  required_min_qty                                         Int      @default(0)
+  created_at                                               DateTime @default(now()) @db.Timestamptz(6)
+  product_product_requirement_product_idToproduct          product  @relation("product_requirement_product_idToproduct", fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_req_prod")
+  product_product_requirement_required_product_idToproduct product  @relation("product_requirement_required_product_idToproduct", fields: [required_product_id], references: [id], onUpdate: NoAction, map: "fk_req_rprod")
+
+  @@unique([product_id, required_product_id], map: "uq_req")
+  @@index([product_id], map: "idx_req_product")
+}
+
+model subscription {
+  id                       String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id               String
+  billing_account_id       String              @db.Uuid
+  status                   subscription_status @default(INCOMPLETE)
+  start_at                 DateTime            @default(now()) @db.Timestamptz(6)
+  trial_end_at             DateTime?           @db.Timestamptz(6)
+  current_period_start     DateTime?           @db.Timestamptz(6)
+  current_period_end       DateTime?           @db.Timestamptz(6)
+  cancel_at                DateTime?           @db.Timestamptz(6)
+  canceled_at              DateTime?           @db.Timestamptz(6)
+  paused_at                DateTime?           @db.Timestamptz(6)
+  resume_at                DateTime?           @db.Timestamptz(6)
+  external_provider        String?
+  external_subscription_id String?
+  meta                     Json?
+  created_at               DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime            @default(now()) @db.Timestamptz(6)
+  billing_account          billing_account     @relation(fields: [billing_account_id], references: [id], onUpdate: NoAction, map: "fk_sub_ba")
+  Company                  Company             @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_sub_company")
+  subscription_item        subscription_item[]
+
+  @@index([company_id, status], map: "idx_sub_company_status")
+  @@index([current_period_end], map: "idx_sub_period")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model subscription_item {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subscription_id String         @db.Uuid
+  product_id      String         @db.Uuid
+  price_id        String         @db.Uuid
+  quantity        Int            @default(1)
+  meta            Json?
+  created_at      DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime       @default(now()) @db.Timestamptz(6)
+  invoice_item    invoice_item[]
+  price           price          @relation(fields: [price_id], references: [id], onUpdate: NoAction, map: "fk_sitem_price")
+  product         product        @relation(fields: [product_id], references: [id], onUpdate: NoAction, map: "fk_sitem_prod")
+  subscription    subscription   @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_sitem_sub")
+
+  @@index([product_id], map: "idx_sitem_prod")
+  @@index([subscription_id], map: "idx_sitem_sub")
+}
+
 /// *
 /// * =========================
 /// * Enums
@@ -661,8 +1500,8 @@ enum WebchatRole {
 }
 
 enum KnowledgeScope {
-  COMPANY // KB de compañía
-  AGENT // KB específico de agente
+  COMPANY
+  AGENT
 }
 
 enum WebchatSiteStatus {
@@ -676,337 +1515,12 @@ enum KnowledgeVisibility {
   PRIVATE
 }
 
-/// =========================
-/// Employees & Roles (simple, sin company)
-/// =========================
-
-model Employee {
-  id           String  @id @default(cuid())
-  name         String
-  notes        String?
-  color        String?
-  active       Boolean @default(true)
-  timezone     String  @default("Europe/Madrid")
-  openingHours Json?
-  exceptions   Json?
-
-  // N-N con Location (con metadata en el pivot)
-  locations EmployeeLocation[]
-
-  // Roles (globales por ahora)
-  roles EmployeeRole[]
-
-  appointments          Appointment[]
-  timeOffs              EmployeeTimeOff[]
-  allowedForServices    ServiceAllowedStaff[] @relation("ServiceAllowedStaff_to_Employee")
-  appointmentStaffLinks AppointmentStaff[]    @relation("Employee_to_AppointmentStaff")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([active])
-}
-
-model StaffRole {
-  id String @id @default(cuid())
-
-  name      String
-  slug      String
-  color     String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  services         Service[]
-  employees        EmployeeRole[]
-  neededByServices ServiceNeedRole[]  @relation("StaffRole_to_ServiceNeedRole")
-  AppointmentStaff AppointmentStaff[] @relation("StaffRole_to_AppointmentStaff")
-
-  @@unique([slug])
-}
-
-model EmployeeRole {
-  id         String  @id @default(cuid())
-  employeeId String
-  roleId     String
-  isPrimary  Boolean @default(false)
-
-  employee Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  role     StaffRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
-  @@unique([employeeId, roleId]) // no repetir el mismo rol
-  @@index([employeeId])
-  @@index([roleId])
-}
-
-model EmployeeLocation {
-  id         String @id @default(cuid())
-  employeeId String
-  locationId String
-
-  // Flags para el motor de calendario
-  isPrimary                 Boolean @default(false)
-  visibleInLocation         Boolean @default(true) // aparece al agendar en ESTA location
-  allowCrossLocationBooking Boolean @default(false) // si true, puede aparecer en búsquedas cruzadas
-
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-
-  @@unique([employeeId, locationId])
-  @@index([employeeId])
-  @@index([locationId])
-}
-
-model ResourceType {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  resources        Resource[]
-  neededByServices ServiceNeedResourceType[] @relation("ResourceType_to_ServiceNeedResourceType")
-
-  @@unique([slug])
-}
-
-model Resource {
-  id         String  @id @default(cuid())
-  locationId String
-  name       String
-  notes      String?
-  capacity   Int?
-  active     Boolean @default(true)
-
-  typeId String?
-  type   ResourceType? @relation(fields: [typeId], references: [id], onDelete: SetNull)
-
-  location                 Location                @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  tags                     ResourceTagOnResource[]
-  appointments             Appointment[]
-  timeOffs                 ResourceTimeOff[]
-  appointmentResourceLinks AppointmentResource[]   @relation("Resource_to_AppointmentResource")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model ResourceTag {
-  id    String  @id @default(cuid())
-  name  String
-  slug  String
-  color String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  resources          ResourceTagOnResource[]
-  services           Service[]               @relation("ServiceToResourceTag")
-  requiredByServices ServiceRequiredTag[]
-
-  @@unique([slug])
-}
-
-model ServiceAllowedStaff {
-  id              String  @id @default(cuid())
-  serviceId       String
-  employeeId      String
-  priority        Int?
-  allowOnlyListed Boolean @default(false)
-
-  service  Service  @relation(name: "ServiceAllowedStaff_to_Service", fields: [serviceId], references: [id], onDelete: Cascade)
-  employee Employee @relation(name: "ServiceAllowedStaff_to_Employee", fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@unique([serviceId, employeeId])
-  @@index([serviceId])
-  @@index([employeeId])
-}
-
-model AppointmentStaff {
-  id            String  @id @default(cuid())
-  appointmentId String
-  employeeId    String
-  roleId        String?
-  isPrimary     Boolean @default(false)
-
-  appointment Appointment @relation("ApptStaffLink", fields: [appointmentId], references: [id], onDelete: Cascade)
-  employee    Employee    @relation("Employee_to_AppointmentStaff", fields: [employeeId], references: [id], onDelete: Cascade)
-  role        StaffRole?  @relation("StaffRole_to_AppointmentStaff", fields: [roleId], references: [id], onDelete: SetNull)
-
-  @@unique([appointmentId, employeeId, roleId])
-  @@index([appointmentId])
-  @@index([employeeId])
-  @@index([roleId])
-}
-
-model AppointmentResource {
-  id            String  @id @default(cuid())
-  appointmentId String
-  resourceId    String
-  isPrimary     Boolean @default(false)
-
-  appointment Appointment @relation("ApptResourceLink", fields: [appointmentId], references: [id], onDelete: Cascade)
-  resource    Resource    @relation("Resource_to_AppointmentResource", fields: [resourceId], references: [id], onDelete: Cascade)
-
-  @@unique([appointmentId, resourceId])
-  @@index([appointmentId])
-  @@index([resourceId])
-}
-
-model ResourceTagOnResource {
-  id            String @id @default(cuid())
-  resourceId    String
-  resourceTagId String
-
-  resource Resource    @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-  tag      ResourceTag @relation(fields: [resourceTagId], references: [id], onDelete: Cascade)
-
-  @@unique([resourceId, resourceTagId])
-}
-
-/// =========================
-/// Appointments - núcleo mínimo
-/// =========================
-
 enum AppointmentStatus {
   PENDING
-  ASSIGNED
   BOOKED
-  CONFIRMED
   COMPLETED
   CANCELLED
   NO_SHOW
-}
-
-model Service {
-  id              String  @id @default(cuid())
-  locationId      String
-  name            String
-  description     String?
-  durationMin     Int     @default(30)
-  bufferBeforeMin Int     @default(0)
-  bufferAfterMin  Int     @default(0)
-  color           String?
-  price           Decimal @default(0) @db.Decimal(10, 2)
-
-  // requisitos simples (v1)
-  requiredRoleId        String?
-  requiredResourceTagId String?
-
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  location     Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  requiredRole StaffRole? @relation(fields: [requiredRoleId], references: [id], onDelete: SetNull)
-
-  // 👇 legacy 1-a-1 (mantén por compatibilidad)
-  requiredTag ResourceTag? @relation("ServiceToResourceTag", fields: [requiredResourceTagId], references: [id], onDelete: SetNull)
-
-  // 👇 nuevo: múltiples requisitos (2.a – 2.c)
-  needsRoles         ServiceNeedRole[] // p.ej. “Higienista O Doctor (1)”
-  needsResourceTypes ServiceNeedResourceType[] // p.ej. “1 sillón”
-  requiredTagsMany   ServiceRequiredTag[] // p.ej. varios tags de recurso
-
-  // preferencias de personal concreto (whitelist opcional)
-  allowedStaff  ServiceAllowedStaff[] @relation("ServiceAllowedStaff_to_Service")
-  appointments  Appointment[]
-  agentSessions AgentSession[]
-
-  @@index([locationId])
-  @@index([active])
-  @@index([requiredRoleId])
-  @@index([requiredResourceTagId])
-}
-
-model ServiceNeedRole {
-  id             String  @id @default(cuid())
-  serviceId      String
-  roleId         String
-  groupKey       String? // mismas groupKey = alternativas; p.ej. "operador"
-  requireAtLeast Int     @default(1) // se aplica por grupo; el código debe consolidarlo por groupKey
-  isOptional     Boolean @default(false)
-
-  service Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  role    StaffRole @relation("StaffRole_to_ServiceNeedRole", fields: [roleId], references: [id], onDelete: Cascade)
-
-  @@index([serviceId])
-  @@index([roleId])
-  @@index([serviceId, groupKey])
-}
-
-model ServiceNeedResourceType {
-  id             String  @id @default(cuid())
-  serviceId      String
-  resourceTypeId String
-  groupKey       String?
-  requireAtLeast Int     @default(1)
-  isOptional     Boolean @default(false)
-
-  service      Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  resourceType ResourceType @relation("ResourceType_to_ServiceNeedResourceType", fields: [resourceTypeId], references: [id], onDelete: Cascade)
-
-  @@index([serviceId])
-  @@index([resourceTypeId])
-  @@index([serviceId, groupKey])
-}
-
-model ServiceRequiredTag {
-  id        String @id @default(cuid())
-  serviceId String
-  tagId     String
-
-  service Service     @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  tag     ResourceTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@unique([serviceId, tagId])
-  @@index([tagId])
-}
-
-model Appointment {
-  id         String            @id @default(cuid())
-  locationId String
-  serviceId  String
-  startAt    DateTime
-  endAt      DateTime
-  status     AppointmentStatus @default(PENDING)
-
-  // 🔁 BACK-REL EMPLOYEE
-  employeeId String?
-  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-
-  // 🔁 BACK-REL RESOURCE
-  resourceId String?
-  resource   Resource? @relation(fields: [resourceId], references: [id], onDelete: SetNull)
-
-  // Cliente (si ya lo tienes, mantenlo)
-  customerId    String?
-  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  customerName  String?
-  customerPhone String?
-  customerEmail String?
-
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // 🔁 BACK-REL: quién lo creó (AGENTE)
-  createdByAgentId String?
-  createdByAgent   Agent?  @relation("AppointmentCreatedByAgent", fields: [createdByAgentId], references: [id], onDelete: SetNull)
-
-  // 🔁 BACK-REL: en qué sesión se creó
-  createdInSessionId String?
-  createdInSession   AgentSession? @relation("AppointmentCreatedInSession", fields: [createdInSessionId], references: [id], onDelete: SetNull)
-
-  location      Location              @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  service       Service               @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  staffLinks    AppointmentStaff[]    @relation("ApptStaffLink")
-  resourceLinks AppointmentResource[] @relation("ApptResourceLink")
-
-  @@index([employeeId, startAt])
-  @@index([locationId, startAt])
-  @@index([createdByAgentId])
-  @@index([createdInSessionId])
 }
 
 enum TimeOffType {
@@ -1015,86 +1529,6 @@ enum TimeOffType {
   BLOCK
   OTHER
 }
-
-model EmployeeTimeOff {
-  id         String   @id @default(cuid())
-  employeeId String
-  locationId String
-  type       String   @default("BLOCK") // si quieres enum, lo definimos luego
-  reason     String?
-  startAt    DateTime
-  endAt      DateTime
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-
-  @@index([employeeId, startAt])
-  @@index([locationId, startAt])
-}
-
-model ResourceTimeOff {
-  id         String   @id @default(cuid())
-  resourceId String
-  locationId String
-  type       String   @default("BLOCK")
-  reason     String?
-  startAt    DateTime
-  endAt      DateTime
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-
-  @@index([resourceId, startAt])
-  @@index([locationId, startAt])
-}
-
-// =========================
-// Customers
-// =========================
-model Customer {
-  id        String   @id @default(cuid())
-  firstName String
-  lastName  String
-  phone     String
-  email     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  appointments Appointment[]
-  companies    CompanyCustomer[]
-
-  // NUEVO: quién/desde dónde lo creó
-  createdByAgentId   String?
-  createdInSessionId String?
-
-  createdByAgent   Agent?        @relation("CustomerCreatedByAgent", fields: [createdByAgentId], references: [id], onDelete: SetNull)
-  createdInSession AgentSession? @relation("CustomerCreatedInSession", fields: [createdInSessionId], references: [id], onDelete: SetNull)
-
-  @@index([phone])
-  @@index([createdInSessionId])
-  @@index([createdByAgentId])
-}
-
-model CompanyCustomer {
-  id         String   @id @default(cuid())
-  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  companyId  String
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  customerId String
-  createdAt  DateTime @default(now())
-
-  // Un cliente solo una vez por compañía
-  @@unique([companyId, customerId])
-  @@index([customerId, companyId])
-}
-
-/// =========================
-/// Agents (base + Voice + Chat)
-/// =========================
 
 enum AgentChannel {
   VOICE
@@ -1133,231 +1567,6 @@ enum AgentEnvironment {
   PROD
 }
 
-model Agent {
-  id        String       @id @default(cuid())
-  companyId String
-  name      String
-  channel   AgentChannel
-  status    AgentStatus  @default(ACTIVE)
-  // metadatos genéricos del agente (labels, tags…)
-  meta      Json?
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-
-  company             Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  voice               VoiceAgent?
-  chat                ChatAgent?
-  sessions            AgentSession[]
-  appointmentsCreated Appointment[]         @relation("AppointmentCreatedByAgent")
-  customersCreated    Customer[]            @relation("CustomerCreatedByAgent")
-  knowledgeSpaces     AgentKnowledgeSpace[]
-
-  @@index([companyId, channel, status])
-  @@index([name])
-}
-
-model VoiceAgent {
-  id                 String  @id @default(cuid())
-  agentId            String  @unique
-  // configuración por defecto (fallback si no hay VoiceAgentSettings activo)
-  defaultModel       String? // p.ej. "gpt-4o-mini"
-  defaultTemperature Float?  @default(0.4)
-  defaultPrompt      String? // prompt base de “persona” del agente
-  // proveedor/telefonía (aunque simulemos, lo dejamos listo)
-  provider           String? // "twilio", "mock", etc.
-  providerConfig     Json? // claves/ids del proveedor
-  // audio
-  voiceName          String? // voz TTS
-  language           String? @default("es-ES")
-
-  agent     Agent                @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  settings  VoiceAgentSettings[]
-  companies Company[]            @relation("CompanyVoiceAgent")
-  phases    AgentPhase[]         @relation("VoiceAgentPhases")
-}
-
-model VoiceAgentSettings {
-  id           String  @id @default(cuid())
-  agentId      String
-  // versionado de prompts / plantillas
-  version      Int     @default(1)
-  isActive     Boolean @default(true)
-  prompt       String // prompt “persona” completo (puede incluir few-shots)
-  model        String? // override de modelo
-  temperature  Float?  @default(0.4)
-  // políticas del turno (máx duración, silencios, barge-in, etc.)
-  policy       Json? // {maxSeconds, silenceTimeoutMs, bargeIn:true, ...}
-  // routing/capacidades (qué endpoints puede tocar)
-  capabilities Json? // { canReadCalendar:true, canBook:true, ... }
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  agent VoiceAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@index([agentId, isActive, version])
-}
-
-model ChatAgent {
-  id                 String  @id @default(cuid())
-  agentId            String  @unique
-  defaultModel       String?
-  defaultTemperature Float?  @default(0.3)
-  defaultPrompt      String?
-
-  agent    Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  settings ChatAgentSettings[]
-}
-
-model ChatAgentSettings {
-  id           String  @id @default(cuid())
-  agentId      String
-  version      Int     @default(1)
-  isActive     Boolean @default(true)
-  prompt       String
-  model        String?
-  temperature  Float?  @default(0.3)
-  policy       Json?
-  capabilities Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  agent ChatAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
-
-  @@index([agentId, isActive, version])
-}
-
-/// =========================
-/// Sesiones, turnos, logs
-/// =========================
-
-model AgentSession {
-  id        String             @id @default(cuid())
-  agentId   String
-  companyId String
-  channel   AgentChannel
-  status    AgentSessionStatus @default(INIT)
-
-  // NUEVO
-  environment AgentEnvironment @default(TEST) // este panel = TEST por defecto
-  source      String?          @default("constructor") // de dónde nace la sesión
-
-  // Metadatos de ejecución (para trazabilidad QA)
-  model        String? // p.ej. "gpt-4o-realtime-preview"
-  voice        String? // p.ej. "alloy"
-  language     String? @default("es")
-  temperature  Float?
-  instructions String? @db.Text
-  settings     Json?   @map("meta")
-
-  // info de conversación/llamada
-  startedAt   DateTime  @default(now()) @map("createdAt")
-  updatedAt   DateTime  @updatedAt @map("updatedAt")
-  endedAt     DateTime?
-  durationSec Int?
-  caller      String?
-  callee      String?
-
-  // vínculo con negocio (ya tenías algunos campos)
-  locationId String?
-  serviceId  String?
-
-  // NUEVO: metadatos de cliente web
-  clientIp  String?
-  userAgent String?
-
-  // RELACIONES (ya existentes)
-  agent    Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  location Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  service  Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
-
-  turns AgentTurn[]
-  logs  AgentLog[]
-
-  // NUEVO: “opuestos” para lo que se cree durante la sesión
-  createdCustomers    Customer[]    @relation("CustomerCreatedInSession")
-  createdAppointments Appointment[] @relation("AppointmentCreatedInSession")
-
-  @@index([agentId, companyId, channel, status])
-  @@index([environment, startedAt]) // útil para separar TEST/PROD
-  @@index([startedAt])
-}
-
-model AgentTurn {
-  id        String        @id @default(cuid())
-  sessionId String
-  role      AgentTurnRole // USER | AGENT | SYSTEM | TOOL
-  text      String? // texto transcrito o generado
-  audioUrl  String? // si guardas TTS o grabación
-  payload   Json? // {nlu, entities, toolCalls, modelRaw, ...}
-  createdAt DateTime      @default(now())
-
-  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@index([sessionId, createdAt])
-  @@index([role])
-}
-
-model AgentLog {
-  id        String        @id @default(cuid())
-  sessionId String
-  level     AgentLogLevel @default(INFO)
-  message   String
-  payload   Json?
-  createdAt DateTime      @default(now())
-
-  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@index([sessionId, level, createdAt])
-}
-
-/// ==============================
-/// Fases reutilizables
-/// ==============================
-model Phase {
-  id     String    @id @default(cuid())
-  key    String // slug estable, reutilizable p.ej. "intro", "solicitud_datos"
-  label  String // nombre visible
-  type   PhaseType @default(CUSTOM)
-  prompt String // plantilla base (se puede sobrescribir en AgentPhase.overrides)
-  meta   Json? // datos auxiliares (checklists, UI hints…)
-
-  // Relaciones
-  agents AgentPhase[] // N–N con VoiceAgent a través de AgentPhase
-
-  // Auditoría
-  createdById String?
-  createdBy   User?    @relation("UserPhasesCreated", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@unique([key])
-}
-
-/// ==============================
-/// Pivot N–N con orden/prioridad/overrides
-/// ==============================
-model AgentPhase {
-  id        String  @id @default(cuid())
-  agentId   String
-  phaseId   String
-  order     Int
-  priority  Int?
-  overrides Json?
-  isEnabled Boolean @default(true)
-
-  agent VoiceAgent @relation("VoiceAgentPhases", fields: [agentId], references: [id], onDelete: Cascade)
-  phase Phase      @relation(fields: [phaseId], references: [id], onDelete: Restrict)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([agentId, phaseId])
-  @@index([agentId, order])
-}
-
 /// Tipos de fase canónicos
 enum PhaseType {
   INTRO
@@ -1366,83 +1575,69 @@ enum PhaseType {
   CUSTOM
 }
 
-model KnowledgeSpace {
-  id        String         @id @default(cuid())
-  companyId String
-  name      String
-  scope     KnowledgeScope @default(COMPANY)
-  isActive  Boolean        @default(true)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-
-  company           Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  docs              KnowledgeDoc[]
-  agents            AgentKnowledgeSpace[]
-  knowledgeSections KnowledgeSection[]
-
-  @@index([companyId, scope, isActive])
+enum billing_period {
+  ONCE
+  DAY
+  WEEK
+  MONTH
+  YEAR
 }
 
-model KnowledgeDoc {
-  id         String   @id @default(cuid())
-  spaceId    String
-  title      String
-  sourceUrl  String?
-  mime       String? // "text/markdown", "text/plain", ...
-  text       String   @db.Text
-  tokens     Int?
-  chunkCount Int?
-  updatedAt  DateTime @default(now()) @updatedAt
-  createdAt  DateTime @default(now())
-
-  space  KnowledgeSpace   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-  chunks KnowledgeChunk[]
-
-  @@index([spaceId, updatedAt])
+enum discount_duration {
+  ONCE
+  REPEATING
+  FOREVER
 }
 
-model KnowledgeChunk {
-  id      String @id @default(cuid())
-  docId   String
-  idx     Int
-  content String @db.Text
-  // embedding Json?    // añade si ya usas vector DB
-
-  doc KnowledgeDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
-
-  @@unique([docId, idx])
-  @@index([docId])
+enum entitlement_source {
+  SUBSCRIPTION
+  MANUAL
+  TRIAL
+  PROMO
 }
 
-model AgentKnowledgeSpace {
-  id      String @id @default(cuid())
-  agentId String
-  spaceId String
-
-  agent Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  space KnowledgeSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-
-  @@unique([agentId, spaceId])
-  @@index([spaceId])
+enum invoice_status {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
 }
 
-model KnowledgeSection {
-  id         String              @id @default(cuid())
-  companyId  String
-  spaceId    String? // opcional: si quieres agrupar en un KnowledgeSpace existente
-  title      String
-  slug       String // único dentro de la empresa
-  content    String              @db.Text
-  visibility KnowledgeVisibility @default(PUBLIC)
-  position   Int                 @default(0)
-  isActive   Boolean             @default(true)
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
+enum payment_method_type {
+  CARD
+  SEPA_DEBIT
+  BANK_TRANSFER
+  WALLET
+  OTHER
+}
 
-  company Company         @relation(fields: [companyId], references: [id])
-  space   KnowledgeSpace? @relation(fields: [spaceId], references: [id])
+enum payment_status {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
 
-  @@unique([companyId, slug]) // evita duplicados por empresa
-  @@index([companyId])
-  @@index([spaceId])
+enum product_type {
+  STANDALONE
+  ADDON
+  SEAT
+  USAGE
+  LOCATION
+}
+
+enum product_visibility {
+  PUBLIC
+  HIDDEN
+  INTERNAL
+}
+
+enum subscription_status {
+  INCOMPLETE
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  PAUSED
+  CANCELED
 }

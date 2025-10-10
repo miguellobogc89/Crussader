@@ -75,7 +75,7 @@ export default function EstablishmentKpis({ establishment }: Props) {
                 Nuevas esta semana
               </div>
               <div className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold text-emerald-700">
-                {weeklyNew}
+                {weeklyNew > 0 ? `+${weeklyNew}` : weeklyNew}
               </div>
               <div className="mt-1 text-[11px] sm:text-xs text-neutral-500">
                 Últimos 7 días
@@ -86,13 +86,13 @@ export default function EstablishmentKpis({ establishment }: Props) {
         </div>
       </div>
 
-      {/* Card 3 — % mejora rating 30d */}
+      {/* Card 3 — Rating (30 días) */}
       <div className="rounded-2xl p-[0.5px] sm:p-[1px] bg-gradient-to-r from-indigo-400 to-indigo-600">
         <div className="rounded-[14px] bg-white shadow-sm h-full">
           <div className="flex items-center justify-between p-3 sm:p-4">
             <div>
               <div className="text-[11px] sm:text-xs font-medium uppercase tracking-wide text-neutral-500">
-                Mejora rating (30 días)
+                Cambio rating (30 días)
               </div>
               <div className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">
                 <span
@@ -104,17 +104,22 @@ export default function EstablishmentKpis({ establishment }: Props) {
                       : "text-neutral-700"
                   }
                 >
-                  <Delta />
+                  {deltaPct > 0 ? "+" : ""}
+                  {(establishment as any)?.ratingDelta?.toFixed(2) ?? "—"}
                 </span>
               </div>
               <div className="mt-1 text-[11px] sm:text-xs text-neutral-500">
-                vs. media de hace 30 días
+                {deltaPct > 0 ? "+" : deltaPct < 0 ? "−" : "±"}
+                {Math.abs(Math.round(deltaPct))}% vs hace 30 días
               </div>
             </div>
-            <div className="text-2xl sm:text-3xl select-none" aria-hidden>🚀</div>
+            <div className="text-2xl sm:text-3xl select-none" aria-hidden>
+              🚀
+            </div>
           </div>
         </div>
       </div>
+
 
       {/* Card 4 — Pendientes de respuesta */}
       <div className="rounded-2xl p-[0.5px] sm:p-[1px] bg-gradient-to-r from-sky-400 to-sky-600">
