@@ -36,6 +36,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { title: "Reseñas", href: "/dashboard/reviews", icon: "💬", description: "Métricas y estadísticas" },
       { title: "Reportes", href: "/dashboard/reports", icon: "📋", description: "Generación de informes" },
+      { title: "Informes", href: "/dashboard/informes", icon: "📈", description: "Informes real" },
       { title: "Gráficos", href: "/dashboard/charts-test", icon: "📈", description: "Visualizaciones" },
       { title: "Reportes de prueba", href: "/dashboard/reports-test", icon: "🧪", description: "Sandbox" },
     ],

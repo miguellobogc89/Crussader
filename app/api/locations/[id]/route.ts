@@ -123,48 +123,82 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       },
     });
 
+    // 1.c️⃣ Reseñas sin respuesta
+    const unansweredCount = await prisma.review.count({
+      where: {
+        locationId,
+        responses: { none: {} }, // ningún Response asociado
+      },
+    });
+
+
     const today = mapKpi(todayKpi);
     const latest = mapKpi(latestKpi);
     const history = last30.map(mapKpi);
 
-    // 🟦 Cálculo de mejora/empeora del rating
-    let ratingToday: number | null = null;
-    let rating30DaysAgo: number | null = null;
-    let ratingDelta: number | null = null;
-    let ratingDeltaPct: number | null = null;
+    // 4️⃣ Relectura de la Location para tener los valores actualizados del trigger
+    const updatedLocation = await prisma.location.findUnique({
+      where: { id: locationId },
+      select: {
+        id: true,
+        title: true,
+        city: true,
+        status: true,
+        slug: true,
+        companyId: true,
+        featuredImageUrl: true,
+        reviewsAvg: true,
+        reviewsCount: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
-    // Usa KPI si existe, sino los datos base de la location
-    if (latestKpi) {
-      ratingToday = num(latestKpi.avg30d) ?? num(latestKpi.avgAll);
-      rating30DaysAgo = num(latestKpi.prev30dAvg);
-    } else if (location) {
-      ratingToday = num(location.reviewsAvg);
-      rating30DaysAgo = num(location.reviewsAvg); // fallback si no hay histórico
-    }
+    // 5️⃣ Cálculo de rating de hace más de 30 días
+    const ratingToday: number = num(updatedLocation?.reviewsAvg) ?? num(location?.reviewsAvg) ?? 0;
 
-    if (ratingToday != null && rating30DaysAgo != null && rating30DaysAgo !== 0) {
-      ratingDelta = ratingToday - rating30DaysAgo;
-      ratingDeltaPct = ((ratingToday - rating30DaysAgo) / rating30DaysAgo) * 100;
-    }
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 30);
 
-    // Totales
+    const aggOld = await prisma.review.aggregate({
+      _avg: { rating: true },
+      where: {
+        locationId,
+        createdAtG: { lt: thirtyDaysAgo }, // todas las reseñas anteriores a hace 30 días
+      },
+    });
+
+    const rating30DaysAgo = num(aggOld._avg.rating);
+    const ratingDelta = ratingToday - (rating30DaysAgo ?? ratingToday);
+    const ratingDeltaPct =
+      rating30DaysAgo && rating30DaysAgo !== 0
+        ? ((ratingToday - rating30DaysAgo) / rating30DaysAgo) * 100
+        : 0;
+
+    console.log("📊 ratingToday:", ratingToday);
+    console.log("📊 rating30DaysAgo:", rating30DaysAgo);
+    console.log("📊 ratingDelta:", ratingDelta);
+    console.log("📊 ratingDeltaPct:", ratingDeltaPct);
+
+    // 6️⃣ Totales
     const totals = latest
       ? {
           totalReviews: latest.totalReviews,
           newReviews7d: latest.newReviews7d,
           newReviews30d: latest.newReviews30d,
-          unansweredCount: latest.unansweredCount,
+          unansweredCount, // ✅ añadido aquí
           responses7d: latest.responses7d,
         }
       : {
           totalReviews: location?.reviewsCount ?? 0,
           newReviews7d: recentReviewsCount,
           newReviews30d: null,
-          unansweredCount: null,
+          unansweredCount, // ✅ añadido también aquí
           responses7d: null,
         };
 
-    // Rates
+
+    // 7️⃣ Rates
     const rates = {
       avgAll: ratingToday,
       ratingToday,
@@ -173,17 +207,17 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       ratingDeltaPct,
     };
 
-    // ✅ Salida final unificada
+    // ✅ Salida final
     return NextResponse.json({
       ok: true,
       data: {
-        location: location
+        location: updatedLocation
           ? {
-              ...location,
-              reviewsAvg: num(location.reviewsAvg),
-              reviewsCount: location.reviewsCount ?? 0,
-              createdAt: location.createdAt?.toISOString?.() ?? null,
-              updatedAt: location.updatedAt?.toISOString?.() ?? null,
+              ...updatedLocation,
+              reviewsAvg: num(updatedLocation.reviewsAvg),
+              reviewsCount: updatedLocation.reviewsCount ?? 0,
+              createdAt: updatedLocation.createdAt?.toISOString?.() ?? null,
+              updatedAt: updatedLocation.updatedAt?.toISOString?.() ?? null,
             }
           : null,
         kpis: {
@@ -201,9 +235,6 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     });
   } catch (e: any) {
     console.error("[GET /api/locations/[id]] 💥 Error completo:", e);
-    return NextResponse.json(
-      { ok: false, error: e.message || String(e) },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: e.message || String(e) }, { status: 500 });
   }
 }

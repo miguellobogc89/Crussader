@@ -20,24 +20,33 @@ export default function EstablishmentKpis({ establishment }: Props) {
   const rating = typeof establishment?.rating === "number" ? establishment.rating : null;
   const totalReviews = establishment?.totalReviews ?? 0;
   const weeklyNew = (establishment as any)?.weeklyNewReviews ?? 0;
-  const deltaPctRaw = (establishment as any)?.ratingDelta30dPct;
-  const deltaPct =
-    typeof deltaPctRaw === "number" ? Math.round(deltaPctRaw * 10) / 10 : 0;
+  const deltaRaw = (establishment as any)?.ratingDelta ?? 0;
+  const deltaPctRaw = (establishment as any)?.ratingDeltaPct ?? 0;
   const pending = establishment?.pendingResponses ?? 0;
+
+  // Redondeos y signos
+  const deltaValue =
+    typeof deltaRaw === "number" ? Math.round(deltaRaw * 100) / 100 : 0;
+  const deltaPct =
+    typeof deltaPctRaw === "number" ? Math.round(deltaPctRaw) : 0;
 
   const Delta = () => (
     <span
       className={
-        deltaPct > 0
+        deltaValue > 0
           ? "text-emerald-700"
-          : deltaPct < 0
+          : deltaValue < 0
           ? "text-rose-700"
           : "text-neutral-600"
       }
     >
-      {deltaPct > 0 ? "▲" : deltaPct < 0 ? "▼" : "•"} {Math.abs(deltaPct)}%
+      {deltaValue > 0 ? "▲" : deltaValue < 0 ? "▼" : "•"}{" "}
+      {deltaValue > 0 ? "+" : ""}
+      {deltaValue} ({deltaPct > 0 ? "+" : ""}
+      {deltaPct}%)
     </span>
   );
+
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
@@ -86,31 +95,46 @@ export default function EstablishmentKpis({ establishment }: Props) {
         </div>
       </div>
 
-      {/* Card 3 — Rating (30 días) */}
+      {/* Card 3 — Mejora rating (30 días) */}
       <div className="rounded-2xl p-[0.5px] sm:p-[1px] bg-gradient-to-r from-indigo-400 to-indigo-600">
         <div className="rounded-[14px] bg-white shadow-sm h-full">
           <div className="flex items-center justify-between p-3 sm:p-4">
             <div>
               <div className="text-[11px] sm:text-xs font-medium uppercase tracking-wide text-neutral-500">
-                Cambio rating (30 días)
+                Mejora rating (30 días)
               </div>
+
+              {/* Valor principal: diferencia absoluta con signo */}
               <div className="mt-1 sm:mt-2 text-2xl sm:text-3xl font-bold">
                 <span
                   className={
-                    deltaPct > 0
+                    deltaRaw > 0
                       ? "text-emerald-700"
-                      : deltaPct < 0
+                      : deltaRaw < 0
                       ? "text-rose-700"
                       : "text-neutral-700"
                   }
                 >
-                  {deltaPct > 0 ? "+" : ""}
-                  {(establishment as any)?.ratingDelta?.toFixed(2) ?? "—"}
+                  {deltaRaw > 0 ? "+" : deltaRaw < 0 ? "−" : ""}
+                  {deltaValue}
                 </span>
               </div>
+
+              {/* Subtexto: porcentaje con signo */}
               <div className="mt-1 text-[11px] sm:text-xs text-neutral-500">
-                {deltaPct > 0 ? "+" : deltaPct < 0 ? "−" : "±"}
-                {Math.abs(Math.round(deltaPct))}% vs hace 30 días
+                <span
+                  className={
+                    deltaRaw > 0
+                      ? "text-emerald-700"
+                      : deltaRaw < 0
+                      ? "text-rose-700"
+                      : "text-neutral-600"
+                  }
+                >
+                  {deltaPct > 0 ? "+" : deltaPct < 0 ? "−" : ""}
+                  {Math.abs(deltaPct)}%
+                </span>{" "}
+                vs. hace 30 días
               </div>
             </div>
             <div className="text-2xl sm:text-3xl select-none" aria-hidden>
@@ -119,6 +143,8 @@ export default function EstablishmentKpis({ establishment }: Props) {
           </div>
         </div>
       </div>
+
+
 
 
       {/* Card 4 — Pendientes de respuesta */}
