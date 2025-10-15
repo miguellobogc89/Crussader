@@ -3,21 +3,10 @@
 /**
  * app/dashboard/concepts/page.tsx
  * =========================================================
- * Propósito:
- * - Mostrar conceptos existentes (badges verde/rojo).
- * - Mostrar topics (accordion con sus concepts).
- * - Botón "Calcular topics" que llama a /api/.../llm-group vía GET (compatible navegador).
- *
- * Endpoints que usa:
- * - GET /api/reviews/tasks/concepts/list   (opcional; si no existe, hace fallback)
- * - GET /api/concepts/summary              (fallback para concepts)
- * - GET /api/reviews/tasks/topics/list     (topics existentes)
- * - GET /api/reviews/tasks/topics/llm-group?run=1&dryRun=0   (calcula y persiste)
- *
- * Notas:
- * - Si no hay concepts, lo indica.
- * - Si no hay topics, lo indica y ofrece calcular.
- * - Tras calcular topics, refresca la lista automáticamente.
+ * - Muestra conceptos (badges verde/rojo)
+ * - Muestra topics (accordion con sus concepts)
+ * - Botón "Calcular topics (rebuild)" → borra topics, limpia asignaciones y recalcula
+ * - Botón "Borrar concepts & topics" → limpia tablas y resetea reviews
  * =========================================================
  */
 
@@ -71,74 +60,65 @@ export default function ConceptsAndTopicsPage() {
     }
   }
 
-async function loadConceptsWithFallback(): Promise<Concept[]> {
-  // 1) Endpoint nuevo
-  try {
-    const res = await fetch("/api/reviews/tasks/concepts/list", { cache: "no-store" });
-    if (res.ok) {
-      const json = await res.json();
-      if (json?.ok && Array.isArray(json?.concepts)) {
-        // Admite tanto {avg_rating} como {rating}
-        return (json.concepts as any[]).map((c, i) => ({
-          id: String(c.id ?? i),
-          label: String(c.label ?? "Concepto"),
-          avg_rating:
-            typeof c.avg_rating === "number"
-              ? c.avg_rating
-              : typeof c.rating === "number"
-              ? c.rating
-              : null,
-          review_count:
-            typeof c.review_count === "number" ? c.review_count : null,
-        }));
+  async function loadConceptsWithFallback(): Promise<Concept[]> {
+    try {
+      const res = await fetch("/api/reviews/tasks/concepts/list", { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.ok && Array.isArray(json?.concepts)) {
+          return (json.concepts as any[]).map((c, i) => ({
+            id: String(c.id ?? i),
+            label: String(c.label ?? "Concepto"),
+            avg_rating:
+              typeof c.avg_rating === "number"
+                ? c.avg_rating
+                : typeof c.rating === "number"
+                ? c.rating
+                : null,
+            review_count: typeof c.review_count === "number" ? c.review_count : null,
+          }));
+        }
       }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
+
+    try {
+      const res = await fetch("/api/concepts/summary", { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (Array.isArray(json)) {
+        return json.map((x: any, i: number) => ({
+          id: String(i),
+          label: String(x.topic ?? x.label ?? "Concepto"),
+          avg_rating: typeof x.avgRating === "number" ? x.avgRating : null,
+          review_count: typeof x.docs === "number" ? x.docs : null,
+        })) as Concept[];
+      }
+      if (Array.isArray(json?.items)) {
+        return json.items.map((x: any, i: number) => ({
+          id: String(i),
+          label: String(x.topic ?? x.label ?? "Concepto"),
+          avg_rating: typeof x.avgRating === "number" ? x.avgRating : null,
+          review_count: typeof x.docs === "number" ? x.docs : null,
+        })) as Concept[];
+      }
+    } catch {
+      // ignore
+    }
+
+    return [];
   }
-
-  // 2) Fallback antiguo
-  try {
-    const res = await fetch("/api/concepts/summary", { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    if (Array.isArray(json)) {
-      return json.map((x: any, i: number) => ({
-        id: String(i),
-        label: String(x.topic ?? x.label ?? "Concepto"),
-        avg_rating: typeof x.avgRating === "number" ? x.avgRating : null,
-        review_count: typeof x.docs === "number" ? x.docs : null,
-      })) as Concept[];
-    }
-    if (Array.isArray(json?.items)) {
-      return json.items.map((x: any, i: number) => ({
-        id: String(i),
-        label: String(x.topic ?? x.label ?? "Concepto"),
-        avg_rating: typeof x.avgRating === "number" ? x.avgRating : null,
-        review_count: typeof x.docs === "number" ? x.docs : null,
-      })) as Concept[];
-    }
-  } catch {
-    // ignore
-  }
-
-  return [];
-}
-
 
   async function loadTopics(): Promise<Topic[]> {
     const res = await fetch("/api/reviews/tasks/topics/list", { cache: "no-store" });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status} en /topics/list`);
-    }
+    if (!res.ok) throw new Error(`HTTP ${res.status} en /topics/list`);
     const json = await res.json();
     if (!json?.ok) throw new Error(json?.error || "Respuesta no OK en /topics/list");
     const topics = (json.topics || []) as Topic[];
-    // aseguremos campo concepts
     for (const t of topics) {
       // @ts-ignore
       if (!Array.isArray(t.concepts) && Array.isArray((t as any).concept)) {
-        // Prisma venía como t.concept, lo normalizamos:
         // @ts-ignore
         t.concepts = (t as any).concept;
         // @ts-ignore
@@ -154,22 +134,52 @@ async function loadConceptsWithFallback(): Promise<Concept[]> {
     setError(null);
     setToast(null);
     try {
-      // GET compatible con navegador (persiste):
-      const url = "/api/reviews/tasks/topics/llm-group?run=1&dryRun=0&limit=200&includeAssigned=0";
+      const url =
+        "/api/reviews/tasks/topics/llm-group?run=1&dryRun=0&limit=200&includeAssigned=0&rebuild=1";
       const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status} al calcular topics`);
       const json = await res.json();
-      if (!json?.ok) throw new Error(json?.error || "Falló el cálculo de topics");
+      if (!json?.ok && json?.ok !== undefined)
+        throw new Error(json?.error || "Falló el cálculo de topics");
+
       setToast(
         `Topics creados: ${json?.createdTopics ?? 0}. Concepts asignados: ${json?.assignedConcepts ?? 0}.`
       );
-      // refrescar lista de topics
-      const t = await loadTopics();
-      setTopics(t);
+
+      const [conceptList, topicList] = await Promise.all([
+        loadConceptsWithFallback(),
+        loadTopics(),
+      ]);
+      setConcepts(conceptList);
+      setTopics(topicList);
     } catch (e: any) {
       setError(e?.message || "Error creando topics");
     } finally {
       setLoadingTopics(false);
+    }
+  }
+
+  async function handleWipe() {
+    setError(null);
+    setToast(null);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/reset-concepts-topics", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ resetReviews: true }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status} al borrar datos`);
+      const json = await res.json();
+      if (!json?.ok) throw new Error(json?.error || "Reset no OK");
+
+      setToast("Concepts & topics borrados. Reviews marcadas como pendientes.");
+      setConcepts([]);
+      setTopics([]);
+    } catch (e: any) {
+      setError(e?.message || "No se pudo borrar tables");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -197,9 +207,18 @@ async function loadConceptsWithFallback(): Promise<Concept[]> {
             onClick={handleCalcTopics}
             className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-60"
             disabled={loading || loadingTopics}
-            title="Agrupar concepts en topics (persistir)"
+            title="Reagrupar concepts en topics (rebuild + persistir)"
           >
-            {loadingTopics ? "Calculando topics..." : "Calcular topics"}
+            {loadingTopics ? "Calculando..." : "Calcular topics (rebuild)"}
+          </button>
+
+          <button
+            onClick={handleWipe}
+            className="px-3 py-2 rounded-lg bg-red-600 text-white text-sm hover:bg-red-700 disabled:opacity-60"
+            disabled={loading || loadingTopics}
+            title="Borrar concepts & topics y resetear reviews"
+          >
+            Borrar concepts & topics
           </button>
         </div>
       </header>

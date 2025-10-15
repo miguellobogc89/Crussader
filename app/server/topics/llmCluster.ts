@@ -3,18 +3,17 @@
 // 📌 Propósito:
 // Agrupar *concepts* existentes usando la IA en clusters (topics).
 //
-// Cómo funciona (simple):
+// Flujo:
 // - Lee concepts (por defecto SOLO los que no tienen topic_id).
-// - Envía al LLM la lista {id, label} y pide una agrupación en JSON:
+// - Envía al LLM la lista {id, label} y pide agrupación JSON:
 //     { topics: [{ label, description?, members: [conceptId, ...] }, ...] }
-// - Si dryRun=true → solo devuelve la propuesta (no escribe en DB).
-// - Si dryRun=false → crea los topics y asigna concept.topic_id en transacción.
-// - No seteamos 'centroid' (Unsupported en Prisma); si alguna vez quieres
-//   centroid por embedding, haz un UPDATE vía $queryRaw tras crear.
+// - Si dryRun=true → devuelve la propuesta (no escribe en DB).
+// - Si dryRun=false → crea topics y asigna concept.topic_id en transacción.
+// - avg_rating del topic = media de concept.rating de sus miembros.
 //
 // Parámetros:
-//   limit?: número máximo de concepts a considerar (default 200)
-//   includeAssigned?: si true, incluye también los ya asignados a algún topic
+//   limit?: máx. concepts a considerar (default 200)
+//   includeAssigned?: si true, incluye también ya asignados a topic
 //   dryRun?: si true, no persiste cambios (default true)
 // ===================================================
 
@@ -25,7 +24,6 @@ type ConceptLite = {
   id: string;
   label: string;
   topic_id: string | null;
-  // ⛔️ avg_rating eliminado del modelo concept → no lo mantenemos aquí.
 };
 
 type LLMTopicsResponse = {
@@ -83,8 +81,7 @@ export async function llmGroupConcepts(opts?: {
   const dryRun = opts?.dryRun !== false ? true : false;
 
   // 1) Cargar concepts
-  // ⛔️ 'review_count' ya no existe para orderBy.
-  // ✅ Si quieres priorizar por volumen, usa el recuento de la relación review_concept.
+  // Prioriza por nº de vínculos (si existe la relación) y fecha de actualización
   const concepts = await prisma.concept.findMany({
     where: includeAssigned ? {} : { topic_id: null },
     orderBy: [
@@ -96,12 +93,7 @@ export async function llmGroupConcepts(opts?: {
       id: true,
       label: true,
       topic_id: true,
-      // ⛔️ avg_rating eliminado del select
-      model: true,          // (no lo usamos, pero no molesta)
-      created_at: true,     // idem
-      updated_at: true,     // idem
-      sentiment: true,      // idem
-      confidence: true,     // idem
+      updated_at: true,
     },
   });
 
@@ -118,7 +110,7 @@ export async function llmGroupConcepts(opts?: {
     };
   }
 
-  // Adaptamos el tipo a ConceptLite (ignoramos campos extra)
+  // Adaptar a ConceptLite
   const lite: ConceptLite[] = concepts.map((c) => ({
     id: c.id,
     label: c.label,
@@ -127,7 +119,6 @@ export async function llmGroupConcepts(opts?: {
 
   // 2) LLM → clustering
   const messages = buildPrompt(lite);
-
   const resp = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.2,
@@ -135,6 +126,7 @@ export async function llmGroupConcepts(opts?: {
     messages,
   });
 
+  // Parseo robusto
   let json: LLMTopicsResponse | null = null;
   try {
     const raw = resp.choices?.[0]?.message?.content ?? "{}";
@@ -176,7 +168,7 @@ export async function llmGroupConcepts(opts?: {
         label: String(t.label || "").trim().slice(0, 120) || "Sin título",
         description: t.description ? String(t.description).slice(0, 240) : null,
         members: validMembers,
-    };
+      };
     })
     .filter((t) => t.members.length > 0);
 
@@ -209,22 +201,22 @@ export async function llmGroupConcepts(opts?: {
 
   await prisma.$transaction(async (tx) => {
     for (const topic of cleaned) {
-      // ✅ Calcular promedio de rating usando la tabla review_concept
-      // (concept ya no guarda avg_rating)
-      const agg = await tx.review_concept.aggregate({
-        _avg: { rating: true },
-        where: { concept_id: { in: topic.members } },
-      });
-      const avg = agg._avg.rating ?? null;
+      // Media de concept.rating para los miembros del topic (SQL crudo por compat)
+      const idsList = topic.members.map((id) => `'${id}'`).join(",");
+      const avgRow = await tx.$queryRawUnsafe<{ avg: number | null }[]>(
+        `SELECT AVG(rating)::float AS avg
+         FROM concept
+         WHERE id IN (${idsList}) AND rating IS NOT NULL`
+      );
+      const avg = avgRow?.[0]?.avg ?? null;
 
       const createdTopic = await tx.topic.create({
         data: {
           label: topic.label,
           description: topic.description ?? undefined,
           model: "gpt-4o-mini",
-          // centroid: OMITIDO (Unsupported en Prisma client)
           concept_count: topic.members.length,
-          avg_rating: avg, // number | null
+          avg_rating: avg, // 👈 media de estrellas de sus concepts
           is_stable: topic.members.length >= 3,
         },
         select: { id: true },

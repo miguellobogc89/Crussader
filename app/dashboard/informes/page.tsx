@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/app
 import { CalendarDays } from "lucide-react";
 import KeywordsCloud from "@/app/components/insights/KeywordsCloud";
 import ThemesSummary from "@/app/components/insights/ThemesSummary";
+import BubblesGalaxy from "@/app/components/insights/BubblesGalaxy"; // 👈 nuevo
 
 function rangeDefaults() {
   const today = new Date();
@@ -57,8 +58,30 @@ export default function InformesPage() {
       variant="default"
       backFallback="/dashboard"
     >
-      {/* Palabras (n-gramas crudos por sentimiento) */}
+      {/* Burbujas por conceptos (filtra por Company/Location) */}
       <div className="grid grid-cols-1 gap-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle>Mapa de burbujas de conceptos</CardTitle>
+            <CardDescription>
+              Diámetro proporcional a frecuencia · color según ★rating · borde opaco, relleno semitransparente.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BubblesGalaxy
+              companyId={currentCompanyId ?? null}
+              locationId={currentLocationId ?? null}
+              from={from}
+              to={to}
+              maxNodes={60}
+              height={520}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Palabras (n-gramas crudos por sentimiento) */}
+      <div className="grid grid-cols-1 gap-6 mt-6">
         <KeywordsCloud companyId={currentCompanyId ?? ""} locationId={currentLocationId ?? null} />
       </div>
 

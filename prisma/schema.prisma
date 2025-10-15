@@ -1402,20 +1402,32 @@ model subscription_item {
 }
 
 model concept {
-  id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  label          String
-  model          String
-  centroid       Unsupported("vector")?
-  created_at     DateTime               @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime               @default(now()) @db.Timestamptz(6)
-  topic_id       String?                @db.Uuid
-  sentiment      String?
-  confidence     Float?                 @db.Real
-  topic          topic?                 @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
-  review_concept review_concept[]
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label             String
+  model             String
+  centroid          Unsupported("vector")?
+  created_at        DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime               @default(now()) @db.Timestamptz(6)
+  topic_id          String?                @db.Uuid
+  sentiment         String?
+  confidence        Float?                 @db.Real
+  relevance         Float?                 @default(1) @db.Real
+  assigned_at       DateTime?              @db.Timestamptz(6)
+  rating            Int?
+  review_created_at DateTime?              @db.Timestamptz(6)
+  review_date       DateTime?              @db.Timestamptz(6)
+  company_id        String?
+  location_id       String?
+  topic             topic?                 @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
+  review_concept    review_concept[]
 
   @@index([centroid], map: "idx_concept_centroid")
   @@index([sentiment], map: "idx_concept_sentiment")
+  @@index([company_id], map: "idx_concept_company_id")
+  @@index([location_id], map: "idx_concept_location_id")
+  @@index([rating], map: "idx_concept_rating")
+  @@index([review_created_at], map: "idx_concept_review_created_at")
+  @@index([review_date], map: "idx_concept_review_date")
 }
 
 model review_concept {
