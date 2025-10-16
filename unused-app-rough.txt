@@ -1,0 +1,291 @@
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\robots.ts: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\sitemap.ts: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\type.ts: View, CalendarAppt
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarOnly\layout.ts: MIN_PILL_PX, clamp, posFromTimesTZ
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarOnly\types.ts: Appointment, View
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarOnly\tz.ts: TIMEZONE
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\sidebar\types.ts: NavGroup
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\use-toast.ts: useToast, toast
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\config\nav.ts: NavItem, getNavItems, findActiveItem
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\admin\voiceagents\actions\_types.ts: AgentSettings, PartialSettings
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\admin\voiceagents\actions\actions.ts: listAssignableCompanies, listAllVoiceAgentsForAssignment, setCompanyVoiceAgent, getCompanyCalendarSummary, listCompanyVoiceAgents, createVoiceAgentForCompany, listCompanyLocations, assignVoiceAgentToLocations, unassignVoiceAgentFromLocations
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\admin\voiceagents\actions\agents.actions.ts: AgentListItem, listVoiceAgents, createVoiceAgent, duplicateVoiceAgent, deleteVoiceAgent, renameVoiceAgent, toggleVoiceAgent, AdminAgentListItem, listAllAgentsAdmin
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\admin\voiceagents\actions\agents.helpers.ts: getVoiceAgentIdByAgent, resolveCompanyId, buildCompanyKnowledge
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\admin\voiceagents\actions\chat.actions.ts: Slots, TurnInference, generateIntroFromPrompt, generateReplyFromPrompt, classifyTurn
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\admin\voiceagents\actions\flow.actions.ts: Stage, listStages, saveFlowForAgent
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\_types.ts: AgentSettings, PartialSettings
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\actions.ts: loadAgentSettings, saveAgentSettings, loadCompanyMeta
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\agents.actions.ts: AgentListItem, listVoiceAgents, createVoiceAgent, duplicateVoiceAgent, deleteVoiceAgent, renameVoiceAgent, toggleVoiceAgent
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\agents.helpers.ts: getVoiceAgentIdByAgent
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\chat.actions.ts: Slots, TurnInference, generateIntroFromPrompt, generateReplyFromPrompt, classifyTurn
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\flow.actions.ts: Stage, listStages, saveFlowForAgent
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\_lib\template.ts: PROMPT_BUILDER_VERSION, LLMRole, LLMMessage, BusinessContext, AgentStyleId, AgentStylePreset, StyleControls, AgentRulesConfig, AgentSettings, PhaseInput, BuildMessagesInput, HARD_RULES_V1, STYLE_PRESETS, buildMessagesFromSettingsV2, trimToNSentences, hasConcreteExample, buildOutputContract, buildMessagesFromSettings, computeGreeting, shortCompanyName, renderTemplate, buildBusinessContextFromKnowledge
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\createDeepgramClient.ts: createDeepgramClient
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\useNewRealtimeCall.ts: useNewRealtimeCall
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\hooks\useDeepgramRealtime.ts: useDeepgramRealtime
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\hooks\useRingtone.ts: useRingtone
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\hooks\useTranscriber.ts: TranscriberOpts
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\hooks\deprecated\useContinuousSTT.ts: useContinuousSTT
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\hooks\deprecated\useMicAccess.ts: useMicAccess
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\hooks\deprecated\useSmartAudio.ts: useSmartAudio
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\hooks\locationEvents.ts: triggerLocationsRefresh
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\hooks\useCompanyLocations.ts: LocationRow, useCompanyLocations
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\providers\bootstrap-store.ts: BootstrapState, useBootstrapData, useBootstrapStatus, useBootstrapError
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\schemas\response-settings.ts: ResponseSettingsSchema, ResponseSettings
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\server\embeddings.ts: EMBEDDING_DIM, cosine, embedText
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\server\openaiClient.ts: LABEL_MODEL
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\server\concepts\extractConcepts.ts: ExtractedConcept
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\server\concepts\processBatch.ts: countPendingForLocation, processUnconceptualizedForLocation, processUnconceptualizedBatch
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\server\concepts\recomputeCentroids.ts: recomputeConceptCentroids
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\server\concepts\recomputeConceptMetrics.ts: recomputeConceptMetrics
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\server\topics\labeling.ts: labelTopic
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\server\topics\llmCluster.ts: llmGroupConceptsPreview, llmGroupConcepts
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\types\response-settings.ts: ResponseSettings
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\layout.tsx: metadata, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\theme-provider.tsx: ThemeProvider
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\auth\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\AppSidebar.tsx: AppSidebar
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\AuthGuard.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ListToolbar.tsx: ReviewsToolbarProps, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\PageContainer.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\PageContainerBottom.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\PageContainerTop.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\SectionScaffold.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\TabsMenu.tsx: TabIconName, TabItem, TabsMenuProps, TabsMenu
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\admin\AdminPagination.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\admin\AdminSearch.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\admin\CompaniesTable.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\admin\EditLocationModal.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\admin\LocationRowActions.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\admin\LocationsTable.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\admin\PageSizeSelect.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\admin\UsersActionsMenu.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\admin\UsersTable.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\admin\finance\ResultsTable.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\buffer\PreloadAdminBuffer.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\buffer\PreloadCompanyBuffer.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\AppointmentDetailsCard.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\AppointmentPill.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarCenter.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarHeader.tsx: CompanyLite, LocationRow, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarOnly.tsx: default, CalendarAppt
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarRight.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarToolbar.tsx: CompanyLite, LocationRow, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CreateAppointmentModal.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\EditAppointmentModal.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\EmployeeList.tsx: Employee, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\ResourceList.tsx: Resource, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\ResourceStatus.tsx: Employee, Resource, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\SchedulerCalendar.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\UpcomingEventsList.tsx: AppointmentLite, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarOnly\CurrentTimeLine.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarOnly\DayColumn.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarOnly\DayView.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarOnly\MonthView.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarOnly\ViewControls.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarOnly\WeekDaysHeader.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\CalendarOnly\WeekView.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\settings\TopToolbar.tsx: LocationRow, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\settings\tabs\EmployeesTab.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\settings\tabs\ResourcesTab.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\settings\tabs\RulesTab.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\calendar\settings\tabs\ServicesTab.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\charts\AlertsList.tsx: AlertItem, AlertsListProps, AlertsList
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\charts\ChartCard.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\charts\CompetitiveRadar.tsx: CompetitiveRadarRow, CompetitiveRadarProps, CompetitiveRadar
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\charts\DeviceOriginList.tsx: DeviceRow, DeviceOriginListProps, DeviceOriginList
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\charts\KpiTargetsProgress.tsx: KpiTargetsProgressProps, KpiTargetsProgress
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\charts\LineCombo.tsx: LineComboProps, LineCombo
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\charts\MonthlyHighlights.tsx: HighlightItem, MonthlyHighlightsProps, MonthlyHighlights
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\charts\RatingLineChart.tsx: RatingLineChartProps, RatingLineChart
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\charts\ResponseTimeCompare.tsx: ResponseTimeCompareProps, ResponseTimeCompare
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\charts\ReviewSourcesPie.tsx: ReviewSourcesPieProps, ReviewSourcesPie
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\charts\ReviewsAreaChart.tsx: ReviewsAreaChartProps, ReviewsAreaChart
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\charts\SentimentDonut.tsx: SentimentDonutProps, SentimentDonut
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\charts\StarDistribution.tsx: StarDistributionProps, StarDistribution
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\charts\TopKeywordsBars.tsx: TopKeywordsRow, TopKeywordsBarsProps, TopKeywordsBars
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\company\AddLocationsModal.tsx: NewLocation, AddLocationsModal
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\company\CompanyModal.tsx: EMP_BANDS, EmpBand, CompanyForm, CompanyModal
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\company\CompanySummaryKpis.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\company\EstablishmentCard.tsx: EstablishmentCard
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\company\cards\AverageRatingCard.tsx: AverageRatingCard
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\company\cards\CompanyInfoCard.tsx: CompanyInfoCard
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\company\cards\CompanyKpiRow.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\company\cards\EstablishmentsCard.tsx: EstablishmentsCard
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\company\cards\GrowthCard.tsx: GrowthCard
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\crussader\CompanyLocationShell.tsx: CompanyLocationChange, CompanyLocationShell, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\crussader\CompanySelector.tsx: CompanyLite, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\crussader\LocationSelector.tsx: LocationLite, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\crussader\SearchPicker.tsx: SearchPickerProps, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\database\LocationsTable.tsx: UiLocationRow, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\design-system\table\ColorDot.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\design-system\table\DataTable.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\design-system\table\StandardDemoTable.tsx: StandardRow, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\employees\EditEmployeeModal.tsx: EditEmployeeModal
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\employees\EmployeesTable.tsx: EmployeeRow, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\employees\RolesTable.tsx: RoleRow, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\employees\ServicesTable.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\establishments\EstablishmentCard.tsx: EstablishmentCardProps, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\establishments\EstablishmentKpis.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\establishments\EstablishmentTabs.tsx: Establishment, EstablishmentTabs, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\insights\BubblesGalaxy.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\insights\ConceptBadges.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\insights\ConceptsUpdater.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\insights\KeywordsCloud.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\insights\TopicsList.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\insights\TopicsUpdater.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\knowledge\CompanySelector.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\knowledge\KnowledgeSectionsManager.tsx: dynamic, createSectionAction, deleteSectionAction, saveSectionAction, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\knowledge\SectionEditor.tsx: dynamic, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\knowledge\SectionsSidebar.tsx: dynamic, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\kpis\KpiCards.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\layouts\HeaderIconTitle.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\layouts\PageShell.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\layouts\SectionLayout.tsx: SectionTab, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\products\ProductTile.tsx: ApiAddon, ApiProduct, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\products\RealProductsSection.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\reviews\GenerateReviewResponseButton.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\reviews\LocationTabs.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\reviews\ResponsePreviewPanel.tsx: ResponsePreviewPanel
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\reviews\ResponseSettingsForm.tsx: ResponseSettingsForm
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\reviews\ReviewDashboard.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\reviews\ReviewWithResponseCard.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\reviews\ReviewsGrid.tsx: ReviewItem, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\reviews\ReviewsList.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\reviews\ReviewsToolbar.tsx: ReviewsToolbarProps, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\reviews\controls\ReviewsFilters.tsx: ReviewsFiltersValue, ReviewsFiltersProps, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\reviews\controls\SearchInput.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\reviews\controls\SortSelect.tsx: SortKey, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\settings\BillingTab.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\settings\LabsTab.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\settings\NotificationsTab.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\settings\ResponsesTab.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\settings\UserTab.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\sidebar\SidebarCollapse.tsx: SidebarCollapse
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\sidebar\SidebarItem.tsx: SidebarItem
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\Dot.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\SubmitButton.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\accordion.tsx: Accordion, AccordionItem, AccordionTrigger, AccordionContent
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\alert-dialog.tsx: AlertDialog, AlertDialogPortal, AlertDialogOverlay, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\alert.tsx: Alert, AlertTitle, AlertDescription
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\aspect-ratio.tsx: AspectRatio
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\avatar.tsx: Avatar, AvatarImage, AvatarFallback
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\badge.tsx: BadgeProps, Badge, badgeVariants
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\breadcrumb.tsx: Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator, BreadcrumbEllipsis
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\button.tsx: ButtonProps, Button, buttonVariants
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\calendar.tsx: CalendarProps, Calendar
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\card.tsx: Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\carousel.tsx: CarouselApi, Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\chart.tsx: ChartConfig, ChartContainer, ChartStyle, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\checkbox.tsx: Checkbox
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\chip-input.tsx: ChipInput
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\collapsible.tsx: Collapsible, CollapsibleTrigger, CollapsibleContent
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\command.tsx: Command, CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandShortcut, CommandSeparator
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\context-menu.tsx: ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuCheckboxItem, ContextMenuRadioItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuShortcut, ContextMenuGroup, ContextMenuPortal, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuRadioGroup
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\dialog.tsx: Dialog, DialogPortal, DialogOverlay, DialogClose, DialogTrigger, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\drawer.tsx: Drawer, DrawerPortal, DrawerOverlay, DrawerTrigger, DrawerClose, DrawerContent, DrawerHeader, DrawerFooter, DrawerTitle, DrawerDescription
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\dropdown-menu.tsx: DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuCheckboxItem, DropdownMenuRadioItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuGroup, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuRadioGroup
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\form.tsx: useFormField, Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage, FormField
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\gradual-slider.tsx: GradualSlider
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\hover-card.tsx: HoverCard, HoverCardTrigger, HoverCardContent
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\input-otp.tsx: InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\input.tsx: Input
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\label.tsx: Label
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\loading-overlay.tsx: LoadingOverlay
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\menubar.tsx: Menubar, MenubarMenu, MenubarTrigger, MenubarContent, MenubarItem, MenubarSeparator, MenubarLabel, MenubarCheckboxItem, MenubarRadioGroup, MenubarRadioItem, MenubarPortal, MenubarSubContent, MenubarSubTrigger, MenubarGroup, MenubarSub, MenubarShortcut
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\navigation-menu.tsx: navigationMenuTriggerStyle, NavigationMenu, NavigationMenuList, NavigationMenuItem, NavigationMenuContent, NavigationMenuTrigger, NavigationMenuLink, NavigationMenuIndicator, NavigationMenuViewport
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\pagination.tsx: Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\popover.tsx: Popover, PopoverTrigger, PopoverContent
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\progress.tsx: Progress
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\radio-group.tsx: RadioGroup, RadioGroupItem
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\resizable.tsx: ResizablePanelGroup, ResizablePanel, ResizableHandle
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\scroll-area.tsx: ScrollArea, ScrollBar
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\searchable-select.tsx: Option, SearchableSelect
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\segmented-control.tsx: SegmentedControl
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\select.tsx: Select, SelectGroup, SelectValue, SelectTrigger, SelectContent, SelectLabel, SelectItem, SelectSeparator, SelectScrollUpButton, SelectScrollDownButton
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\separator.tsx: Separator
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\sheet.tsx: Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetOverlay, SheetPortal, SheetTitle, SheetTrigger
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\sidebar.tsx: Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupAction, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuAction, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarMenuSkeleton, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, SidebarProvider, SidebarRail, SidebarSeparator, SidebarTrigger, useSidebar
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\skeleton.tsx: Skeleton
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\slider.tsx: Slider
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\sonner.tsx: Toaster, toast
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\switch.tsx: Switch
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\table.tsx: Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\tabs.tsx: Tabs, TabsList, TabsTrigger, TabsContent
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\textarea.tsx: TextareaProps, Textarea
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\toast.tsx: ToastProps, ToastActionElement, ToastProvider, ToastViewport, Toast, ToastTitle, ToastDescription, ToastClose, ToastAction
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\toaster.tsx: Toaster
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\toggle-group.tsx: ToggleGroup, ToggleGroupItem
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\toggle.tsx: Toggle, toggleVariants
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\ui\tooltip.tsx: Tooltip, TooltipTrigger, TooltipContent, TooltipProvider
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\assign\AgentsListPanel.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\assign\CompanyListPanel.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\assign\OrgAgentAssignment.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\assign\TabPageAssign.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\constructor\AgentGeneralSettingsDock.tsx: VadMode, AgentGeneralSettings, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\constructor\AgentGeneralSettingsPanel.tsx: VadMode, AgentGeneralSettings, DEFAULT_AGENT_GENERAL_SETTINGS, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\constructor\AgentsSidebar.tsx: AgentListItem, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\constructor\AssignAgentsPanel.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\constructor\ChatCallTestingPanel.tsx: ChatMessage, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\constructor\ChatConfigurationShell.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\constructor\FlowBuilderShell.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\constructor\FlowEditor.tsx: FlowStage, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\constructor\TabPageConstructor.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\constructor\VoiceCallManager.tsx: ConnectOptions, ManagerReturn, useVoiceCallManager
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\constructor\VoiceSettingsPanel.tsx: VoiceSettings, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\constructor\VoiceStylePanel.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\monitor\TabPageMonitor.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\components\voiceAgent\tel\TabPageTel.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\error.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\layout.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\not-found.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\[...missing]\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\admin\page.tsx: dynamic, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\admin\UI_and_Dessign\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\admin\finance\kam-simulator\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\admin\voiceagents\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\analytics\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\calendar\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\calendar\settings\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\charts-test\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\company\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\concepts\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\database\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\home\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\informes\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\informes\candidatos\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\informes\temas\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\integrations\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\integrations-test\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\knowledge\page.tsx: dynamic, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\myusers\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\notifications\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\oops\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\products\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\reports\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\reports-test\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\reviews\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\security\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\settings\page.tsx: dynamic, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\settings\billing\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\settings\labs\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\settings\notifications\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\settings\responses\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\settings\user\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\ChatCallPanel.tsx: ChatRow, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\MicTestPanel.tsx: MicTestPanel
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\SimpleChatPanel.tsx: ChatRow, default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\SimpleVoiceSettingsPanel.tsx: SimpleVoiceSettingsPanel
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\TestMic.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\VoiceDictationBar.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\VoiceSettingsPanel.tsx: VoiceSettings, VoiceSettingsPanel
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\dashboard\voiceagent\components\VoiceTestBar.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\legal\privacy\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\legal\support\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\legal\terms\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\login\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\me\page.tsx: default
+C:\Users\ES28845103K\Documents\Proyectos\Crussader\web\web\app\providers\BootstrapProvider.tsx: default

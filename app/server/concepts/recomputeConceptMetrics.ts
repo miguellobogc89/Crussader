@@ -50,7 +50,7 @@ export async function recomputeConceptMetrics(limitConcepts = 200) {
     if (!rows?.length) {
       await prisma.concept.update({
         where: { id: c.id },
-        data: { review_count: 0, avg_rating: 0, updated_at: new Date() },
+        data: { updated_at: new Date() },
       });
       updated++;
       continue;
@@ -89,7 +89,7 @@ export async function recomputeConceptMetrics(limitConcepts = 200) {
     } else {
       await prisma.concept.update({
         where: { id: c.id },
-        data: { review_count: count, avg_rating: avg, updated_at: new Date() },
+        data: { updated_at: new Date() },
       });
     }
 
