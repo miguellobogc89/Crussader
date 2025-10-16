@@ -1,100 +1,167 @@
 // app/server/topics/llmCluster.ts
-// ===================================================
-// 📌 Propósito:
-// Agrupar *concepts* existentes usando la IA en clusters (topics).
-//
-// Flujo:
-// - Lee concepts (por defecto SOLO los que no tienen topic_id).
-// - Envía al LLM la lista {id, label} y pide agrupación JSON:
-//     { topics: [{ label, description?, members: [conceptId, ...] }, ...] }
-// - Si dryRun=true → devuelve la propuesta (no escribe en DB).
-// - Si dryRun=false → crea topics y asigna concept.topic_id en transacción.
-// - avg_rating del topic = media de concept.rating de sus miembros.
-//
-// Parámetros:
-//   limit?: máx. concepts a considerar (default 200)
-//   includeAssigned?: si true, incluye también ya asignados a topic
-//   dryRun?: si true, no persiste cambios (default true)
-// ===================================================
-
 import { prisma } from "@/app/server/db";
 import { openai } from "@/app/server/openaiClient";
+import { generateAndStoreTopicDescription } from "@/app/server/topics/generateTopicDescription";
 
-type ConceptLite = {
+/* ───────────────────────────── Types ───────────────────────────── */
+
+type ConceptRow = {
   id: string;
   label: string;
+  rating: number | null;
   topic_id: string | null;
 };
 
+type ConceptLite = { id: string; label: string };
+
 type LLMTopicsResponse = {
   topics: Array<{
-    label: string;
+    topic_label?: string;
+    label?: string;
     description?: string | null;
     members: string[];
   }>;
 };
 
-function buildPrompt(concepts: ConceptLite[]) {
-  const items = concepts.map((c) => ({ id: c.id, label: c.label }));
+type CleanedTopic = { label: string; description: string | null; members: string[] };
+
+/* ─────────────────────────── Prompt base ───────────────────────── */
+
+function buildMessagesForClustering(items: ConceptLite[], minTopicSize: number) {
+  const system = [
+    "Eres un asistente que agrupa conceptos {id,label} en CATEGORÍAS DE NEGOCIO reutilizables y accionables.",
+    "Objetivo: que cualquier negocio entienda qué áreas funcionan y cuáles no.",
+    "",
+    "REGLAS ESTRICTAS",
+    "1) Etiqueta cada topic con un SUSTANTIVO/ÁREA (2–4 palabras).",
+    "   Con adjetivos y juicios ('bueno/malo', 'problemas de...', 'Excelente..'). ",
+    `2) Tamaño mínimo del topic = ${minTopicSize}. NO crees grupos de 1.`,
+    "3) Agrupa por similitud semántica. Une wording similar/sinónimos.",
+    "4) No inventes IDs. No repitas un ID en varios topics.",
+    "",
+    "TAXONOMÍA SEMILLA (orientativa; usa cuando aplique o crea similares sin adjetivos):",
+    "- Atención al cliente",
+    "- Soporte y posventa",
+    "- Producto y calidad",
+    "- Precio y percepción",
+    "- Entregas y plazos",
+    "- Citas y puntualidad",
+    "- Pagos y facturación",
+    "- Canales telefónicos",
+    "- Mensajería/WhatsApp",
+    "- Email y comunicaciones",
+    "- Web/App y reservas",
+    "- Experiencia en tienda",
+    "- Instalaciones y espera",
+    "- Logística y envíos",
+    "- Accesos y aparcamiento",
+  ].join("\n");
+
+  const user = [
+    "Te doy una lista de conceptos {id,label}.",
+    "Agrúpalos en formato JSON EXACTO:",
+    "{",
+    '  "topics": [',
+    '    { "topic_label": "nombre del tema", "members": ["id1","id2","..."] }',
+    "  ]",
+    "}",
+    "Políticas: sin adjetivos, sin inventar IDs, sin duplicar IDs, tamaño mínimo del grupo indicado.",
+    "",
+    "Datos:",
+    JSON.stringify(items, null, 2),
+  ].join("\n");
+
   return [
-    {
-      role: "system" as const,
-      content:
-        "Eres un asistente que agrupa frases cortas (conceptos) en temas de negocio (topics) coherentes, útiles y accionables.",
-    },
-    {
-      role: "user" as const,
-      content: [
-        "Tarea:",
-        "- Te doy una lista de conceptos {id,label}.",
-        "- Devuélveme una agrupación en formato JSON CONCRETO (response_format: json).",
-        "- Reglas:",
-        "  1) Crea entre 3 y 20 topics (flexible según datos).",
-        "  2) Cada topic debe tener 'label' claro y 'members' con IDs de concepts.",
-        "  3) No inventes IDs. No repitas un mismo concept en varios topics.",
-        "  4) Evita topics genéricos como 'Otros'.",
-        "  5) El label del topic debe sonar a categoría de negocio ('Dificultad para anular cita por teléfono', 'Seguimiento vía WhatsApp', 'Resultados en 24h', etc.).",
-        "  6) Opcional: 'description' breve (1 frase) que aclare el alcance del topic.",
-        "",
-        "Ejemplo de salida estricta:",
-        `{
-  "topics": [
-    { "label": "Seguimiento vía WhatsApp", "description": "Mensajes sobre confirmaciones y seguimiento por WhatsApp", "members": ["<conceptId1>", "<conceptId7>", "<conceptId23>"] },
-    { "label": "Resultados en 24h", "members": ["<conceptId4>", "<conceptId12>"] }
-  ]
-}`,
-        "",
-        "Datos:",
-        JSON.stringify(items, null, 2),
-      ].join("\n"),
-    },
+    { role: "system" as const, content: system },
+    { role: "user" as const, content: user },
   ];
 }
 
+/* ─────────────────────── Carga de conceptos ────────────────────── */
+
+async function loadCandidateConcepts(params: {
+  locationId?: string | null;
+  companyId?: string | null;
+  recencyDays?: number;
+  limit?: number;
+}): Promise<ConceptRow[]> {
+  const recencyDays = Math.max(1, Math.min(3650, params.recencyDays ?? 365));
+  const limit = Math.max(1, Math.min(2000, params.limit ?? 500));
+
+  const sql = `
+    SELECT c.id::text, c.label, c.rating, c.topic_id
+    FROM concept c
+    JOIN "Review" r ON r.id = c.review_id
+    LEFT JOIN topic t ON t.id = c.topic_id
+    WHERE
+      COALESCE(r."createdAtG", r."ingestedAt") >= (now() - make_interval(days => $1::int))
+      AND ($2::text IS NULL OR r."locationId" = $2::text)
+      AND ($3::text IS NULL OR r."companyId"  = $3::text)
+      AND (c.topic_id IS NULL OR COALESCE(t.is_stable, false) = false)
+    ORDER BY c.updated_at DESC NULLS LAST
+    LIMIT $4::int
+  `;
+
+  const rows = await prisma.$queryRawUnsafe<ConceptRow[]>(
+    sql,
+    recencyDays,
+    params.locationId ?? null,
+    params.companyId ?? null,
+    limit
+  );
+
+  return rows;
+}
+
+/* ──────────────── Util: descripción 30–70 caracteres ───────────── */
+
+function buildTopicDescription(topic: CleanedTopic, byId: Map<string, ConceptRow>): string {
+  const phrases: string[] = [];
+  for (const id of topic.members) {
+    const lbl = (byId.get(id)?.label || "").replace(/\.$/, "").trim();
+    if (!lbl) continue;
+    const lower = lbl.toLowerCase();
+    if (!phrases.some((p) => p.toLowerCase() === lower)) phrases.push(lbl);
+  }
+
+  let desc = "";
+  for (const p of phrases) {
+    const candidate = desc ? `${desc}; ${p}` : p;
+    if (candidate.length <= 68) desc = candidate;
+    else break;
+  }
+
+  if (desc.length < 30) {
+    desc = `${topic.label}: ${topic.members.length} conceptos relacionados`;
+  }
+
+  if (desc.length > 70) {
+    desc = desc.slice(0, 70);
+    desc = desc.replace(/\s+\S*$/, "") + "…";
+  }
+
+  return desc;
+}
+
+/* ────────────────────────── PERSISTENCIA ───────────────────────── */
+
 export async function llmGroupConcepts(opts?: {
+  locationId?: string | null;
+  companyId?: string | null;
+  recencyDays?: number;
   limit?: number;
   includeAssigned?: boolean;
+  minTopicSize?: number;
   dryRun?: boolean;
 }) {
-  const limit = Math.max(1, Math.min(1000, opts?.limit ?? 200));
-  const includeAssigned = !!opts?.includeAssigned;
+  const minTopicSize = Math.max(2, Math.min(10, opts?.minTopicSize ?? 2));
   const dryRun = opts?.dryRun !== false ? true : false;
 
-  // 1) Cargar concepts
-  // Prioriza por nº de vínculos (si existe la relación) y fecha de actualización
-  const concepts = await prisma.concept.findMany({
-    where: includeAssigned ? {} : { topic_id: null },
-    orderBy: [
-      { review_concept: { _count: "desc" } }, // requiere relación review_concept en el schema
-      { updated_at: "desc" },
-    ],
-    take: limit,
-    select: {
-      id: true,
-      label: true,
-      topic_id: true,
-      updated_at: true,
-    },
+  const concepts = await loadCandidateConcepts({
+    locationId: opts?.locationId ?? null,
+    companyId: opts?.companyId ?? null,
+    recencyDays: opts?.recencyDays ?? 365,
+    limit: opts?.limit ?? 500,
   });
 
   if (concepts.length === 0) {
@@ -104,21 +171,13 @@ export async function llmGroupConcepts(opts?: {
       createdTopics: 0,
       assignedConcepts: 0,
       preview: { topics: [] as any[] },
-      note: includeAssigned
-        ? "No hay concepts que agrupar (incluso incluyendo asignados)."
-        : "No hay concepts sin topic pendientes.",
+      note: "No hay conceptos pendientes en este alcance.",
     };
   }
 
-  // Adaptar a ConceptLite
-  const lite: ConceptLite[] = concepts.map((c) => ({
-    id: c.id,
-    label: c.label,
-    topic_id: c.topic_id,
-  }));
+  const items: ConceptLite[] = concepts.map((c) => ({ id: c.id, label: c.label }));
+  const messages = buildMessagesForClustering(items, minTopicSize);
 
-  // 2) LLM → clustering
-  const messages = buildPrompt(lite);
   const resp = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.2,
@@ -126,98 +185,91 @@ export async function llmGroupConcepts(opts?: {
     messages,
   });
 
-  // Parseo robusto
   let json: LLMTopicsResponse | null = null;
   try {
     const raw = resp.choices?.[0]?.message?.content ?? "{}";
     json = JSON.parse(raw) as LLMTopicsResponse;
   } catch {
-    const raw = resp.choices?.[0]?.message?.content ?? "{}";
-    try {
-      json = JSON.parse(raw) as LLMTopicsResponse;
-    } catch {
-      return {
-        ok: false,
-        error: "La IA no devolvió JSON válido para el clustering.",
-        raw: resp.choices?.[0]?.message?.content,
-      };
-    }
+    return { ok: false, error: "La IA no devolvió JSON válido para el clustering." };
   }
 
   if (!json?.topics || !Array.isArray(json.topics)) {
-    return {
-      ok: false,
-      error: "Respuesta JSON sin 'topics' válido.",
-      preview: json,
-    };
+    return { ok: false, error: "Respuesta JSON sin 'topics' válido.", preview: json };
   }
 
-  // 3) Validación de members y deduplicación
-  const conceptSet = new Set(lite.map((c) => c.id));
+  const conceptSet = new Set<string>(concepts.map((c) => c.id));
   const seen = new Set<string>();
-  const cleaned = json.topics
+
+  const cleaned: CleanedTopic[] = json.topics
     .map((t) => {
-      const validMembers = (t.members || [])
+      const rawLabel = String((t.topic_label ?? t.label ?? "").toString().trim()).slice(0, 120);
+      const label = rawLabel && rawLabel.length >= 3 ? rawLabel : "Tema sin título";
+
+      const validMembers: string[] = (t.members ?? [])
         .filter((id) => conceptSet.has(id))
         .filter((id) => {
           if (seen.has(id)) return false;
           seen.add(id);
           return true;
         });
+
       return {
-        label: String(t.label || "").trim().slice(0, 120) || "Sin título",
+        label,
         description: t.description ? String(t.description).slice(0, 240) : null,
         members: validMembers,
       };
     })
-    .filter((t) => t.members.length > 0);
+    .filter((t) => t.members.length >= minTopicSize)
+    .sort((a, b) => b.members.length - a.members.length);
 
   if (cleaned.length === 0) {
     return {
       ok: true,
-      taken: lite.length,
+      taken: concepts.length,
       createdTopics: 0,
       assignedConcepts: 0,
       preview: { topics: [] as any[] },
-      note: "El LLM generó agrupaciones vacías tras limpiar IDs/duplicados.",
+      note: `El LLM generó agrupaciones < ${minTopicSize} miembros; descartadas por política.`,
     };
   }
 
-  // Si dryRun: solo preview
   if (dryRun) {
+    const assignedConcepts = cleaned.reduce((sum, t) => sum + t.members.length, 0);
     return {
       ok: true,
-      taken: lite.length,
+      taken: concepts.length,
       createdTopics: cleaned.length,
-      assignedConcepts: cleaned.reduce((s, t) => s + t.members.length, 0),
+      assignedConcepts,
       preview: { topics: cleaned },
       note: "dryRun=true (no se escribió nada).",
     };
   }
 
-  // 4) Persistir en DB dentro de una transacción
+  const byId = new Map<string, ConceptRow>(concepts.map((c) => [c.id, c]));
   let created = 0;
   let assigned = 0;
+  const createdTopicIds: string[] = [];
 
   await prisma.$transaction(async (tx) => {
     for (const topic of cleaned) {
-      // Media de concept.rating para los miembros del topic (SQL crudo por compat)
-      const idsList = topic.members.map((id) => `'${id}'`).join(",");
-      const avgRow = await tx.$queryRawUnsafe<{ avg: number | null }[]>(
-        `SELECT AVG(rating)::float AS avg
-         FROM concept
-         WHERE id IN (${idsList}) AND rating IS NOT NULL`
-      );
-      const avg = avgRow?.[0]?.avg ?? null;
+      const ratings = topic.members
+        .map((id) => byId.get(id)?.rating)
+        .filter((n): n is number => typeof n === "number");
+
+      const avgRaw =
+        ratings.length > 0 ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null;
+      const avgRounded = avgRaw !== null ? Math.round(avgRaw * 100) / 100 : null;
+
+      const autoDesc = buildTopicDescription(topic, byId);
 
       const createdTopic = await tx.topic.create({
         data: {
           label: topic.label,
-          description: topic.description ?? undefined,
+          description: autoDesc, // se sobrescribe después
           model: "gpt-4o-mini",
           concept_count: topic.members.length,
-          avg_rating: avg, // 👈 media de estrellas de sus concepts
-          is_stable: topic.members.length >= 3,
+          avg_rating: avgRounded,
+          is_stable: topic.members.length > 3,
         },
         select: { id: true },
       });
@@ -229,12 +281,16 @@ export async function llmGroupConcepts(opts?: {
 
       created += 1;
       assigned += topic.members.length;
+      createdTopicIds.push(createdTopic.id);
     }
   });
 
+  // 👇 Generar descripciones IA completas para todos los topics creados
+  await Promise.all(createdTopicIds.map((id) => generateAndStoreTopicDescription(id)));
+
   return {
     ok: true,
-    taken: lite.length,
+    taken: concepts.length,
     createdTopics: created,
     assignedConcepts: assigned,
     preview: { topics: cleaned },
