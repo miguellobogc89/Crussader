@@ -89,7 +89,7 @@ export default function InformesPage() {
       >
         <SectionWrapper topPadding="pt-6 sm:pt-10">
           <div className="space-y-6">
-            {/* IDs visibles */}
+            {/* IDs visibles 
             <div className="space-y-2">
               <div className="text-lg font-semibold text-foreground">IDs actuales:</div>
               <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm font-mono">
@@ -104,7 +104,7 @@ export default function InformesPage() {
               ) : (
                 <div className="text-muted-foreground">Selecciona una empresa o ubicación.</div>
               )}
-            </div>
+            </div>*/}
 
             {/* Topics */}
             <Card>
@@ -123,17 +123,7 @@ export default function InformesPage() {
               </CardContent>
             </Card>
 
-            {/* (opcional) mapa de burbujas u otros */}
-            {ready ? (
-              <BubblesGalaxy
-                companyId={currentCompanyId}
-                locationId={currentLocationId}
-                from={from}
-                to={to}
-                maxNodes={60}
-                height={520}
-              />
-            ) : null}
+
           </div>
         </SectionWrapper>
       </div>

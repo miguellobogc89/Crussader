@@ -60,8 +60,6 @@ export const authOptions: NextAuthOptions = {
             "openid",
             "email",
             "profile", // ⬅ necesario para name + picture
-            "https://www.googleapis.com/auth/calendar.events",
-            "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
           ].join(" "),
           access_type: "offline",
           prompt: "consent",

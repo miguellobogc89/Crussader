@@ -1,27 +1,19 @@
 // app/api/reviews/tasks/concepts/pending/route.ts
-// ===================================================
-// GET /api/reviews/tasks/concepts/pending
-// Devuelve cuántas reviews siguen sin conceptualizar.
-// ===================================================
-
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/server/db";
 
-export async function GET() {
-  try {
-    const rows = await prisma.$queryRawUnsafe<{ pending: number }[]>(
-      `
-      SELECT COUNT(*)::int AS pending
-      FROM review
-      WHERE COALESCE(is_conceptualized, false) = false
-      `
-    );
-    const pending = rows[0]?.pending ?? 0;
-    return NextResponse.json({ ok: true, pending });
-  } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: e?.message || "No se pudo comprobar pendientes" },
-      { status: 500 }
-    );
-  }
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const locationId = searchParams.get("locationId");
+  if (!locationId) return NextResponse.json({ ok: false, error: "locationId requerido" }, { status: 400 });
+
+  const [row] = await prisma.$queryRaw<{ n: string }[]>`
+    SELECT COUNT(*)::text AS n
+    FROM "Review" r
+    WHERE r."locationId" = ${locationId}
+      AND COALESCE(r."isTest", false) = false
+      AND COALESCE(r.is_conceptualized, false) = false
+      AND COALESCE(NULLIF(TRIM(r.comment), ''), NULL) IS NOT NULL
+  `;
+  return NextResponse.json({ ok: true, pending: Number(row?.n ?? "0") });
 }

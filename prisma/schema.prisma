@@ -136,37 +136,37 @@ model ExternalConnection {
 }
 
 model Company {
-  id                   String                 @id @default(cuid())
+  id                   String                @id @default(cuid())
   name                 String
   createdById          String
-  createdAt            DateTime               @default(now())
-  activity             String?                @db.VarChar(64)
-  cif                  String?                @db.VarChar(32)
-  employeesBand        String?                @db.VarChar(32)
+  createdAt            DateTime              @default(now())
+  activity             String?               @db.VarChar(64)
+  cif                  String?               @db.VarChar(32)
+  employeesBand        String?               @db.VarChar(32)
   logoUrl              String?
   address              String?
-  brandColor           String?                @db.VarChar(16)
+  brandColor           String?               @db.VarChar(16)
   city                 String?
   country              String?
-  countryCode          String?                @db.VarChar(2)
+  countryCode          String?               @db.VarChar(2)
   description          String?
   email                String?
   facebookUrl          String?
   instagramUrl         String?
   lastSyncAt           DateTime?
   linkedinUrl          String?
-  matrix               String?                @db.VarChar(128)
+  matrix               String?               @db.VarChar(128)
   phone                String?
   postalCode           String?
   region               String?
-  registryId           String?                @db.VarChar(64)
-  reviewsAvg           Decimal?               @db.Decimal(3, 2)
-  reviewsCount         Int                    @default(0)
+  registryId           String?               @db.VarChar(64)
+  reviewsAvg           Decimal?              @db.Decimal(3, 2)
+  reviewsCount         Int                   @default(0)
   twitterUrl           String?
-  updatedAt            DateTime               @default(now()) @updatedAt
-  vatNumber            String?                @db.VarChar(32)
+  updatedAt            DateTime              @default(now()) @updatedAt
+  vatNumber            String?               @db.VarChar(32)
   website              String?
-  plan                 String?                @default("free")
+  plan                 String?               @default("free")
   planRenewsAt         DateTime?
   stripeCustomerId     String?
   stripeSubscriptionId String?
@@ -174,7 +174,7 @@ model Company {
   voiceAgentId         String?
   Agents               Agent[]
   AgentSessions        AgentSession[]
-  voiceAgent           VoiceAgent?            @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id])
+  voiceAgent           VoiceAgent?           @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id])
   customers            CompanyCustomer[]
   jobs                 Job[]
   knowledgeItems       KnowledgeItem[]
@@ -182,18 +182,15 @@ model Company {
   knowledgeSpaces      KnowledgeSpace[]
   Lead                 Lead[]
   Location             Location[]
-  LocationKpiDaily     LocationKpiDaily[]     @relation("CompanyToKpiDaily")
+  LocationKpiDaily     LocationKpiDaily[]    @relation("CompanyToKpiDaily")
   responseSettings     ResponseSettings?
-  Reviews              Review[]               @relation("CompanyReviews")
+  Reviews              Review[]              @relation("CompanyReviews")
   UserCompany          UserCompany[]
-  WebchatSites         WebchatSite[]          @relation("CompanyToWebchatSite")
+  WebchatSites         WebchatSite[]         @relation("CompanyToWebchatSite")
   billing_account      billing_account[]
   discount_redemption  discount_redemption[]
   entitlement          entitlement[]
   invoice              invoice[]
-  review_concept       review_concept[]
-  review_concept_input review_concept_input[]
-  review_theme         review_theme[]
   subscription         subscription[]
   theme_candidate      theme_candidate[]
   themes               themes[]
@@ -237,7 +234,7 @@ model Lead {
 }
 
 model Location {
-  id                   String                 @id @default(cuid())
+  id                   String              @id @default(cuid())
   companyId            String
   title                String
   address              String?
@@ -248,11 +245,11 @@ model Location {
   phone                String?
   website              String?
   googleName           String?
-  googlePlaceId        String?                @unique
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @default(now()) @updatedAt
+  googlePlaceId        String?             @unique
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @default(now()) @updatedAt
   address2             String?
-  countryCode          String?                @db.VarChar(2)
+  countryCode          String?             @db.VarChar(2)
   email                String?
   externalConnectionId String?
   facebookUrl          String?
@@ -261,15 +258,15 @@ model Location {
   googleLocationId     String?
   instagramUrl         String?
   lastSyncAt           DateTime?
-  latitude             Decimal?               @db.Decimal(10, 7)
-  longitude            Decimal?               @db.Decimal(10, 7)
+  latitude             Decimal?            @db.Decimal(10, 7)
+  longitude            Decimal?            @db.Decimal(10, 7)
   openingHours         Json?
-  reviewsAvg           Decimal?               @db.Decimal(3, 2)
-  reviewsCount         Int                    @default(0)
-  slug                 String?                @unique
-  status               LocationStatus?        @default(DRAFT)
+  reviewsAvg           Decimal?            @db.Decimal(3, 2)
+  reviewsCount         Int                 @default(0)
+  slug                 String?             @unique
+  status               LocationStatus?     @default(DRAFT)
   timezone             String?
-  isFeatured           Boolean                @default(false)
+  isFeatured           Boolean             @default(false)
   activityId           String?
   typeId               String?
   exceptions           Json?
@@ -278,20 +275,17 @@ model Location {
   employeeLinks        EmployeeLocation[]
   employeeTimeOffs     EmployeeTimeOff[]
   jobs                 Job[]
-  activity             Activity?              @relation(fields: [activityId], references: [id])
-  company              Company                @relation(fields: [companyId], references: [id])
-  ExternalConnection   ExternalConnection?    @relation(fields: [externalConnectionId], references: [id])
-  type                 Type?                  @relation(fields: [typeId], references: [id])
-  KpiDaily             LocationKpiDaily[]     @relation("LocationToKpiDaily")
+  activity             Activity?           @relation(fields: [activityId], references: [id])
+  company              Company             @relation(fields: [companyId], references: [id])
+  ExternalConnection   ExternalConnection? @relation(fields: [externalConnectionId], references: [id])
+  type                 Type?               @relation(fields: [typeId], references: [id])
+  KpiDaily             LocationKpiDaily[]  @relation("LocationToKpiDaily")
   resources            Resource[]
   resourceTimeOffs     ResourceTimeOff[]
-  Reviews              Review[]               @relation("LocationReviews")
+  Reviews              Review[]            @relation("LocationReviews")
   services             Service[]
   UserLocation         UserLocation[]
-  WebchatSites         WebchatSite[]          @relation("LocationToWebchatSite")
-  review_concept       review_concept[]
-  review_concept_input review_concept_input[]
-  review_theme         review_theme[]
+  WebchatSites         WebchatSite[]       @relation("LocationToWebchatSite")
   theme_candidate      theme_candidate[]
   themes               themes[]
 
@@ -316,30 +310,31 @@ model UserLocation {
 }
 
 model Review {
-  id              String          @id @default(cuid())
-  companyId       String
-  locationId      String
-  provider        ReviewProvider
-  externalId      String
-  reviewerName    String?
-  reviewerPhoto   String?
-  reviewerAnon    Boolean?
-  rating          Int
-  comment         String?
-  languageCode    String?         @db.VarChar(8)
-  createdAtG      DateTime?
-  updatedAtG      DateTime?
-  replyComment    String?
-  replyUpdatedAtG DateTime?
-  ingestedAt      DateTime        @default(now())
-  updatedAt       DateTime        @default(now()) @updatedAt
-  isTest          Boolean         @default(false)
-  jobs            Job[]
-  responses       Response[]
-  Company         Company         @relation("CompanyReviews", fields: [companyId], references: [id], onDelete: Cascade)
-  Location        Location        @relation("LocationReviews", fields: [locationId], references: [id], onDelete: Cascade)
-  analysis        ReviewAnalysis?
-  review_theme    review_theme[]
+  id                String          @id @default(cuid())
+  companyId         String
+  locationId        String
+  provider          ReviewProvider
+  externalId        String
+  reviewerName      String?
+  reviewerPhoto     String?
+  reviewerAnon      Boolean?
+  rating            Int
+  comment           String?
+  languageCode      String?         @db.VarChar(8)
+  createdAtG        DateTime?
+  updatedAtG        DateTime?
+  replyComment      String?
+  replyUpdatedAtG   DateTime?
+  ingestedAt        DateTime        @default(now())
+  updatedAt         DateTime        @default(now()) @updatedAt
+  isTest            Boolean         @default(false)
+  is_conceptualized Boolean        @default(false)
+  jobs              Job[]
+  responses         Response[]
+  Company           Company         @relation("CompanyReviews", fields: [companyId], references: [id], onDelete: Cascade)
+  Location          Location        @relation("LocationReviews", fields: [locationId], references: [id], onDelete: Cascade)
+  analysis          ReviewAnalysis?
+  concept           concept[]
 
   @@unique([provider, externalId])
   @@index([companyId])
@@ -1402,86 +1397,25 @@ model subscription_item {
 }
 
 model concept {
-  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  label             String
-  model             String
-  centroid          Unsupported("vector")?
-  created_at        DateTime               @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime               @default(now()) @db.Timestamptz(6)
-  topic_id          String?                @db.Uuid
-  sentiment         String?
-  confidence        Float?                 @db.Real
-  relevance         Float?                 @default(1) @db.Real
-  assigned_at       DateTime?              @db.Timestamptz(6)
-  rating            Int?
-  review_created_at DateTime?              @db.Timestamptz(6)
-  review_date       DateTime?              @db.Timestamptz(6)
-  company_id        String?
-  location_id       String?
-  topic             topic?                 @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
-  review_concept    review_concept[]
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label       String
+  model       String
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @db.Timestamptz(6)
+  topic_id    String?   @db.Uuid
+  sentiment   String?
+  confidence  Float?    @db.Real
+  relevance   Float?    @default(1) @db.Real
+  assigned_at DateTime? @db.Timestamptz(6)
+  rating      Int?
+  review_date DateTime? @db.Timestamptz(6)
+  review_id   String?
+  review      Review?   @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_concept_review")
 
-  @@index([centroid], map: "idx_concept_centroid")
-  @@index([sentiment], map: "idx_concept_sentiment")
-  @@index([company_id], map: "idx_concept_company_id")
-  @@index([location_id], map: "idx_concept_location_id")
   @@index([rating], map: "idx_concept_rating")
-  @@index([review_created_at], map: "idx_concept_review_created_at")
   @@index([review_date], map: "idx_concept_review_date")
-}
-
-model review_concept {
-  id                String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  review_id         String               @db.Uuid
-  concept_id        String               @db.Uuid
-  relevance         Float                @default(1)
-  assigned_at       DateTime             @default(now()) @db.Timestamptz(6)
-  rating            Int?
-  review_created_at DateTime?            @db.Timestamptz(6)
-  location_id       String?
-  company_id        String?
-  review_date       DateTime?            @db.Timestamptz(6)
-  Company           Company?             @relation(fields: [company_id], references: [id], onUpdate: NoAction, map: "fk_rc_company")
-  Location          Location?            @relation(fields: [location_id], references: [id], onUpdate: NoAction, map: "fk_rc_location")
-  concept           concept              @relation(fields: [concept_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  review            review_concept_input @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@unique([review_id, concept_id], map: "review_concept_uniq")
-  @@index([company_id], map: "idx_rc_company")
-  @@index([location_id], map: "idx_rc_location")
-  @@index([rating], map: "idx_rc_rating")
-  @@index([review_created_at], map: "idx_rc_review_date")
-}
-
-model review_embedding {
-  review_id  String                @id @db.Uuid
-  model      String
-  vector     Unsupported("vector")
-  created_at DateTime              @default(now()) @db.Timestamptz(6)
-  review     review_concept_input  @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@index([vector], map: "idx_reviewemb_vector")
-}
-
-model review_theme {
-  review_id    String
-  theme_id     String    @db.Uuid
-  company_id   String
-  location_id  String?
-  sentiment    Sentiment
-  confidence   Float     @default(0.0) @db.Real
-  matched_snip String?
-  created_at   DateTime  @default(now()) @db.Timestamptz(6)
-  Company      Company   @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  Location     Location? @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  Review       Review    @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  themes       themes    @relation(fields: [theme_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@id([review_id, theme_id])
-  @@index([company_id, location_id], map: "idx_review_theme_company")
-  @@index([created_at], map: "idx_review_theme_created")
-  @@index([sentiment], map: "idx_review_theme_sentiment")
-  @@index([theme_id], map: "idx_review_theme_theme")
+  @@index([review_id], map: "idx_concept_review_id")
+  @@index([sentiment], map: "idx_concept_sentiment")
 }
 
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
@@ -1543,7 +1477,6 @@ model themes {
   color           String?
   created_at      DateTime          @default(now()) @db.Timestamptz(6)
   updated_at      DateTime          @default(now()) @db.Timestamptz(6)
-  review_theme    review_theme[]
   theme_candidate theme_candidate[]
   theme_terms     theme_terms[]
   Company         Company?          @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
@@ -1555,46 +1488,15 @@ model themes {
 }
 
 model topic {
-  id            String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   label         String
   description   String?
   model         String?
-  centroid      Unsupported("vector")?
-  concept_count Int?                   @default(0)
-  avg_rating    Float?                 @default(0)
-  is_stable     Boolean?               @default(false)
-  created_at    DateTime?              @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime?              @default(now()) @db.Timestamptz(6)
-  concept       concept[]
-
-  @@index([centroid], map: "idx_topic_centroid")
-}
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-model review_concept_input {
-  id                String            @id(map: "review_pkey") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  source_id         String?
-  author_id         String?
-  date              DateTime          @db.Timestamptz(6)
-  rating            Int
-  text              String
-  analyzed_at       DateTime?         @db.Timestamptz(6)
-  created_at        DateTime          @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime          @default(now()) @db.Timestamptz(6)
-  is_conceptualized Boolean?          @default(false)
-  company_id        String?
-  location_id       String?
-  location_category String?
-  review_concept    review_concept[]
-  Company           Company?          @relation(fields: [company_id], references: [id], onUpdate: NoAction, map: "fk_rci_company")
-  Location          Location?         @relation(fields: [location_id], references: [id], onUpdate: NoAction, map: "fk_rci_location")
-  review_embedding  review_embedding?
-
-  @@index([location_category], map: "idx_rci_category")
-  @@index([company_id], map: "idx_rci_company")
-  @@index([location_id], map: "idx_rci_location")
-  @@index([analyzed_at], map: "idx_review_analyzed")
-  @@index([date], map: "idx_review_date")
+  concept_count Int?      @default(0)
+  avg_rating    Float?    @db.Real
+  is_stable     Boolean?  @default(false)
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime? @default(now()) @db.Timestamptz(6)
 }
 
 /// *

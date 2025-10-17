@@ -1,6 +1,10 @@
 // app/server/concepts/processBatch.ts
+// ======================================================
+// Extrae conceptos desde reseñas pendientes (sin concept)
+// y marca cada review como conceptualizada al finalizar.
+// ======================================================
+
 import { prisma } from "@/app/server/db";
-import { embedTexts, toPgVectorLiteral } from "../embeddings";
 import { extractConceptsFromReview } from "./extractConcepts";
 
 type RawReview = {
@@ -17,7 +21,7 @@ function normalizeRating(v: unknown): number | null {
   return Math.max(0, Math.min(5, Math.round(n)));
 }
 
-/** Cuenta reviews de una ubicación pendientes de conceptualizar */
+/** Cuenta reviews sin conceptualizar */
 export async function countPendingForLocation(locationId: string) {
   const [row] = await prisma.$queryRaw<{ n: string }[]>`
     SELECT COUNT(*)::text AS n
@@ -28,7 +32,7 @@ export async function countPendingForLocation(locationId: string) {
   return Number(row?.n ?? "0");
 }
 
-/** Procesa un batch de reviews pendientes para una ubicación concreta */
+/** Procesa un batch de reviews pendientes de conceptualización */
 export async function processUnconceptualizedForLocation(locationId: string, limit = 50) {
   const reviews = await prisma.$queryRaw<RawReview[]>`
     SELECT
@@ -44,7 +48,8 @@ export async function processUnconceptualizedForLocation(locationId: string, lim
     LIMIT ${limit}
   `;
 
-  if (reviews.length === 0) return { processed: 0, insertedConcepts: 0, emptyText: 0 };
+  if (reviews.length === 0)
+    return { processed: 0, insertedConcepts: 0, emptyText: 0 };
 
   let insertedConcepts = 0;
   let emptyText = 0;
@@ -52,80 +57,55 @@ export async function processUnconceptualizedForLocation(locationId: string, lim
   for (const r of reviews) {
     const text = (r.comment ?? "").trim();
 
-    // Si no hay texto, marcar como conceptualizada y seguir
+    // 🔹 Si no hay texto → marcar conceptualizada y seguir
     if (!text) {
-      await prisma.$executeRaw`
-        UPDATE "Review" SET is_conceptualized = true, "updatedAt" = now()
-        WHERE id = ${r.id}
-      `;
+      await prisma.review.update({
+        where: { id: r.id },
+        data: { is_conceptualized: true, updatedAt: new Date() },
+      });
       emptyText++;
       continue;
     }
 
-    // Extraer conceptos (0..6)
+    // 🔹 Extraer conceptos (0..6)
     const extracted = await extractConceptsFromReview(text);
     if (!extracted || extracted.length === 0) {
-      await prisma.$executeRaw`
-        UPDATE "Review" SET is_conceptualized = true, "updatedAt" = now()
-        WHERE id = ${r.id}
-      `;
+      await prisma.review.update({
+        where: { id: r.id },
+        data: { is_conceptualized: true, updatedAt: new Date() },
+      });
       continue;
     }
-
-    // Embeddings de labels
-    const labels = extracted.map((c) => c.label);
-    const vectors = await embedTexts(labels).catch(() => [] as number[][]);
 
     const reviewDateISO = (r.createdAtG ?? r.ingestedAt) || null;
     const rating = normalizeRating(r.rating);
 
-    // Insertar 1 concept por ítem
-    for (let i = 0; i < extracted.length; i++) {
-      const item = extracted[i];
-      const vec = vectors[i];
-      if (!item?.label || !vec) continue;
+    // 🔹 Insertar 1 concept por ítem extraído
+    for (const item of extracted) {
+      if (!item?.label) continue;
 
-      const centroidLit = toPgVectorLiteral(vec);
-
-      await prisma.$executeRawUnsafe(
-        `
-        INSERT INTO concept (
-          id, label, model, centroid,
-          sentiment, confidence, relevance,
-          rating, review_date, review_id,
-          created_at, updated_at
-        )
-        VALUES (
-          gen_random_uuid(),
-          $1,
-          'text-embedding-3-small',
-          ${centroidLit},
-          $2,
-          $3::real,
-          $4::real,
-          $5::int,
-          $6::timestamptz,
-          $7::text,
-          now(), now()
-        )
-        `,
-        item.label,
-        item.sentiment ?? null,
-        typeof item.confidence === "number" ? item.confidence : null,
-        1, // relevance por ahora
-        rating,
-        reviewDateISO,
-        r.id
-      );
+      await prisma.concept.create({
+        data: {
+          label: item.label,
+          model: "gpt-4o-mini",
+          review_id: r.id,
+          sentiment: item.sentiment ?? null,
+          confidence:
+            typeof item.confidence === "number" ? item.confidence : null,
+          relevance: 1,
+          rating: rating ?? undefined,
+          review_date: reviewDateISO ? new Date(reviewDateISO) : undefined,
+        },
+      });
 
       insertedConcepts++;
     }
 
-    // Marcar la review como conceptualizada
-    await prisma.$executeRaw`
-      UPDATE "Review" SET is_conceptualized = true, "updatedAt" = now()
-      WHERE id = ${r.id}
-    `;
+    // 🔹 Marcar la review como conceptualizada
+    await prisma.review.update({
+      where: { id: r.id },
+      data: { is_conceptualized: true, updatedAt: new Date() },
+    });
   }
 
   return { processed: reviews.length, insertedConcepts, emptyText };
