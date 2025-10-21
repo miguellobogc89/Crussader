@@ -133,7 +133,7 @@ export function AppSidebar() {
           { title: "UI & Dessign", href: "/dashboard/admin/UI_and_Dessign", icon: "🤖", description: "Diseño de la interfaz" },
           { title: "Empresas y establecimientos", href: "/dashboard/admin/companies", icon: "🏪", description: "Estructura, sedes y negocios" },
           { title: "Integraciones", href: "/dashboard/admin/integrations", icon: "🔌", description: "Conexiones externas" },
-          { title: "Finanzas", href: "/dashboard/admin/finance/kam-simulator", icon: "💰", description: "Pagos, costes y facturas" },
+          { title: "Finanzas", href: "/dashboard/admin/finance", icon: "💰", description: "Pagos, costes y facturas" },
           { title: "Productos", href: "/dashboard/admin/products", icon: "📦", description: "Configurador de productos" },
           { title: "Ventas", href: "/dashboard/admin/sales", icon: "🛒", description: "Canales y conversión" },
           { title: "Permisos y auditoría", href: "/dashboard/admin/audit", icon: "🧾", description: "Logs y cumplimiento" },
