@@ -23,7 +23,13 @@ import {
 export default function MarketingLandingPage() {
   const { data: session } = useSession();
   const isLoggedIn = !!session?.user;
-  const landingOnly = process.env.NEXT_PUBLIC_LANDING_ONLY === "1"; // ← FLAG
+  const landingOnly = process.env.NEXT_PUBLIC_LANDING_ONLY === "1"; // ← FLAG (no lo tocamos)
+
+  // helpers para next targets
+  const nextDashboard = encodeURIComponent("/dashboard");
+  const nextReviews = encodeURIComponent("/dashboard/reviews");
+  const nextRespSettings = encodeURIComponent("/dashboard/settings/responses");
+  const nextReports = encodeURIComponent("/dashboard/reports");
 
   return (
     <div className="min-h-screen bg-white text-black">
@@ -44,13 +50,13 @@ export default function MarketingLandingPage() {
           </nav>
 
           <div className="flex gap-3">
-            <Link href={isLoggedIn ? "/dashboard" : "/auth"}>
+            <Link href={isLoggedIn ? "/dashboard" : `/auth/login?next=${nextDashboard}`}>
               <Button variant="outline" className="border-gray-300">
                 {isLoggedIn ? "Ir al Dashboard" : "Iniciar sesión"}
               </Button>
             </Link>
             {!isLoggedIn && (
-              <Link href="/auth">
+              <Link href={`/auth/register?next=${nextDashboard}`}>
                 <Button className="bg-violet-600 hover:bg-violet-700">Registrarse</Button>
               </Link>
             )}
@@ -70,12 +76,12 @@ export default function MarketingLandingPage() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href={isLoggedIn ? "/dashboard" : "/auth"}>
+            <Link href={isLoggedIn ? "/dashboard" : `/auth/register?next=${nextDashboard}`}>
               <Button size="lg" className="bg-violet-600 px-6 text-base hover:bg-violet-700">
                 {isLoggedIn ? "Ir al Dashboard" : "Comenzar gratis"}
               </Button>
             </Link>
-            <Link href={isLoggedIn ? "/dashboard/reviews" : "/auth"}>
+            <Link href={isLoggedIn ? "/dashboard/reviews" : `/auth/login?next=${nextReviews}`}>
               <Button size="lg" variant="outline" className="px-6 text-base">
                 Ver demo
               </Button>
@@ -212,10 +218,10 @@ export default function MarketingLandingPage() {
               </div>
 
               <div className="mt-8 flex gap-3">
-                <Link href={isLoggedIn ? "/dashboard/settings/responses" : "/auth"}>
+                <Link href={isLoggedIn ? "/dashboard/settings/responses" : `/auth/login?next=${nextRespSettings}`}>
                   <Button className="bg-violet-600 hover:bg-violet-700">Probar ajustes</Button>
                 </Link>
-                <Link href={isLoggedIn ? "/dashboard/reports" : "/auth"}>
+                <Link href={isLoggedIn ? "/dashboard/reports" : `/auth/login?next=${nextReports}`}>
                   <Button variant="outline">Ver reportes</Button>
                 </Link>
               </div>

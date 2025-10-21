@@ -13,8 +13,9 @@ const adminEmail = "miguel.lobogc.89@gmail.com";
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
+
   providers: [
-    // --- Credenciales (email + passwordHash) ---
+    // --- Credenciales (email + password) ---
     Credentials({
       name: "Credentials",
       credentials: {
@@ -22,14 +23,26 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(creds) {
-        if (!creds?.email || !creds?.password) throw new Error("MISSING_CREDENTIALS");
+        if (!creds?.email || !creds?.password)
+          throw new Error("MISSING_CREDENTIALS");
 
-        const user = await prisma.user.findUnique({ where: { email: creds.email } });
-        const ok = !!user?.passwordHash && (await verifyPassword(creds.password, user.passwordHash));
+        const email = creds.email.trim().toLowerCase();
+        const user = await prisma.user.findUnique({ where: { email } });
+        const ok =
+          !!user?.passwordHash &&
+          (await verifyPassword(creds.password, user.passwordHash));
+
         if (!user || !ok) {
-          await prisma.userLogin.create({
-            data: { userId: user?.id, provider: "credentials", success: false, error: "BAD_CREDENTIALS" },
-          });
+          if (user?.id) {
+            await prisma.userLogin.create({
+              data: {
+                userId: user.id,
+                provider: "credentials",
+                success: false,
+                error: "BAD_CREDENTIALS",
+              },
+            });
+          }
           throw new Error("BAD_CREDENTIALS");
         }
 
@@ -39,14 +52,23 @@ export const authOptions: NextAuthOptions = {
 
         await prisma.user.update({
           where: { id: user.id },
-          data: { lastLoginAt: new Date(), loginCount: { increment: 1 }, failedLoginCount: 0 },
+          data: {
+            lastLoginAt: new Date(),
+            loginCount: { increment: 1 },
+            failedLoginCount: 0,
+          },
         });
+
         await prisma.userLogin.create({
           data: { userId: user.id, provider: "credentials", success: true },
         });
 
-        // Pasamos también el role para setearlo en el JWT
-        return { id: user.id, name: user.name ?? "", email: user.email!, role: user.role };
+        return {
+          id: user.id,
+          name: user.name ?? "",
+          email: user.email!,
+          role: user.role,
+        };
       },
     }),
 
@@ -56,11 +78,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          scope: [
-            "openid",
-            "email",
-            "profile", // ⬅ necesario para name + picture
-          ].join(" "),
+          scope: ["openid", "email", "profile"].join(" "),
           access_type: "offline",
           prompt: "consent",
         },
@@ -68,42 +86,87 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
 
-  pages: { signIn: "/auth" },
+  // Página de login separada
+  pages: {
+    signIn: "/auth/login",
+  },
 
   callbacks: {
-    async signIn({ user, account }) {
-      // ... (tu lógica existente tal cual)
+    // 🔹 Lógica de alta/verificación con Google
+    async signIn({ user, account, profile }) {
+      if (account?.provider !== "google") return true;
+
+      const email = (user?.email || "").toLowerCase().trim();
+      if (!email) return false;
+
+      // ¿Viene verificado por Google?
+      const emailVerifiedGoogle =
+        (profile as any)?.email_verified === true ||
+        (profile as any)?.email_verified === "true";
+
+      const existing = await prisma.user.findUnique({ where: { email } });
+
+      // Si ya existe
+      if (existing) {
+        if (existing.isSuspended) return false;
+        if (!existing.isActive) return false;
+
+        // Marcar verificado si procede
+        if (emailVerifiedGoogle && !existing.emailVerified) {
+          await prisma.user.update({
+            where: { id: existing.id },
+            data: { emailVerified: new Date() },
+          });
+        }
+        return true;
+      }
+
+      // Alta automática con Google
+      await prisma.user.create({
+        data: {
+          email,
+          name: user?.name ?? "",
+          role: "user",
+          isActive: true,
+          isSuspended: false,
+          emailVerified: emailVerifiedGoogle ? new Date() : null,
+        },
+      });
+
       return true;
     },
 
-    // ⬇ Añadimos 'profile' para poder leer picture/name de Google
+    // 🔹 Construir JWT
     async jwt({ token, user, account, profile }) {
-      // ====== lo tuyo (roles/uid) ======
-      if (user && (user as any).role) (token as any).role = (user as any).role;
+      // Roles / IDs personalizados
+      if (user && (user as any).role)
+        (token as any).role = (user as any).role;
       if (!(token as any).role && token?.email) {
-        (token as any).role = token.email === adminEmail ? "system_admin" : "user";
+        (token as any).role =
+          token.email === adminEmail ? "system_admin" : "user";
       }
       if (user && (user as any).id) (token as any).uid = (user as any).id;
 
-      // ====== NUEVO: al conectar con Google, guarda nombre/email/foto ======
+      // Si es Google: añade nombre/foto/email
       if (account?.provider === "google" && profile) {
-        token.name = (profile as any).name ?? token.name;                 // ⬅ NEW
-        token.email = (profile as any).email ?? token.email;              // ⬅ NEW
+        token.name = (profile as any).name ?? token.name;
+        token.email = (profile as any).email ?? token.email;
         token.picture =
           (profile as any).picture ??
           (profile as any).avatar_url ??
-          token.picture;                                                  // ⬅ NEW
-        token.sub = token.sub ?? (profile as any).sub;                    // ⬅ NEW
+          token.picture;
+        token.sub = token.sub ?? (profile as any).sub;
       }
 
-      // ====== NUEVO: guardar tokens de Google al conectar ======
+      // Guardar tokens de Google
       if (account?.provider === "google") {
         (token as any).google_access_token = account.access_token;
-        (token as any).google_refresh_token = account.refresh_token ?? (token as any).google_refresh_token;
-        (token as any).google_expires_at = account.expires_at; // epoch (s)
+        (token as any).google_refresh_token =
+          account.refresh_token ?? (token as any).google_refresh_token;
+        (token as any).google_expires_at = account.expires_at;
       }
 
-      // ====== NUEVO: refrescar access_token cuando falte ~1 min ======
+      // Refrescar access_token cuando falte ~1 min
       const exp = (token as any).google_expires_at as number | undefined;
       const needsRefresh = !!exp && Date.now() / 1000 > exp - 60;
       if (needsRefresh && (token as any).google_refresh_token) {
@@ -112,7 +175,9 @@ export const authOptions: NextAuthOptions = {
             process.env.GOOGLE_CLIENT_ID,
             process.env.GOOGLE_CLIENT_SECRET
           );
-          client.setCredentials({ refresh_token: (token as any).google_refresh_token });
+          client.setCredentials({
+            refresh_token: (token as any).google_refresh_token,
+          });
 
           const { credentials } = await client.refreshAccessToken();
           (token as any).google_access_token = credentials.access_token;
@@ -127,19 +192,18 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
 
+    // 🔹 Propagar a session
     async session({ session, token }) {
-      // lo tuyo (role/id)
       if (session.user) {
         (session.user as any).role = (token as any).role || "user";
-        if ((token as any).uid) (session.user as any).id = (token as any).uid;
+        if ((token as any).uid)
+          (session.user as any).id = (token as any).uid;
 
-        // ⬅ NEW: propaga nombre / email / foto a la sesión (sidebar)
-        session.user.name = (token.name as string) ?? session.user.name;       // ⬅ NEW
-        session.user.email = (token.email as string) ?? session.user.email;    // ⬅ NEW
-        session.user.image = (token.picture as string) ?? session.user.image;  // ⬅ NEW
+        session.user.name = (token.name as string) ?? session.user.name;
+        session.user.email = (token.email as string) ?? session.user.email;
+        session.user.image = (token.picture as string) ?? session.user.image;
       }
 
-      // tokens de Google a session (por si los usas server-side)
       (session as any).googleAccessToken = (token as any).google_access_token;
       (session as any).googleTokenError = (token as any).google_token_error;
       return session;

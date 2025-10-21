@@ -92,7 +92,6 @@ export default function CandidatesPage() {
           </button>
         </div>
       }
-      backFallback="/dashboard/informes"
     >
       <div className="space-y-6">
         <Card>

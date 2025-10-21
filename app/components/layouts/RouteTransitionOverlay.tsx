@@ -1,101 +1,117 @@
-// app/components/layouts/RouteTransitionOverlay.tsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 /**
- * Overlay de transición:
- * - scope="viewport" -> fixed fullscreen (por defecto)
- * - scope="container" -> absolute al contenedor padre (que debe ser relative)
+ * Muestra una barra de progreso arriba + un overlay con blur
+ * cuando cambia la ruta del App Router.
  *
- * También responde a:
- *   window.dispatchEvent(new CustomEvent("crussader:navigate-start"))
- *   window.dispatchEvent(new CustomEvent("crussader:navigate-end"))
+ * Usa una animación “optimista”: avanza hasta ~85% y termina
+ * al montar la nueva ruta, con una duración mínima para evitar flicker.
  */
 export default function RouteTransitionOverlay({
-  scope = "viewport",
+  scope = "container", // "container" (por defecto) = dentro del área de página; "full" = cubre toda la app
   className = "",
-  minMs = 250,
+  minDurationMs = 450,
 }: {
-  scope?: "viewport" | "container";
+  scope?: "container" | "full";
   className?: string;
-  /** tiempo mínimo visible (anti-parpadeo) */
-  minMs?: number;
+  minDurationMs?: number;
 }) {
   const pathname = usePathname();
-  const [visible, setVisible] = useState(false);
-  const prevPathRef = useRef(pathname);
-  const timerRef = useRef<number | null>(null);
+  const lastPathRef = useRef<string | null>(null);
 
-  const start = () => {
-    if (timerRef.current) return;
-    setVisible(true);
-    timerRef.current = window.setTimeout(() => {
-      timerRef.current = null;
-    }, minMs);
-  };
+  const [active, setActive] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  const end = () => {
-    const hide = () => setVisible(false);
-    if (timerRef.current) {
-      const t = timerRef.current;
-      timerRef.current = null;
-      window.setTimeout(hide, Math.max(0, minMs));
-    } else {
-      hide();
-    }
-  };
-
-  // Cambios reales de ruta
+  // Detecta cambios de ruta
   useEffect(() => {
-    if (pathname !== prevPathRef.current) {
+    if (lastPathRef.current === null) {
+      lastPathRef.current = pathname;
+      return;
+    }
+    if (lastPathRef.current !== pathname) {
+      lastPathRef.current = pathname;
       start();
-      const after = window.setTimeout(() => {
-        end();
-        prevPathRef.current = pathname;
-      }, 350);
-      return () => window.clearTimeout(after);
     }
-  }, [pathname, minMs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
-  // Eventos manuales
+  // Simulación de progreso tipo NProgress (optimista)
   useEffect(() => {
-    const onStart = () => start();
-    const onEnd = () => end();
-    window.addEventListener("crussader:navigate-start", onStart);
-    window.addEventListener("crussader:navigate-end", onEnd);
-    return () => {
-      window.removeEventListener("crussader:navigate-start", onStart);
-      window.removeEventListener("crussader:navigate-end", onEnd);
+    if (!active) return;
+    let raf: number;
+    let running = true;
+
+    const tick = () => {
+      setProgress((p) => {
+        if (p < 0.85) {
+          // incrementos decrecientes
+          const delta = (1 - p) * 0.08;
+          return Math.min(p + delta, 0.85);
+        }
+        return p;
+      });
+      if (running) raf = requestAnimationFrame(tick);
     };
-  }, []);
+    raf = requestAnimationFrame(tick);
+    return () => {
+      running = false;
+      cancelAnimationFrame(raf);
+    };
+  }, [active]);
 
-  if (!visible) return null;
+  // Inicia y finaliza con duración mínima
+  const start = () => {
+    setProgress(0.06);
+    setActive(true);
 
-  const positioning =
-    scope === "viewport"
-      ? "fixed inset-0 z-[60]"
-      : "absolute inset-0 z-[30]"; // menor que sidebar, mayor que el contenido
+    const started = performance.now();
+    const finish = () => {
+      const elapsed = performance.now() - started;
+      const wait = Math.max(0, minDurationMs - elapsed);
+      window.setTimeout(() => {
+        // completa barra y oculta overlay
+        setProgress(1);
+        // pequeño delay para permitir la transición CSS
+        window.setTimeout(() => {
+          setActive(false);
+          setProgress(0);
+        }, 220);
+      }, wait);
+    };
+
+    // Finaliza cuando el frame actual haya “pintado” la nueva ruta
+    // (suficiente en la mayoría de casos con Suspense en App Router)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(finish);
+    });
+  };
+
+  const scopeClass = useMemo(
+    () => (scope === "full" ? "fixed inset-0 z-[999]" : "absolute inset-0 z-50"),
+    [scope]
+  );
+
+  // No renderizamos nada si está inactivo
+  if (!active) return null;
 
   return (
-    <div
-      aria-live="polite"
-      className={`pointer-events-none ${positioning} bg-background/40 backdrop-blur-sm transition-opacity ${className}`}
-    >
-      <div className="flex h-full w-full items-center justify-center">
-        <Spinner />
+    <div className={[scopeClass, className].join(" ")}>
+      {/* Overlay con blur (no bloquea clics del sidebar si el scope es container) */}
+      <div className="absolute inset-0 bg-white/30 backdrop-blur-[2px] pointer-events-none" />
+
+      {/* Barra superior de progreso */}
+      <div className="absolute left-0 top-0 h-0.5 w-full bg-transparent">
+        <div
+          className="h-full bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 transition-[width,opacity] duration-200 ease-out"
+          style={{
+            width: `${Math.max(0, Math.min(100, progress * 100))}%`,
+            opacity: progress > 0 ? 1 : 0,
+          }}
+        />
       </div>
     </div>
-  );
-}
-
-function Spinner() {
-  return (
-    <div
-      role="status"
-      aria-label="Cargando"
-      className="inline-flex h-10 w-10 animate-spin items-center justify-center rounded-full border-2 border-muted-foreground/40 border-t-foreground"
-    />
   );
 }

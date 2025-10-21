@@ -5,21 +5,25 @@ import * as React from "react";
 import { Card, CardContent } from "@/app/components/ui/card";
 import { MapPin, Star, Calendar, Wifi, WifiOff, RefreshCw } from "lucide-react";
 import type { LocationRow } from "@/hooks/useCompanyLocations";
+import { ConnectButton } from "@/app/components/company/ConnectButton";
+import { useBillingStatus } from "@/hooks/useBillingStatus";
 
 type Props = {
   location: LocationRow;
   onSync: () => void | Promise<void>;
-  onConnect?: () => void; // si no se pasa, no se muestra el botón "Conectar"
+  onConnect?: () => void;
 };
 
 export function EstablishmentCard({ location, onSync, onConnect }: Props) {
+  const { data, loading, canConnect } = useBillingStatus();
+
   const title = (location as any).title ?? (location as any).name ?? "Ubicación";
   const addr = [location.address, location.city, location.postalCode].filter(Boolean).join(", ");
 
   const connected = Boolean(
     (location as any).externalConnectionId ||
-    (location as any).ExternalConnection?.id ||
-    location.googlePlaceId
+      (location as any).ExternalConnection?.id ||
+      location.googlePlaceId
   );
 
   const accountEmail =
@@ -31,17 +35,19 @@ export function EstablishmentCard({ location, onSync, onConnect }: Props) {
   const lastSyncAt = (location as any).lastSyncAt as string | Date | undefined;
   const lastSyncText = lastSyncAt ? new Date(String(lastSyncAt)).toLocaleString() : "—";
 
-  const avg = typeof location.reviewsAvg === "number"
-    ? location.reviewsAvg
-    : Number(location.reviewsAvg ?? NaN);
+  const avg =
+    typeof location.reviewsAvg === "number"
+      ? location.reviewsAvg
+      : Number(location.reviewsAvg ?? NaN);
   const avgText = Number.isFinite(avg) ? avg.toFixed(1) : "—";
-  const countText = typeof location.reviewsCount === "number" ? String(location.reviewsCount) : "0";
+  const countText =
+    typeof location.reviewsCount === "number" ? String(location.reviewsCount) : "0";
 
   return (
     <Card className="relative overflow-hidden hover:shadow-lg transition-all duration-300">
       <CardContent className="p-6">
         <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between">
-          {/* Izquierda */}
+          {/* IZQUIERDA */}
           <div className="flex-1 space-y-3">
             <div className="flex items-center gap-3">
               <span className="text-2xl">🏬</span>
@@ -70,9 +76,21 @@ export function EstablishmentCard({ location, onSync, onConnect }: Props) {
                 <span className="text-muted-foreground">Última sync: {lastSyncText}</span>
               </div>
             </div>
+
+            {/* BOTÓN CONECTAR */}
+            {!connected && onConnect && !loading && (
+              <ConnectButton
+                canConnect={canConnect}
+                onConnect={onConnect}
+                onViewPlans={() => window.open("/dashboard/billing/plans", "_blank")}
+              />
+            )}
+            {!connected && loading && (
+              <p className="text-xs text-muted-foreground">Comprobando suscripción…</p>
+            )}
           </div>
 
-          {/* Derecha */}
+          {/* DERECHA */}
           <div className="flex flex-col md:items-end gap-3">
             <span
               className={`px-2 py-0.5 rounded text-xs ${
@@ -84,25 +102,14 @@ export function EstablishmentCard({ location, onSync, onConnect }: Props) {
               {connected ? "Conectado" : "No conectado"}
             </span>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => void onSync()}
-                className="px-2 py-1 rounded border text-sm hover:bg-gray-50 inline-flex items-center gap-1"
-                title="Sincronizar ahora"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Sincronizar
-              </button>
-
-              {!connected && onConnect && (
-                <button
-                  onClick={() => onConnect()}
-                  className="px-2 py-1 rounded bg-primary text-white hover:bg-primary/90 text-sm"
-                >
-                  Conectar
-                </button>
-              )}
-            </div>
+            <button
+              onClick={() => void onSync()}
+              className="px-2 py-1 rounded border text-sm hover:bg-gray-50 inline-flex items-center gap-1"
+              title="Sincronizar ahora"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Sincronizar
+            </button>
           </div>
         </div>
       </CardContent>

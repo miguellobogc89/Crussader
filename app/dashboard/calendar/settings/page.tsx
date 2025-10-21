@@ -129,12 +129,6 @@ export default function CalendarSettingsPage() {
     <PageShell
       title={`Configuración — ${selectedCompany?.name ?? "Empresa"}`}
       description="Define empleados, salas/recursos, servicios y reglas de la agenda."
-      breadcrumbs={[
-        { label: "Dashboard", href: "/dashboard" },
-        { label: "Calendario", href: "/dashboard/calendar" },
-        { label: "Configuración" },
-      ]}
-      actions={shellActions}
       toolbar={
         <TopToolbar
           companies={companies}

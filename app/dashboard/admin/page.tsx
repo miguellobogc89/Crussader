@@ -1,83 +1,141 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { redirect } from "next/navigation";
-
-import UsersTable from "@/app/components/admin/UsersTable";
-import CompaniesTable from "@/app/components/admin/CompaniesTable";
-import LocationsTable from "@/app/components/admin/LocationsTable";
-import { TabsMenu, type TabItem } from "@/app/components/TabsMenu";
-import PreloadAdminBuffer from "@/app/components/buffer/PreloadAdminBuffer";
-
+// app/dashboard/admin/page.tsx
+import Link from "next/link";
 import PageShell from "@/app/components/layouts/PageShell";
+import { Card, CardContent } from "@/app/components/ui/card";
+import {
+  Users,
+  Wallet,
+  Bot,
+  Palette,
+  Package,
+  ShoppingCart,
+  Activity,
+  Plug,
+  ChevronRight,
+} from "lucide-react";
 
-export const dynamic = "force-dynamic";
+type Option = {
+  id: string;
+  title: string;
+  description: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string; // tailwind text-*
+};
 
-const ADMIN_TABS: TabItem[] = [
-  { href: "?tab=locations", label: "Ubicaciones", icon: "map-pin" },
-  { href: "?tab=users",     label: "Usuarios",    icon: "users" },
-  { href: "?tab=companies", label: "Empresas",    icon: "building-2" },
+const settingsOptions: Option[] = [
+  {
+    id: "usuarios",
+    title: "Usuarios",
+    description: "Gestiona usuarios y permisos",
+    href: "/dashboard/admin/users",
+    icon: Users,
+    color: "text-blue-500",
+  },
+  {
+    id: "finanzas",
+    title: "Finanzas y Contabilidad",
+    description: "Control de gastos e ingresos",
+    href: "/dashboard/admin/finance",
+    icon: Wallet,
+    color: "text-green-500",
+  },
+  {
+    id: "agentes-ia",
+    title: "Agentes IA",
+    description: "Configura asistentes inteligentes",
+    href: "/dashboard/admin/voiceagents",
+    icon: Bot,
+    color: "text-purple-500",
+  },
+  {
+    id: "ui-design",
+    title: "UI & Design",
+    description: "Personaliza la apariencia",
+    href: "/dashboard/admin/UI_and_Dessign",
+    icon: Palette,
+    color: "text-pink-500",
+  },
+  {
+    id: "productos",
+    title: "Productos",
+    description: "Catálogo y gestión de productos",
+    href: "/dashboard/admin/products",
+    icon: Package,
+    color: "text-orange-500",
+  },
+  {
+    id: "ventas",
+    title: "Ventas",
+    description: "Monitorea tus ventas",
+    href: "/dashboard/admin/sales",
+    icon: ShoppingCart,
+    color: "text-emerald-500",
+  },
+  {
+    id: "sistema",
+    title: "Estado del Sistema",
+    description: "Salud y rendimiento",
+    href: "/dashboard/admin/system",
+    icon: Activity,
+    color: "text-red-500",
+  },
+  {
+    id: "integraciones",
+    title: "Integraciones",
+    description: "Conecta servicios externos",
+    href: "/dashboard/admin/integrations",
+    icon: Plug,
+    color: "text-indigo-500",
+  },
 ];
 
-export default async function AdminPage({
-  searchParams,
-}: {
-  searchParams?: {
-    uq?: string; upage?: string;
-    cq?: string; cpage?: string;
-    lq?: string; lpage?: string;
-    tab?: "locations" | "users" | "companies";
-    take?: string;
-  };
-}) {
-  const session = await getServerSession(authOptions);
-  const role = (session?.user as any)?.role ?? "user";
-  if (role !== "system_admin") redirect("/dashboard");
+export default function AdminIndexPage() {
+  return (
+    <PageShell
+      title="Ajustes de Administrador"
+      description="Centro de configuración y herramientas avanzadas"
+      // Si tu PageShell acepta icono por nombre: titleIconName="Shield"
+      // o si acepta componente: titleIcon={Shield}
+    >
+      <div className="w-full max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {settingsOptions.map((option) => {
+            const Icon = option.icon;
+            return (
+              <Link key={option.id} href={option.href} className="block">
+                <Card className="hover:shadow-md transition-all duration-200 cursor-pointer group border">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      {/* Icono */}
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Icon className={`h-6 w-6 ${option.color}`} />
+                        </div>
+                      </div>
 
-  const uq = (searchParams?.uq ?? "").trim();
-  const upage = Math.max(1, Number(searchParams?.upage ?? 1) || 1);
+                      {/* Contenido */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-foreground text-lg mb-1">
+                          {option.title}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {option.description}
+                        </p>
+                      </div>
 
-  const cq = (searchParams?.cq ?? "").trim();
-  const cpage = Math.max(1, Number(searchParams?.cpage ?? 1) || 1);
-
-  const lq = (searchParams?.lq ?? "").trim();
-  const lpage = Math.max(1, Number(searchParams?.lpage ?? 1) || 1);
-
-  const take = Math.max(1, Math.min(Number(searchParams?.take ?? "10"), 100));
-
-  const tab = (searchParams?.tab ?? "locations") as "locations" | "users" | "companies";
-
-// app/dashboard/admin/page.tsx (fragmento clave)
-return (
-  <PageShell
-    title="Administración"
-    description="Gestión de ubicaciones, usuarios y empresas"
-    headerBand={
-      <TabsMenu
-        tabs={ADMIN_TABS}
-        renderMode="nav-only"
-        appearance="admin"
-        dense
-      />
-    }
-  >
-    <PreloadAdminBuffer
-      lq={lq} lpage={lpage}
-      cq={cq} cpage={cpage}
-      uq={uq} upage={upage}
-    />
-
-    {tab === "locations" && (
-      <section id="locations">
-        <LocationsTable
-          lq={lq} lpage={lpage}
-          uq={uq} upage={upage}
-          cq={cq} cpage={cpage}
-        />
-      </section>
-    )}
-    {tab === "users" && <section id="users"><UsersTable /></section>}
-    {tab === "companies" && <section id="companies"><CompaniesTable /></section>}
-  </PageShell>
-);
-
+                      {/* Flecha */}
+                      <div className="flex-shrink-0">
+                        <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </PageShell>
+  );
 }

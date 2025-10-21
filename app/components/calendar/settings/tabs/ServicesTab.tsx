@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
-import DataTable from "@/app/components/design-system/table/DataTable";
-import ColorDot from "@/app/components/design-system/table/ColorDot";
-import type { ColumnDef } from "@/app/components/design-system/table/types";
+import DataTable from "@/app/components/crussader/UX/table/DataTable";
+import ColorDot from "@/app/components/crussader/UX/table/ColorDot";
+import type { ColumnDef } from "@/app/components/crussader/UX/table/types";
 import { Badge } from "@/app/components/ui/badge";
 
 /* === Tipo de fila para la tabla de servicios === */

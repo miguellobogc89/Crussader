@@ -59,9 +59,19 @@ async function loadCandidateConcepts(params: {
   companyId?: string | null;
   recencyDays?: number;
   limit?: number;
+  /** si true, incluye conceptos ya asignados (solo si el topic no es estable); si false, solo sin topic */
+  includeAssigned?: boolean;
 }): Promise<ConceptRow[]> {
   const recencyDays = Math.max(1, Math.min(3650, params.recencyDays ?? 365));
   const limit = Math.max(1, Math.min(2000, params.limit ?? 500));
+  const includeAssigned = params.includeAssigned === true;
+
+  // WHERE dinámico según includeAssigned
+  // - includeAssigned=false -> SOLO sin topic
+  // - includeAssigned=true  -> sin topic O asignados a topic no estable
+  const topicWhere = includeAssigned
+    ? ` (c.topic_id IS NULL OR COALESCE(t.is_stable, false) = false) `
+    : ` (c.topic_id IS NULL) `;
 
   const sql = `
     SELECT c.id::text, c.label, c.rating, c.topic_id
@@ -72,7 +82,7 @@ async function loadCandidateConcepts(params: {
       COALESCE(r."createdAtG", r."ingestedAt") >= (now() - make_interval(days => $1::int))
       AND ($2::text IS NULL OR r."locationId" = $2::text)
       AND ($3::text IS NULL OR r."companyId"  = $3::text)
-      AND (c.topic_id IS NULL OR COALESCE(t.is_stable, false) = false)
+      AND ${topicWhere}
     ORDER BY c.updated_at DESC NULLS LAST
     LIMIT $4::int
   `;
@@ -104,12 +114,13 @@ function fallbackShortDescription(members: string[], byId: Map<string, ConceptRo
 /* ───────── Preview ───────── */
 export async function llmGroupConceptsPreview(
   limit = 200,
-  scope?: { locationId?: string | null; companyId?: string | null; recencyDays?: number }
+  scope?: { locationId?: string | null; companyId?: string | null; recencyDays?: number; includeAssigned?: boolean }
 ) {
   const concepts = await loadCandidateConcepts({
     locationId: scope?.locationId ?? null,
     companyId: scope?.companyId ?? null,
     recencyDays: scope?.recencyDays ?? 365,
+    includeAssigned: scope?.includeAssigned === true,
     limit,
   });
 
@@ -144,19 +155,29 @@ export async function llmGroupConcepts(opts?: {
   limit?: number;
   minTopicSize?: number;  // default 2
   dryRun?: boolean;       // default true
+  includeAssigned?: boolean; // default false
 }) {
   const minTopicSize = Math.max(2, Math.min(10, opts?.minTopicSize ?? 2));
   const dryRun = opts?.dryRun !== false ? true : false;
+  const includeAssigned = opts?.includeAssigned === true;
 
   const concepts = await loadCandidateConcepts({
     locationId: opts?.locationId ?? null,
     companyId: opts?.companyId ?? null,
     recencyDays: opts?.recencyDays ?? 365,
+    includeAssigned,
     limit: opts?.limit ?? 500,
   });
 
   if (!concepts.length) {
-    return { ok: true, taken: 0, createdTopics: 0, assignedConcepts: 0, preview: { topics: [] as any[] }, note: "No hay conceptos pendientes en este alcance." };
+    return {
+      ok: true,
+      taken: 0,
+      createdTopics: 0,
+      assignedConcepts: 0,
+      preview: { topics: [] as any[] },
+      note: "No hay conceptos pendientes en este alcance."
+    };
   }
 
   const items: ConceptLite[] = concepts.map((c) => ({ id: c.id, label: c.label }));
@@ -187,12 +208,26 @@ export async function llmGroupConcepts(opts?: {
     .sort((a, b) => b.members.length - a.members.length);
 
   if (!cleaned.length) {
-    return { ok: true, taken: concepts.length, createdTopics: 0, assignedConcepts: 0, preview: { topics: [] as any[] }, note: `El LLM generó agrupaciones < ${minTopicSize} miembros; descartadas.` };
+    return {
+      ok: true,
+      taken: concepts.length,
+      createdTopics: 0,
+      assignedConcepts: 0,
+      preview: { topics: [] as any[] },
+      note: `El LLM generó agrupaciones < ${minTopicSize} miembros; descartadas.`
+    };
   }
 
   if (dryRun) {
     const assignedConcepts = cleaned.reduce((sum, t) => sum + t.members.length, 0);
-    return { ok: true, taken: concepts.length, createdTopics: cleaned.length, assignedConcepts, preview: { topics: cleaned }, note: "dryRun=true (no se escribió nada)." };
+    return {
+      ok: true,
+      taken: concepts.length,
+      createdTopics: cleaned.length,
+      assignedConcepts,
+      preview: { topics: cleaned },
+      note: "dryRun=true (no se escribió nada)."
+    };
   }
 
   const byId = new Map<string, ConceptRow>(concepts.map((c) => [c.id, c]));
@@ -204,7 +239,9 @@ export async function llmGroupConcepts(opts?: {
     const ratings = topic.members
       .map((id) => byId.get(id)?.rating)
       .filter((n): n is number => typeof n === "number");
-    const avgRounded = ratings.length ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 100) / 100 : null;
+    const avgRounded = ratings.length
+      ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 100) / 100
+      : null;
 
     const fallbackDesc = fallbackShortDescription(topic.members, byId);
 
@@ -235,5 +272,11 @@ export async function llmGroupConcepts(opts?: {
     try { await generateAndStoreTopicDescription(id); } catch { /* fallback ya persistido */ }
   }
 
-  return { ok: true, taken: concepts.length, createdTopics: created, assignedConcepts: assigned, preview: { topics: cleaned } };
+  return {
+    ok: true,
+    taken: concepts.length,
+    createdTopics: created,
+    assignedConcepts: assigned,
+    preview: { topics: cleaned }
+  };
 }

@@ -2,8 +2,10 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { cookies } from "next/headers";
+import "server-only";
 
-
+/** Relación mínima para el Type de Location cuando cargamos por company */
 type LocationTypeRel = {
   id: string;
   name: string;
@@ -22,6 +24,7 @@ export type BootstrapData = {
     role: "system_admin" | "org_admin" | "user" | "test";
     locale: string | null;
     timezone: string | null;
+    onboardingStatus: "PENDING" | "IN_PROGRESS" | "COMPLETED";
   };
   companies: Array<{
     companyId: string;
@@ -88,7 +91,9 @@ export type BootstrapData = {
   }>;
 };
 
-/** Carga única: usuario + empresas + (empresa activa) + ubicaciones + conexiones */
+const ACTIVE_COOKIE = "active_company_id";
+
+/** Carga única: usuario + empresas + (empresa activa por cookie/primera) + ubicaciones + conexiones */
 export async function getBootstrapData(): Promise<BootstrapData> {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? null;
@@ -98,90 +103,58 @@ export async function getBootstrapData(): Promise<BootstrapData> {
   const user = await prisma.user.findUnique({
     where: { email },
     select: {
-      id: true,
-      name: true,
-      email: true,
-      image: true,
-      role: true,
-      locale: true,
-      timezone: true,
+      id: true, name: true, email: true, image: true,
+      role: true, locale: true, timezone: true, onboardingStatus: true,
     },
   });
   if (!user) throw Object.assign(new Error("no_user"), { status: 400 });
 
-  // ---- Empresas del usuario (UserCompany)
+  // ---- Empresas del usuario
   const userCompanies = await prisma.userCompany.findMany({
     where: { userId: user.id },
     select: { companyId: true, role: true },
     orderBy: { createdAt: "asc" },
   });
 
-  const activeCompanyId = userCompanies[0]?.companyId ?? null;
+  // LEER cookie (no escribir aquí)
+  const jar = await cookies(); // ✅ En Next 15 es async
+  const cookieCompanyId = jar.get(ACTIVE_COOKIE)?.value ?? null;
 
-  // ---- Empresa activa (elige la primera por ahora; luego podrás persistir preferencia)
+  // Preferimos cookie si pertenece al usuario; si no, la primera
+  const userCompanyIds = new Set(userCompanies.map((uc) => uc.companyId));
+  const activeCompanyId =
+    (cookieCompanyId && userCompanyIds.has(cookieCompanyId) ? cookieCompanyId : null) ??
+    userCompanies[0]?.companyId ??
+    null;
+
+  // ---- Empresa activa (si hay)
   const activeCompany = activeCompanyId
     ? await prisma.company.findUnique({
         where: { id: activeCompanyId },
         select: {
-          id: true,
-          name: true,
-          logoUrl: true,
-          plan: true,
-          city: true,
-          country: true,
-          website: true,
-          brandColor: true,
-          reviewsAvg: true,
-          reviewsCount: true,
-          lastSyncAt: true,
+          id: true, name: true, logoUrl: true, plan: true, city: true, country: true,
+          website: true, brandColor: true, reviewsAvg: true, reviewsCount: true, lastSyncAt: true,
         },
       })
     : null;
 
-  // ---- Ubicaciones de la empresa activa
+  // ---- Ubicaciones de la activa
   const rawLocations = activeCompanyId
     ? await prisma.location.findMany({
         where: { companyId: activeCompanyId },
         select: {
-          id: true,
-          companyId: true,
-          title: true,
-          slug: true,
-          status: true,
-          type: true,
-          address: true,
-          address2: true,
-          city: true,
-          region: true,
-          postalCode: true,
-          country: true,
-          countryCode: true,
-          phone: true,
-          email: true,
-          website: true,
-          googleName: true,
-          googlePlaceId: true,
-          googleLocationId: true,
-          googleAccountId: true,
-          externalConnectionId: true,
-          featuredImageUrl: true,
-          instagramUrl: true,
-          facebookUrl: true,
-          timezone: true,
-          latitude: true,
-          longitude: true,
-          reviewsAvg: true,
-          reviewsCount: true,
-          lastSyncAt: true,
-          createdAt: true,
-          updatedAt: true,
-          isFeatured: true,
+          id: true, companyId: true, title: true, slug: true, status: true, type: true,
+          address: true, address2: true, city: true, region: true, postalCode: true,
+          country: true, countryCode: true, phone: true, email: true, website: true,
+          googleName: true, googlePlaceId: true, googleLocationId: true, googleAccountId: true,
+          externalConnectionId: true, featuredImageUrl: true, instagramUrl: true, facebookUrl: true,
+          timezone: true, latitude: true, longitude: true, reviewsAvg: true, reviewsCount: true,
+          lastSyncAt: true, createdAt: true, updatedAt: true, isFeatured: true,
         },
         orderBy: { createdAt: "asc" },
       })
     : [];
 
-  // Normalizamos Decimals -> string
   const locations = rawLocations.map((l) => ({
     ...l,
     latitude: l.latitude ? l.latitude.toString() : null,
@@ -189,55 +162,80 @@ export async function getBootstrapData(): Promise<BootstrapData> {
     reviewsAvg: l.reviewsAvg ? l.reviewsAvg.toString() : null,
   }));
 
-  // ---- Conexiones externas de la empresa activa
-// lib/bootstrap.ts (en getBootstrapData)
-const connections = activeCompanyId
-  ? await prisma.externalConnection.findMany({
-      where: { companyId: activeCompanyId },
-      select: {
-        id: true,
-        provider: true,
-        accountName: true,
-        accountEmail: true,
-        scope: true,
-        expires_at: true,
-        companyId: true,
-        createdAt: true,
-        updatedAt: true,
-        // 🔒 Omitimos access_token y refresh_token en el bootstrap del cliente
-      },
-      orderBy: { createdAt: "asc" },
-    })
-  : [];
-
+  // ---- Conexiones externas (sin tokens)
+  const connections = activeCompanyId
+    ? await prisma.externalConnection.findMany({
+        where: { companyId: activeCompanyId },
+        select: {
+          id: true, provider: true, accountName: true, accountEmail: true, scope: true,
+          expires_at: true, companyId: true, createdAt: true, updatedAt: true,
+        },
+        orderBy: { createdAt: "asc" },
+      })
+    : [];
 
   return {
     user: {
       id: user.id,
       name: user.name,
-      email: user.email!,         // email es unique y requerido en tu flujo
+      email: user.email!,
       image: user.image ?? null,
       role: user.role,
       locale: user.locale ?? null,
       timezone: user.timezone ?? null,
+      onboardingStatus: (user.onboardingStatus as any) ?? "PENDING",
     },
     companies: userCompanies,
     activeCompany: activeCompany
       ? {
-        id: activeCompany.id,
-        name: activeCompany.name,
-        logoUrl: activeCompany.logoUrl,
-        plan: activeCompany.plan,
-        city: activeCompany.city,
-        country: activeCompany.country,
-        website: activeCompany.website,
-        brandColor: activeCompany.brandColor,
-        reviewsAvg: activeCompany.reviewsAvg ? activeCompany.reviewsAvg.toString() : null,
-        reviewsCount: activeCompany.reviewsCount,
-        lastSyncAt: activeCompany.lastSyncAt ?? null,
-      }
+          id: activeCompany.id,
+          name: activeCompany.name,
+          logoUrl: activeCompany.logoUrl,
+          plan: activeCompany.plan,
+          city: activeCompany.city,
+          country: activeCompany.country,
+          website: activeCompany.website,
+          brandColor: activeCompany.brandColor,
+          reviewsAvg: activeCompany.reviewsAvg ? activeCompany.reviewsAvg.toString() : null,
+          reviewsCount: activeCompany.reviewsCount,
+          lastSyncAt: activeCompany.lastSyncAt ?? null,
+        }
       : null,
     locations,
     connections,
   };
+}
+
+/**
+ * Server Action para CAMBIAR la empresa activa (valida pertenencia y setea cookie).
+ * Úsala desde un formulario/acción del cliente o desde el Sidebar.
+ */
+export async function setActiveCompanyCookie(companyId: string) {
+  "use server";
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email ?? null;
+  if (!email) throw Object.assign(new Error("unauth"), { status: 401 });
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+  if (!user) throw Object.assign(new Error("no_user"), { status: 400 });
+
+  const belongs = await prisma.userCompany.findFirst({
+    where: { userId: user.id, companyId },
+    select: { companyId: true },
+  });
+  if (!belongs) throw Object.assign(new Error("forbidden_company"), { status: 403 });
+
+  // ✅ En Server Actions SÍ puedes setear cookies
+  const jar = await cookies();
+  jar.set(ACTIVE_COOKIE, companyId, {
+    path: "/",
+    sameSite: "lax",
+    httpOnly: false,
+    maxAge: 60 * 60 * 24 * 365,
+  });
+
+  return true;
 }

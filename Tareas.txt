@@ -1,0 +1,94 @@
+Roadmap:
+
+
+
+========== MVP REVIEWS =================
+
+- Meter una sola entrada reviews en la sidebar -- OK
+- Esta entrada mostrará "Crear Plan" o  la info real dependiendo del account -- OK
+- La página de reviews tendra un tabmenu con las reseñas, analytics seguiminto, analytics sentimiento y configuración -- OK
+
+- Configuración mostrará ajustes de respuesta, notificaciones y suscripción
+- La configuración de respuestas debe funcionar correctamente
+- en los informes debemos poder seleccionar arriba la antiguedad, para que mas de un año por ejemplo sea premium
+- En empresa debemos poder conectar la cuenta una vez que tengramos suubscripción o trial y debe guiarnos cuando nos demos de alta en la prueba
+- Las ubicaciones deben tener un icono
+- Los usuarios foto
+- las emrpesas logo
+- gamificación de % commpletado
+
+===== General ========
+- notificaciones
+- Cupones
+- cookies
+- terminos del servicio y politica de privacidad
+- UX:
+	· Barra de carga
+	· Spinners
+	· Toasts
+	· Notificaciones
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+========== MVP CALENDARIO =================
+
+1. Configuración de usuario
+	- Perfil e info
+	- Notificaciones
+	- Seguridad
+	- Alta en el correo
+
+2. Seguimiento de ventas
+	- Leads
+	- Accounts
+
+3. Creación de calendario y funcionamiento
+	- Reglas: creamos una tabla needs de relacion?
+	- Ordenes de asignación. Para una higiene a quien asignamos primero
+	- Podemos reservar sin asignación? Si reservamos sin asignacion y a uno de los recursos se le asigna algo a la misma hora, al otro se le asigna esto instantaneamente
+	- 
+
+
+
+==========================================================================
+Relaciones:
+- Que ser relacionen bien usuarios y empresas
+
+
+Agente Voz
+- Asegurar que funcionan los ajustes
+- Organizar la pantalla del agente
+- Conectar a telefono
+- QUe el agente guarde usuarios en la bbdd
+
+General:
+- Renderizar Páginas
+
+Calendario:
+- Crear un calendario por recurso/empleado
+- Sacar un calendario gratuito
+- Crear reglas
+- Lista de espera
+- Comunicación por whatsapp
+
+Notifaciones:
+- crear script que vaya creando visitas aleatoriamente
+
+- construir la matriz de roles y permisos
+

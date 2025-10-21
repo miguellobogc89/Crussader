@@ -1,52 +1,48 @@
-// app/components/layouts/PageHeader.tsx
 "use client";
 
-import { ReactNode } from "react";
+import Breadcrumbs, {
+} from "@/app/components/crussader/navigation/Breadcrumbs";
 
-type Crumb = { label: string; href?: string };
+type Props = {
+  title: string;
+  description?: string;
+  actions?: React.ReactNode;
+  className?: string;
+};
 
+/**
+ * Cabecera de página estándar: muestra breadcrumbs + título + descripción + acciones.
+ */
 export default function PageHeader({
   title,
   description,
-  breadcrumbs,
   actions,
-}: {
-  title: string;
-  description?: string;
-  breadcrumbs?: Crumb[];
-  actions?: ReactNode;
-}) {
+  className = "",
+}: Props) {
   return (
-    <header className="w-full">
-      {/* Breadcrumbs (opcional) */}
-      {breadcrumbs && breadcrumbs.length > 0 && (
-        <nav className="mb-2 text-sm text-muted-foreground">
-          <ol className="flex flex-wrap items-center gap-1">
-            {breadcrumbs.map((c, i) => (
-              <li key={i} className="flex items-center gap-1">
-                {i > 0 && <span aria-hidden="true">/</span>}
-                {c.href ? (
-                  <a href={c.href} className="hover:underline">
-                    {c.label}
-                  </a>
-                ) : (
-                  <span aria-current="page">{c.label}</span>
-                )}
-              </li>
-            ))}
-          </ol>
-        </nav>
-      )}
+    <header
+      className={[
+        "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between",
+        className,
+      ].join(" ")}
+    >
+      <div className="flex flex-col gap-2">
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="max-w-3xl">
-          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">{title}</h1>
+        {/* === Título y descripción === */}
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            {title}
+          </h1>
           {description && (
-            <p className="mt-1 text-muted-foreground">{description}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           )}
         </div>
-        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>
+
+      {/* === Acciones (botones, toggles, etc.) === */}
+      {actions ? (
+        <div className="flex shrink-0 items-center gap-2">{actions}</div>
+      ) : null}
     </header>
   );
 }

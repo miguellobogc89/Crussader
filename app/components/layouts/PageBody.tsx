@@ -21,7 +21,7 @@ export default function PageBody({
   return (
     <main
       role="main"
-      className={`w-full ${width} mx-auto px-4 sm:px-6 lg:px-8 py-4`}
+      className={`w-full  bg-dark ${width} mx-auto px-4 sm:px-6 lg:px-8 py-4`}
     >
       {toolbar && <div className="mb-4">{toolbar}</div>}
       {children}

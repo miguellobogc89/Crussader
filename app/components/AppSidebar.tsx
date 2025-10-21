@@ -1,31 +1,45 @@
-// app/components/AppSidebar.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, ChevronDown, ChevronsLeft } from "lucide-react";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-// NUEVO: primitivas reutilizables de la sidebar
 import { SidebarItem } from "@/app/components/sidebar/SidebarItem";
-import { SidebarCollapse } from "@/app/components/sidebar/SidebarCollapse";
-import { SidebarIcon } from "@/app/components/sidebar/SidebarIcon";
+import { Group, useActiveGroupId } from "@/app/components/sidebar/NavGroups";
 import type { NavItem, NavGroup } from "@/app/components/sidebar/types";
 
-/* ================= Utilidades ================= */
+import { Brand } from "@/app/components/sidebar/Brand";
+import { CompanyChip } from "@/app/components/sidebar/CompanyChip";
+import { UserFooter } from "@/app/components/sidebar/UserFooter";
+import TrialBanner from "@/app/components/sidebar/TrialBanner";
+
+/* ======== util ======== */
 function isActivePath(pathname: string, href: string) {
   if (pathname === href) return true;
   return pathname.startsWith(href + "/");
 }
 
-/* ================= Datos ================= */
+/* ======== datos de navegación ======== */
 const HOME: NavItem = {
   title: "Inicio",
   href: "/dashboard/home",
   icon: "🏠",
   description: "Página principal",
+};
+
+const PRICING: NavItem = {
+  title: "Pricing",
+  href: "/dashboard/pricing",
+  icon: "💎",
+  description: "Plans & pricing",
+};
+
+const REVIEWS: NavItem = {
+  title: "Reseñas",
+  href: "/dashboard/reviews",
+  icon: "💬",
+  description: "Automatización de reseñas",
 };
 
 const GROUPS: NavGroup[] = [
@@ -47,6 +61,7 @@ const GROUPS: NavGroup[] = [
     icon: "🏢",
     items: [
       { title: "Empresa", href: "/dashboard/company", icon: "🏛️", description: "Información de la empresa" },
+      { title: "Cuenta", href: "/dashboard/account", icon: "📅", description: "Mi cuenta" },
       { title: "Empleados", href: "/dashboard/myusers", icon: "👥", description: "Empleados y roles" },
       { title: "Calendario", href: "/dashboard/calendar", icon: "📅", description: "Gestión de reservas" },
     ],
@@ -75,114 +90,23 @@ const GROUPS: NavGroup[] = [
   },
 ];
 
-/* ================= Grupo (controlado por props) ================= */
-function Group({
-  group,
-  pathname,
-  collapsed,
-  open,
-  onHeaderClick,
-  onRequestExpand,
-  onItemNavigate,
-}: {
-  group: NavGroup;
-  pathname: string;
-  collapsed: boolean;
-  open: boolean; // controlado desde el padre
-  onHeaderClick: () => void; // pedir abrir/cerrar este grupo
-  onRequestExpand: () => void;
-  onItemNavigate: () => void;
-}) {
-  const anyActive = useMemo(
-    () => group.items.some((it) => isActivePath(pathname, it.href)),
-    [pathname, group.items]
-  );
-  const headerActive = anyActive && !collapsed;
-
-  const onClickHeader = () => {
-    if (collapsed) {
-      onRequestExpand();
-    }
-    onHeaderClick(); // el padre decide si abre este y cierra otros
-  };
-
-  return (
-    <div className="w-full">
-      <button
-        type="button"
-        onClick={onClickHeader}
-        aria-expanded={!collapsed ? open : undefined}
-        className={[
-          "flex w-full items-center rounded-lg transition-colors",
-          "min-h-11 px-2",
-          collapsed ? "justify-center" : "justify-between px-3",
-          headerActive
-            ? "bg-slate-800/70 text-white border-r-2 border-primary/60"
-            : "text-slate-300 hover:text-white hover:bg-slate-800/60",
-        ].join(" ")}
-        title={collapsed ? group.title : undefined}
-      >
-        <div className={["flex items-center", collapsed ? "" : "gap-3"].join(" ")}>
-          <SidebarIcon icon={group.icon} />
-          {!collapsed && <span className="truncate text-sm font-medium">{group.title}</span>}
-        </div>
-        {!collapsed && (
-          <ChevronDown
-            className={["h-4 w-4 transition-transform duration-300", open ? "rotate-180" : ""].join(" ")}
-          />
-        )}
-      </button>
-
-      {/* Contenido del grupo */}
-      {!collapsed && (
-        <SidebarCollapse open={open} className="mt-1">
-          <div
-            className={[
-              // Espacio a la izquierda un poco mayor para que quepa la línea centrada bajo el icono
-              "relative ml-0 pl-7 space-y-1",
-              // Línea fina, clara y más a la derecha (como cayendo del centro del icono)
-              "before:content-[''] before:absolute before:top-2 before:bottom-2",
-              // Ajusta este left para afinar el centrado bajo el icono del header (≈ 1.6–1.8rem)
-              "before:left-[1.4rem]",
-              // 1px de ancho y color más claro
-              "before:w-px before:bg-white/35",
-            ].join(" ")}
-          >
-            {group.items.map((it) => (
-              <SidebarItem
-                key={it.href}
-                item={it}
-                active={isActivePath(pathname, it.href)}
-                collapsed={false}
-                onNavigate={onItemNavigate}
-              />
-            ))}
-          </div>
-        </SidebarCollapse>
-      )}
-    </div>
-  );
-}
-
-/* ================= Sidebar principal ================= */
 export function AppSidebar() {
   const pathname = usePathname() ?? "";
   const isMobile = useIsMobile();
+  const { data: session } = useSession();
 
   const [collapsed, setCollapsed] = useState<boolean>(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  const { data: session } = useSession();
+  // ===== admin flag (igual que tenías)
   const user = session?.user;
-
-  // ===== DEBUG + detección de admin (normalizando valores)
   const roleRaw = (user as any)?.role ?? (user as any)?.companyRole ?? "";
   const rolesArrRaw = (user as any)?.roles ?? [];
   const permsArrRaw = (user as any)?.permissions ?? (user as any)?.perms ?? [];
   const role = String(roleRaw || "").toLowerCase();
   const rolesArr = Array.isArray(rolesArrRaw) ? rolesArrRaw.map((r: any) => String(r).toLowerCase()) : [];
   const permsArr = Array.isArray(permsArrRaw) ? permsArrRaw.map((p: any) => String(p).toLowerCase()) : [];
-  const ADMIN_ALIASES = new Set(["admin", "administrator", "owner", "superadmin", "super_admin", "system_admin", "sysadmin", "root"]);
+  const ADMIN_ALIASES = new Set(["admin","administrator","owner","superadmin","super_admin","system_admin","sysadmin","root"]);
   const adminFlags = {
     a_isAdminField: (user as any)?.isAdmin === true,
     b_roleEqAdmin: ADMIN_ALIASES.has(role) || /admin/.test(role),
@@ -194,14 +118,11 @@ export function AppSidebar() {
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
       console.log("[Sidebar admin debug]", { user, roleRaw, roleNormalized: role, rolesArr, permsArr, adminFlags, isAdmin });
     }
   }, [user, isAdmin, role, rolesArr.length, permsArr.length]);
 
-  const userInitial = (user?.name?.charAt(0) || user?.email?.charAt(0) || "U").toUpperCase();
-
-  // Grupo ADMIN (aparece arriba de Inicio)
+  // ===== grupos (inyecta admin si aplica)
   const ADMIN_GROUP: NavGroup | null = isAdmin
     ? {
         id: "admin",
@@ -213,6 +134,7 @@ export function AppSidebar() {
           { title: "Empresas y establecimientos", href: "/dashboard/admin/companies", icon: "🏪", description: "Estructura, sedes y negocios" },
           { title: "Integraciones", href: "/dashboard/admin/integrations", icon: "🔌", description: "Conexiones externas" },
           { title: "Finanzas", href: "/dashboard/admin/finance/kam-simulator", icon: "💰", description: "Pagos, costes y facturas" },
+          { title: "Productos", href: "/dashboard/admin/products", icon: "📦", description: "Configurador de productos" },
           { title: "Ventas", href: "/dashboard/admin/sales", icon: "🛒", description: "Canales y conversión" },
           { title: "Permisos y auditoría", href: "/dashboard/admin/audit", icon: "🧾", description: "Logs y cumplimiento" },
           { title: "Estado del sistema", href: "/dashboard/admin/system", icon: "⚙️", description: "Salud y configuración" },
@@ -221,34 +143,23 @@ export function AppSidebar() {
       }
     : null;
 
-  const isOverlay = isMobile && !collapsed;
   const ALL_GROUPS: NavGroup[] = ADMIN_GROUP ? [ADMIN_GROUP, ...GROUPS] : GROUPS;
 
-  // Grupo que contiene la ruta activa (para abrir por defecto)
-  const defaultOpenId = useMemo(() => {
-    const g = ALL_GROUPS.find((gg) => gg.items.some((it) => isActivePath(pathname, it.href)));
-    return g?.id ?? null;
-  }, [pathname, ALL_GROUPS]);
-
-  // === NUEVO: estado controlado para "solo un abierto"
+  // cuál abrir por defecto
+  const defaultOpenId = useActiveGroupId(ALL_GROUPS);
   const [openGroupId, setOpenGroupId] = useState<string | null>(defaultOpenId);
 
-  // Si cambia la ruta o el set de grupos, actualiza el abierto por defecto
   useEffect(() => {
     setOpenGroupId(defaultOpenId);
   }, [defaultOpenId]);
 
+  const isOverlay = isMobile && !collapsed;
   const requestExpand = () => setCollapsed(false);
-
-  // Cerrar tras navegar (solo móvil)
   const onItemNavigate = () => {
     if (isMobile) setCollapsed(true);
   };
-
-  // Ancho animado (100vw en móvil overlay)
   const width = isOverlay ? "100vw" : collapsed ? "4rem" : "18rem";
 
-  // Bloquear scroll del body cuando el overlay móvil está abierto
   useEffect(() => {
     if (isOverlay) {
       const prev = document.body.style.overflow;
@@ -259,7 +170,6 @@ export function AppSidebar() {
     }
   }, [isOverlay]);
 
-  // Cerrar con Escape en móvil overlay
   useEffect(() => {
     if (!isOverlay) return;
     const onKey = (e: KeyboardEvent) => {
@@ -269,17 +179,8 @@ export function AppSidebar() {
     return () => window.removeEventListener("keydown", onKey);
   }, [isOverlay]);
 
-  // Accesibilidad: expandir con teclado al pulsar la marca
-  function handleBrandKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (collapsed && (e.key === "Enter" || e.key === " ")) {
-      e.preventDefault();
-      setCollapsed(false);
-    }
-  }
-
-  // Handler de clic en cabecera de grupo — garantiza 1 abierto
   function handleGroupHeaderClick(id: string) {
-    setUserMenuOpen(false); // cierra el menú usuario si abres un grupo
+    setUserMenuOpen(false);
     setOpenGroupId((prev) => (prev === id ? null : id));
   }
 
@@ -291,49 +192,14 @@ export function AppSidebar() {
         isOverlay ? "fixed inset-0 z-50" : "",
       ].join(" ")}
     >
-      {/* Header fijo */}
-      <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-900">
-        <div className={["flex items-center gap-2 py-3", collapsed ? "px-2 justify-center" : "px-3 justify-between"].join(" ")}>
-          {/* Marca (click para expandir cuando está colapsada) */}
-          <div
-            role={collapsed ? "button" : undefined}
-            tabIndex={collapsed ? 0 : -1}
-            onClick={() => collapsed && setCollapsed(false)}
-            onKeyDown={handleBrandKeyDown}
-            className={["flex items-center rounded-md", collapsed ? "p-1 hover:bg-slate-800/60" : "", collapsed ? "" : "gap-2"].join(" ")}
-            title={collapsed ? "Expandir" : undefined}
-          >
-            {/* Logo */}
-            <div className="flex h-8 w-8 items-center justify-center">
-              <img src="/img/logo_crussader.svg" alt="Crussader logo" width={32} height={32} />
-            </div>
+      {/* marca + botón colapsar */}
+      <Brand collapsed={collapsed} setCollapsed={setCollapsed} />
 
-            {!collapsed && (
-              <div className="leading-tight">
-                <div className="text-sm font-semibold text-white">Crussader</div>
-                <div className="text-[11px] text-slate-400">Panel de usuario</div>
-              </div>
-            )}
-          </div>
+      {/* chip de empresa + botón switch (usa /dashboard/company?modal=switch) */}
+      <CompanyChip collapsed={collapsed} />
 
-          {/* Botón contraer — visible solo cuando está expandida */}
-          {!collapsed && (
-            <button
-              type="button"
-              onClick={() => setCollapsed(true)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-300 hover:text-white hover:bg-slate-800 transition-colors ml-auto"
-              aria-label="Contraer sidebar"
-              title="Contraer"
-            >
-              <ChevronsLeft className="h-5 w-5" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Lista con scroll */}
+      {/* navegación */}
       <nav className="flex-1 overflow-y-auto px-2 py-2">
-        {/* ===== Grupo ADMIN (si aplica) — ARRIBA DE INICIO ===== */}
         {ADMIN_GROUP && (
           <div className="mb-2">
             <Group
@@ -348,10 +214,10 @@ export function AppSidebar() {
           </div>
         )}
 
-        {/* Inicio */}
         <SidebarItem item={HOME} active={isActivePath(pathname, HOME.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
+        <SidebarItem item={PRICING} active={isActivePath(pathname, PRICING.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
+        <SidebarItem item={REVIEWS} active={isActivePath(pathname, REVIEWS.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
 
-        {/* Grupos */}
         <div className="mt-2 space-y-1">
           {GROUPS.map((g) => (
             <Group
@@ -368,158 +234,15 @@ export function AppSidebar() {
         </div>
       </nav>
 
-      {/* ===== Footer (pegado abajo, con secciones y submenú) ===== */}
-      <div className="sticky bottom-0 z-10 bg-slate-900">
-        {/* Sección 1: Notificaciones + Soporte */}
-        <div className="border-t border-slate-800">
-          {/* Notificaciones con burbuja */}
-          <Link
-            href="/dashboard/notifications"
-            onClick={onItemNavigate}
-            className={[
-              "relative flex items-center min-h-11 transition-colors",
-              "text-slate-300 hover:text-white hover:bg-slate-800/60",
-              collapsed ? "justify-center px-2" : "justify-start gap-3 px-3",
-            ].join(" ")}
-          >
-            <div className="relative">
-              <Bell className="h-5 w-5" />
-              {/* burbuja con glow */}
-              <div className="absolute -top-1 -right-1 flex items-center justify-center">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-primary blur-sm animate-pulse" />
-                  <div className="relative bg-gradient-to-br from-primary via-primary to-primary/80 text-white text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center border border-white/20 shadow-lg">
-                    3
-                  </div>
-                </div>
-              </div>
-            </div>
-            {!collapsed && <span className="text-sm font-medium">Notificaciones</span>}
-          </Link>
+      <TrialBanner collapsed={collapsed} />
 
-          {/* Soporte (💡) */}
-          <Link
-            href="/dashboard/support"
-            onClick={onItemNavigate}
-            className={[
-              "flex items-center min-h-11 transition-colors",
-              "text-slate-300 hover:text-white hover:bg-slate-800/60",
-              collapsed ? "justify-center px-2" : "justify-start gap-3 px-3",
-            ].join(" ")}
-            title={collapsed ? "Soporte" : undefined}
-          >
-            <span className="text-base">💡</span>
-            {!collapsed && <span className="text-sm font-medium">Soporte</span>}
-          </Link>
-        </div>
-
-        {/* Separador */}
-        <div className="border-t border-slate-800" />
-
-        {/* Sección 2: Usuario (abre submenú abajo) */}
-        <div className="border-b border-transparent">
-          <button
-            type="button"
-            onClick={() => {
-              // Al abrir el menú de usuario, cerramos cualquier grupo abierto
-              setOpenGroupId(null);
-              setUserMenuOpen((v) => !v);
-            }}
-            className={[
-              "w-full flex items-center min-h-11 transition-colors",
-              "text-slate-300 hover:text-white hover:bg-slate-800/60",
-              collapsed ? "justify-center px-2" : "justify-between px-3",
-            ].join(" ")}
-            title={collapsed ? (user?.name ?? "Usuario") : undefined}
-            aria-expanded={!collapsed ? userMenuOpen : undefined}
-          >
-            <div className={["flex items-center", collapsed ? "" : "gap-3"].join(" ")}>
-              {/* Avatar */}
-              {user?.image ? (
-                <img src={user.image} alt={user?.name ?? "Usuario"} className="h-6 w-6 rounded-full object-cover shrink-0" />
-              ) : (
-                <div className="h-6 w-6 rounded-full bg-primary/20 text-primary grid place-items-center text-xs font-semibold shrink-0">
-                  {userInitial}
-                </div>
-              )}
-
-              {/* Nombre (solo en expandido) */}
-              {!collapsed && <span className="text-sm font-medium truncate max-w-[12rem]">{user?.name ?? "Usuario"}</span>}
-            </div>
-
-            {/* Chevron (solo en expandido) */}
-            {!collapsed && (
-              <ChevronDown className={["h-4 w-4 transition-transform duration-300", userMenuOpen ? "rotate-180" : ""].join(" ")} />
-            )}
-          </button>
-
-          {/* Submenú: aparece DEBAJO de "Usuario" */}
-          {!collapsed && (
-            <SidebarCollapse open={userMenuOpen}>
-              <div className="px-2 pb-2 pt-1">
-                <div className="space-y-1">
-                  {/* Configuración */}
-                  <Link
-                    href="/dashboard/settings"
-                    onClick={() => {
-                      setUserMenuOpen(false);
-                      onItemNavigate();
-                    }}
-                    className="flex items-center justify-start gap-3 rounded-lg px-3 min-h-11 text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors"
-                  >
-                    <svg
-                      className="h-5 w-5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M12 1v2" />
-                      <path d="M12 21v2" />
-                      <path d="M4.22 4.22l1.42 1.42" />
-                      <path d="M18.36 18.36l1.42 1.42" />
-                      <path d="M1 12h2" />
-                      <path d="M21 12h2" />
-                      <path d="M4.22 19.78l1.42-1.42" />
-                      <path d="M18.36 5.64l1.42-1.42" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                    <span className="text-sm font-medium">Configuración</span>
-                  </Link>
-
-                  {/* Cerrar sesión */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUserMenuOpen(false);
-                      onItemNavigate();
-                      signOut({ callbackUrl: "/" });
-                    }}
-                    className="w-full flex items-center justify-start gap-3 rounded-lg px-3 min-h-11 text-red-400 hover:text-red-300 hover:bg-red-900/20 transition-colors"
-                  >
-                    <svg
-                      className="h-5 w-5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                      <polyline points="16 17 21 12 16 7" />
-                      <line x1="21" y1="12" x2="9" y2="12" />
-                    </svg>
-                    <span className="text-sm font-medium">Cerrar sesión</span>
-                  </button>
-                </div>
-              </div>
-            </SidebarCollapse>
-          )}
-        </div>
-      </div>
+      {/* footer usuario */}
+      <UserFooter
+        collapsed={collapsed}
+        userMenuOpen={userMenuOpen}
+        setUserMenuOpen={setUserMenuOpen} 
+        onItemNavigate={onItemNavigate}
+      />
     </aside>
   );
 }

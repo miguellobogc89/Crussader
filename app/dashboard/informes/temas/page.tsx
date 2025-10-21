@@ -229,7 +229,6 @@ export default function TemasAgregadosPage() {
     <PageShell
       title="Temas agregados"
       description="N-gramas y Temas curados. Polaridad (X) · Reseñas únicas (Y) · Tamaño = ocurrencias."
-      breadcrumbs={[{ label: "Panel", href: "/dashboard" }, { label: "Informes" }, { label: "Temas" }]}
       toolbar={
         <div className="flex flex-wrap items-center gap-3">
           <CompanyLocationShell

@@ -3,8 +3,8 @@
 import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
-import DataTable from "@/app/components/design-system/table/DataTable";
-import type { ColumnDef } from "@/app/components/design-system/table/types";
+import DataTable from "@/app/components/crussader/UX/table/DataTable";
+import type { ColumnDef } from "@/app/components/crussader/UX/table/types";
 
 // === Tipo de fila para la tabla de recursos ===
 type ResourceRow = {

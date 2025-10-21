@@ -73,7 +73,6 @@ export default function ProductsPage() {
       <PageShell
         title="Productos"
         description="Gestiona tus módulos contratados y descubre nuevas capacidades para tu negocio."
-        breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Productos" }]}
         toolbar={
           <div className="flex justify-between items-center gap-4">
             <TabsList className="grid w-auto grid-cols-3">
@@ -106,8 +105,6 @@ export default function ProductsPage() {
           </div>
         }
         variant="default"
-        backFallback="/dashboard"
-        showShellBadge={true}
       >
         <div className="space-y-6">
           {/* TAB 1: Mock contratados */}

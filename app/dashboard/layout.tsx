@@ -1,5 +1,6 @@
 // app/dashboard/layout.tsx
 import * as React from "react";
+import { SessionProvider } from "next-auth/react";
 import { SidebarProvider } from "@/app/components/ui/sidebar";
 import { AppSidebar } from "@/app/components/AppSidebar";
 import PageContainer from "@/app/components/PageContainer";
@@ -7,6 +8,7 @@ import { getBootstrapData } from "@/lib/bootstrap";
 import BootstrapProvider from "@/app/providers/BootstrapProvider";
 import { Toaster } from "@/app/components/ui/toaster";
 import RouteTransitionOverlay from "@/app/components/layouts/RouteTransitionOverlay";
+import DashboardRouteGuard from "@/app/dashboard/DashboardRouteGuard";
 
 export default async function DashboardLayout({
   children,
@@ -15,9 +17,18 @@ export default async function DashboardLayout({
 }) {
   const initialData = await getBootstrapData();
 
+  // Si el usuario tiene compañías pero aún no hay compañía activa en bootstrap,
+  // inyectamos un script muy pequeño que hace POST a /api/me/active-company
+  // para fijar la cookie `active_company_id` en el navegador del usuario.
+  const needsEnsureActiveCompany =
+    !initialData.activeCompany && (initialData.companies?.length ?? 0) > 0;
+
   return (
     <SidebarProvider>
       <BootstrapProvider initialData={initialData} autoFetchIfEmpty={false}>
+        {/* ====== Guard de redirección (cliente) ====== */}
+        <DashboardRouteGuard />
+
         {/* ====== Soft-lock orientación: estilos globales ====== */}
         <style>{`
           .orientation-guard { display: none; }
@@ -55,6 +66,22 @@ export default async function DashboardLayout({
         </div>
 
         <Toaster />
+
+        {/* ====== Asegurar compañía activa (sin componentes nuevos) ====== */}
+        {needsEnsureActiveCompany ? (
+          <script
+            // Se ejecuta en el cliente; fija la cookie con la primera compañía del usuario.
+            dangerouslySetInnerHTML={{
+              __html: `
+              (function() {
+                try {
+                  fetch('/api/me/active-company', { method: 'POST' });
+                } catch (_) {}
+              })();
+            `,
+            }}
+          />
+        ) : null}
       </BootstrapProvider>
     </SidebarProvider>
   );

@@ -323,20 +323,10 @@ return (
   <PageShell
     title="Usuarios y roles"
     description="Gestiona los usuarios de tu compañía, define roles y permisos, y envía invitaciones."
-    breadcrumbs={[
-      { label: "Dashboard", href: "/dashboard" },
-      { label: "Usuarios y roles" },
-    ]}
-    actions={
-      <Button size="sm" className="rounded-full">
-        <MailPlus className="h-4 w-4 mr-2" />
-        Invitar usuario
-      </Button>
-    }
+
+
     headerBand={headerBand}
     variant="default"
-    backFallback="/dashboard"
-    showShellBadge={true}
   >
     {activeTab === "users" ? (
       <>

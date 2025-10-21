@@ -19,6 +19,9 @@ export type BootstrapState = {
 
   /** Fetch contra /api/bootstrap si no tienes initialData en el provider */
   fetchFromApi: () => Promise<void>;
+
+  /** 🔧 Actualiza parcialmente los datos del usuario en el store (evita re-fetch) */
+  patchMe: (patch: Partial<BootstrapData["user"]>) => void;
 };
 
 const storeCreator: StateCreator<BootstrapState> = (set, get) => ({
@@ -57,17 +60,33 @@ const storeCreator: StateCreator<BootstrapState> = (set, get) => ({
       set({ status: "error", error: msg });
     }
   },
+
+  patchMe: (patch) =>
+    set((s) =>
+      s.data
+        ? {
+            data: {
+              ...s.data,
+              me: { ...s.data.user, ...patch },
+            },
+          }
+        : {}
+    ),
 });
 
 export const useBootstrapStore = create<BootstrapState>(storeCreator);
 
-/** Selectores tipados (evitan “implicit any” en los callbacks) */
+/** Selectores tipados */
 export function useBootstrapData() {
-  return useBootstrapStore((s: BootstrapState) => s.data);
+  return useBootstrapStore((s) => s.data);
 }
 export function useBootstrapStatus() {
-  return useBootstrapStore((s: BootstrapState) => s.status);
+  return useBootstrapStore((s) => s.status);
 }
 export function useBootstrapError() {
-  return useBootstrapStore((s: BootstrapState) => s.error);
+  return useBootstrapStore((s) => s.error);
+}
+/** Selector para el patch local de "me" (onboardingStatus, name, etc.) */
+export function usePatchMe() {
+  return useBootstrapStore((s) => s.patchMe);
 }

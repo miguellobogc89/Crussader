@@ -13,64 +13,50 @@ datasource db {
 /// * Core Auth
 /// * =========================
 model User {
-  id                 String               @id @default(cuid())
-  name               String?
-  email              String?              @unique
-  emailVerified      DateTime?
-  image              String?
-  role               Role                 @default(user)
-  createdAt          DateTime             @default(now())
-  deactivatedAt      DateTime?
-  failedLoginCount   Int                  @default(0)
-  isActive           Boolean              @default(true)
-  isSuspended        Boolean              @default(false)
-  lastLoginAt        DateTime?
-  lastSeenAt         DateTime?
-  locale             String?              @default("es-ES")
-  loginCount         Int                  @default(0)
-  marketingOptIn     Boolean              @default(false)
-  notes              String?
-  passwordHash       String?
-  phone              String?
-  privacyAcceptedAt  DateTime?
-  suspendedAt        DateTime?
-  suspendedReason    String?
-  termsAcceptedAt    DateTime?
-  timezone           String?              @default("Europe/Madrid")
-  updatedAt          DateTime             @updatedAt
-  Account            Account[]
-  ExternalConnection ExternalConnection[]
-  phasesCreated      Phase[]              @relation("UserPhasesCreated")
-  responsesCreated   Response[]           @relation("ResponseCreatedBy")
-  responsesEdited    Response[]           @relation("ResponseEditedBy")
-  Session            Session[]
-  UserCompany        UserCompany[]
-  UserLocation       UserLocation[]
-  UserLogin          UserLogin[]
-  UserStatusEvent    UserStatusEvent[]
+  id                                  String               @id @default(cuid())
+  name                                String?
+  email                               String?              @unique
+  emailVerified                       DateTime?
+  image                               String?
+  role                                Role                 @default(user)
+  createdAt                           DateTime             @default(now())
+  deactivatedAt                       DateTime?
+  failedLoginCount                    Int                  @default(0)
+  isActive                            Boolean              @default(true)
+  isSuspended                         Boolean              @default(false)
+  lastLoginAt                         DateTime?
+  lastSeenAt                          DateTime?
+  locale                              String?              @default("es-ES")
+  loginCount                          Int                  @default(0)
+  marketingOptIn                      Boolean              @default(false)
+  notes                               String?
+  passwordHash                        String?
+  phone                               String?
+  privacyAcceptedAt                   DateTime?
+  suspendedAt                         DateTime?
+  suspendedReason                     String?
+  termsAcceptedAt                     DateTime?
+  timezone                            String?              @default("Europe/Madrid")
+  updatedAt                           DateTime             @updatedAt
+  onboardingStatus                    OnboardingStatus     @default(PENDING)
+  account_id                          String?              @db.Uuid
+  AuthAccount                         AuthAccount[]
+  ExternalConnection                  ExternalConnection[]
+  phasesCreated                       Phase[]              @relation("UserPhasesCreated")
+  responsesCreated                    Response[]           @relation("ResponseCreatedBy")
+  responsesEdited                     Response[]           @relation("ResponseEditedBy")
+  Session                             Session[]
+  account_User_account_idToaccount    account?             @relation("User_account_idToaccount", fields: [account_id], references: [id], onUpdate: NoAction, map: "fk_user_account")
+  UserCompany                         UserCompany[]
+  UserLocation                        UserLocation[]
+  UserLogin                           UserLogin[]
+  UserStatusEvent                     UserStatusEvent[]
+  account_account_owner_user_idToUser account[]            @relation("account_owner_user_idToUser")
 
   @@index([role])
   @@index([isActive, isSuspended])
   @@index([lastLoginAt])
-}
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-  User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
+  @@index([account_id], map: "idx_user_account")
 }
 
 model Session {
@@ -172,9 +158,11 @@ model Company {
   stripeSubscriptionId String?
   agentSettings        Json?
   voiceAgentId         String?
+  account_id           String?               @db.Uuid
   Agents               Agent[]
   AgentSessions        AgentSession[]
   voiceAgent           VoiceAgent?           @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id])
+  account              account?              @relation(fields: [account_id], references: [id], onUpdate: NoAction, map: "fk_company_account")
   customers            CompanyCustomer[]
   jobs                 Job[]
   knowledgeItems       KnowledgeItem[]
@@ -187,7 +175,7 @@ model Company {
   Reviews              Review[]              @relation("CompanyReviews")
   UserCompany          UserCompany[]
   WebchatSites         WebchatSite[]         @relation("CompanyToWebchatSite")
-  billing_account      billing_account[]
+  billing_account      billing_account?
   discount_redemption  discount_redemption[]
   entitlement          entitlement[]
   invoice              invoice[]
@@ -198,6 +186,7 @@ model Company {
   @@index([name])
   @@index([activity])
   @@index([matrix])
+  @@index([account_id], map: "idx_company_account")
 }
 
 model UserCompany {
@@ -328,7 +317,7 @@ model Review {
   ingestedAt        DateTime        @default(now())
   updatedAt         DateTime        @default(now()) @updatedAt
   isTest            Boolean         @default(false)
-  is_conceptualized Boolean        @default(false)
+  is_conceptualized Boolean         @default(false)
   jobs              Job[]
   responses         Response[]
   Company           Company         @relation("CompanyReviews", fields: [companyId], references: [id], onDelete: Cascade)
@@ -1057,7 +1046,7 @@ model KnowledgeSection {
 
 model billing_account {
   id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  company_id     String
+  company_id     String           @unique
   name           String
   billing_email  String?
   phone          String?
@@ -1072,6 +1061,8 @@ model billing_account {
   meta           Json?
   created_at     DateTime         @default(now()) @db.Timestamptz(6)
   updated_at     DateTime         @default(now()) @db.Timestamptz(6)
+  account_id     String?          @db.Uuid
+  account        account?         @relation(fields: [account_id], references: [id], onUpdate: NoAction, map: "fk_ba_account")
   Company        Company          @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ba_company")
   invoice        invoice[]
   payment_method payment_method[]
@@ -1387,6 +1378,7 @@ model subscription_item {
   meta            Json?
   created_at      DateTime       @default(now()) @db.Timestamptz(6)
   updated_at      DateTime       @default(now()) @db.Timestamptz(6)
+  company_id      String
   invoice_item    invoice_item[]
   price           price          @relation(fields: [price_id], references: [id], onUpdate: NoAction, map: "fk_sitem_price")
   product         product        @relation(fields: [product_id], references: [id], onUpdate: NoAction, map: "fk_sitem_prod")
@@ -1403,19 +1395,34 @@ model concept {
   created_at  DateTime  @default(now()) @db.Timestamptz(6)
   updated_at  DateTime  @default(now()) @db.Timestamptz(6)
   topic_id    String?   @db.Uuid
+  review_id   String?
   sentiment   String?
   confidence  Float?    @db.Real
   relevance   Float?    @default(1) @db.Real
   assigned_at DateTime? @db.Timestamptz(6)
   rating      Int?
   review_date DateTime? @db.Timestamptz(6)
-  review_id   String?
-  review      Review?   @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_concept_review")
+  review      Review?   @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  topic       topic?    @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
 
+  @@index([topic_id], map: "idx_concept_topic_id")
+  @@index([review_id], map: "idx_concept_review_id")
   @@index([rating], map: "idx_concept_rating")
   @@index([review_date], map: "idx_concept_review_date")
-  @@index([review_id], map: "idx_concept_review_id")
   @@index([sentiment], map: "idx_concept_sentiment")
+}
+
+model topic {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label         String
+  description   String?
+  model         String?
+  concept_count Int?      @default(0)
+  avg_rating    Float?    @default(0)
+  is_stable     Boolean?  @default(false)
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime  @default(now()) @db.Timestamptz(6)
+  concept       concept[]
 }
 
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
@@ -1487,16 +1494,57 @@ model themes {
   @@index([company_id, location_id, active], map: "idx_themes_scope_active")
 }
 
-model topic {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  label         String
-  description   String?
-  model         String?
-  concept_count Int?      @default(0)
-  avg_rating    Float?    @db.Real
-  is_stable     Boolean?  @default(false)
-  created_at    DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime? @default(now()) @db.Timestamptz(6)
+model AuthAccount {
+  id                String  @id(map: "Account_pkey")
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  User              User    @relation(fields: [userId], references: [id], onDelete: Cascade, map: "Account_userId_fkey")
+
+  @@unique([provider, providerAccountId], map: "Account_provider_providerAccountId_key")
+  @@index([userId], map: "Account_userId_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model account {
+  id                               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                             String
+  slug                             String
+  owner_user_id                    String?
+  status                           String             @default("active")
+  plan_slug                        String?
+  plan_started_at                  DateTime?          @db.Timestamptz(6)
+  plan_renews_at                   DateTime?          @db.Timestamptz(6)
+  trial_start_at                   DateTime?          @db.Timestamptz(6)
+  trial_end_at                     DateTime?          @db.Timestamptz(6)
+  trial_used                       Boolean            @default(false)
+  max_users                        Int                @default(1)
+  max_companies                    Int                @default(1)
+  max_locations                    Int                @default(1)
+  current_users                    Int                @default(0)
+  current_companies                Int                @default(0)
+  current_locations                Int                @default(0)
+  meta                             Json?
+  created_at                       DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at                       DateTime           @default(now()) @db.Timestamptz(6)
+  subscription_status              SubscriptionStatus @default(NONE)
+  Company                          Company[]
+  User_User_account_idToaccount    User[]             @relation("User_account_idToaccount")
+  User_account_owner_user_idToUser User?              @relation("account_owner_user_idToUser", fields: [owner_user_id], references: [id], onUpdate: NoAction)
+  billing_account                  billing_account[]
+
+  @@index([owner_user_id], map: "idx_account_owner")
+  @@index([plan_slug], map: "idx_account_plan_slug")
+  @@index([status], map: "idx_account_status")
 }
 
 /// *
@@ -1515,6 +1563,12 @@ enum LeadStatus {
   QUALIFIED
   LOST
   WON
+}
+
+enum OnboardingStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
 }
 
 enum LeadSource {
@@ -1763,4 +1817,13 @@ enum theme_term_kind {
   bigram
   regex
   phrase
+}
+
+enum SubscriptionStatus {
+  NONE
+  TRIAL
+  TRIAL_ENDED
+  ACTIVE
+  CANCELED
+  EXPIRED
 }
