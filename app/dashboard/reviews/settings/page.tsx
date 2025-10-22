@@ -1,38 +1,17 @@
 // app/dashboard/reviews/settings/page.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
-import PageShell from "@/app/components/layouts/PageShell";
-import TabMenu, { type TabItem } from "@/app/components/crussader/navigation/TabMenu";
+import { useEffect, useState } from "react";
 import { LoadingOverlay } from "@/app/components/ui/loading-overlay";
 import { toast } from "@/hooks/use-toast";
 import { useBootstrapData } from "@/app/providers/bootstrap-store";
 import type { ResponseSettings } from "@/app/schemas/response-settings";
-import { SettingsEditorCard } from "@/app/components/reviews/settings/SettingsEditorCard";
-import { PreviewStickyCard } from "@/app/components/reviews/settings/PreviewStickyCard";
 import { Button } from "@/app/components/ui/button";
-import { ChevronRight, Shield, Sparkles, SlidersHorizontal, SendHorizonal, Lock } from "lucide-react";
+import SettingsSidebar from "@/app/components/reviews/settings/SettingsSidebar";
+import SettingsShell from "@/app/components/reviews/settings/SettingsShell";
+import ResponsePreview from "@/app/components/reviews/settings/ResponsePreview";
 
-/* ===== Tabs superiores (header) ===== */
-const TABS: TabItem[] = [
-  { label: "Reseñas", href: "/dashboard/reviews" },
-  { label: "Informes", href: "/dashboard/reviews/reports" },
-  { label: "Sentimiento", href: "/dashboard/reviews/sentiment" },
-  { label: "Configuración", href: "/dashboard/reviews/settings" },
-];
-
-/* ===== Menú lateral (anclas locales) ===== */
-const SIDE_LINKS: { href: string; label: string; icon?: React.ReactNode }[] = [
-  { href: "#general", label: "General", icon: <SlidersHorizontal className="h-4 w-4" /> },
-  { href: "#tone", label: "Tono y estilo", icon: <Sparkles className="h-4 w-4" /> },
-  { href: "#automation", label: "Automatización", icon: <SendHorizonal className="h-4 w-4" /> },
-  { href: "#privacy", label: "Privacidad", icon: <Shield className="h-4 w-4" /> },
-  { href: "#publishing", label: "Publicación", icon: <ChevronRight className="h-4 w-4" /> },
-  { href: "#advanced", label: "Avanzado", icon: <Lock className="h-4 w-4" /> },
-];
-
-/* ===== Utilidades ===== */
+/* ===== utils ===== */
 function resolveCompanyId(boot: unknown): string | null {
   const b = (boot ?? {}) as Record<string, any>;
   return (
@@ -40,7 +19,7 @@ function resolveCompanyId(boot: unknown): string | null {
     b?.activeCompany?.id ??
     b?.activeCompanyId ??
     b?.companyId ??
-    (Array.isArray(b?.companies) && b.companies[0]?.id) ??
+    (Array.isArray(b?.companies) && b?.companies[0]?.id) ??
     null
   );
 }
@@ -58,7 +37,7 @@ function fmt(dt: string | Date | null): string {
   }
 }
 
-/* ===== Defaults ===== */
+/* ===== defaults ===== */
 const defaultSettings: ResponseSettings = {
   businessName: "Heladería Brumazul",
   sector: "Restauración - Heladería",
@@ -89,6 +68,112 @@ const defaultSettings: ResponseSettings = {
   maxCharacters: 300,
 };
 
+/* ===== helpers para prompt preview ===== */
+function mapToneNumberToLabel(n: number | undefined): string {
+  if (!Number.isFinite(n)) return "neutral";
+  if (n! <= 1) return "neutral";
+  if (n! === 2) return "cálido";
+  if (n! === 3) return "positivo";
+  if (n! === 4) return "muy positivo";
+  return "entusiasta";
+}
+function mapMaxCharsToLength(c: number | undefined): "very_short" | "short" | "medium" | "long" {
+  const v = Number(c ?? 300);
+  if (v <= 180) return "very_short";
+  if (v <= 300) return "short";
+  if (v <= 450) return "medium";
+  return "long";
+}
+function toEngineSettings(s: ResponseSettings) {
+  return {
+    language: s.language ?? "es",
+    lang: s.language ?? "es",
+    tone: mapToneNumberToLabel(s.tone),
+    emojiLevel: Math.max(0, Math.min(3, Number(s.emojiIntensity ?? 0))),
+    formality: s.treatment === "usted" ? "usted" : "tu",
+    signature: s.standardSignature ?? null,
+    model: s.model || process.env.AI_MODEL || "gpt-4o-mini",
+    temperature: typeof s.creativity === "number" ? s.creativity : 0.3,
+    forbidCompensation: s.noPublicCompensation !== false,
+    stripPII: s.avoidPersonalData !== false,
+    length: mapMaxCharsToLength(s.maxCharacters),
+    companyName: s.businessName ?? null,
+    locationName: null,
+  };
+}
+function sampleReviewByStar(star: 1 | 3 | 5) {
+  if (star === 1)
+    return {
+      rating: 1,
+      author: "Cliente de ejemplo",
+      content:
+        "Muy mala experiencia: el helado llegó derretido y el personal fue poco amable. No volveré.",
+    };
+  if (star === 3)
+    return {
+      rating: 3,
+      author: "Cliente de ejemplo",
+      content:
+        "Helado correcto y buen precio, aunque la espera fue algo larga y la mesa estaba poco limpia.",
+    };
+  return {
+    rating: 5,
+    author: "Cliente de ejemplo",
+    content:
+      "¡Riquísimo! Sabores muy cremosos y atención de diez. Repetiremos seguro. Gracias 😊",
+  };
+}
+
+/* ===== Panel SYSTEM (alineado a la derecha) ===== */
+function SystemPromptPanel({
+  system,
+  loading,
+  error,
+  onToggle,
+  open,
+}: {
+  system: string;
+  loading: boolean;
+  error: string | null;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="rounded-xl border bg-gray-50 px-4 py-3 shadow-sm w-[680px] max-w-full">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-medium text-gray-700">System prompt (diagnóstico)</div>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="text-xs rounded-md border px-2 py-1 text-gray-600 hover:bg-white"
+        >
+          {open ? "Ocultar" : "Mostrar"}
+        </button>
+      </div>
+      {open && (
+        <div className="mt-3">
+          {error && (
+            <div className="rounded-md border border-red-300 bg-red-50 p-3 text-xs text-red-800">
+              Error: {error}
+            </div>
+          )}
+          {!error && loading && (
+            <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+              Generando vista previa…
+            </div>
+          )}
+          {!error && !loading && (
+            <pre className="whitespace-pre-wrap break-words rounded-md border bg-white p-3 text-xs font-mono text-gray-800">
+              {system || "—"}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ========== PAGE ========== */
 export default function ReviewsSettingsPage() {
   const boot = useBootstrapData();
   const companyId = resolveCompanyId(boot);
@@ -98,14 +183,14 @@ export default function ReviewsSettingsPage() {
   const [previewStar, setPreviewStar] = useState<1 | 3 | 5>(5);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [meta, setMeta] = useState<{
-    updatedAt?: string;
-    updatedBy?: { id?: string; name?: string | null; email?: string | null } | null;
-  } | null>(null);
 
-  // área scroll central
-  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  // prompt preview
+  const [sysOpen, setSysOpen] = useState(true);
+  const [sysLoading, setSysLoading] = useState(false);
+  const [systemText, setSystemText] = useState("");
+  const [sysError, setSysError] = useState<string | null>(null);
 
+  // load settings
   useEffect(() => {
     if (!companyId) return;
     let ignore = false;
@@ -115,12 +200,9 @@ export default function ReviewsSettingsPage() {
         const data = await res.json();
         if (ignore) return;
         setSettings(data?.settings ?? defaultSettings);
-        setMeta(data?.meta ?? null);
         setIsModified(false);
       } catch {
         setSettings(defaultSettings);
-        setMeta(null);
-        setIsModified(false);
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -129,6 +211,41 @@ export default function ReviewsSettingsPage() {
       ignore = true;
     };
   }, [companyId]);
+
+  // load prompt (RUTA PLURAL)
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      try {
+        setSysLoading(true);
+        setSysError(null);
+        const mapped = toEngineSettings(settings);
+        const example = sampleReviewByStar(previewStar);
+
+        const res = await fetch("/api/responses/preview", {
+          method: "POST",
+          signal: controller.signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            settings: mapped,
+            review: example,
+          }),
+        });
+
+        const ct = (res.headers.get("content-type") || "").toLowerCase();
+        const json = ct.includes("application/json")
+          ? await res.json()
+          : { ok: false, error: await res.text() };
+        if (!json?.ok) throw new Error(json?.error || "preview_failed");
+        setSystemText(String(json.system || ""));
+      } catch (e: any) {
+        if (e?.name !== "AbortError") setSysError(e?.message || "No se pudo generar el preview");
+      } finally {
+        setSysLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [JSON.stringify(settings), previewStar]);
 
   const updateSettings = (updates: Partial<ResponseSettings>) => {
     setSettings((prev) => ({ ...prev, ...updates }));
@@ -139,152 +256,85 @@ export default function ReviewsSettingsPage() {
     if (!companyId || isSaving) return;
     setIsSaving(true);
     try {
-      const res = await fetch(`/api/companies/${companyId}/response-settings`, {
+      await fetch(`/api/companies/${companyId}/response-settings`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settings),
-        cache: "no-store",
       });
-      const data = await res.json();
-
-      if (data?.ok) {
-        const res2 = await fetch(`/api/companies/${companyId}/response-settings`, { cache: "no-store" });
-        const fresh = await res2.json();
-
-        setSettings(fresh?.settings ?? settings);
-        setMeta(fresh?.meta ?? data.meta ?? null);
-        setIsModified(false);
-
-        toast({ title: "Cambios guardados", description: "Tus ajustes se han actualizado correctamente." });
-      } else {
-        toast({
-          variant: "error",
-          title: "No se pudo guardar",
-          description: data?.error ?? "Revisa tu conexión e inténtalo de nuevo.",
-        });
-      }
+      setIsModified(false);
+      toast({ title: "Cambios guardados", description: "Tus ajustes se han actualizado correctamente." });
     } catch {
-      toast({ variant: "error", title: "No se pudo guardar", description: "Se produjo un error inesperado." });
+      toast({ variant: "error", title: "Error al guardar", description: "Inténtalo de nuevo." });
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleRestore = () => {
-    setSettings(defaultSettings);
-    setIsModified(true);
-    toast({
-      title: "Valores restaurados",
-      description: "Se cargaron los valores por defecto. Recuerda guardar los cambios.",
-    });
-  };
-
-  const who = useMemo(
-    () => meta?.updatedBy?.name ?? meta?.updatedBy?.email ?? meta?.updatedBy?.id ?? undefined,
-    [meta]
-  );
-
-  const onSideNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    e.preventDefault();
-    const id = href.startsWith("#") ? href : `#${href}`;
-    const target = document.querySelector(id) as HTMLElement | null;
-    if (!target) return;
-    // desplazamiento suave dentro del contenedor central
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   if (!companyId) return <div className="p-6 text-sm text-muted-foreground">No hay compañía activa.</div>;
   if (loading) return <div className="p-6">Cargando…</div>;
 
   return (
-    <PageShell
-      title="Configuración de respuestas"
-      description="Ajusta el tono y las reglas para contestar reseñas"
-      headerBand={<TabMenu items={TABS} />}
-      variant="full"
-    >
-      <LoadingOverlay show={isSaving} text="Guardando ajustes…" />
-
-      {/* Sin scroll global: ocultamos overflow y forzamos alto de viewport */}
-      <div className="w-full bg-white h-[100svh] overflow-hidden">
-        {/* 3 columnas: izq fija 260, centro 1fr con scroll, dcha fija 440 */}
-        <div className="grid grid-cols-[260px_1fr_440px] gap-0 h-full">
-
-          {/* ===== Columna izquierda fija ===== */}
-          <aside className="border-r border-slate-200/70 bg-white sticky top-0 self-start h-full hidden lg:block">
-            <nav className="py-4">
-              <ul className="space-y-1 px-3">
-                {SIDE_LINKS.map((it) => (
-                  <li key={it.href}>
-                    <Link
-                      href={it.href}
-                      onClick={(e) => onSideNavClick(e, it.href)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                    >
-                      <span className="text-slate-500">{it.icon}</span>
-                      <span className="font-medium">{it.label}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          </aside>
-
-          {/* ===== Columna central con scroll ===== */}
-          <main
-            ref={scrollAreaRef}
-            className="overflow-y-auto h-full px-4 sm:px-6"
-          >
-            {/* Secciones con offset por header (ajusta 24 si necesitas) */}
-            <section id="general" className="scroll-mt-24 py-6">
-              <div className="grid grid-cols-1 gap-6">
-                <SettingsEditorCard settings={settings} onUpdate={updateSettings} />
-              </div>
-            </section>
-
-            <section id="tone" className="scroll-mt-24 py-6">
-              <div className="grid grid-cols-1 gap-6">
-                {/* secciones adicionales si separas el tono */}
-              </div>
-            </section>
-
-            <section id="automation" className="scroll-mt-24 py-6" />
-            <section id="privacy" className="scroll-mt-24 py-6" />
-            <section id="publishing" className="scroll-mt-24 py-6" />
-            <section id="advanced" className="scroll-mt-24 py-6" />
-
-            <div className="h-8" />
-          </main>
-
-          {/* ===== Columna derecha fija, más ancha (440px) ===== */}
-          <aside className="border-l border-slate-200/70 bg-white sticky top-0 self-start h-full px-4 py-4">
-            <div className="mx-auto w-full max-w-[400px]">
-              <PreviewStickyCard
-                settings={settings}
-                selectedStar={previewStar}
-                onStarChange={setPreviewStar}
-              />
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <Button
-                  variant="outline"
-                  onClick={handleRestore}
-                  disabled={!isModified}
-                  className="disabled:opacity-100 disabled:bg-transparent"
-                >
-                  Descartar
-                </Button>
-                <Button
-                  onClick={handleSave}
-                  disabled={!isModified || isSaving}
-                  className="text-white bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 hover:from-indigo-500 hover:via-violet-500 hover:to-fuchsia-500"
-                >
-                  {isSaving ? "Guardando…" : "Guardar"}
-                </Button>
-              </div>
-            </div>
-          </aside>
-        </div>
+    <div className="space-y-6 mx-auto w-full max-w-[1400px] px-3 sm:px-6">
+      {/* 1️⃣ System prompt alineado a la derecha (más ancho total del layout) */}
+      <div className="flex justify-end">
+        <SystemPromptPanel
+          system={systemText}
+          loading={sysLoading}
+          error={sysError}
+          onToggle={() => setSysOpen((v) => !v)}
+          open={sysOpen}
+        />
       </div>
-    </PageShell>
+
+      {/* 2️⃣ Preview a TODO el ancho del contenedor */}
+      <ResponsePreview
+        settings={settings}
+        selectedStar={previewStar}
+        onStarChange={setPreviewStar}
+        className="w-full"
+      />
+
+      {/* 3️⃣ Bloque principal con sidebar y settings (más ancho y sin desbordes) */}
+      <div className="w-full h-[80svh] overflow-hidden bg-white grid grid-cols-[15%_85%] rounded-xl border">
+        {/* Sidebar fija */}
+        <SettingsSidebar />
+
+        {/* Panel derecho con top fijo (acciones) y scroll — contención horizontal */}
+        <section className="flex flex-col h-full min-w-0">
+          <div className="border-b border-slate-200/70 px-5 py-4 shrink-0">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                disabled={!isModified}
+                onClick={() => window.location.reload()}
+                className="disabled:opacity-100 disabled:bg-transparent"
+              >
+                Descartar
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={!isModified || isSaving}
+                className="text-white bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 hover:from-indigo-500 hover:via-violet-500 hover:to-fuchsia-500"
+              >
+                {isSaving ? "Guardando…" : "Guardar"}
+              </Button>
+            </div>
+          </div>
+
+          {/* ÚNICO scroll: el shell con PREVIEW + secciones — evita sobresalir */}
+          <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
+            <SettingsShell
+              settings={settings}
+              onUpdate={updateSettings}
+              selectedStar={previewStar}
+              onStarChange={setPreviewStar}
+              className="max-w-full"
+            />
+          </div>
+        </section>
+      </div>
+
+      <LoadingOverlay show={isSaving} text="Guardando ajustes…" />
+    </div>
   );
 }

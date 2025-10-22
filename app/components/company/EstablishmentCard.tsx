@@ -7,6 +7,8 @@ import { MapPin, Star, Calendar, Wifi, WifiOff, RefreshCw } from "lucide-react";
 import type { LocationRow } from "@/hooks/useCompanyLocations";
 import { ConnectButton } from "@/app/components/company/ConnectButton";
 import { useBillingStatus } from "@/hooks/useBillingStatus";
+// 👇 importa el helper de iconos (emojis)
+import { getBusinessIcon } from "@/lib/businessTypeIcons";
 
 type Props = {
   location: LocationRow;
@@ -17,13 +19,19 @@ type Props = {
 export function EstablishmentCard({ location, onSync, onConnect }: Props) {
   const { data, loading, canConnect } = useBillingStatus();
 
-  const title = (location as any).title ?? (location as any).name ?? "Ubicación";
-  const addr = [location.address, location.city, location.postalCode].filter(Boolean).join(", ");
+  const title =
+    (location as any).title ??
+    (location as any).name ??
+    "Ubicación";
+
+  const addr = [location.address, location.city, location.postalCode]
+    .filter(Boolean)
+    .join(", ");
 
   const connected = Boolean(
     (location as any).externalConnectionId ||
-      (location as any).ExternalConnection?.id ||
-      location.googlePlaceId
+    (location as any).ExternalConnection?.id ||
+    (location as any).googlePlaceId
   );
 
   const accountEmail =
@@ -36,12 +44,28 @@ export function EstablishmentCard({ location, onSync, onConnect }: Props) {
   const lastSyncText = lastSyncAt ? new Date(String(lastSyncAt)).toLocaleString() : "—";
 
   const avg =
-    typeof location.reviewsAvg === "number"
-      ? location.reviewsAvg
-      : Number(location.reviewsAvg ?? NaN);
+    typeof (location as any).reviewsAvg === "number"
+      ? (location as any).reviewsAvg
+      : Number((location as any).reviewsAvg ?? NaN);
+
   const avgText = Number.isFinite(avg) ? avg.toFixed(1) : "—";
   const countText =
-    typeof location.reviewsCount === "number" ? String(location.reviewsCount) : "0";
+    typeof (location as any).reviewsCount === "number"
+      ? String((location as any).reviewsCount)
+      : "0";
+
+  // 👇 Intentamos obtener el nombre del tipo desde varias formas habituales del payload
+  const rawTypeName =
+    (location as any).type?.name ??
+    (location as any).Type?.name ??
+    (location as any).businessType?.name ??
+    (location as any).BusinessType?.name ??
+    (location as any).typeName ??
+    (location as any).type ??
+    null;
+
+  // 👇 Emoji final (fallback al título si no hay tipo)
+  const icon = getBusinessIcon(rawTypeName || title);
 
   return (
     <Card className="relative overflow-hidden hover:shadow-lg transition-all duration-300">
@@ -50,7 +74,10 @@ export function EstablishmentCard({ location, onSync, onConnect }: Props) {
           {/* IZQUIERDA */}
           <div className="flex-1 space-y-3">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">🏬</span>
+              {/* 👇 Icono dinámico por tipo */}
+              <span className="text-2xl" aria-hidden>
+                {icon}
+              </span>
               <div>
                 <h3 className="font-semibold text-lg">{title}</h3>
                 <p className="text-xs text-muted-foreground">

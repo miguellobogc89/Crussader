@@ -1,7 +1,7 @@
 // app/api/reviews/[id]/responses/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createAIResponseForReview } from "@/lib/ai/createAIResponseForReview";
+import { createAIResponseForReview } from "@/lib/ai/createAIResponseForReview.adapter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,7 +84,8 @@ export async function POST(
 
     // 2) Generar IA
     if (action === "generate" || !content) {
-      const created = await createAIResponseForReview(id);
+      const created = await createAIResponseForReview({ reviewId: id });
+
       return NextResponse.json({ ok: true, response: created }, { status: 201 });
     }
 

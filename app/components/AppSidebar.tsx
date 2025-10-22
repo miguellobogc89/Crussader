@@ -42,6 +42,13 @@ const REVIEWS: NavItem = {
   description: "Automatización de reseñas",
 };
 
+const SETTINGS: NavItem = {
+  title: "Configuración",
+  href: "/dashboard/settings",
+  icon: "⚙️",
+  description: "Ajustes de usuario",
+};
+
 const GROUPS: NavGroup[] = [
   {
     id: "dashboard",
@@ -57,11 +64,10 @@ const GROUPS: NavGroup[] = [
   },
   {
     id: "business",
-    title: "Negocio",
+    title: "Mi Negocio",
     icon: "🏢",
     items: [
       { title: "Empresa", href: "/dashboard/company", icon: "🏛️", description: "Información de la empresa" },
-      { title: "Cuenta", href: "/dashboard/account", icon: "📅", description: "Mi cuenta" },
       { title: "Empleados", href: "/dashboard/myusers", icon: "👥", description: "Empleados y roles" },
       { title: "Calendario", href: "/dashboard/calendar", icon: "📅", description: "Gestión de reservas" },
     ],
@@ -75,17 +81,6 @@ const GROUPS: NavGroup[] = [
       { title: "Agentes de voz IA", href: "/dashboard/integrations-test", icon: "🎙️", description: "Conecta servicios" },
       { title: "Todos los productos", href: "/dashboard/products", icon: "📦", description: "Productos y servicios" },
       { title: "WebChat IA", href: "/dashboard/database", icon: "🗄️", description: "Conexiones y datos" },
-    ],
-  },
-  {
-    id: "settings",
-    title: "Configuración",
-    icon: "⚙️",
-    items: [
-      { title: "Perfil de Usuario", href: "/dashboard/settings", icon: "👤", description: "Gestiona tu información personal" },
-      { title: "Notificaciones", href: "/dashboard/notifications", icon: "🔔", description: "Preferencias" },
-      { title: "Seguridad", href: "/dashboard/security", icon: "🛡️", description: "Seguridad y privacidad" },
-      { title: "Facturación", href: "/dashboard/billing", icon: "💳", description: "Pagos y suscripciones" },
     ],
   },
 ];
@@ -217,6 +212,7 @@ export function AppSidebar() {
         <SidebarItem item={HOME} active={isActivePath(pathname, HOME.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
         <SidebarItem item={PRICING} active={isActivePath(pathname, PRICING.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
         <SidebarItem item={REVIEWS} active={isActivePath(pathname, REVIEWS.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
+        <SidebarItem item={SETTINGS} active={isActivePath(pathname, SETTINGS.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
 
         <div className="mt-2 space-y-1">
           {GROUPS.map((g) => (
