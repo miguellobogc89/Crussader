@@ -1,43 +1,35 @@
 // app/dashboard/reviews/settings/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { LoadingOverlay } from "@/app/components/ui/loading-overlay";
-import { toast } from "@/hooks/use-toast";
-import { useBootstrapData } from "@/app/providers/bootstrap-store";
-import type { ResponseSettings } from "@/app/schemas/response-settings";
-import { Button } from "@/app/components/ui/button";
-import SettingsSidebar from "@/app/components/reviews/settings/SettingsSidebar";
-import SettingsShell from "@/app/components/reviews/settings/SettingsShell";
-import ResponsePreview from "@/app/components/reviews/settings/ResponsePreview";
+import { useLayoutEffect, useRef, useState } from "react";
+import VerticalMenu, { type VerticalMenuItem } from "@/app/components/reviews/settings/VerticalMenu";
+import {
+  Eye,
+  SlidersHorizontal,
+  MessageSquare,
+  Megaphone,
+  ShieldCheck,
+  Cpu,
+  Languages,
+  Sparkles,
+  Globe,
+  UserCheck,
+} from "lucide-react";
+import { ResponsePreviewPanel } from "@/app/components/reviews/settings/ResponsePreviewPanel";
+import type { ResponseSettings } from "@/app/types/response-settings";
 
-/* ===== utils ===== */
-function resolveCompanyId(boot: unknown): string | null {
-  const b = (boot ?? {}) as Record<string, any>;
-  return (
-    b?.company?.id ??
-    b?.activeCompany?.id ??
-    b?.activeCompanyId ??
-    b?.companyId ??
-    (Array.isArray(b?.companies) && b?.companies[0]?.id) ??
-    null
-  );
-}
-function fmt(dt: string | Date | null): string {
-  if (!dt) return "";
-  const d = typeof dt === "string" ? new Date(dt) : dt;
-  try {
-    return new Intl.DateTimeFormat("es-ES", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: "Europe/Madrid",
-    }).format(d);
-  } catch {
-    return d.toLocaleString();
-  }
-}
+// Secciones
+import {
+  BrandIdentitySection,
+  LanguageSection,
+  StarRulesSection,
+  ChannelsCtaSection,
+  PoliciesSection,
+  PublishingSection,
+  ModelAiSection,
+} from "@/app/components/reviews/settings/sections";
 
-/* ===== defaults ===== */
+/* ===== defaults acordes a ResponseSettings ===== */
 const defaultSettings: ResponseSettings = {
   businessName: "Heladería Brumazul",
   sector: "Restauración - Heladería",
@@ -68,273 +60,115 @@ const defaultSettings: ResponseSettings = {
   maxCharacters: 300,
 };
 
-/* ===== helpers para prompt preview ===== */
-function mapToneNumberToLabel(n: number | undefined): string {
-  if (!Number.isFinite(n)) return "neutral";
-  if (n! <= 1) return "neutral";
-  if (n! === 2) return "cálido";
-  if (n! === 3) return "positivo";
-  if (n! === 4) return "muy positivo";
-  return "entusiasta";
-}
-function mapMaxCharsToLength(c: number | undefined): "very_short" | "short" | "medium" | "long" {
-  const v = Number(c ?? 300);
-  if (v <= 180) return "very_short";
-  if (v <= 300) return "short";
-  if (v <= 450) return "medium";
-  return "long";
-}
-function toEngineSettings(s: ResponseSettings) {
-  return {
-    language: s.language ?? "es",
-    lang: s.language ?? "es",
-    tone: mapToneNumberToLabel(s.tone),
-    emojiLevel: Math.max(0, Math.min(3, Number(s.emojiIntensity ?? 0))),
-    formality: s.treatment === "usted" ? "usted" : "tu",
-    signature: s.standardSignature ?? null,
-    model: s.model || process.env.AI_MODEL || "gpt-4o-mini",
-    temperature: typeof s.creativity === "number" ? s.creativity : 0.3,
-    forbidCompensation: s.noPublicCompensation !== false,
-    stripPII: s.avoidPersonalData !== false,
-    length: mapMaxCharsToLength(s.maxCharacters),
-    companyName: s.businessName ?? null,
-    locationName: null,
-  };
-}
-function sampleReviewByStar(star: 1 | 3 | 5) {
-  if (star === 1)
-    return {
-      rating: 1,
-      author: "Cliente de ejemplo",
-      content:
-        "Muy mala experiencia: el helado llegó derretido y el personal fue poco amable. No volveré.",
-    };
-  if (star === 3)
-    return {
-      rating: 3,
-      author: "Cliente de ejemplo",
-      content:
-        "Helado correcto y buen precio, aunque la espera fue algo larga y la mesa estaba poco limpia.",
-    };
-  return {
-    rating: 5,
-    author: "Cliente de ejemplo",
-    content:
-      "¡Riquísimo! Sabores muy cremosos y atención de diez. Repetiremos seguro. Gracias 😊",
-  };
-}
-
-/* ===== Panel SYSTEM (alineado a la derecha) ===== */
-function SystemPromptPanel({
-  system,
-  loading,
-  error,
-  onToggle,
-  open,
-}: {
-  system: string;
-  loading: boolean;
-  error: string | null;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div className="rounded-xl border bg-gray-50 px-4 py-3 shadow-sm w-[680px] max-w-full">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-sm font-medium text-gray-700">System prompt (diagnóstico)</div>
-        <button
-          type="button"
-          onClick={onToggle}
-          className="text-xs rounded-md border px-2 py-1 text-gray-600 hover:bg-white"
-        >
-          {open ? "Ocultar" : "Mostrar"}
-        </button>
-      </div>
-      {open && (
-        <div className="mt-3">
-          {error && (
-            <div className="rounded-md border border-red-300 bg-red-50 p-3 text-xs text-red-800">
-              Error: {error}
-            </div>
-          )}
-          {!error && loading && (
-            <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
-              Generando vista previa…
-            </div>
-          )}
-          {!error && !loading && (
-            <pre className="whitespace-pre-wrap break-words rounded-md border bg-white p-3 text-xs font-mono text-gray-800">
-              {system || "—"}
-            </pre>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ========== PAGE ========== */
 export default function ReviewsSettingsPage() {
-  const boot = useBootstrapData();
-  const companyId = resolveCompanyId(boot);
-
   const [settings, setSettings] = useState<ResponseSettings>(defaultSettings);
-  const [isModified, setIsModified] = useState(false);
-  const [previewStar, setPreviewStar] = useState<1 | 3 | 5>(5);
-  const [loading, setLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [selectedStar, setSelectedStar] = useState<1 | 3 | 5>(5);
+  const [active, setActive] = useState<string>("preview");
 
-  // prompt preview
-  const [sysOpen, setSysOpen] = useState(true);
-  const [sysLoading, setSysLoading] = useState(false);
-  const [systemText, setSystemText] = useState("");
-  const [sysError, setSysError] = useState<string | null>(null);
-
-  // load settings
-  useEffect(() => {
-    if (!companyId) return;
-    let ignore = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/companies/${companyId}/response-settings`, { cache: "no-store" });
-        const data = await res.json();
-        if (ignore) return;
-        setSettings(data?.settings ?? defaultSettings);
-        setIsModified(false);
-      } catch {
-        setSettings(defaultSettings);
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    })();
-    return () => {
-      ignore = true;
-    };
-  }, [companyId]);
-
-  // load prompt (RUTA PLURAL)
-  useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        setSysLoading(true);
-        setSysError(null);
-        const mapped = toEngineSettings(settings);
-        const example = sampleReviewByStar(previewStar);
-
-        const res = await fetch("/api/responses/preview", {
-          method: "POST",
-          signal: controller.signal,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            settings: mapped,
-            review: example,
-          }),
-        });
-
-        const ct = (res.headers.get("content-type") || "").toLowerCase();
-        const json = ct.includes("application/json")
-          ? await res.json()
-          : { ok: false, error: await res.text() };
-        if (!json?.ok) throw new Error(json?.error || "preview_failed");
-        setSystemText(String(json.system || ""));
-      } catch (e: any) {
-        if (e?.name !== "AbortError") setSysError(e?.message || "No se pudo generar el preview");
-      } finally {
-        setSysLoading(false);
-      }
-    })();
-    return () => controller.abort();
-  }, [JSON.stringify(settings), previewStar]);
-
-  const updateSettings = (updates: Partial<ResponseSettings>) => {
+  const onUpdate = (updates: Partial<ResponseSettings>) =>
     setSettings((prev) => ({ ...prev, ...updates }));
-    setIsModified(true);
-  };
 
-  const handleSave = async () => {
-    if (!companyId || isSaving) return;
-    setIsSaving(true);
-    try {
-      await fetch(`/api/companies/${companyId}/response-settings`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      });
-      setIsModified(false);
-      toast({ title: "Cambios guardados", description: "Tus ajustes se han actualizado correctamente." });
-    } catch {
-      toast({ variant: "error", title: "Error al guardar", description: "Inténtalo de nuevo." });
-    } finally {
-      setIsSaving(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [availH, setAvailH] = useState<number>(0);
+
+  // Altura exacta bajo el header/tabmenu
+  useLayoutEffect(() => {
+    function recalc() {
+      const top = rootRef.current?.getBoundingClientRect().top ?? 0;
+      setAvailH(Math.max(0, window.innerHeight - top));
     }
-  };
+    recalc();
+    window.addEventListener("resize", recalc);
+    window.addEventListener("orientationchange", recalc);
+    return () => {
+      window.removeEventListener("resize", recalc);
+      window.removeEventListener("orientationchange", recalc);
+    };
+  }, []);
 
-  if (!companyId) return <div className="p-6 text-sm text-muted-foreground">No hay compañía activa.</div>;
-  if (loading) return <div className="p-6">Cargando…</div>;
+  const MENU_ITEMS: VerticalMenuItem[] = [
+    { label: "Preview", value: "preview", icon: Eye },
+    { label: "General", value: "general", icon: SlidersHorizontal },
+    { label: "Idioma", value: "language", icon: Languages },
+    { label: "Reglas por estrellas", value: "stars", icon: Sparkles },
+    { label: "Canales / CTA", value: "channels", icon: Globe },
+    { label: "Políticas", value: "policies", icon: ShieldCheck },
+    { label: "Publicación", value: "publishing", icon: UserCheck },
+    { label: "Modelo (IA)", value: "model", icon: Cpu },
+  ];
+
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
-    <div className="space-y-6 mx-auto w-full max-w-[1400px] px-3 sm:px-6">
-      {/* 1️⃣ System prompt alineado a la derecha (más ancho total del layout) */}
-      <div className="flex justify-end">
-        <SystemPromptPanel
-          system={systemText}
-          loading={sysLoading}
-          error={sysError}
-          onToggle={() => setSysOpen((v) => !v)}
-          open={sysOpen}
-        />
-      </div>
+    <div
+      ref={rootRef}
+      style={{ height: availH ? `${availH - 16}px` : undefined }}
+      className="overflow-hidden bg-white border rounded-xl"
+    >
+      {/* Layout: menú | separador | contenido */}
+      <div className="h-full w-full grid grid-cols-[220px_1px_1fr]">
+        {/* Menú */}
+        <div className="h-full overflow-hidden">
+          <VerticalMenu
+            items={MENU_ITEMS}
+            value={active}
+            onSelect={(val) => {
+              setActive(val);
+              scrollTo(val);
+            }}
+            className="h-full px-0"
+          />
+        </div>
 
-      {/* 2️⃣ Preview a TODO el ancho del contenedor */}
-      <ResponsePreview
-        settings={settings}
-        selectedStar={previewStar}
-        onStarChange={setPreviewStar}
-        className="w-full"
-      />
+        {/* Separador vertical */}
+        <div className="h-full w-px bg-slate-200" />
 
-      {/* 3️⃣ Bloque principal con sidebar y settings (más ancho y sin desbordes) */}
-      <div className="w-full h-[80svh] overflow-hidden bg-white grid grid-cols-[15%_85%] rounded-xl border">
-        {/* Sidebar fija */}
-        <SettingsSidebar />
-
-        {/* Panel derecho con top fijo (acciones) y scroll — contención horizontal */}
-        <section className="flex flex-col h-full min-w-0">
-          <div className="border-b border-slate-200/70 px-5 py-4 shrink-0">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                disabled={!isModified}
-                onClick={() => window.location.reload()}
-                className="disabled:opacity-100 disabled:bg-transparent"
-              >
-                Descartar
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={!isModified || isSaving}
-                className="text-white bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 hover:from-indigo-500 hover:via-violet-500 hover:to-fuchsia-500"
-              >
-                {isSaving ? "Guardando…" : "Guardar"}
-              </Button>
-            </div>
-          </div>
-
-          {/* ÚNICO scroll: el shell con PREVIEW + secciones — evita sobresalir */}
-          <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
-            <SettingsShell
+        {/* Contenido con scroll interno y scroll suave */}
+        <div
+          className="h-full overflow-y-auto"
+          style={{ scrollBehavior: "smooth" }}
+        >
+          {/* Preview (sin sombras; pegado arriba) */}
+          <section id="preview" className="px-6 py-4 scroll-mt-4">
+            <ResponsePreviewPanel
               settings={settings}
-              onUpdate={updateSettings}
-              selectedStar={previewStar}
-              onStarChange={setPreviewStar}
-              className="max-w-full"
+              selectedStar={selectedStar}
+              onStarChange={setSelectedStar}
             />
-          </div>
-        </section>
-      </div>
+          </section>
 
-      <LoadingOverlay show={isSaving} text="Guardando ajustes…" />
+          {/* Secciones mapeadas a cada opción del menú */}
+          <div id="general" className="px-6 py-4 scroll-mt-4">
+            <BrandIdentitySection settings={settings} onUpdate={onUpdate} />
+          </div>
+
+          <div id="language" className="px-6 py-4 scroll-mt-4">
+            <LanguageSection settings={settings} onUpdate={onUpdate} />
+          </div>
+
+          <div id="stars" className="px-6 py-4 scroll-mt-4">
+            <StarRulesSection settings={settings} onUpdate={onUpdate} />
+          </div>
+
+          <div id="channels" className="px-6 py-4 scroll-mt-4">
+            <ChannelsCtaSection settings={settings} onUpdate={onUpdate} />
+          </div>
+
+          <div id="policies" className="px-6 py-4 scroll-mt-4">
+            <PoliciesSection settings={settings} onUpdate={onUpdate} />
+          </div>
+
+          <div id="publishing" className="px-6 py-4 scroll-mt-4">
+            <PublishingSection settings={settings} onUpdate={onUpdate} />
+          </div>
+
+          <div id="model" className="px-6 py-4 scroll-mt-4">
+            <ModelAiSection settings={settings} onUpdate={onUpdate} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

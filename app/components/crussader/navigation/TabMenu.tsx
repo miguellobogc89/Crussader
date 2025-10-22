@@ -66,7 +66,7 @@ export default function TabMenu({ items, className = "" }: { items: TabItem[]; c
               href={it.href}
               role="tab"
               aria-selected={active}
-              ref={(el) => (tabRefs.current[index] = el)}
+              ref={(el) => { tabRefs.current[index] = el; }}
               onMouseEnter={() => moveHighlightTo(index)}
               onMouseLeave={() => {
                 const activeIndex = items.findIndex((it) => isActive(it.href, it.exact));
