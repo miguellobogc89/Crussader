@@ -1,6 +1,13 @@
 // app/schemas/response-settings.ts
 import { z } from "zod";
 
+// Sub-schema para CTA por bucket
+const CTAConfigSchema = z.object({
+  channel: z.enum(["whatsapp", "phone", "email", "web"]),
+  contact: z.string().optional(),
+  text: z.string().max(300),
+});
+
 export const ResponseSettingsSchema = z.object({
   businessName: z.string(),
   sector: z.string(),
@@ -13,7 +20,6 @@ export const ResponseSettingsSchema = z.object({
 
   starSettings: z.object({
     "1-2": z.object({
-      // En UI usas "apology" aquí, pero dejamos string por flexibilidad
       objective: z.string(),
       length: z.number().int().min(0).max(2),
       enableCTA: z.boolean(),
@@ -31,7 +37,11 @@ export const ResponseSettingsSchema = z.object({
   }),
 
   preferredChannel: z.enum(["whatsapp", "phone", "email", "web"]),
-  ctaText: z.string().max(300),
+  ctaByRating: z.object({
+    "1-2": CTAConfigSchema,
+    "3": CTAConfigSchema,
+    "4-5": CTAConfigSchema,
+  }),
   showCTAWhen: z.enum(["always", "below3", "above4", "never"]),
   addUTM: z.boolean(),
   bannedPhrases: z.array(z.string()),
@@ -45,6 +55,10 @@ export const ResponseSettingsSchema = z.object({
   model: z.enum(["gpt-4o", "gpt-4o-mini"]),
   creativity: z.number().min(0).max(1),
   maxCharacters: z.number().int().min(100).max(1000),
+
+  notificationChannel: z.enum(["email", "whatsapp", "sms"]),
+  notificationContact: z.string(),
 });
 
 export type ResponseSettings = z.infer<typeof ResponseSettingsSchema>;
+export type CTAConfig = z.infer<typeof CTAConfigSchema>;

@@ -1,4 +1,4 @@
-// app/components/reviews/settings/ResponseReviewPanel.tsx
+// app/components/reviews/settings/ResponsePreviewPanel.tsx
 "use client";
 
 import {
@@ -10,9 +10,11 @@ import {
 } from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
-import { Star, MessageCircle, Bot, Sparkles } from "lucide-react";
-import type { ResponseSettings } from "@/app/types/response-settings";
+import { Star, MessageCircle, Bot, Sparkles, Loader2 } from "lucide-react";
+import type { ResponseSettings } from "@/app/schemas/response-settings";
 import { SegmentedControl } from "@/app/components/ui/segmented-control";
+import { usePreviewResponse } from "@/hooks/usePreviewResponse";
+import { useEffect, useState } from "react";
 
 interface ResponsePreviewPanelProps {
   settings: ResponseSettings;
@@ -25,52 +27,24 @@ export function ResponsePreviewPanel({
   selectedStar,
   onStarChange,
 }: ResponsePreviewPanelProps) {
-  const getPreviewContent = () => {
-    const starConfig =
-      selectedStar <= 2
-        ? settings.starSettings["1-2"]
-        : selectedStar === 3
-        ? settings.starSettings["3"]
-        : settings.starSettings["4-5"];
+  const [manualTrigger, setManualTrigger] = useState(false);
 
-    const toneEmojis = ["😌", "😐", "🧐", "😊", "🙂", "🤩"];
-    const toneEmoji = toneEmojis[settings.tone] || "😊";
-
-    let response = "";
-    if (selectedStar <= 2) {
-      response =
-        settings.emojiIntensity >= 1
-          ? `¡Hola! ${toneEmoji} Lamentamos mucho tu experiencia. Nos tomamos muy en serio todos los comentarios...`
-          : `Hola. Lamentamos mucho tu experiencia. Nos tomamos muy en serio todos los comentarios...`;
-    } else if (selectedStar === 3) {
-      response =
-        settings.emojiIntensity >= 1
-          ? `¡Hola! ${toneEmoji} Gracias por tu reseña. Valoramos tu feedback y siempre buscamos mejorar...`
-          : `Hola. Gracias por tu reseña. Valoramos tu feedback y siempre buscamos mejorar...`;
-    } else {
-      response =
-        settings.emojiIntensity >= 2
-          ? `¡Hola! ${toneEmoji} ¡Muchísimas gracias por tu fantástica reseña! 🎉 Nos alegra saber que...`
-          : settings.emojiIntensity >= 1
-          ? `¡Hola! ${toneEmoji} Muchísimas gracias por tu fantástica reseña. Nos alegra saber que...`
-          : `Hola. Muchísimas gracias por tu fantástica reseña. Nos alegra saber que...`;
-    }
-
-    if (starConfig.length === 0) {
-      response = response.substring(0, 120) + "...";
-    } else if (starConfig.length === 2) {
-      response +=
-        " Queremos asegurarnos de que cada cliente tenga la mejor experiencia posible. Si tienes alguna sugerencia adicional, no dudes en contactarnos.";
-    }
-
-    response += `\n\n${settings.standardSignature}`;
-
-    if (starConfig.enableCTA && shouldShowCTA()) {
-      response += `\n\n${settings.ctaText}`;
-    }
-
-    return response;
+  // Texto de ejemplo según estrellas
+  const sampleReviewByStar: Record<1 | 3 | 5, string> = {
+    1: "La atención fue lenta y el pedido llegó incompleto. No repetiré si no mejoran.",
+    3: "Estuvo bien en general, aunque la espera fue algo larga. Podría mejorar.",
+    5: "Todo perfecto: atención rápida y producto de gran calidad. ¡Muy recomendable!",
   };
+
+  const { loading, data, error, fetchResponse } = usePreviewResponse({
+    review: { content: sampleReviewByStar[selectedStar] },
+    settings,
+  });
+
+  // Si se cambia la configuración o las estrellas, recarga automáticamente
+  useEffect(() => {
+    if (manualTrigger) fetchResponse();
+  }, [selectedStar, settings, manualTrigger]);
 
   const shouldShowCTA = () => {
     switch (settings.showCTAWhen) {
@@ -81,7 +55,6 @@ export function ResponsePreviewPanel({
       case "above4":
         return selectedStar >= 4;
       case "never":
-        return false;
       default:
         return false;
     }
@@ -107,7 +80,9 @@ export function ResponsePreviewPanel({
           <MessageCircle className="h-5 w-5 text-primary" />
           Preview de respuesta
         </CardTitle>
-        <CardDescription>Así es cómo se verán las respuestas con tu configuración</CardDescription>
+        <CardDescription>
+          Así es cómo se verán las respuestas con tu configuración
+        </CardDescription>
 
         <div className="pt-3">
           <SegmentedControl
@@ -123,6 +98,7 @@ export function ResponsePreviewPanel({
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {/* Reseña simulada */}
         <div className="bg-muted/30 rounded-lg p-4 border-l-4 border-primary/30">
           <div className="flex items-center gap-2 mb-2">
             <div className="flex">
@@ -142,19 +118,18 @@ export function ResponsePreviewPanel({
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            {selectedStar <= 2
-              ? "Experiencia regular, el servicio podría mejorar..."
-              : selectedStar === 3
-              ? "Estuvo bien, aunque hay cosas que podrían mejorar..."
-              : "¡Excelente experiencia! Todo perfecto, muy recomendable..."}
+            “{sampleReviewByStar[selectedStar]}”
           </p>
           <p className="text-xs text-muted-foreground mt-2">— Cliente Ejemplo</p>
         </div>
 
+        {/* Respuesta generada */}
         <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg p-4 border">
           <div className="flex items-center gap-2 mb-3">
             <Bot className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Respuesta generada</span>
+            <span className="text-sm font-medium text-primary">
+              Respuesta generada
+            </span>
             {shouldShowCTA() && (
               <Badge variant="secondary" className="text-xs">
                 CTA
@@ -162,11 +137,35 @@ export function ResponsePreviewPanel({
             )}
           </div>
 
-          <div className="whitespace-pre-wrap text-sm leading-relaxed">
-            {getPreviewContent()}
-          </div>
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              Generando respuesta…
+            </div>
+          ) : error ? (
+            <div className="text-sm text-red-500">
+              ⚠️ Error al generar respuesta: {error}
+            </div>
+          ) : (
+            <div className="whitespace-pre-wrap text-sm leading-relaxed">
+              {data?.result || "(Haz clic en 'Generar ejemplo')"}
+            </div>
+          )}
+
+          {/* Prompt dev (colapsable) */}
+          {!loading && data?.applied && (
+            <details className="mt-4 text-xs text-muted-foreground">
+              <summary className="cursor-pointer text-primary font-medium">
+                Ver ajustes aplicados
+              </summary>
+              <pre className="mt-2 bg-muted p-2 rounded max-h-64 overflow-auto whitespace-pre-wrap">
+                {JSON.stringify(data.applied, null, 2)}
+              </pre>
+            </details>
+          )}
         </div>
 
+        {/* Configuración aplicada */}
         <div className="space-y-3 pt-4 border-t">
           <h4 className="text-sm font-medium flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
@@ -181,44 +180,43 @@ export function ResponsePreviewPanel({
               {settings.publishMode === "draft" ? "📄 Borrador" : "🚀 Auto"}
             </Badge>
             <Badge variant="outline" className="text-xs">
-              {settings.variantsToGenerate} variante
-              {settings.variantsToGenerate !== 1 ? "s" : ""}
+              {settings.model}
             </Badge>
-            <Badge variant="outline" className="text-xs">{settings.model}</Badge>
-            <Badge variant="outline" className="text-xs">T: {settings.creativity}</Badge>
-          </div>
-
-          <div className="text-xs text-muted-foreground">
-            <div>
-              Longitud: 
-              {
-                ["Breve", "Media", "Detallada"][
-                  selectedStar <= 2
-                    ? settings.starSettings["1-2"].length
-                    : selectedStar === 3
-                    ? settings.starSettings["3"].length
-                    : settings.starSettings["4-5"].length
-                ]
-              } 
-              • Máx: {settings.maxCharacters} chars
-            </div>
-            <div>
-              Tono: 
-              {
-                ["Sereno", "Neutral", "Profesional", "Cercano", "Amable", "Entusiasta"][
-                  settings.tone
-                ]
-              }
-            </div>
+            <Badge variant="outline" className="text-xs">
+              T: {settings.creativity}
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              Variantes: {settings.variantsToGenerate}
+            </Badge>
           </div>
         </div>
 
+        {/* Botones */}
         <div className="flex gap-2 pt-4">
-          <Button size="sm" variant="outline" className="flex-1">
-            Probar prompt
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            onClick={() => {
+              setManualTrigger(true);
+              fetchResponse();
+            }}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" /> Generando...
+              </>
+            ) : (
+              "Generar ejemplo"
+            )}
           </Button>
-          <Button size="sm" variant="outline" className="flex-1">
-            Generar ejemplo
+          <Button
+            size="sm"
+            variant="secondary"
+            className="flex-1"
+            onClick={() => window.open("/api/responses/preview", "_blank")}
+          >
+            Probar endpoint
           </Button>
         </div>
       </CardContent>
