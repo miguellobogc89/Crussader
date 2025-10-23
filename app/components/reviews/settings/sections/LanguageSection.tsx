@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/app/components/ui/label";
 import { Switch } from "@/app/components/ui/switch";
 import { Languages } from "lucide-react";
-import type { ResponseSettings } from "@/app/types/response-settings";
+import type { ResponseSettings } from "@/app/schemas/response-settings";
 
 export function LanguageSection({
   settings,

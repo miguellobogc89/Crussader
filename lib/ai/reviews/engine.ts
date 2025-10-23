@@ -1,6 +1,6 @@
 // lib/ai/engine.ts
-import { completeOpenAI } from "./providers/openai";
-import { applyPostFilters } from "./policy/postFilters";
+import { completeOpenAI } from "../providers/openai";
+import { applyPostFilters } from "../policy/postFilters";
 import type { AIOptions, TemplateInput } from "./types";
 
 /**

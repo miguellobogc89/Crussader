@@ -1,6 +1,6 @@
 // app/api/responses/preview/route.ts
 import { NextResponse } from "next/server";
-import { getPromptPreview } from "@/lib/ai/responseEngine";
+import { getPromptPreview } from "@/lib/ai/reviews/responseEngine";
 
 export const dynamic = "force-dynamic";
 

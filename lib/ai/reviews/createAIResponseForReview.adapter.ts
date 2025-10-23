@@ -3,7 +3,7 @@
 // Objetivo: NO tocar la ruta API por dentro; solo cambiar un import.
 // Mantiene promptVersion "settings-v1" para no romper analítica/reportes.
 
-import { generateReviewResponse as runEngine } from "@/lib/ai/responseEngine";
+import { generateReviewResponse as runEngine } from "@/lib/ai/reviews/responseEngine";
 
 type AnyDict = Record<string, any>;
 

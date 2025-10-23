@@ -8,7 +8,7 @@ import { Switch } from "@/app/components/ui/switch";
 import { Separator } from "@/app/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/components/ui/tooltip";
 import { Info, User } from "lucide-react";
-import type { ResponseSettings } from "@/app/types/response-settings";
+import type { ResponseSettings } from "@/app/schemas/response-settings";
 
 export function PoliciesSection({
   settings,

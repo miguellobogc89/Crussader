@@ -1,6 +1,6 @@
 // lib/ai/createAIResponseForReview.ts
 import { prisma } from "@/lib/prisma";
-import { buildMessagesFromSettings } from "@/lib/ai/prompt/promptBuilder";
+import { buildMessagesFromSettings } from "@/lib/ai/reviews/prompt/promptBuilder";
 import { sanitizeAndConstrain } from "@/lib/ai/policy/postFilters";
 import type { ResponseSettings } from "@/app/schemas/response-settings";
 import { ResponseSettingsSchema } from "@/app/schemas/response-settings";

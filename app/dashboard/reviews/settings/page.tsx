@@ -16,7 +16,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { ResponsePreviewPanel } from "@/app/components/reviews/settings/ResponsePreviewPanel";
-import type { ResponseSettings } from "@/app/types/response-settings";
+import type { ResponseSettings } from "@/app/schemas/response-settings";
 
 // Secciones
 import {
@@ -29,28 +29,57 @@ import {
   ModelAiSection,
 } from "@/app/components/reviews/settings/sections";
 
-/* ===== defaults acordes a ResponseSettings ===== */
+// Traemos el default canonical (asegura que todas las claves del schema estén presentes)
+import { defaultResponseSettings } from "@/app/schemas/default-response-settings";
+
+/* ===== defaults acordes a ResponseSettings (heredados del canonical) ===== */
 const defaultSettings: ResponseSettings = {
+  // Partimos del canonical y sobreescribimos lo que queramos
+  ...defaultResponseSettings,
+
+  // Valores específicos para esta demo/ejemplo
   businessName: "Heladería Brumazul",
   sector: "Restauración - Heladería",
+  standardSignature: "— Equipo Heladería Brumazul",
+
+  // Ajustes concretos (si quieres otros valores por defecto, cámbialos aquí)
   treatment: "tu",
   tone: 3,
   emojiIntensity: 1,
-  standardSignature: "— Equipo Heladería Brumazul",
   language: "es",
   autoDetectLanguage: true,
+
+  // Puedes sobrescribir buckets o dejar los del canonical
   starSettings: {
     "1-2": { objective: "apology", length: 1, enableCTA: true },
     "3": { objective: "neutral", length: 1, enableCTA: false },
     "4-5": { objective: "thanks", length: 1, enableCTA: true },
   },
-  preferredChannel: "whatsapp",
-  ctaText: "¡Nos vemos pronto!",
+
+  // Ejemplo de CTAs por bucket (si quieres personalizarlos aquí)
+  ctaByRating: {
+    "1-2": {
+      channel: "whatsapp",
+      contact: "",
+      text: "¡Lamentamos la experiencia! Escríbenos por WhatsApp y lo solucionamos 💬",
+    },
+    "3": {
+      channel: "email",
+      contact: "",
+      text: "Gracias por tu reseña. Escríbenos si podemos mejorar 📩",
+    },
+    "4-5": {
+      channel: "web",
+      contact: "",
+      text: "¡Gracias por tu reseña! Visítanos de nuevo 💙",
+    },
+  },
+
+  // Visibilidad CTA / tracking
   showCTAWhen: "below3",
   addUTM: false,
-  bannedPhrases: [],
-  noPublicCompensation: true,
-  avoidPersonalData: true,
+
+  // Publicación y IA
   publishMode: "draft",
   autoPublishThreshold: "4stars",
   variantsToGenerate: 2,

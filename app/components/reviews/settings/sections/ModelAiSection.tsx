@@ -1,13 +1,24 @@
 // app/components/reviews/settings/sections/ModelAiSection.tsx
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
 import { Label } from "@/app/components/ui/label";
-import { Badge } from "@/app/components/ui/badge";
 import { Sparkles } from "lucide-react";
-import type { ResponseSettings } from "@/app/types/response-settings";
-import { GradualSlider } from "@/app/components/ui/gradual-slider";
+import type { ResponseSettings } from "@/app/schemas/response-settings";
+import AnimatedSlider from "@/app/components/crussader/UX/controls/AnimatedSlider";
 
 export function ModelAiSection({
   settings,
@@ -33,11 +44,19 @@ export function ModelAiSection({
           </CardTitle>
           <CardDescription>Configuración técnica del modelo de IA</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          {/* Modelo */}
           <div className="space-y-2">
             <Label>Modelo</Label>
-            <Select value={settings.model} onValueChange={(value) => onUpdate({ model: value as any })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select
+              value={settings.model}
+              onValueChange={(value) =>
+                onUpdate({ model: value as ResponseSettings["model"] })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="gpt-4o">GPT-4o (Recomendado)</SelectItem>
                 <SelectItem value="gpt-4o-mini">GPT-4o Mini (Más rápido)</SelectItem>
@@ -45,33 +64,20 @@ export function ModelAiSection({
             </Select>
           </div>
 
+          {/* Creatividad */}
           <div className="space-y-3">
-            <Label>Creatividad/Temperatura</Label>
-            <GradualSlider
+            <Label>Creatividad / Temperatura</Label>
+            <AnimatedSlider
+              id="creativity-slider"
               value={settings.creativity}
               onChange={(value) => onUpdate({ creativity: value })}
               options={creativityOptions}
-              gradient="from-slate-400 to-violet-400"
+              gradientFromTo="from-slate-400 to-violet-400"
+              thicknessPx={12}
+              widthPercent={100}
+              showLabels={true}
+              emphasizeSelected={true}
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="maxChars">Máximo de caracteres</Label>
-            <div className="flex items-center space-x-4">
-              <input
-                type="range"
-                id="maxChars"
-                min={100}
-                max={1000}
-                step={50}
-                value={settings.maxCharacters}
-                onChange={(e) => onUpdate({ maxCharacters: parseInt(e.target.value) })}
-                className="flex-1"
-              />
-              <Badge variant="outline" className="min-w-20 justify-center">
-                {settings.maxCharacters}
-              </Badge>
-            </div>
           </div>
         </CardContent>
       </Card>

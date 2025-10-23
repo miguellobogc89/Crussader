@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { generateReviewResponse } from "@/lib/ai/generateReviewResponse";
+import { generateReviewResponse } from "@/lib/ai/reviews/generateReviewResponse";
 
 export async function autoRespondForReview(reviewId: string) {
   // Evitar duplicados (idempotente)

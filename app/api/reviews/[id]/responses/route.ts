@@ -1,7 +1,7 @@
 // app/api/reviews/[id]/responses/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { createAIResponseForReview } from "@/lib/ai/createAIResponseForReview.adapter";
+import { createAIResponseForReview } from "@/lib/ai/reviews/createAIResponseForReview.adapter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
