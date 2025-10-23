@@ -1,21 +1,48 @@
 Roadmap:
 
-
-
 ========== MVP REVIEWS =================
 
 - Meter una sola entrada reviews en la sidebar -- OK
 - Esta entrada mostrará "Crear Plan" o  la info real dependiendo del account -- OK
 - La página de reviews tendra un tabmenu con las reseñas, analytics seguiminto, analytics sentimiento y configuración -- OK
+- Configuración mostrará ajustes de respuesta, notificaciones y suscripción -- OK
 
-- Configuración mostrará ajustes de respuesta, notificaciones y suscripción
-- La configuración de respuestas debe funcionar correctamente
+- La configuración de respuestas debe funcionar correctamente 
+
+llamar a lowie (meter SIM)
+llamar a Ionos
+llamar al colchon
+
+- Las respuestas de guardan en la base de datos y la review se marca como contestada
+- Automatizar la autocontestación y que ponga, respuesta contestada automaticamente
+- cuando edito una review que me permita deshacer
+- Corregir paneles sentimientos
+- Montar todos los gráficos
+- Arreglar el puñetero webchat y crearle un panel d econfiguración para controlarlo
+- Renderizar la web para portatil y tablet como minimo
 - en los informes debemos poder seleccionar arriba la antiguedad, para que mas de un año por ejemplo sea premium
+- Cupones de activación
+
+
+-------- Una vez tengamos la API de Google --------------
 - En empresa debemos poder conectar la cuenta una vez que tengramos suubscripción o trial y debe guiarnos cuando nos demos de alta en la prueba
-- Las ubicaciones deben tener un icono
+
+
+-------- Necesario de otras pestañas --------------
+- Corregir la rpecarga geeneral d elas páginas
+- Notificaciones
+- La pestaña company funcionando perfectamente
+- Modificación de datos de usuario
+
+
+-------- Extras -----------------------------------
 - Los usuarios foto
 - las emrpesas logo
 - gamificación de % commpletado
+- Las ubicaciones deben tener un icono
+
+-------- Para la versión de pago -------------------------
+
 
 ===== General ========
 - notificaciones

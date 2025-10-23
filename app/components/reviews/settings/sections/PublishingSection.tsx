@@ -1,91 +1,237 @@
 // app/components/reviews/settings/sections/PublishingSection.tsx
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
+import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
-import { UserCheck } from "lucide-react";
-import type { ResponseSettings } from "@/app/types/response-settings";
+import { Switch } from "@/app/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
+import { Badge } from "@/app/components/ui/badge";
+import {
+  CheckCircle2,
+  Bell,
+  MessageCircle,
+  Mail,
+  Smartphone,
+  Info,
+} from "lucide-react";
 import { SegmentedControl } from "@/app/components/ui/segmented-control";
 
-export function PublishingSection({
-  settings,
-  onUpdate,
-}: {
+// ✅ IMPORT CORRECTO desde el schema actualizado
+import type { ResponseSettings } from "@/app/schemas/response-settings";
+
+type Threshold = "5stars" | "4stars" | "3stars";
+type NotifyChannel = "email" | "whatsapp" | "sms";
+
+const notificationChannels: Record<
+  NotifyChannel,
+  { icon: React.ComponentType<{ className?: string }>; label: string; placeholder: string }
+> = {
+  email: { icon: Mail, label: "Email", placeholder: "usuario@ejemplo.com" },
+  whatsapp: { icon: MessageCircle, label: "WhatsApp", placeholder: "+34 612 345 678" },
+  sms: { icon: Smartphone, label: "SMS", placeholder: "+34 612 345 678" },
+};
+
+interface PublishingSectionProps {
   settings: ResponseSettings;
   onUpdate: (updates: Partial<ResponseSettings>) => void;
-}) {
+}
+
+export function PublishingSection({ settings, onUpdate }: PublishingSectionProps) {
+  const autoPublishEnabled = settings.publishMode === "auto";
+
+  const currentChannel = settings.notificationChannel;
+  const currentContact = settings.notificationContact;
+
+  // Validación segura del canal
+  const isValidChannel = currentChannel in notificationChannels;
+  const NotificationIcon = isValidChannel
+    ? notificationChannels[currentChannel].icon
+    : Mail;
+
+  const channelInfo = isValidChannel
+    ? notificationChannels[currentChannel]
+    : notificationChannels.email;
+
+  const threshold = settings.autoPublishThreshold;
+
+  const starRangeOptions = [
+    { value: "5stars", label: "Solo 5★" },
+    { value: "4stars", label: "4★ y 5★" },
+    { value: "3stars", label: "3★, 4★ y 5★" },
+  ] as const;
+
+  const thresholdHelp =
+    threshold === "5stars"
+      ? "Solo las reseñas de 5 estrellas se publicarán automáticamente."
+      : threshold === "4stars"
+      ? "Las reseñas de 4 y 5 estrellas se publicarán automáticamente."
+      : "Las reseñas de 3, 4 y 5 estrellas se publicarán automáticamente.";
+
   return (
-    <section id="publishing">
+    <div className="w-full max-w-3xl">
       <Card className="border-none shadow-elegant bg-white/60 backdrop-blur-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserCheck className="h-5 w-5 text-primary" />
-            Publicación y control
-          </CardTitle>
-          <CardDescription>Cómo y cuándo se publican las respuestas</CardDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-primary" />
+                Autopublicación
+              </CardTitle>
+              <CardDescription>
+                Configura qué respuestas se publican automáticamente
+              </CardDescription>
+            </div>
+
+            <div className="hidden sm:flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Modo:</span>
+              <Badge variant="secondary" className="text-xs">
+                {autoPublishEnabled ? "Auto" : "Borrador"}
+              </Badge>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Modo de publicación</Label>
-            <SegmentedControl
-              options={[
-                { value: "draft", label: "Borrador" },
-                { value: "auto", label: "Auto-publicar" },
-              ]}
-              value={settings.publishMode}
-              onChange={(value) => onUpdate({ publishMode: value as "draft" | "auto" })}
+
+        <CardContent className="space-y-6">
+          <div className="flex gap-3 p-4 rounded-lg bg-accent/10 border border-accent/20">
+            <Info className="h-5 w-5 text-accent shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">¿Cómo funciona la autopublicación?</p>
+              <p className="text-sm text-muted-foreground">
+                1) Llega una reseña nueva. 2) Se genera automáticamente un <strong>borrador</strong> de respuesta.
+                3) Si activas la autopublicación, se publicarán <strong>directamente</strong> las que cumplan el criterio de estrellas.
+                El resto se te notificará (y aparecerá en la app) para que decidas si generar más variantes o publicarlas.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-4 rounded-lg border bg-background/50">
+            <div className="space-y-0.5">
+              <Label htmlFor="autoPublish" className="text-base font-medium cursor-pointer">
+                Activar autopublicación
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Las respuestas se publicarán automáticamente según el criterio configurado
+              </p>
+            </div>
+            <Switch
+              id="autoPublish"
+              checked={autoPublishEnabled}
+              onCheckedChange={(checked) => onUpdate({ publishMode: checked ? "auto" : "draft" })}
             />
           </div>
 
-          {settings.publishMode === "auto" && (
-            <div className="space-y-2">
-              <Label>Umbral auto-publicación</Label>
-              <Select
-                value={settings.autoPublishThreshold}
-                onValueChange={(value) => onUpdate({ autoPublishThreshold: value as any })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="3stars">≥3★</SelectItem>
-                  <SelectItem value="4stars">≥4★</SelectItem>
-                  <SelectItem value="5stars">≥5★</SelectItem>
-                </SelectContent>
-              </Select>
+          {autoPublishEnabled && (
+            <div className="space-y-6 pl-4 border-l-2 border-primary/20">
+              <div className="space-y-3">
+                <Label>Autopublicar respuestas a partir de</Label>
+                <SegmentedControl
+                  options={starRangeOptions as any}
+                  value={threshold}
+                  onChange={(value) =>
+                    onUpdate({ autoPublishThreshold: value as Threshold })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">{thresholdHelp}</p>
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Respuestas que NO se autopublican
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-4 p-4 rounded-lg bg-muted/30">
+                <div className="flex items-start gap-3">
+                  <Bell className="h-5 w-5 text-primary mt-0.5" />
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Notificación de borradores pendientes</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Te avisamos por el canal que elijas cuando una respuesta quede en borrador (además aparecerá en la app).
+                        Desde allí podrás revisar, generar más variantes o publicarla.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="notificationChannel">Canal de notificación</Label>
+                      <Select
+                        value={currentChannel}
+                        onValueChange={(value) =>
+                          onUpdate({ notificationChannel: value as NotifyChannel })
+                        }
+                      >
+                        <SelectTrigger id="notificationChannel">
+                          <SelectValue placeholder="Selecciona canal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(
+                            Object.entries(notificationChannels) as Array<
+                              [NotifyChannel, (typeof notificationChannels)[NotifyChannel]]
+                            >
+                          ).map(([key, { icon: Icon, label }]) => (
+                            <SelectItem key={key} value={key}>
+                              <div className="flex items-center gap-2">
+                                <Icon className="h-4 w-4" />
+                                {label}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="notificationContact" className="flex items-center gap-2">
+                        <NotificationIcon className="h-4 w-4 text-primary" />
+                        {channelInfo.label}
+                      </Label>
+                      <Input
+                        id="notificationContact"
+                        value={currentContact}
+                        onChange={(e) => onUpdate({ notificationContact: e.target.value })}
+                        placeholder={channelInfo.placeholder}
+                        type={currentChannel === "email" ? "email" : "text"}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {currentChannel === "email" && "Dirección de email donde recibirás las notificaciones"}
+                        {currentChannel === "whatsapp" && "Número de WhatsApp con código de país"}
+                        {currentChannel === "sms" && "Número de teléfono con código de país"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Variantes a generar</Label>
-              <Select
-                value={settings.variantsToGenerate.toString()}
-                onValueChange={(value) => onUpdate({ variantsToGenerate: parseInt(value) })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 variante</SelectItem>
-                  <SelectItem value="2">2 variantes</SelectItem>
-                  <SelectItem value="3">3 variantes</SelectItem>
-                </SelectContent>
-              </Select>
+          {!autoPublishEnabled && (
+            <div className="p-4 rounded-lg bg-muted/30 border border-muted">
+              <p className="text-sm text-muted-foreground">
+                Con la autopublicación desactivada, todas las respuestas generadas quedarán como <strong>borradores</strong> y
+                recibirás una notificación en la app para revisarlas antes de publicar.
+              </p>
             </div>
-            <div className="space-y-2">
-              <Label>Selección</Label>
-              <Select
-                value={settings.selectionMode}
-                onValueChange={(value) => onUpdate({ selectionMode: value as "auto" | "manual" })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Automática (mejor de N)</SelectItem>
-                  <SelectItem value="manual">Manual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
-    </section>
+    </div>
   );
 }

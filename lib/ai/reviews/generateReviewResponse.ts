@@ -2,7 +2,7 @@
 // Adaptador legacy → motor unificado.
 // Mantiene la firma para no romper el playground o el “prompt de prueba”.
 
-import { generateReviewResponse as runEngine } from "@/lib/ai/responseEngine";
+import { generateReviewResponse as runEngine } from "@/lib/ai/reviews/responseEngine";
 import type { Tone, Language, TemplateId } from "./types";
 
 export type GenerateReviewResponseInput = {
