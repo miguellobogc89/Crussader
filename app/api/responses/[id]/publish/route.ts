@@ -1,6 +1,6 @@
 // app/api/responses/[id]/publish/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
@@ -14,7 +14,7 @@ export async function POST(
   }
 
   try {
-    const updated = await db.response.update({
+    const updated = await prisma.response.update({
       where: { id },
       data: {
         status: "PUBLISHED",

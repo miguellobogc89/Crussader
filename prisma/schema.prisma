@@ -42,6 +42,7 @@ model User {
   account_id                          String?              @db.Uuid
   AuthAccount                         AuthAccount[]
   ExternalConnection                  ExternalConnection[]
+  Notification                        Notification[]
   phasesCreated                       Phase[]              @relation("UserPhasesCreated")
   responsesCreated                    Response[]           @relation("ResponseCreatedBy")
   responsesEdited                     Response[]           @relation("ResponseEditedBy")
@@ -319,6 +320,7 @@ model Review {
   isTest            Boolean         @default(false)
   is_conceptualized Boolean         @default(false)
   jobs              Job[]
+  Notification      Notification[]
   responses         Response[]
   Company           Company         @relation("CompanyReviews", fields: [companyId], references: [id], onDelete: Cascade)
   Location          Location        @relation("LocationReviews", fields: [locationId], references: [id], onDelete: Cascade)
@@ -1538,6 +1540,7 @@ model account {
   updated_at                       DateTime           @default(now()) @db.Timestamptz(6)
   subscription_status              SubscriptionStatus @default(NONE)
   Company                          Company[]
+  Notification                     Notification[]
   User_User_account_idToaccount    User[]             @relation("User_account_idToaccount")
   User_account_owner_user_idToUser User?              @relation("account_owner_user_idToUser", fields: [owner_user_id], references: [id], onUpdate: NoAction)
   billing_account                  billing_account[]
@@ -1545,6 +1548,32 @@ model account {
   @@index([owner_user_id], map: "idx_account_owner")
   @@index([plan_slug], map: "idx_account_plan_slug")
   @@index([status], map: "idx_account_status")
+}
+
+model Notification {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type        String
+  object_id   String
+  comment     String?
+  notified_at DateTime @default(now()) @db.Timestamptz(6)
+  status      String   @default("unread")
+  read   Boolean @default(false)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  metadata    Json?
+  locationId  String?
+  companyd    String?
+  userId      String?
+  reviewId    String?
+  accountId   String?  @db.Uuid
+  subject     String?
+  body        String?
+  account     account? @relation(fields: [accountId], references: [id], onUpdate: NoAction, map: "fk_notification_account")
+  Review      Review?  @relation(fields: [reviewId], references: [id], onUpdate: NoAction, map: "fk_notification_review")
+  User        User?    @relation(fields: [userId], references: [id], onUpdate: NoAction, map: "fk_notification_user")
+
+  @@index([notified_at(sort: Desc)], map: "idx_notification_notified")
+  @@index([object_id], map: "idx_notification_object_id")
+  @@index([status], map: "idx_notification_status")
 }
 
 /// *
@@ -1601,6 +1630,7 @@ enum JobType {
   SYNC_REVIEWS
   SYNC_LOCATIONS
   RECOMPUTE_KPI
+  NOTIFY
 }
 
 enum JobStatus {

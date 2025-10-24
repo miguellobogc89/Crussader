@@ -1,62 +1,96 @@
 // lib/prisma.ts
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client"
 
 function buildClient() {
-  const base = new PrismaClient({ log: ["warn", "error"] });
+  const base = new PrismaClient({ log: ["warn", "error"] })
 
-  // Extiende solo el modelo Review.create para disparar el auto-responder
   const extended = base.$extends({
     query: {
       review: {
         async create({ args, query }) {
-          const result = await query(args); // crea la review
-
-          const id = (result as { id?: string }).id;
+          const result = await query(args)
+          const id = result?.id
           if (id) {
-            (async () => {
+            // 🎯 Auto responder
+            ;(async () => {
               try {
-                const { autoRespondForReview } = await import("@/lib/reviews/autoResponder");
-                await autoRespondForReview(id);
+                const { autoRespondForReview } = await import("@/lib/reviews/autoResponder")
+                await autoRespondForReview(id)
               } catch (e: any) {
-                console.error("[autoResponder] error:", e?.message ?? e);
+                console.error("[autoResponder] error:", e?.message ?? e)
               }
-            })();
+            })()
+
+            // 🔔 Notificación automática
+            ;(async () => {
+              try {
+                const { generateNotification } = await import("@/lib/notifications/generateNotification")
+                await generateNotification({
+                  model: "Review",
+                  action: "create",
+                  data: result as any,
+                })
+              } catch (e: any) {
+                console.error("[notification] error:", e?.message ?? e)
+              }
+            })()
           }
 
-          return result;
+          return result
+        },
+      },
+
+      user: {
+        async create({ args, query }) {
+          const result = await query(args)
+          const id = result?.id
+          if (id) {
+            // 🔔 Notificación automática
+            ;(async () => {
+              try {
+                const { generateNotification } = await import("@/lib/notifications/generateNotification")
+                await generateNotification({
+                  model: "User",
+                  action: "create",
+                  data: result as any,
+                })
+              } catch (e: any) {
+                console.error("[notification] error:", e?.message ?? e)
+              }
+            })()
+          }
+
+          return result
         },
       },
     },
-  });
+  })
 
-  return extended;
+  return extended
 }
 
-// 🔧 Tipo del cliente extendido
-type ExtendedPrismaClient = ReturnType<typeof buildClient>;
+type ExtendedPrismaClient = ReturnType<typeof buildClient>
 
-// Cache global para evitar múltiples instancias en dev/HMR
-const globalForPrisma = globalThis as unknown as { prisma?: ExtendedPrismaClient };
-
-export const prisma: ExtendedPrismaClient = globalForPrisma.prisma ?? buildClient();
+const globalForPrisma = globalThis as unknown as { prisma?: ExtendedPrismaClient }
+export const prisma: ExtendedPrismaClient = globalForPrisma.prisma ?? buildClient()
 
 if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+  globalForPrisma.prisma = prisma
 }
-// 👇 Alias solo-tipado con todos los modelos visibles para TS
-import type { PrismaClient as PrismaClientType } from "@prisma/client";
-export const prismaModels = prisma as unknown as PrismaClientType;
-// (sigue exportando `prisma` como hasta ahora)
-// --- Cliente SIN extensiones (tipado estándar) para endpoints que requieren todos los modelos ---
-import { PrismaClient as PrismaClientBase } from "@prisma/client";
 
-let _prismaRaw: PrismaClientBase | undefined = (globalThis as any).__prismaRaw__;
+// Prisma tipado estándar
+import type { PrismaClient as PrismaClientType } from "@prisma/client"
+export const prismaModels = prisma as unknown as PrismaClientType
+
+// Prisma sin $extends (para uso interno como notificaciones)
+import { PrismaClient as PrismaClientBase } from "@prisma/client"
+
+let _prismaRaw: PrismaClientBase | undefined = (globalThis as any).__prismaRaw__
 if (!_prismaRaw) {
-  _prismaRaw = new PrismaClientBase({ log: ["warn", "error"] });
+  _prismaRaw = new PrismaClientBase({ log: ["warn", "error"] })
   if (process.env.NODE_ENV !== "production") {
-    (globalThis as any).__prismaRaw__ = _prismaRaw;
+    (globalThis as any).__prismaRaw__ = _prismaRaw
   }
 }
 
-/** Cliente Prisma sin $extends (expone webchatSite, webchatSession, webchatMessage, etc.) */
-export const prismaRaw = _prismaRaw;
+export const prismaRaw = _prismaRaw
