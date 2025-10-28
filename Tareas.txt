@@ -6,14 +6,10 @@ Roadmap:
 - Esta entrada mostrará "Crear Plan" o  la info real dependiendo del account -- OK
 - La página de reviews tendra un tabmenu con las reseñas, analytics seguiminto, analytics sentimiento y configuración -- OK
 - Configuración mostrará ajustes de respuesta, notificaciones y suscripción -- OK
+- Las respuestas de guardan en la base de datos y la review se marca como contestada -- OK
 
 - La configuración de respuestas debe funcionar correctamente 
 
-llamar a lowie (meter SIM)
-llamar a Ionos
-llamar al colchon
-
-- Las respuestas de guardan en la base de datos y la review se marca como contestada
 - Automatizar la autocontestación y que ponga, respuesta contestada automaticamente
 - cuando edito una review que me permita deshacer
 - Corregir paneles sentimientos

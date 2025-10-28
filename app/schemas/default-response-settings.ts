@@ -2,7 +2,6 @@
 import type { ResponseSettings } from "./response-settings";
 
 export const defaultResponseSettings: ResponseSettings = {
-  businessName: "",
   sector: "",
   treatment: "tu",
   tone: 2,

@@ -10,13 +10,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/app/components/ui/dropdown-menu";
+import { useBootstrapData } from "@/app/providers/bootstrap-store";
 
 export type LocationLite = {
   id: string;
   title: string;
   city?: string | null;
   reviewsCount?: number | null;
-  color?: string | null;
+  color?: string | null; // En bootstrap no viene color; lo dejamos por compat
 };
 
 export default function LocationSelector({
@@ -24,94 +25,61 @@ export default function LocationSelector({
   onSelect,
   className = "",
 }: {
-  companyId: string | null | undefined;
+  companyId: string | null | undefined; // se mantiene por compat, pero usamos bootstrap.activeCompany
   onSelect: (id: string | null, location?: LocationLite | null) => void;
   className?: string;
 }) {
+  const boot = useBootstrapData();
+
   const [locations, setLocations] = useState<LocationLite[] | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Carga desde bootstrap:
+   * - Usa boot.locations (ya vienen de la empresa activa en el bootstrap)
+   * - No hace fetch.
+   * - Mantiene selección previa desde localStorage si existe y está disponible.
+   */
   useEffect(() => {
-    let cancelled = false;
-    const ac = new AbortController();
+    try {
+      setError(null);
 
-    const HARD_TIMEOUT_MS = 6000;
-    const hardTimeout = setTimeout(() => {
-      if (!cancelled && locations === null) {
-        console.warn("[LocationSelector] timeout duro");
-        setError("timeout");
-        setLocations([]);         // salir de loading
-        // ❌ no reseteamos selección ni onSelect(null)
+      // Sin bootstrap aún -> loading
+      if (!boot) {
+        setLocations(null);
+        return;
       }
-    }, HARD_TIMEOUT_MS);
 
-    async function load() {
-      try {
-        setError(null);
+      // Si no hay empresa activa, no habrá locations
+      const rowsSrc = Array.isArray(boot.locations) ? boot.locations : [];
+      const rows: LocationLite[] = rowsSrc.map((l: any) => ({
+        id: String(l.id),
+        title: String(l.title ?? "Sin nombre"),
+        city: l.city ?? null,
+        reviewsCount: typeof l.reviewsCount === "number" ? l.reviewsCount : 0,
+        color: null, // bootstrap no trae color; mantenemos field por compat
+      }));
 
-        if (!companyId) {
-          setLocations([]);
-          // mantenemos la selección previa por si el usuario vuelve atrás
-          return;
-        }
+      setLocations(rows);
 
-        setLocations(null); // loading
-        const res = await fetch(`/api/locations?companyId=${companyId}`, {
-          cache: "no-store",
-          signal: ac.signal,
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const saved = typeof window !== "undefined" ? localStorage.getItem("reviews:locationId") : null;
+      const exists = (id: string | null) => Boolean(id && rows.some((r) => r.id === id));
+      const defaultId = (exists(saved) ? saved : null) ?? (rows[0]?.id ?? null);
 
-        const raw = await res.text();
-        let json: any = {};
-        try {
-          json = raw ? JSON.parse(raw) : {};
-        } catch {
-          throw new Error("invalid_json");
-        }
-        if (cancelled) return;
-
-        const rows: LocationLite[] = (json?.locations || []).map((l: any) => ({
-          id: String(l.id),
-          title: String(l.title ?? "Sin nombre"),
-          city: l.city ?? null,
-          reviewsCount: typeof l.reviewsCount === "number" ? l.reviewsCount : 0,
-          color: l.color ?? null,
-        }));
-
-        setLocations(rows);
-
-        const saved = typeof window !== "undefined" ? localStorage.getItem("reviews:locationId") : null;
-        const prefer = (id: string | null) => (id && rows.some((r) => r.id === id) ? id : null);
-        const defaultId = prefer(saved) ?? rows[0]?.id ?? null;
-
-        if (defaultId) {
-          setSelectedLocationId(defaultId);
-          localStorage.setItem("reviews:locationId", defaultId);
-        }
-        const loc = rows.find((x) => x.id === defaultId) ?? null;
-        onSelect(defaultId, loc);
-      } catch (e) {
-        if (cancelled) return;
-        console.error("[LocationSelector] fallo fetch ubicaciones:", e);
-        setError("fetch");
-        setLocations([]);         // salir de loading
-        // ❌ NO borrar selectedLocationId ni onSelect(null)
-      } finally {
-        clearTimeout(hardTimeout);
+      if (defaultId) {
+        setSelectedLocationId(defaultId);
+        if (typeof window !== "undefined") localStorage.setItem("reviews:locationId", defaultId);
       }
+      const loc = rows.find((x) => x.id === defaultId) ?? null;
+      onSelect(defaultId, loc);
+    } catch (e) {
+      console.error("[LocationSelector] bootstrap->locations error:", e);
+      setError("bootstrap");
+      setLocations([]); // salir de loading con error
     }
-
-    load();
-
-    return () => {
-      cancelled = true;
-      clearTimeout(hardTimeout);
-      ac.abort();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId]);
+    // Dependemos de boot.locations y de activeCompany.id (por si cambia)
+  }, [boot]);
 
   const selected =
     useMemo(

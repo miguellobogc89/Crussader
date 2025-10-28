@@ -1557,11 +1557,9 @@ model Notification {
   comment     String?
   notified_at DateTime @default(now()) @db.Timestamptz(6)
   status      String   @default("unread")
-  read   Boolean @default(false)
   created_at  DateTime @default(now()) @db.Timestamptz(6)
   metadata    Json?
   locationId  String?
-  companyd    String?
   userId      String?
   reviewId    String?
   accountId   String?  @db.Uuid

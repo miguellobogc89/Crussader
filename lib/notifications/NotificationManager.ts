@@ -1,3 +1,4 @@
+// lib/notifications/NotificationManager
 import { Role } from "@prisma/client"
 
 export type NotificationChannel = "dashboard" | "email" | "whatsapp"

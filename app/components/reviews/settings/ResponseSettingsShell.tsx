@@ -16,7 +16,7 @@ import { BrandIdentitySection } from "@/app/components/reviews/settings/sections
 import { StarRulesSection } from "@/app/components/reviews/settings/sections/StarRulesSection";
 import { ChannelsCtaSection } from "@/app/components/reviews/settings/sections/ChannelsCtaSection";
 import { PublishingSection } from "@/app/components/reviews/settings/sections/PublishingSection";
-import { ResponsePreviewPanel } from "@/app/components/reviews/settings/ResponsePreviewPanel";
+import { ResponsePreviewPanel } from "@/app/components/reviews/settings/sections/ResponsePreviewPanel";
 
 import { ConfigBadgesBar } from "@/app/components/reviews/settings/ConfigBadgesBar";
 import type { BadgesComputed } from "@/app/components/reviews/settings/ConfigBadgesBar";

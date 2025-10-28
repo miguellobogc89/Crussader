@@ -30,6 +30,12 @@ export type BootstrapData = {
     companyId: string;
     role: "OWNER" | "ADMIN" | "MEMBER" | null;
   }>;
+  /** ✅ NUEVO: misma info pero con nombre resuelto */
+  companiesResolved?: Array<{
+    id: string;
+    name: string;
+    role: "OWNER" | "ADMIN" | "MEMBER" | null;
+  }>;
   activeCompany: {
     id: string;
     name: string;
@@ -43,6 +49,8 @@ export type BootstrapData = {
     reviewsCount: number;
     lastSyncAt: Date | null;
   } | null;
+  /** ✅ NUEVO: alias cómodo para el cliente */
+  activeCompanyResolved?: { id: string; name: string } | null;
   locations: Array<{
     id: string;
     companyId: string;
@@ -109,12 +117,28 @@ export async function getBootstrapData(): Promise<BootstrapData> {
   });
   if (!user) throw Object.assign(new Error("no_user"), { status: 400 });
 
-  // ---- Empresas del usuario
+  // ---- Empresas del usuario (membership "ligero" original)
   const userCompanies = await prisma.userCompany.findMany({
     where: { userId: user.id },
     select: { companyId: true, role: true },
     orderBy: { createdAt: "asc" },
   });
+
+  // ✅ NUEVO: la misma consulta pero uniendo Company para tener el nombre:
+  const userCompaniesWithName = await prisma.userCompany.findMany({
+    where: { userId: user.id },
+    select: {
+      companyId: true,
+      role: true,
+      Company: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  const companiesResolved = userCompaniesWithName.map((uc) => ({
+    id: uc.Company?.id ?? uc.companyId,
+    name: uc.Company?.name ?? `Empresa ${uc.companyId.slice(0, 6)}…`,
+    role: uc.role,
+  }));
 
   // LEER cookie (no escribir aquí)
   const jar = await cookies(); // ✅ En Next 15 es async
@@ -174,6 +198,11 @@ export async function getBootstrapData(): Promise<BootstrapData> {
       })
     : [];
 
+  // ✅ NUEVO: alias cómodo para el cliente
+  const activeCompanyResolved = activeCompany
+    ? { id: activeCompany.id, name: activeCompany.name }
+    : null;
+
   return {
     user: {
       id: user.id,
@@ -185,7 +214,8 @@ export async function getBootstrapData(): Promise<BootstrapData> {
       timezone: user.timezone ?? null,
       onboardingStatus: (user.onboardingStatus as any) ?? "PENDING",
     },
-    companies: userCompanies,
+    companies: userCompanies,            // ← no lo tocamos (compatibilidad)
+    companiesResolved,                   // ← NUEVO: con nombre
     activeCompany: activeCompany
       ? {
           id: activeCompany.id,
@@ -201,6 +231,7 @@ export async function getBootstrapData(): Promise<BootstrapData> {
           lastSyncAt: activeCompany.lastSyncAt ?? null,
         }
       : null,
+    activeCompanyResolved,               // ← NUEVO: alias {id, name}
     locations,
     connections,
   };

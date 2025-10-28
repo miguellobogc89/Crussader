@@ -2,6 +2,8 @@
 
 import { Notification, Review, User } from "@prisma/client";
 import { prismaRaw } from "@/lib/prisma";
+// 👇 Asegura que apunta al index del directorio
+import { renderTemplate } from "@/lib/notifications/templates/index";
 
 type NotificationTriggerPayload =
   | { model: "Review"; action: "create"; data: Partial<Review> & { id: string } }
@@ -30,7 +32,6 @@ async function handleReviewCreated(
   const reviewId = review.id ?? null;
   let accountId: string | null = null;
 
-  // Obtener account_id a través de la relación con Company
   try {
     const company = await prismaRaw.company.findUnique({
       where: { id: review.companyId ?? "" },
@@ -41,6 +42,14 @@ async function handleReviewCreated(
     console.warn(`[handleReviewCreated] No se pudo obtener accountId:`, error);
   }
 
+  // ⬇️ Render + trazas
+  const tpl = await renderTemplate("review_created", review);
+  console.log("[notifications] template result (review_created):", tpl);
+
+  // ⬇️ Forzamos valores seguros (nunca undefined)
+  const subject = tpl?.subject ?? "Nueva reseña";
+  const body = tpl?.body ?? "";
+
   return await prismaRaw.notification.create({
     data: {
       type: "review_created",
@@ -49,11 +58,13 @@ async function handleReviewCreated(
       accountId,
       locationId,
       reviewId,
-      userId: null, // aún no asociamos usuario a una review
+      userId: null,
       metadata: {
         provider: review.provider ?? null,
         companyId: review.companyId ?? null,
       },
+      subject,
+      body,
     },
   });
 }

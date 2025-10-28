@@ -15,7 +15,7 @@ import {
   Globe,
   UserCheck,
 } from "lucide-react";
-import { ResponsePreviewPanel } from "@/app/components/reviews/settings/ResponsePreviewPanel";
+import { ResponsePreviewPanel } from "@/app/components/reviews/settings/sections/ResponsePreviewPanel";
 import type { ResponseSettings } from "@/app/schemas/response-settings";
 
 // Secciones
@@ -38,7 +38,6 @@ const defaultSettings: ResponseSettings = {
   ...defaultResponseSettings,
 
   // Valores específicos para esta demo/ejemplo
-  businessName: "Heladería Brumazul",
   sector: "Restauración - Heladería",
   standardSignature: "— Equipo Heladería Brumazul",
 

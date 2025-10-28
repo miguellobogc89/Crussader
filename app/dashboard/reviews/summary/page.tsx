@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import ReviewsToolbar from "@/app/components/reviews/ReviewsToolbar";
 import { type Establishment } from "@/app/components/establishments/EstablishmentTabs";
-import EstablishmentKpis from "@/app/components/establishments/EstablishmentKpis";
 import { ReviewCard } from "@/app/components/reviews/ReviewCard";
 import { useSectionLoading } from "@/hooks/useSectionLoading";
-import { CompanyLocationShell } from "@/app/components/crussader/CompanyLocationShell";
-import type { LocationLite } from "@/app/components/crussader/LocationSelector";
+import LocationSelector, { type LocationLite } from "@/app/components/crussader/LocationSelector";
+import { useBootstrapData } from "@/app/providers/bootstrap-store";
 
 type ReviewForCard = {
   id: string;
@@ -45,6 +43,9 @@ export default function ReviewsSummaryPage() {
   const { loading, setLoading, SectionWrapper } = useSectionLoading(false);
   const gridTopRef = useRef<HTMLDivElement | null>(null);
 
+  const boot = useBootstrapData();
+  const companyId = boot?.activeCompany?.id ?? null;
+
   useEffect(() => {
     if (!activeEst?.id) return;
     let cancelled = false;
@@ -73,8 +74,10 @@ export default function ReviewsSummaryPage() {
     <div className="py-6 sm:py-8">
       <div className="w-full bg-white rounded-lg border px-3 sm:px-4 py-3 sm:py-4 mb-6 sm:mb-8">
         <div className="flex items-end justify-between gap-3">
-          <CompanyLocationShell
-            onChange={({ locationId, location }) => {
+          {/* ✅ Sustituido por LocationSelector */}
+          <LocationSelector
+            companyId={companyId}
+            onSelect={(locationId, location) => {
               if (locationId && location) {
                 setActiveEst(makeEstablishmentFromLocation(location));
                 setPage(1);
@@ -103,7 +106,7 @@ export default function ReviewsSummaryPage() {
       {/* KPIs y grid (usa tus componentes tal como tenías) */}
       {/* ...tu código previo para KPIs, toolbar y grid... */}
       <SectionWrapper topPadding="pt-6 sm:pt-10">
-        <div ref={gridTopRef} className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+        <div ref={gridTopRef} className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
           {reviews.map(r => <ReviewCard key={r.id} review={r} />)}
           {!loading && reviews.length === 0 && (
             <div className="col-span-full text-muted-foreground">No hay reseñas.</div>

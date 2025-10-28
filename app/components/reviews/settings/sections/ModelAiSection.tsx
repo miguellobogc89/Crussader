@@ -1,22 +1,7 @@
-// app/components/reviews/settings/sections/ModelAiSection.tsx
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/app/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/app/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
 import { Label } from "@/app/components/ui/label";
-import { Sparkles } from "lucide-react";
 import type { ResponseSettings } from "@/app/schemas/response-settings";
 import AnimatedSlider from "@/app/components/crussader/UX/controls/AnimatedSlider";
 
@@ -35,52 +20,39 @@ export function ModelAiSection({
   ];
 
   return (
-    <section id="model">
-      <Card className="border-none shadow-elegant bg-white/60 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Modelo y creatividad (IA)
-          </CardTitle>
-          <CardDescription>Configuración técnica del modelo de IA</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Modelo */}
-          <div className="space-y-2">
-            <Label>Modelo</Label>
-            <Select
-              value={settings.model}
-              onValueChange={(value) =>
-                onUpdate({ model: value as ResponseSettings["model"] })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="gpt-4o">GPT-4o (Recomendado)</SelectItem>
-                <SelectItem value="gpt-4o-mini">GPT-4o Mini (Más rápido)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    <>
+      {/* Modelo */}
+      <div className="space-y-2">
+        <Label>Modelo</Label>
+        <Select
+          value={settings.model}
+          onValueChange={(value) => onUpdate({ model: value as ResponseSettings["model"] })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Selecciona modelo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="gpt-4o">GPT-4o (Recomendado)</SelectItem>
+            <SelectItem value="gpt-4o-mini">GPT-4o Mini (Más rápido)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-          {/* Creatividad */}
-          <div className="space-y-3">
-            <Label>Creatividad / Temperatura</Label>
-            <AnimatedSlider
-              id="creativity-slider"
-              value={settings.creativity}
-              onChange={(value) => onUpdate({ creativity: value })}
-              options={creativityOptions}
-              gradientFromTo="from-slate-400 to-violet-400"
-              thicknessPx={12}
-              widthPercent={100}
-              showLabels={true}
-              emphasizeSelected={true}
-            />
-          </div>
-        </CardContent>
-      </Card>
-    </section>
+      {/* Creatividad */}
+      <div className="space-y-3 mt-6">
+        <Label>Creatividad / Temperatura</Label>
+        <AnimatedSlider
+          id="creativity-slider"
+          value={settings.creativity}
+          onChange={(value) => onUpdate({ creativity: value })}
+          options={creativityOptions}
+          gradientFromTo="from-slate-400 to-violet-400"
+          thicknessPx={12}
+          widthPercent={100}
+          showLabels={true}
+          emphasizeSelected={true}
+        />
+      </div>
+    </>
   );
 }

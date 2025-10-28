@@ -1,3 +1,4 @@
+// lib/ai/reviews/prompt/promptBuilder.ts
 import type { ResponseSettings } from "@/app/schemas/response-settings";
 
 const TONES = ["sereno", "neutral", "profesional", "cercano", "amable", "entusiasta"] as const;
@@ -9,10 +10,12 @@ const LENGTH_HINTS: Record<number, string> = {
   2: "Medio (3-5 frases).",
 };
 
-function pickStarBucket(rating: number) {
-  if (rating <= 2) return "1-2" as const;
-  if (rating === 3) return "3" as const;
-  return "4-5" as const;
+type Bucket = "1-2" | "3" | "4-5";
+
+function pickStarBucket(rating: number): Bucket {
+  if (rating <= 2) return "1-2";
+  if (rating === 3) return "3";
+  return "4-5";
 }
 
 function decideLanguage(cfg: ResponseSettings, detected?: string | null) {
@@ -34,7 +37,7 @@ export function buildMessagesFromSettings(
   const lang = decideLanguage(cfg, review.languageCode);
   const toneName = TONES[cfg.tone] ?? "neutral";
   const emojiHint = EMOJI_HINT[cfg.emojiIntensity] ?? "pocos emojis";
-  const bucket = pickStarBucket(review.rating);
+  const bucket: Bucket = pickStarBucket(review.rating);
   const starCfg = cfg.starSettings[bucket];
 
   const objectiveMap: Record<string, Record<"es" | "en" | "pt", string>> = {
@@ -48,14 +51,18 @@ export function buildMessagesFromSettings(
   const sigRaw = (cfg.standardSignature ?? "").trim();
   const finalSignature = sigRaw ? (sigRaw.startsWith("—") ? sigRaw : `— ${sigRaw}`) : "";
 
-  // CTA según reglas
+  // CTA según reglas (usa ctaByRating por bucket)
   let cta = "";
-  const shouldCTA =
+  const ruleAllows =
     cfg.showCTAWhen === "always" ||
-    (cfg.showCTAWhen === "below3" && review.rating <= 3) ||
+    (cfg.showCTAWhen === "below3" && review.rating < 3) ||
     (cfg.showCTAWhen === "above4" && review.rating >= 4);
-  if (shouldCTA && starCfg.enableCTA && cfg.ctaText?.trim()) {
-    cta = cfg.ctaText.trim();
+
+  const ctaCfg = cfg.ctaByRating?.[bucket];
+  if (ruleAllows && starCfg.enableCTA && ctaCfg?.text?.trim()) {
+    cta = ctaCfg.text.trim();
+    // Si quisieras empujar también el contacto al modelo, podrías añadir:
+    // if (ctaCfg.contact?.trim()) cta += ` (${ctaCfg.contact.trim()})`;
   }
 
   // Hints
@@ -66,7 +73,7 @@ export function buildMessagesFromSettings(
   const comment = (review.comment ?? "").trim();
 
   const system = [
-    `Eres un asistente que redacta respuestas a reseñas para "${cfg.businessName}" (${cfg.sector}).`,
+    `Eres un asistente que redacta respuestas a reseñas para  (${cfg.sector}).`,
     `Escribe en ${lang}. Usa el tratamiento de ${cfg.treatment === "tu" ? "tuteo" : "usted"}.`,
     `Tono: ${toneName}. Emplea ${emojiHint}, solo si encaja.`,
     `Objetivo principal: ${objective}.`,

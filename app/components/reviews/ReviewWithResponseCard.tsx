@@ -1,4 +1,4 @@
-// ReviewWithResponseCard.tsx
+// app/components/reviews/ReviewWithResponseCard.tsx
 "use client";
 
 import { useMemo, useState } from "react";

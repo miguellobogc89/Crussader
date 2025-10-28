@@ -1,14 +1,8 @@
+// app/components/reviews/settings/sections/ResponsePreviewPanel.tsx
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
-import { Star, MessageCircle, Bot, Sparkles } from "lucide-react";
+import { Star, Bot, Sparkles } from "lucide-react";
 import type { ResponseSettings } from "@/app/schemas/response-settings";
 import { SegmentedControl } from "@/app/components/ui/segmented-control";
 import { useMemo } from "react";
@@ -202,152 +196,136 @@ export function ResponsePreviewPanel({
   }, [selectedStar, settings]);
 
   return (
-    <Card className="border-none shadow-none bg-white sticky top-2">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5 text-primary" />
-              Preview de respuesta
-            </CardTitle>
-            <CardDescription>
-              Así se verá la respuesta con tu configuración para la selección actual
-            </CardDescription>
+    <div className="space-y-6">
+      {/* Selector de estrellas (va en el cuerpo ahora) */}
+      <div className="flex items-center justify-end">
+        <SegmentedControl
+          className="min-w-[180px] justify-end text-sm"
+          options={[
+            { value: "1", label: "1", icon: "⭐" },
+            { value: "3", label: "3", icon: "⭐" },
+            { value: "5", label: "5", icon: "⭐" },
+          ]}
+          value={String(selectedStar)}
+          onChange={(v) => onStarChange(parseInt(v, 10) as 1 | 3 | 5)}
+        />
+      </div>
+
+      {/* Badges de configuración */}
+      {showConfigBadges && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Configuración aplicada
+          </h4>
+
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline" className="text-xs">
+              {getLanguageFlag()} {settings.autoDetectLanguage ? "AUTO" : settings.language.toUpperCase()}
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              {settings.publishMode === "draft" ? "📄 Borrador" : "🚀 Publicación automática"}
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              Variantes: {settings.variantsToGenerate}
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              Modelo: {settings.model}
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              T: {settings.creativity}
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              Emojis: {settings.emojiIntensity}
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              Máx: {settings.maxCharacters} chars
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              CTA: {settings.showCTAWhen === "never" ? "Desactivado" : settings.showCTAWhen}
+            </Badge>
+            {settings.standardSignature?.trim() && (
+              <Badge variant="outline" className="text-xs">
+                Firma: activa
+              </Badge>
+            )}
           </div>
 
-          {/* Selector compacto, alineado a la derecha */}
-          <div className="pt-1">
-            <SegmentedControl
-              className="min-w-[180px] justify-end text-sm"
-              options={[
-                { value: "1", label: "1", icon: "⭐" },
-                { value: "3", label: "3", icon: "⭐" },
-                { value: "5", label: "5", icon: "⭐" },
-              ]}
-              value={String(selectedStar)}
-              onChange={(v) => onStarChange(parseInt(v, 10) as 1 | 3 | 5)}
-            />
+          <div className="text-xs text-muted-foreground">
+            Longitud: {block.lengthLabel} • Máx: {settings.maxCharacters} chars •
+            &nbsp;Tono: {TONE_LABELS[settings.tone] ?? "Neutral"}
           </div>
         </div>
-      </CardHeader>
+      )}
 
-      <CardContent className="space-y-8">
-        {/* Badges de configuración */}
-        {showConfigBadges && (
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium flex items-center gap-2">
-              <Sparkles className="h-4 w-4" />
-              Configuración aplicada
-            </h4>
-
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className="text-xs">
-                {getLanguageFlag()} {settings.autoDetectLanguage ? "AUTO" : settings.language.toUpperCase()}
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                {settings.publishMode === "draft" ? "📄 Borrador" : "🚀 Publicación automática"}
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                Variantes: {settings.variantsToGenerate}
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                Modelo: {settings.model}
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                T: {settings.creativity}
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                Emojis: {settings.emojiIntensity}
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                Máx: {settings.maxCharacters} chars
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                CTA: {settings.showCTAWhen === "never" ? "Desactivado" : settings.showCTAWhen}
-              </Badge>
-              {settings.standardSignature?.trim() && (
-                <Badge variant="outline" className="text-xs">
-                  Firma: activa
-                </Badge>
-              )}
+      {/* Bloque de preview */}
+      <div className="rounded-xl border overflow-hidden">
+        <div className="bg-muted/30 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex">
+              {[...Array(5)].map((_, i) => (
+                <Star
+                  key={i}
+                  className={
+                    i < (block.star === 1 ? 1 : block.star === 3 ? 3 : 5)
+                      ? "h-4 w-4 fill-yellow-400 text-yellow-400"
+                      : "h-4 w-4 text-muted-foreground"
+                  }
+                />
+              ))}
             </div>
-
-            <div className="text-xs text-muted-foreground">
-              Longitud: {block.lengthLabel} • Máx: {settings.maxCharacters} chars •
-              &nbsp;Tono: {TONE_LABELS[settings.tone] ?? "Neutral"}
-            </div>
+            <Badge variant="outline" className="text-xs">
+              Ejemplo {block.star}★
+            </Badge>
+            <Badge variant="secondary" className="text-xs">
+              Longitud: {block.lengthLabel}
+            </Badge>
           </div>
-        )}
+          <div className="text-xs px-2 py-1 rounded-md border bg-primary/10 border-primary/30 text-primary">
+            {block.star} ⭐
+          </div>
+        </div>
 
-        {/* Bloque de preview */}
-        <div className="rounded-xl border overflow-hidden">
-          <div className="bg-muted/30 p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex">
-                {[...Array(5)].map((_, i) => (
-                  <Star
-                    key={i}
-                    className={
-                      i < (block.star === 1 ? 1 : block.star === 3 ? 3 : 5)
-                        ? "h-4 w-4 fill-yellow-400 text-yellow-400"
-                        : "h-4 w-4 text-muted-foreground"
-                    }
-                  />
-                ))}
-              </div>
-              <Badge variant="outline" className="text-xs">
-                Ejemplo {block.star}★
-              </Badge>
+        <div className="px-4 pt-4">
+          <p className="text-sm font-medium">{sampleReviewByStar[block.star].title}</p>
+          <p className="text-sm text-muted-foreground mt-1">“{sampleReviewByStar[block.star].text}”</p>
+          <p className="text-xs text-muted-foreground mt-2">— Cliente Ejemplo</p>
+        </div>
+
+        <div className="m-4 mt-3 rounded-lg border bg-gradient-to-br from-primary/5 to-primary/10 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Bot className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium text-primary">Respuesta generada</span>
+            {block.showCTA && (
               <Badge variant="secondary" className="text-xs">
-                Longitud: {block.lengthLabel}
+                CTA
               </Badge>
-            </div>
-            <div className="text-xs px-2 py-1 rounded-md border bg-primary/10 border-primary/30 text-primary">
-              {block.star} ⭐
-            </div>
+            )}
+            <Badge variant="outline" className="text-[10px]">
+              Bucket: {block.bucket}
+            </Badge>
           </div>
 
-          <div className="px-4 pt-4">
-            <p className="text-sm font-medium">{sampleReviewByStar[block.star].title}</p>
-            <p className="text-sm text-muted-foreground mt-1">“{sampleReviewByStar[block.star].text}”</p>
-            <p className="text-xs text-muted-foreground mt-2">— Cliente Ejemplo</p>
+          <div className="whitespace-pre-wrap text-sm leading-relaxed">
+            {block.response}
           </div>
 
-          <div className="m-4 mt-3 rounded-lg border bg-gradient-to-br from-primary/5 to-primary/10 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Bot className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium text-primary">Respuesta generada</span>
-              {block.showCTA && (
-                <Badge variant="secondary" className="text-xs">
-                  CTA
-                </Badge>
-              )}
+          {/* Prompt DEV */}
+          <div className="mt-4 rounded-md border bg-amber-50/60 p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-amber-900">
+                Prompt (solo DEV)
+              </span>
               <Badge variant="outline" className="text-[10px]">
-                Bucket: {block.bucket}
+                {settings.model} • T={settings.creativity} • Var={settings.variantsToGenerate}
               </Badge>
             </div>
-
-            <div className="whitespace-pre-wrap text-sm leading-relaxed">
-              {block.response}
-            </div>
-
-            {/* Prompt DEV */}
-            <div className="mt-4 rounded-md border bg-amber-50/60 p-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-amber-900">
-                  Prompt (solo DEV)
-                </span>
-                <Badge variant="outline" className="text-[10px]">
-                  {settings.model} • T={settings.creativity} • Var={settings.variantsToGenerate}
-                </Badge>
-              </div>
-              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-[11px] leading-snug text-amber-900">
-                {block.devPrompt}
-              </pre>
-            </div>
+            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-[11px] leading-snug text-amber-900">
+              {block.devPrompt}
+            </pre>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

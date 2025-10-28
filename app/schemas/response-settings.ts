@@ -9,7 +9,6 @@ const CTAConfigSchema = z.object({
 });
 
 export const ResponseSettingsSchema = z.object({
-  businessName: z.string(),
   sector: z.string(),
   treatment: z.enum(["tu", "usted"]),
   tone: z.number().int().min(0).max(5),

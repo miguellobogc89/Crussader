@@ -36,7 +36,7 @@ interface ReviewCardProps {
 /** “hace X”: días -> semanas (1-3) -> 1 mes */
 function timeAgo(dateStr: string) {
   const dt = new Date(dateStr);
-  if (isNaN(dt.getTime())) return ""; // si no parsea, no mostramos nada
+  if (isNaN(dt.getTime())) return "";
   const now = new Date();
   const diffMs = now.getTime() - dt.getTime();
   const d = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -49,7 +49,7 @@ function timeAgo(dateStr: string) {
   if (w === 1) return "hace 1 semana";
   if (w <= 3) return `hace ${w} semanas`;
 
-  return "hace 1 mes"; // simplificado tal y como pediste
+  return "hace 1 mes";
 }
 
 const StarRating = ({ rating }: { rating: number }) => (
@@ -71,13 +71,7 @@ const StarRating = ({ rating }: { rating: number }) => (
   </div>
 );
 
-const StatusBadge = ({
-  status,
-  edited,
-}: {
-  status: UIStatus;
-  edited?: boolean;
-}) => {
+const StatusBadge = ({ status, edited }: { status: UIStatus; edited?: boolean }) => {
   const variants: Record<UIStatus, string> = {
     pending: "bg-[hsl(var(--pending))] text-[hsl(var(--pending-foreground))]",
     published: "bg-[hsl(var(--published))] text-[hsl(var(--published-foreground))]",
@@ -93,15 +87,10 @@ const StatusBadge = ({
 
 export function ReviewCard({ review, businessResponse, responses }: ReviewCardProps) {
   // =======================
-  // Estado para lista/índice
+  // Estado lista/índice
   // =======================
   const initialList = useMemo<BusinessResponse[]>(
-    () =>
-      responses?.length
-        ? responses
-        : businessResponse
-        ? [businessResponse]
-        : [],
+    () => (responses?.length ? responses : businessResponse ? [businessResponse] : []),
     [responses, businessResponse]
   );
 
@@ -125,6 +114,7 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
 
   const hasResponse = respText.trim().length > 0;
   const buttonsDisabled = loading || published;
+  const isPublishedView = published && !isEditing;
 
   // Sync cuando cambia el índice/actual
   useEffect(() => {
@@ -157,10 +147,7 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
         const resAll = await fetch(`/api/reviews/${review.id}/responses`, { cache: "no-store" });
         if (resAll.ok) {
           const json = await resAll.json();
-          const arr: BusinessResponse[] =
-            json?.responses ??
-            (Array.isArray(json) ? json : []) ??
-            [];
+          const arr: BusinessResponse[] = json?.responses ?? (Array.isArray(json) ? json : []) ?? [];
           if (!cancelled && arr.length) {
             setList(arr);
             setIdx(0);
@@ -168,7 +155,6 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
           }
         }
 
-        // Fallback: latest
         const res = await fetch(`/api/reviews/${review.id}/responses?latest=1`, { cache: "no-store" });
         if (!res.ok) return;
         const json = await res.json();
@@ -180,7 +166,9 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
       } catch {}
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [review.id]);
 
@@ -213,7 +201,6 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
       let created: BusinessResponse | null = json?.response ?? null;
 
       if (!created?.content) {
-        // Fallback a latest si el backend no devolvió la respuesta creada
         const last = await fetch(`/api/reviews/${review.id}/responses?latest=1`, { cache: "no-store" })
           .then((r) => (r.ok ? r.json() : null))
           .catch(() => null);
@@ -270,9 +257,7 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
 
       setList((prev) =>
         prev.map((r, i) =>
-          i === idx
-            ? { ...r, ...(updated ?? { content: respText, edited: true, status: "draft" }) }
-            : r
+          i === idx ? { ...r, ...(updated ?? { content: respText, edited: true, status: "draft" }) } : r
         )
       );
       setRespStatus("draft");
@@ -329,11 +314,7 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
         return;
       }
 
-      setList((prev) =>
-        prev.map((r, i) =>
-          i === idx ? { ...r, status: "published", published: true } : r
-        )
-      );
+      setList((prev) => prev.map((r, i) => (i === idx ? { ...r, status: "published", published: true } : r)));
       setRespStatus("published");
       setPublished(true);
       setIsEditing(false);
@@ -381,7 +362,6 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
                 <h4 className="font-semibold text-foreground text-sm sm:text-base">{review.author}</h4>
                 <div className="flex items-center gap-2 mt-0.5 sm:mt-1">
                   <StarRating rating={review.rating} />
-                  {/* quitamos la fecha en texto plano aquí */}
                 </div>
               </div>
             </div>
@@ -402,14 +382,15 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
 
         {/* Respuesta del negocio */}
         <div className="space-y-2.5 sm:space-y-3">
-          <div className="flex items-center justify-between">
-            <h5 className="text-sm font-medium text-foreground">Respuesta del negocio</h5>
-            {hasResponse && <StatusBadge status={respStatus} edited={respEdited} />}
-          </div>
+          <h5 className="text-sm font-medium text-foreground">Respuesta del negocio</h5>
 
-          {list.length > 0 ? (
+          {/* ✅ Vista publicada: solo mensaje, sin badges ni botones */}
+          {isPublishedView ? (
+            <p className="text-[13px] sm:text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+              {respText}
+            </p>
+          ) : list.length > 0 ? (
             <>
-              {/* Textarea (editable si isEditing) */}
               <textarea
                 className="w-full min-h-[96px] sm:min-h-[112px] rounded-lg border border-border/30 bg-muted/50 p-2.5 sm:p-3 text-[13px] sm:text-sm text-foreground/90 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
                 value={respText}
@@ -417,25 +398,20 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
                 disabled={!isEditing || buttonsDisabled}
               />
 
+              {/* Badge solo si no está publicada */}
+              {hasResponse && !published && <StatusBadge status={respStatus} edited={respEdited} />}
+
               <div className="flex gap-2 pt-1.5 sm:pt-2">
-                {/* Publicar */}
                 <Button
                   size="sm"
                   className="flex-1 bg-[hsl(var(--published))] hover:opacity-90 text-[hsl(var(--published-foreground))] disabled:opacity-60 disabled:cursor-not-allowed"
                   onClick={publish}
                   disabled={buttonsDisabled || isEditing}
                 >
-                  {loading ? (
-                    <Loader2 size={14} className="mr-0 sm:mr-1 animate-spin" />
-                  ) : (
-                    <Send size={14} className="mr-0 sm:mr-1" />
-                  )}
-                  <span className="hidden sm:inline">
-                    {published ? "Publicado" : "Publicar"}
-                  </span>
+                  {loading ? <Loader2 size={14} className="mr-0 sm:mr-1 animate-spin" /> : <Send size={14} className="mr-0 sm:mr-1" />}
+                  <span className="hidden sm:inline">{published ? "Publicado" : "Publicar"}</span>
                 </Button>
 
-                {/* Regenerar con icono borroso + spinner superpuesto */}
                 <Button
                   variant="outline"
                   size="sm"
@@ -444,14 +420,9 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
                   disabled={loading || published}
                 >
                   <span className="relative inline-flex items-center">
-                    {/* Icono base que se vuelve borroso cuando loading */}
-                    <RotateCcw
-                      size={14}
-                      className={`mr-0 sm:mr-1 transition ${loading ? "opacity-60 blur-[1px]" : ""}`}
-                    />
-                    {/* Spinner superpuesto centrado sobre el icono */}
+                    <RotateCcw size={14} className={`mr-0 sm:mr-1 transition ${loading ? "opacity-60 blur-[1px]" : ""}`} />
                     {loading && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 mr-0 sm:mr-1">
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2">
                         <Loader2 size={14} className="animate-spin" />
                       </span>
                     )}
@@ -461,7 +432,6 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
                   </span>
                 </Button>
 
-                {/* Editar / Guardar */}
                 {!isEditing ? (
                   <Button
                     variant="outline"
@@ -481,48 +451,46 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
                     onClick={saveEdit}
                     disabled={buttonsDisabled || respText.trim().length === 0}
                   >
-                    {loading ? (
-                      <Loader2 size={14} className="mr-0 sm:mr-1 animate-spin" />
-                    ) : (
-                      <Edit3 size={14} className="mr-0 sm:mr-1" />
-                    )}
+                    {loading ? <Loader2 size={14} className="mr-0 sm:mr-1 animate-spin" /> : <Edit3 size={14} className="mr-0 sm:mr-1" />}
                     <span className="hidden sm:inline">Guardar</span>
                   </Button>
                 )}
               </div>
 
               {/* Footer: paginación de respuestas */}
-              <div className="flex items-center justify-between pt-2.5 sm:pt-3">
-                <div className="text-[11px] sm:text-xs text-muted-foreground">
-                  {list.length ? `${idx + 1} / ${list.length}` : "0 / 0"}
+              {!published && (
+                <div className="flex items-center justify-between pt-2.5 sm:pt-3">
+                  <div className="text-[11px] sm:text-xs text-muted-foreground">
+                    {list.length ? `${idx + 1} / ${list.length}` : "0 / 0"}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={goPrev}
+                      disabled={isEditing || !canCycle}
+                      aria-label="Anterior"
+                      title="Anterior"
+                      className="h-8 w-8 rounded-full"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={goNext}
+                      disabled={isEditing || !canCycle}
+                      aria-label="Siguiente"
+                      title="Siguiente"
+                      className="h-8 w-8 rounded-full"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    onClick={goPrev}
-                    disabled={isEditing || !canCycle}
-                    aria-label="Anterior"
-                    title="Anterior"
-                    className="h-8 w-8 rounded-full"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    onClick={goNext}
-                    disabled={isEditing || !canCycle}
-                    aria-label="Siguiente"
-                    title="Siguiente"
-                    className="h-8 w-8 rounded-full"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+              )}
             </>
           ) : (
             <div className="bg-muted/30 rounded-lg p-4 border border-dashed border-border/50 text-center">
@@ -532,11 +500,7 @@ export function ReviewCard({ review, businessResponse, responses }: ReviewCardPr
                 onClick={handleGenerate}
                 disabled={loading}
               >
-                {loading ? (
-                  <Loader2 size={14} className="mr-1 animate-spin" />
-                ) : (
-                  <RotateCcw size={14} className="mr-1" />
-                )}
+                {loading ? <Loader2 size={14} className="mr-1 animate-spin" /> : <RotateCcw size={14} className="mr-1" />}
                 {loading ? "Generando…" : "Generar respuesta"}
               </Button>
             </div>

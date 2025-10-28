@@ -29,17 +29,27 @@ export function getPromptPreview({ review, settings }: GetPromptPreviewOptions) 
 
   const hasCTA = !!(starConfig?.enableCTA && ctaConfig?.text?.trim());
 
-  // Mensaje system
-  const system = `Eres un asistente que redacta respuestas a reseñas de clientes. Usa un tono ${tone}, con una longitud ${length}, en idioma ${language}, tratamiento en "${settings.treatment}". Responde de forma empática, evita datos falsos y sigue instrucciones del negocio.`;
+  // Normalizaciones ligeras
+  const sector = (settings.sector ?? "").trim();
+  const signature = (settings.standardSignature ?? "").trim();
 
-  // Mensaje user
+  // Mensaje system — instrucciones al modelo
+  const system = [
+    `Eres un asistente que redacta respuestas a reseñas de clientes.`,
+    `Usa un tono ${tone}, con una longitud ${length}, en idioma ${language}, tratamiento en "${settings.treatment}".`,
+    `El negocio es del tipo "${sector || "no especificado"}".`,
+    `Responde de forma empática y natural, evita datos falsos y no inventes información.`,
+    `⚠️ Importante: NO incluyas la firma del negocio en el texto. La firma se añadirá después del salto de línea.`,
+  ].join(" ");
+
+  // Mensaje user — caso concreto
   const userLines = [
     `Reseña: "${review.content}"`,
     `Objetivo: ${starConfig?.objective || "responder adecuadamente"}`,
     `Tono: ${tone} (nivel ${settings.tone})`,
     `Longitud: ${length} (${targetChars} caracteres máximo)`,
     `Emojis: intensidad ${settings.emojiIntensity}`,
-    `Firma estándar: ${settings.standardSignature || "Ninguna"}`,
+    `Firma estándar (añadida después, no repetir): ${signature || "Ninguna"}`,
     `Incluir CTA: ${hasCTA ? `${ctaConfig?.text} (${ctaConfig?.channel})` : "No"}`,
     `Idioma: ${language}`,
     `Tratamiento: "${settings.treatment}"`,
@@ -62,7 +72,8 @@ export function getPromptPreview({ review, settings }: GetPromptPreviewOptions) 
       maxCharacters: targetChars,
       formality: settings.treatment,
       hasCTA,
-      signature: settings.standardSignature,
+      signature,
+      sector,
     },
   };
 }
