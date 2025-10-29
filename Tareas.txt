@@ -7,7 +7,6 @@ Roadmap:
 - La página de reviews tendra un tabmenu con las reseñas, analytics seguiminto, analytics sentimiento y configuración -- OK
 - Configuración mostrará ajustes de respuesta, notificaciones y suscripción -- OK
 - Las respuestas de guardan en la base de datos y la review se marca como contestada -- OK
-
 - La configuración de respuestas debe funcionar correctamente 
 
 - Automatizar la autocontestación y que ponga, respuesta contestada automaticamente
