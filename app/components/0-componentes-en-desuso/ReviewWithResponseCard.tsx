@@ -2,7 +2,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Stars } from "./Stars";
+import { Stars } from "@/app/components/reviews/summary/ReviewCard/Stars";
 // import ActionButton from "./ActionButton";  // ya no lo usamos
 import {
   ChevronLeft,

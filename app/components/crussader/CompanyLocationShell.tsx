@@ -59,7 +59,6 @@ export function CompanyLocationShell({
     <div className={`flex gap-2 items-end ${className}`}>
       <LocationSelector
         key={companyId ?? "no-company"}
-        companyId={companyId}
         onSelect={(locationId, location) => {
           if (!onChange) return;
           // Emitimos siempre el payload con la company del bootstrap
@@ -70,7 +69,6 @@ export function CompanyLocationShell({
             location,
           });
         }}
-        className={disabled ? "opacity-70 pointer-events-none" : ""}
       />
     </div>
   );
