@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import {
   ScatterChart,
@@ -26,7 +26,7 @@ type TopicApi = {
   description?: string | null;
   avg_rating?: number | null;  // 0..5
   percent?: number;            // 0..1
-  concepts_count?: number;     // lo mostramos como "reviews"
+  concepts_count?: number;
   review_count?: number;
   avg_age_days?: number | null;
   avgAgeDays?: number | null;
@@ -101,12 +101,41 @@ function deriveAvgAgeDays(t: TopicApi): number | null {
   return diff / (1000 * 60 * 60 * 24);
 }
 
-/* ================== Tooltip / Label ================== */
-const CustomTooltip = ({ active, payload }: any) => {
-  if (!active || !payload || !payload.length) return null;
+/* ================== Tooltip con fade ================== */
+const FadingTooltip = ({ active, payload }: any) => {
+  // mantenemos el contenido para permitir fade-out
+  const [visible, setVisible] = useState(false);
+  const hideTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (active) {
+      if (hideTimer.current) {
+        window.clearTimeout(hideTimer.current);
+        hideTimer.current = null;
+      }
+      const t = window.setTimeout(() => setVisible(true), 10);
+      return () => window.clearTimeout(t);
+    } else {
+      setVisible(false);
+    }
+  }, [active]);
+
+  if (!payload || !payload.length) return null;
   const data: TopicData & { x?: number; y?: number; z?: number } = payload[0].payload;
+
+  if (!active && hideTimer.current == null) {
+    hideTimer.current = window.setTimeout(() => {
+      hideTimer.current && window.clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }, 160);
+  }
+
   return (
-    <div className="bg-popover/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg max-w-xs">
+    <div
+      className={`bg-popover/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-lg max-w-xs transition-opacity duration-150 ${
+        visible ? "opacity-100" : "opacity-0"
+      }`}
+    >
       <p className="font-semibold text-sm text-foreground mb-2">{data.topic}</p>
       <div className="space-y-1 text-xs">
         <div className="flex justify-between gap-4">
@@ -178,6 +207,31 @@ const SafePointLabel = (props: any) => {
   );
 };
 
+/* ================== Placeholder ================== */
+function ChartPlaceholder() {
+  return (
+    <div className="w-full relative overflow-hidden rounded-md" style={{ aspectRatio: "4 / 3" }}>
+      <div className="absolute inset-0">
+        {/* grid muy fino y claro */}
+        <svg width="100%" height="100%">
+          <defs>
+            <pattern id="dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M20 0 H0 V20" stroke="hsl(var(--border))" strokeDasharray="2 4" opacity="0.15" />
+            </pattern>
+          </defs>
+          <rect x="0" y="0" width="100%" height="100%" fill="url(#dots)" />
+        </svg>
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="inline-block w-3 h-3 rounded-full border border-border animate-pulse" />
+          Cargando datos…
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ================== Componente ================== */
 export default function BubbleInsightsChart({
   companyId = null,
@@ -190,13 +244,43 @@ export default function BubbleInsightsChart({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [totalReviews, setTotalReviews] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [cw, setCw] = useState(0); // chart width
+
+  // medir ancho para escalar márgenes, fuentes y tamaños
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setCw(entry.contentRect.width || 0);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // escala (clamp) respecto a un ancho base de 900px
+  const baseW = 900;
+  const s = Math.max(0.65, Math.min(1, cw / baseW));           // escala general
+  const fs = Math.max(10, Math.round(12 * s));                  // fuente ticks
+  const mTop = Math.round(40 * s);
+  const mLR  = Math.round(56 * s);
+  const mBot = Math.round(56 * s);
+  const strokeW = Math.max(1, Math.round(2 * s));               // grosor bordes de burbuja
+  const showRefLabel = cw >= 380;                                // evita solapes en móviles muy estrechos
+  const bubbleScale = Math.max(0.55, Math.min(1, cw / baseW));   // escala del área de burbuja
+  const zMin = Math.round(100 * bubbleScale);
+  const zMax = Math.round(14000 * bubbleScale);
 
   const hasFilters = !!companyId || !!locationId;
 
   const url = useMemo(() => {
     const p = new URLSearchParams();
-    if (companyId) p.set("companyId", companyId);
     if (locationId) p.set("locationId", locationId);
+    else if (companyId) p.set("companyId", companyId);
     if (from) p.set("from", from);
     if (to) p.set("to", to);
     p.set("previewN", String(previewN));
@@ -205,16 +289,16 @@ export default function BubbleInsightsChart({
 
   useEffect(() => {
     let cancelled = false;
-
     async function load() {
       try {
+        setIsLoading(true);
         if (!hasFilters) {
+          // modo demo (no es "loading")
           setData(mockData);
           setErr(null);
           setTotalReviews(mockData.reduce((a, b) => a + (b.reviews || 0), 0));
           return;
         }
-
         setErr(null);
         const res = await fetch(url, { cache: "no-store" });
         const json = await res.json();
@@ -241,7 +325,7 @@ export default function BubbleInsightsChart({
               description: t.description ?? null,
               score,
               weight,
-              avgAge: deriveAvgAgeDays(t), // puede ser null
+              avgAge: deriveAvgAgeDays(t),
               reviews,
             };
           })
@@ -255,9 +339,10 @@ export default function BubbleInsightsChart({
           setData([]);
           setTotalReviews(0);
         }
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     }
-
     load();
     return () => {
       cancelled = true;
@@ -284,6 +369,8 @@ export default function BubbleInsightsChart({
     return { ...item, x: score, y: age, z: scaledSize };
   });
 
+  const showChart = !isLoading;
+
   return (
     <Card className="w-full bg-card border-border shadow-sm">
       <CardHeader className="pb-4">
@@ -293,7 +380,7 @@ export default function BubbleInsightsChart({
               Performance por Topic
             </CardTitle>
             <CardDescription className="text-xs text-muted-foreground leading-relaxed">
-              X = Puntuación (0-5) · Y = Antigüedad (días) · Tamaño = Peso %
+              X = Puntuación (1–5) · Y = Antigüedad (días) · Tamaño = Peso %
               {hasFilters && totalReviews ? ` · ${totalReviews} reviews totales` : ""}
               {err ? ` · Error: ${err}` : ""}
               {!hasFilters ? " · Modo demo (sin filtros)" : ""}
@@ -313,82 +400,89 @@ export default function BubbleInsightsChart({
       </CardHeader>
 
       <CardContent className="pt-0">
-        <div className={`w-full h-[420px] md:h-[480px] transition-opacity duration-300 ${data.length ? "opacity-100" : "opacity-0"}`}>
-          <ResponsiveContainer width="100%" height="100%" debounce={200}>
-            <ScatterChart margin={{ top: 40, right: 30, bottom: 50, left: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+        {!showChart ? (
+          <ChartPlaceholder />
+        ) : (
+          <div ref={containerRef} className="w-full" style={{ aspectRatio: "4 / 3" }}>
+            <ResponsiveContainer width="100%" height="100%" debounce={200}>
+              <ScatterChart margin={{ top: mTop, right: mLR, bottom: mBot, left: mLR }}>
+                {/* Grid: muy fino, muy claro y punteado */}
+                <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" opacity={0.15} />
 
-              <XAxis
-                type="number"
-                dataKey="x"
-                domain={[0, 5.2]}
-                ticks={[0, 1, 2, 3, 4, 5]}
-                stroke="hsl(var(--muted-foreground))"
-                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                tickLine={{ stroke: "hsl(var(--border))" }}
-              >
-                <Label
-                  value="Puntuación (0-5)"
-                  position="bottom"
-                  offset={20}
-                  style={{ fill: "hsl(var(--muted-foreground))", fontSize: 12, fontWeight: 500 }}
+                <XAxis
+                  type="number"
+                  dataKey="x"
+                  domain={[1, 5]} // mantiene 1–5
+                  ticks={[1, 2, 3, 4, 5]}
+                  allowDataOverflow={true}
+                  stroke="hsl(var(--muted-foreground))"
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: fs }}
+                  tickLine={{ stroke: "hsl(var(--border))", opacity: 0.4 }}
+                  axisLine={{ stroke: "hsl(var(--border))", opacity: 0.4 }}
+                >
+                  <Label
+                    value="Puntuación (1–5)"
+                    position="bottom"
+                    offset={Math.round(20 * s)}
+                    style={{ fill: "hsl(var(--muted-foreground))", fontSize: fs, fontWeight: 500 }}
+                  />
+                </XAxis>
+
+                {/* Y oculto por completo */}
+                <YAxis
+                  type="number"
+                  dataKey="y"
+                  reversed
+                  domain={[0, (dataMax: number) => Math.max(10, Math.ceil(dataMax + 5))]}
+                  hide
                 />
-              </XAxis>
 
-              <YAxis
-                type="number"
-                dataKey="y"
-                domain={[0, (dataMax: number) => Math.max(10, Math.ceil(dataMax + 5))]}
-                allowDataOverflow={false}
-                stroke="hsl(var(--muted-foreground))"
-                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                tickLine={{ stroke: "hsl(var(--border))" }}
-              >
-                <Label
-                  value="Antigüedad media (días)"
-                  angle={-90}
-                  position="left"
-                  offset={5}
-                  style={{ fill: "hsl(var(--muted-foreground))", fontSize: 12, fontWeight: 500 }}
+                {/* Control del tamaño – escalado responsive */}
+                <ZAxis type="number" dataKey="z" range={[zMin, zMax]} />
+
+                {/* Umbral crítico */}
+                <ReferenceLine
+                  x={3}
+                  stroke="hsl(var(--muted-foreground))"
+                  strokeDasharray="5 5"
+                  strokeOpacity={0.4}
+                  strokeWidth={1}
+                  label={
+                    showRefLabel
+                      ? { value: "Umbral crítico", position: "top", fill: "hsl(var(--muted-foreground))", fontSize: fs - 1 }
+                      : undefined
+                  }
                 />
-              </YAxis>
 
-              {/* Control del tamaño */}
-              <ZAxis type="number" dataKey="z" range={[200, 2000]} />
+                {/* Tooltip con fade (sin desplazamiento extraño) */}
+                <Tooltip
+                  content={<FadingTooltip />}
+                  cursor={false}
+                  wrapperStyle={{ outline: "none" }}
+                  allowEscapeViewBox={{ x: true, y: true }}
+                />
 
-              {/* Umbral crítico */}
-              <ReferenceLine
-                x={3}
-                stroke="hsl(var(--muted-foreground))"
-                strokeDasharray="5 5"
-                strokeOpacity={0.4}
-                strokeWidth={1.5}
-                label={{ value: "Umbral crítico", position: "top", fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-              />
-
-              <Tooltip content={<CustomTooltip />} cursor={false} />
-
-              <Scatter data={chartData} shape="circle" isAnimationActive={false}>
-                {/* Etiquetas robustas */}
-                <LabelList dataKey="topic" content={<SafePointLabel />} />
-                {chartData.map((entry, index) => {
-                  const sizeRatio = (entry.z - 200) / (2000 - 200);
-                  const baseAlpha = 0.4 + sizeRatio * 0.35;
-                  return (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={getColorByScore(entry.score, baseAlpha)}
-                      stroke={getColorByScore(entry.score, Math.min(baseAlpha * 1.8, 0.95))}
-                      strokeWidth={2}
-                      className="hover:stroke-[4] transition-all cursor-pointer hover:opacity-90"
-                      style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.15))" }}
-                    />
-                  );
-                })}
-              </Scatter>
-            </ScatterChart>
-          </ResponsiveContainer>
-        </div>
+                <Scatter data={chartData} shape="circle" isAnimationActive={false}>
+                  <LabelList dataKey="topic" content={<SafePointLabel />} />
+                  {chartData.map((entry, index) => {
+                    const sizeRatio = (entry.z - 200) / (2000 - 200);
+                    const baseAlpha = 0.2 + sizeRatio * 0.25; // relleno más transparente
+                    return (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={getColorByScore(entry.score, baseAlpha)}
+                        stroke={getColorByScore(entry.score, Math.min(baseAlpha * 2.0, 0.9))}
+                        strokeWidth={strokeW}
+                        className="hover:stroke-[3.5] transition-all cursor-pointer hover:opacity-90"
+                        style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.12))" }}
+                      />
+                    );
+                  })}
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+        )}
 
         {/* Leyenda */}
         <div className="mt-6 pt-4 border-t border-border/50">
@@ -397,15 +491,15 @@ export default function BubbleInsightsChart({
               <span className="text-muted-foreground font-medium">Color:</span>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full border border-border/50 shadow-sm" style={{ backgroundColor: getColorByScore(1, 0.7) }} />
+                  <div className="w-3 h-3 rounded-full border border-border/50 shadow-sm" style={{ backgroundColor: getColorByScore(1, 0.4) }} />
                   <span className="text-muted-foreground">Crítico</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full border border-border/50 shadow-sm" style={{ backgroundColor: getColorByScore(3, 0.7) }} />
+                  <div className="w-3 h-3 rounded-full border border-border/50 shadow-sm" style={{ backgroundColor: getColorByScore(3, 0.4) }} />
                   <span className="text-muted-foreground">Neutral</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full border border-border/50 shadow-sm" style={{ backgroundColor: getColorByScore(5, 0.7) }} />
+                  <div className="w-3 h-3 rounded-full border border-border/50 shadow-sm" style={{ backgroundColor: getColorByScore(5, 0.4) }} />
                   <span className="text-muted-foreground">Excelente</span>
                 </div>
               </div>

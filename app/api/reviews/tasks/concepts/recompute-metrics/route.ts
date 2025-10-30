@@ -1,4 +1,5 @@
 // app/api/reviews/tasks/concepts/recompute-metrics/route.ts
+// Destruir
 // ===================================================
 // Recalcula métricas de concept con soporte a ambos esquemas:
 // - review (minúscula, id uuid)

@@ -1,20 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 type Props = {
   reviewId: string;
   label?: string;
   className?: string;
+  onGenerated?: (response: {
+    id: string;
+    content: string;
+    status: string;
+    published: boolean;
+    createdAt: string | Date;
+    edited?: boolean;
+  }) => void;
 };
 
 export default function GenerateReviewResponseButton({
   reviewId,
   label = "Generar respuesta IA",
   className = "",
+  onGenerated,
 }: Props) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -27,25 +34,24 @@ export default function GenerateReviewResponseButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "generate",
-          tone: "cordial",        // configurable
-          lang: "es",             // configurable
-          templateId: "default-v1"
+          tone: "cordial",
+          lang: "es",
+          templateId: "default-v1",
         }),
+        cache: "no-store",
       });
 
       const data = await res.json();
-      if (!res.ok || !data?.ok) {
+      if (!res.ok || !data?.ok || !data?.response) {
         throw new Error(data?.error || "No se pudo generar la respuesta");
       }
 
       setMsg("Generada ✔");
-      // Fuerza refresco de los datos del server (App Router)
-      router.refresh();
+      onGenerated?.(data.response);
     } catch (e: any) {
       setMsg(`Error: ${String(e.message || e)}`);
     } finally {
       setLoading(false);
-      // Limpia el mensaje tras unos segundos (opcional)
       setTimeout(() => setMsg(null), 2500);
     }
   }

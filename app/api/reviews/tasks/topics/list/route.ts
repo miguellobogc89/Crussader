@@ -12,7 +12,7 @@ export async function GET(req: Request) {
     const previewN   = Math.max(1, Math.min(20, Number(url.searchParams.get("previewN") ?? 8)));
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 1) Total de reviews en el alcance (para %)
+    // 1) Total de reviews en alcance (para calcular percent)
     // ─────────────────────────────────────────────────────────────────────────
     let totalReviews = 0;
     {
@@ -22,8 +22,8 @@ export async function GET(req: Request) {
 
       if (companyId)  { whereParts.push(`r."companyId"  = $${i++}`); params.push(companyId); }
       if (locationId) { whereParts.push(`r."locationId" = $${i++}`); params.push(locationId); }
-      if (from)       { whereParts.push(`COALESCE(r."createdAtG", r."ingestedAt") >= $${i++}::timestamptz`); params.push(`${from}T00:00:00Z`); }
-      if (to)         { whereParts.push(`COALESCE(r."createdAtG", r."ingestedAt") <  $${i++}::timestamptz`); params.push(`${to}T00:00:00Z`); }
+      if (from)       { whereParts.push(`r."createdAtG" >= $${i++}::timestamptz`); params.push(`${from}T00:00:00Z`); }
+      if (to)         { whereParts.push(`r."createdAtG" <  $${i++}::timestamptz`); params.push(`${to}T00:00:00Z`); }
 
       const where = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
@@ -39,8 +39,7 @@ export async function GET(req: Request) {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 2) Resumen por topic con "centro de gravedad temporal" (half-life 14 días)
-    //    y cálculo de días desde ese timestamp ponderado (days_since_latest)
+    // 2) Resumen por topic + “centro de gravedad temporal” (half-life 14 días)
     // ─────────────────────────────────────────────────────────────────────────
     const topicWhereParts: string[] = [`c.topic_id IS NOT NULL`];
     const topicParams: any[] = [];
@@ -48,8 +47,8 @@ export async function GET(req: Request) {
 
     if (companyId)  { topicWhereParts.push(`r."companyId"  = $${j++}`); topicParams.push(companyId); }
     if (locationId) { topicWhereParts.push(`r."locationId" = $${j++}`); topicParams.push(locationId); }
-    if (from)       { topicWhereParts.push(`COALESCE(r."createdAtG", r."ingestedAt") >= $${j++}::timestamptz`); topicParams.push(`${from}T00:00:00Z`); }
-    if (to)         { topicWhereParts.push(`COALESCE(r."createdAtG", r."ingestedAt") <  $${j++}::timestamptz`); topicParams.push(`${to}T00:00:00Z`); }
+    if (from)       { topicWhereParts.push(`r."createdAtG" >= $${j++}::timestamptz`); topicParams.push(`${from}T00:00:00Z`); }
+    if (to)         { topicWhereParts.push(`r."createdAtG" <  $${j++}::timestamptz`); topicParams.push(`${to}T00:00:00Z`); }
 
     const topicWhere = topicWhereParts.length ? `WHERE ${topicWhereParts.join(" AND ")}` : "";
 
@@ -69,7 +68,7 @@ export async function GET(req: Request) {
         SELECT
           t.id AS topic_id,
           c.id AS concept_id,
-          COALESCE(c.updated_at, c.created_at) AS ts,
+          COALESCE(r."createdAtG", r."ingestedAt") AS ts,
           COUNT(DISTINCT c.review_id) AS n_reviews
         FROM topic t
         JOIN concept c ON c.topic_id = t.id
@@ -108,7 +107,6 @@ export async function GET(req: Request) {
           topic_id,
           -- días desde ese timestamp ponderado (double)
           GREATEST(0::double precision, EXTRACT(EPOCH FROM (NOW() - weighted_ts)) / 86400.0) AS days_since_latest,
-          -- exponemos el propio timestamp para debug/tooltip
           weighted_ts AS latest_concept_at
         FROM topic_time
       )
@@ -117,7 +115,7 @@ export async function GET(req: Request) {
         t.label                                         AS label,
         t.description                                   AS description,
         COALESCE(t.is_stable, false)                    AS is_stable,
-        COUNT(c.*)::int                                 AS concepts_count,
+        COUNT(DISTINCT c.id)::int                       AS concepts_count,
         COUNT(DISTINCT c.review_id)::int                AS review_count,
         ROUND(AVG(c.rating)::numeric, 2)::float         AS avg_rating,
         y.days_since_latest::double precision           AS days_since_latest,
@@ -134,22 +132,36 @@ export async function GET(req: Request) {
     );
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 3) preview_concepts + percent (impacto relativo) + compat fields
+    // 3) preview_concepts + percent (mismo filtro que arriba)
     // ─────────────────────────────────────────────────────────────────────────
     const topics = [];
     for (const r of rows) {
-      const concepts = await prisma.$queryRawUnsafe<{ id: string; label: string; avg_rating: number | null }[]>(
+      const previewWhereParts: string[] = [`c.topic_id = $1::uuid`];
+      const previewParams: any[] = [r.id];
+      let k = 2;
+
+      if (companyId)  { previewWhereParts.push(`rv."companyId"  = $${k++}`); previewParams.push(companyId); }
+      if (locationId) { previewWhereParts.push(`rv."locationId" = $${k++}`); previewParams.push(locationId); }
+      if (from)       { previewWhereParts.push(`rv."createdAtG" >= $${k++}::timestamptz`); previewParams.push(`${from}T00:00:00Z`); }
+      if (to)         { previewWhereParts.push(`rv."createdAtG" <  $${k++}::timestamptz`); previewParams.push(`${to}T00:00:00Z`); }
+
+      const previewWhere = `WHERE ${previewWhereParts.join(" AND ")}`;
+
+      const concepts = await prisma.$queryRawUnsafe<
+        { id: string; label: string; avg_rating: number | null }[]
+      >(
         `
         SELECT
-          c.id::text      AS id,
-          c.label         AS label,
-          c.rating        AS avg_rating
+          c.id::text  AS id,
+          c.label     AS label,
+          c.rating    AS avg_rating
         FROM concept c
-        WHERE c.topic_id = $1::uuid
+        JOIN "Review" rv ON rv.id = c.review_id
+        ${previewWhere}
         ORDER BY c.updated_at DESC NULLS LAST
-        LIMIT $2::int
+        LIMIT $${k}::int
         `,
-        r.id,
+        ...previewParams,
         previewN
       );
 
@@ -164,9 +176,9 @@ export async function GET(req: Request) {
         avg_rating: r.avg_rating,
         review_count: r.review_count,
         percent,
-        // compat (clientes antiguos leen avg_age_days):
+        // compat antiguo:
         avg_age_days: r.days_since_latest ?? null,
-        // nuevos campos explícitos:
+        // nuevos campos:
         days_since_latest: r.days_since_latest ?? null,
         latest_concept_at: r.latest_concept_at ?? null,
         preview_concepts: concepts,

@@ -6,7 +6,9 @@ import { generateAndStoreTopicDescription } from "./generateTopicDescription";
 /* ───────── Types ───────── */
 type ConceptRow = { id: string; label: string; rating: number | null; topic_id: string | null };
 type ConceptLite = { id: string; label: string };
-type LLMTopicsResponse = { topics: Array<{ topic_label?: string; label?: string; description?: string | null; members: string[] }> };
+type LLMTopicsResponse = {
+  topics: Array<{ topic_label?: string; label?: string; description?: string | null; members: string[] }>;
+};
 type CleanedTopic = { label: string; description: string | null; members: string[] };
 type ChatMsg = { role: "system" | "user" | "assistant"; content: string };
 
@@ -131,8 +133,11 @@ export async function llmGroupConceptsPreview(
   const raw = await callLLM(messages);
 
   let json: LLMTopicsResponse | null = null;
-  try { json = JSON.parse(raw) as LLMTopicsResponse; }
-  catch { return { ok: false, error: "Respuesta inválida del modelo." }; }
+  try {
+    json = JSON.parse(raw) as LLMTopicsResponse;
+  } catch {
+    return { ok: false, error: "Respuesta inválida del modelo." };
+  }
 
   const table: Array<{ concept: string; topic_label: string; rating: number | null }> = [];
   const byId = new Map<string, ConceptRow>(concepts.map((c) => [c.id, c]));
@@ -153,8 +158,8 @@ export async function llmGroupConcepts(opts?: {
   companyId?: string | null;
   recencyDays?: number;
   limit?: number;
-  minTopicSize?: number;  // default 2
-  dryRun?: boolean;       // default true
+  minTopicSize?: number; // default 2
+  dryRun?: boolean; // default true
   includeAssigned?: boolean; // default false
 }) {
   const minTopicSize = Math.max(2, Math.min(10, opts?.minTopicSize ?? 2));
@@ -176,7 +181,7 @@ export async function llmGroupConcepts(opts?: {
       createdTopics: 0,
       assignedConcepts: 0,
       preview: { topics: [] as any[] },
-      note: "No hay conceptos pendientes en este alcance."
+      note: "No hay conceptos pendientes en este alcance.",
     };
   }
 
@@ -185,8 +190,11 @@ export async function llmGroupConcepts(opts?: {
   const raw = await callLLM(messages);
 
   let json: LLMTopicsResponse | null = null;
-  try { json = JSON.parse(raw) as LLMTopicsResponse; }
-  catch { return { ok: false, error: "La IA no devolvió JSON válido para el clustering." }; }
+  try {
+    json = JSON.parse(raw) as LLMTopicsResponse;
+  } catch {
+    return { ok: false, error: "La IA no devolvió JSON válido para el clustering." };
+  }
 
   if (!json?.topics || !Array.isArray(json.topics)) {
     return { ok: false, error: "Respuesta JSON sin 'topics' válido.", preview: json };
@@ -201,7 +209,11 @@ export async function llmGroupConcepts(opts?: {
       const label = rawLabel && rawLabel.length >= 3 ? rawLabel : "Tema concreto";
       const validMembers = (t.members ?? [])
         .filter((id: string) => conceptSet.has(id))
-        .filter((id: string) => { if (seen.has(id)) return false; seen.add(id); return true; });
+        .filter((id: string) => {
+          if (seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        });
       return { label, description: t.description ? String(t.description).slice(0, 240) : null, members: validMembers };
     })
     .filter((t) => t.members.length >= minTopicSize)
@@ -214,7 +226,7 @@ export async function llmGroupConcepts(opts?: {
       createdTopics: 0,
       assignedConcepts: 0,
       preview: { topics: [] as any[] },
-      note: `El LLM generó agrupaciones < ${minTopicSize} miembros; descartadas.`
+      note: `El LLM generó agrupaciones < ${minTopicSize} miembros; descartadas.`,
     };
   }
 
@@ -226,14 +238,13 @@ export async function llmGroupConcepts(opts?: {
       createdTopics: cleaned.length,
       assignedConcepts,
       preview: { topics: cleaned },
-      note: "dryRun=true (no se escribió nada)."
+      note: "dryRun=true (no se escribió nada).",
     };
   }
 
   const byId = new Map<string, ConceptRow>(concepts.map((c) => [c.id, c]));
   let created = 0;
   let assigned = 0;
-  const createdTopicIds: string[] = [];
 
   for (const topic of cleaned) {
     const ratings = topic.members
@@ -245,31 +256,40 @@ export async function llmGroupConcepts(opts?: {
 
     const fallbackDesc = fallbackShortDescription(topic.members, byId);
 
+    // Crear el topic con un placeholder de descripción
     const createdTopic = await prisma.topic.create({
       data: {
         label: topic.label,
-        description: fallbackDesc || null, // se reemplaza luego por la IA
+        description: fallbackDesc || null, // se reemplazará por la IA
         model: "gpt-4o-mini",
         concept_count: topic.members.length,
         avg_rating: avgRounded ?? undefined,
         is_stable: topic.members.length > 3,
+        // Si decides persistir por location en la tabla topic:
+        // location_id: opts?.locationId ?? null,
       },
       select: { id: true },
     });
 
+    // Vincular concepts al topic
     await prisma.concept.updateMany({
       where: { id: { in: topic.members } },
       data: { topic_id: createdTopic.id, updated_at: new Date(), assigned_at: new Date() },
     });
 
-    createdTopicIds.push(createdTopic.id);
+    // Generar y guardar descripción cualitativa (reemplaza el fallback)
+    try {
+      const newDesc = await generateAndStoreTopicDescription(createdTopic.id);
+      await prisma.topic.update({
+        where: { id: createdTopic.id },
+        data: { description: newDesc },
+      });
+    } catch {
+      // si falla, se queda el fallback
+    }
+
     created++;
     assigned += topic.members.length;
-  }
-
-  // Descripciones IA post-persistencia (centralizado)
-  for (const id of createdTopicIds) {
-    try { await generateAndStoreTopicDescription(id); } catch { /* fallback ya persistido */ }
   }
 
   return {
@@ -277,6 +297,6 @@ export async function llmGroupConcepts(opts?: {
     taken: concepts.length,
     createdTopics: created,
     assignedConcepts: assigned,
-    preview: { topics: cleaned }
+    preview: { topics: cleaned },
   };
 }

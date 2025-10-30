@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import ReviewCard from "@/app/components/reviews/summary/ReviewCard";
+import ReviewCard from "@/app/components/reviews/summary/ReviewCard/ReviewCard";
 import { useSectionLoading } from "@/hooks/useSectionLoading";
 import LocationSelector, { type LocationLite } from "@/app/components/crussader/LocationSelector";
 import { useBootstrapData } from "@/app/providers/bootstrap-store";
@@ -76,7 +76,9 @@ export default function ReviewsSummaryPage() {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [activeEst?.id, refreshTick, setLoading]);
 
   // Fecha límite
@@ -92,46 +94,79 @@ export default function ReviewsSummaryPage() {
   }, [dateRange]);
 
   // Filtrado total (sin paginar)
-  const pageSizeNum = useMemo(() => parseInt(reviewsPerPage || "12", 10), [reviewsPerPage]);
+  const pageSizeNum = useMemo(
+    () => parseInt(reviewsPerPage || "12", 10),
+    [reviewsPerPage]
+  );
   const filteredAll = useMemo(() => {
     let list = [...reviews];
     if (cutoffDate) list = list.filter((r) => new Date(r.date) >= cutoffDate);
     if (showUnresponded) list = list.filter((r) => !r.businessResponse);
     if (showResponded) list = list.filter((r) => !!r.businessResponse);
-    if (selectedStars.size > 0) list = list.filter((r) => selectedStars.has(r.rating));
+    if (selectedStars.size > 0)
+      list = list.filter((r) => selectedStars.has(r.rating));
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      list = list.filter((r) => r.author.toLowerCase().includes(q) || r.content.toLowerCase().includes(q));
+      list = list.filter(
+        (r) =>
+          r.author.toLowerCase().includes(q) ||
+          r.content.toLowerCase().includes(q)
+      );
     }
     list.sort((a, b) => {
       if (sortBy === "rating-desc") return b.rating - a.rating;
       if (sortBy === "rating-asc") return a.rating - b.rating;
-      const da = +new Date(a.date), db = +new Date(b.date);
+      const da = +new Date(a.date),
+        db = +new Date(b.date);
       return sortBy === "date-desc" ? db - da : da - db;
     });
     return list;
-  }, [reviews, cutoffDate, showUnresponded, showResponded, selectedStars, searchQuery, sortBy]);
+  }, [
+    reviews,
+    cutoffDate,
+    showUnresponded,
+    showResponded,
+    selectedStars,
+    searchQuery,
+    sortBy,
+  ]);
 
   // Total y slice
   const totalPages = Math.max(1, Math.ceil(filteredAll.length / pageSizeNum));
-  const pagedReviews = filteredAll.slice((page - 1) * pageSizeNum, page * pageSizeNum);
+  const pagedReviews = filteredAll.slice(
+    (page - 1) * pageSizeNum,
+    page * pageSizeNum
+  );
 
   // Reset de página si cambian filtros
-  useEffect(() => { setPage(1); }, [
-    dateRange, searchQuery, sortBy, showUnresponded, showResponded, selectedStars, reviewsPerPage
+  useEffect(() => {
+    setPage(1);
+  }, [
+    dateRange,
+    searchQuery,
+    sortBy,
+    showUnresponded,
+    showResponded,
+    selectedStars,
+    reviewsPerPage,
   ]);
 
   return (
-    <div className="py-6 sm:py-8 border bg-gray-50 p-5 rounded-lg">
+    <div className="py-6 sm:py-8 border bg-gray-50 p-5 rounded-lg overflow-x-hidden">
       <div className="w-full bg-white rounded-lg border px-3 sm:px-4 py-3 sm:py-4 mb-6 sm:mb-8">
         <div className="flex items-end justify-between gap-3">
           <LocationSelector
-            companyId={companyId}
             onSelect={(locationId, location) => {
               if (locationId && location) {
                 setActiveEst(makeEstablishmentFromLocation(location));
                 setRefreshTick((t) => t + 1);
-                setTimeout(() => gridTopRef.current?.scrollIntoView({ behavior: "smooth" }), 0);
+                setTimeout(
+                  () =>
+                    gridTopRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                    }),
+                  0
+                );
               }
             }}
           />
@@ -141,7 +176,10 @@ export default function ReviewsSummaryPage() {
               disabled={loading || !activeEst?.id}
               className="inline-flex items-center gap-2 rounded-lg border border-border/80 bg-background px-3 py-1.5 text-sm text-foreground hover:border-foreground/30 hover:shadow-sm disabled:opacity-50 transition"
             >
-              <svg viewBox="0 0 24 24" className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}>
+              <svg
+                viewBox="0 0 24 24"
+                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+              >
                 <path
                   d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L14 10h6V4l-2.35 2.35Z"
                   fill="currentColor"
@@ -183,10 +221,28 @@ export default function ReviewsSummaryPage() {
       </div>
 
       <SectionWrapper topPadding="pt-6 sm:pt-10">
-        <div ref={gridTopRef} className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
-          {pagedReviews.map((r) => <ReviewCard key={r.id} review={r} />)}
+        <div
+          ref={gridTopRef}
+          className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 justify-items-center"
+        >
+          {pagedReviews.map((r) => (
+            <div
+              key={r.id}
+              className="
+                w-[80vw] 
+                sm:w-[85%] 
+                md:w-full 
+                max-w-[720px]
+              "
+            >
+              <ReviewCard review={r} />
+            </div>
+          ))}
+
           {!loading && pagedReviews.length === 0 && (
-            <div className="col-span-full text-muted-foreground">No hay reseñas.</div>
+            <div className="col-span-full text-muted-foreground">
+              No hay reseñas.
+            </div>
           )}
         </div>
       </SectionWrapper>
@@ -199,7 +255,7 @@ export default function ReviewsSummaryPage() {
         pageSizeOptions={[6, 12, 24, 48]}
         onPageSizeChange={(n) => setReviewsPerPage(String(n))}
         className="pt-6"
-/>
+      />
     </div>
   );
 }
