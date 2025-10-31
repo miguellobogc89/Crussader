@@ -153,51 +153,21 @@ export default function ReviewsSummaryPage() {
 
   return (
     <div className="py-6 sm:py-8 border bg-gray-50 p-5 rounded-lg overflow-x-hidden">
-      <div className="w-full bg-white rounded-lg border px-3 sm:px-4 py-3 sm:py-4 mb-6 sm:mb-8">
-        <div className="flex items-end justify-between gap-3">
-          <LocationSelector
-            onSelect={(locationId, location) => {
-              if (locationId && location) {
-                setActiveEst(makeEstablishmentFromLocation(location));
-                setRefreshTick((t) => t + 1);
-                setTimeout(
-                  () =>
-                    gridTopRef.current?.scrollIntoView({
-                      behavior: "smooth",
-                    }),
-                  0
-                );
-              }
-            }}
-          />
-          <div className="pb-[2px]">
-            <button
-              onClick={() => setRefreshTick((t) => t + 1)}
-              disabled={loading || !activeEst?.id}
-              className="inline-flex items-center gap-2 rounded-lg border border-border/80 bg-background px-3 py-1.5 text-sm text-foreground hover:border-foreground/30 hover:shadow-sm disabled:opacity-50 transition"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-              >
-                <path
-                  d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L14 10h6V4l-2.35 2.35Z"
-                  fill="currentColor"
-                />
-              </svg>
-              Actualizar
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4">
+        <div className="mb-6">
           <ReviewsFilterPanel
-            shownCount={pagedReviews.length}
-            totalCount={filteredAll.length}
+            locationSelectorSlot={
+              <LocationSelector
+                onSelect={(locationId, location) => {
+                  if (locationId && location) {
+                    setActiveEst(makeEstablishmentFromLocation(location));
+                    setRefreshTick((t) => t + 1);
+                    setTimeout(() => gridTopRef.current?.scrollIntoView({ behavior: "smooth" }), 0);
+                  }
+                }}
+              />
+            }
             dateRange={dateRange}
             onChangeDateRange={setDateRange}
-            reviewsPerPage={reviewsPerPage}
-            onChangeReviewsPerPage={setReviewsPerPage}
             searchQuery={searchQuery}
             onChangeSearchQuery={setSearchQuery}
             sortBy={sortBy}
@@ -216,9 +186,11 @@ export default function ReviewsSummaryPage() {
               setSearchQuery("");
               setSortBy("date-desc");
             }}
+            onRefresh={() => setRefreshTick((t) => t + 1)}
+            refreshDisabled={loading || !activeEst?.id}
           />
+
         </div>
-      </div>
 
       <SectionWrapper topPadding="pt-6 sm:pt-10">
         <div
@@ -247,15 +219,7 @@ export default function ReviewsSummaryPage() {
         </div>
       </SectionWrapper>
 
-      <ModernPaginator
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        pageSize={pageSizeNum}
-        pageSizeOptions={[6, 12, 24, 48]}
-        onPageSizeChange={(n) => setReviewsPerPage(String(n))}
-        className="pt-6"
-      />
+
     </div>
   );
 }

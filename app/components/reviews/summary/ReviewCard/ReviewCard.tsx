@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/app/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import Review from "@/app/components/reviews/summary/ReviewCard/Review";
 import Response, { type UIStatus } from "@/app/components/reviews/summary/ReviewCard/Response";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 /* ------------------------- Tipos ------------------------- */
 interface ReviewT {
@@ -40,27 +41,16 @@ function normalizeStatus(s: string | undefined): UIStatus {
 
 /* Badge flotante (esquina superior derecha) — tonos claros */
 function CornerBadge({
-  status,
+  reviewPublished,
   onClick,
 }: {
-  status: UIStatus;
+  reviewPublished: boolean;
   onClick?: () => void;
 }) {
-  const map: Record<UIStatus, { label: string; cls: string }> = {
-    pending: {
-      label: "Pendiente",
-      cls: "bg-amber-50 text-amber-800 border border-amber-200",
-    },
-    draft: {
-      label: "Borrador",
-      cls: "bg-sky-50 text-sky-800 border border-sky-200",
-    },
-    published: {
-      label: "Publicada",
-      cls: "bg-emerald-50 text-emerald-800 border border-emerald-200",
-    },
-  };
-  const { label, cls } = map[status];
+  // Pediste que el chip de la REVIEW refleje: Pendiente hasta publicar, y Publicada si hay publicación
+  const cfg = reviewPublished
+    ? { label: "Publicada", cls: "bg-emerald-50 text-emerald-800 border border-emerald-200" }
+    : { label: "Pendiente", cls: "bg-amber-50 text-amber-800 border border-amber-200" };
 
   return (
     <button
@@ -70,18 +60,19 @@ function CornerBadge({
         absolute top-3 right-3 z-10
         inline-flex items-center justify-center
         h-7 px-3 rounded-full text-[11px] font-medium shadow-sm
-        ${cls}
+        ${cfg.cls}
       `}
-      aria-label={label}
-      title={label}
+      aria-label={cfg.label}
+      title={cfg.label}
     >
-      {label}
+      {cfg.label}
     </button>
   );
 }
 
 /* ======================================================= */
 export default function ReviewCard({ review, businessResponse, responses }: ReviewCardProps) {
+  // Lista y versión activa (index 0 = la más reciente)
   const initialList = useMemo<BusinessResponse[]>(
     () => (responses?.length ? responses : businessResponse ? [businessResponse] : []),
     [responses, businessResponse]
@@ -98,9 +89,15 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
 
   const respText = current?.content ?? "";
   const hasResponse = respText.trim().length > 0;
-  const respStatus: UIStatus = current ? current.status : "pending";
   const isPublished = Boolean(current?.published || current?.status === "published");
 
+  // El chip de la REVIEW: publicado si existe alguna publicada, si no -> pendiente
+  const reviewPublished = useMemo(
+    () => list.some((r) => r.published || r.status === "published"),
+    [list]
+  );
+
+  // Cargar última respuesta si no vino
   useEffect(() => {
     let cancelled = false;
     if (responses?.length || businessResponse) return;
@@ -133,11 +130,12 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
     };
   }, [review.id, businessResponse, responses]);
 
+  // Medida para la animación del acordeón
   useEffect(() => {
     if (contentRef.current) {
       setMaxH(contentRef.current.scrollHeight);
     }
-  }, [isExpanded, respText, respStatus, isPublished]);
+  }, [isExpanded, respText, list.length, idx, isPublished]);
 
   async function regenerate() {
     setBusy(true);
@@ -161,7 +159,7 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
         edited: Boolean(r.edited),
         createdAt: r.createdAt,
       };
-      setList((prev) => [normalized, ...prev]);
+      setList((prev) => [normalized, ...prev]); // prepend = nueva versión
       setIdx(0);
       setIsExpanded(true); // abrir al generar
       toast({ title: "Respuesta generada", description: "Revisa y publica cuando quieras." });
@@ -176,6 +174,7 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
     if (!current?.id) return;
     setBusy(true);
     const prev = { ...current };
+    // Optimista
     setList((prevList) =>
       prevList.map((r, i) => (i === idx ? { ...r, published: true, status: "published" } : r))
     );
@@ -184,6 +183,7 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
       if (!res.ok) throw new Error("No se pudo publicar");
       toast({ title: "Publicado", description: "La respuesta se ha publicado correctamente." });
     } catch (e: any) {
+      // rollback
       setList((prevList) =>
         prevList.map((r, i) => (i === idx ? { ...r, published: prev.published, status: prev.status } : r))
       );
@@ -223,26 +223,61 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
     }
   }
 
+  async function removeCurrent() {
+    if (!current?.id) return;
+    const ok = confirm("¿Seguro que deseas borrar esta respuesta?");
+    if (!ok) return;
+
+    setBusy(true);
+    try {
+      // Si tienes endpoint DELETE por ID directo:
+      const res = await fetch(`/api/responses/${current.id}`, { method: "DELETE", cache: "no-store" });
+      if (!res.ok) throw new Error("No se pudo borrar la respuesta");
+
+      setList((prev) => {
+        const next = prev.filter((_, i) => i !== idx);
+        // Recolocar índice
+        if (next.length === 0) {
+          setIdx(-1);
+        } else if (idx >= next.length) {
+          setIdx(next.length - 1);
+        } else {
+          setIdx(idx); // mismo índice, ahora otro elemento
+        }
+        return next;
+      });
+      toast({ title: "Eliminada", description: "La respuesta se ha borrado." });
+    } catch (e: any) {
+      toast({ variant: "error", title: "Error borrando", description: String(e.message || e) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function goPrev() {
+    if (list.length <= 1) return;
+    setIdx((i) => (i <= 0 ? list.length - 1 : i - 1));
+  }
+  function goNext() {
+    if (list.length <= 1) return;
+    setIdx((i) => (i >= list.length - 1 ? 0 : i + 1));
+  }
+
   return (
     <Card
       className="
         group relative
         hover:shadow-[var(--shadow-hover)]
         transition-all duration-300
-        border bg-white from-card to-muted/20
+        border-border bg-white from-card to-muted/20
         w-full max-w-full overflow-hidden
       "
       onClick={() => setIsExpanded((v) => !v)}
       role="button"
       aria-expanded={isExpanded}
     >
-      {/* Badge top-right (siempre visible colapsada) */}
-      {!isExpanded && (
-        <CornerBadge
-          status={hasResponse ? (isPublished ? "published" : current?.status ?? "draft") : "pending"}
-          onClick={() => setIsExpanded(true)}
-        />
-      )}
+      {/* Badge top-right SIEMPRE visible (no desaparece al expandir) */}
+      <CornerBadge reviewPublished={reviewPublished} onClick={() => setIsExpanded(true)} />
 
       <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-5">
         {/* REVIEW */}
@@ -254,8 +289,8 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
           avatarUrl={review.avatar}
         />
 
-        {/* CTA morado abajo-derecha SOLO si está Pendiente (no hay respuesta) y la card está colapsada */}
-        {!isExpanded && !hasResponse && (
+        {/* CTA morado abajo-derecha SOLO si está Pendiente (no hay ninguna publicada) y la card está colapsada */}
+        {!isExpanded && !reviewPublished && !hasResponse && (
           <div className="absolute bottom-3 right-3">
             <button
               type="button"
@@ -290,8 +325,8 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
           {/* Separador */}
           <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mb-3" />
 
-          {/* Si no hay respuesta: CTA morado dentro (por si abren manualmente) */}
-          {!hasResponse && (
+          {/* Si no hay ninguna respuesta aún: CTA morado interno */}
+          {!hasResponse && !reviewPublished && (
             <div className="flex justify-end">
               <button
                 type="button"
@@ -310,21 +345,56 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
             </div>
           )}
 
-          {/* Con respuesta: delega barras redondas en Response */}
+          {/* Con respuesta: mostramos Response con sus acciones contextuales */}
           {hasResponse && (
-            <Response
-              content={respText}
-              status={current?.status ?? "draft"}
-              published={isPublished}
-              edited={current?.edited}
-              allowRegenerate={!isPublished}
-              allowPublish={!isPublished}
-              allowEdit={!isPublished}
-              busy={busy}
-              onRegenerate={regenerate}
-              onPublish={publish}
-              onSave={save}
-            />
+            <>
+              <Response
+                reviewId={review.id}
+                responseId={current?.id}
+                content={respText}
+                status={current?.status ?? "draft"}
+                published={isPublished}
+                edited={current?.edited}
+                busy={busy}
+                // acciones (publicación / regeneración sólo si no publicada)
+                allowRegenerate={!isPublished}
+                allowPublish={!isPublished}
+                allowEdit={true} // Google permite editar también publicadas
+                onRegenerate={regenerate}
+                onPublish={publish}
+                onSave={save}
+                onDelete={removeCurrent}
+              />
+
+              {/* Paginación de versiones (abajo-dcha) */}
+              {list.length > 1 && (
+                <div className="mt-3 flex items-center justify-end gap-2">
+                  <button
+                    className="rounded-full border px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+                    onClick={goPrev}
+                    disabled={busy}
+                    title="Anterior"
+                    aria-label="Anterior"
+                    type="button"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <div className="px-2 text-xs text-neutral-500">
+                    {idx + 1} / {list.length}
+                  </div>
+                  <button
+                    className="rounded-full border px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+                    onClick={goNext}
+                    disabled={busy}
+                    title="Siguiente"
+                    aria-label="Siguiente"
+                    type="button"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </CardContent>
