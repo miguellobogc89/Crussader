@@ -1,48 +1,40 @@
+// app/components/layouts/PageHeader.tsx
 "use client";
 
-import Breadcrumbs, {
-} from "@/app/components/crussader/navigation/Breadcrumbs";
+import PageTitle from "./PageTitle";
 
 type Props = {
   title: string;
   description?: string;
-  actions?: React.ReactNode;
+  titleIconName?: React.ComponentProps<typeof PageTitle>["iconName"];
   className?: string;
 };
 
 /**
- * Cabecera de página estándar: muestra breadcrumbs + título + descripción + acciones.
+ * Cabecera superior fija sin márgenes: ocupa todo el ancho,
+ * mantiene el formato de PageTitle, sin borde ni iconos laterales.
  */
 export default function PageHeader({
   title,
   description,
-  actions,
+  titleIconName,
   className = "",
 }: Props) {
   return (
     <header
       className={[
-        "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between",
+        "w-full h-20 flex items-center",
+        "bg-white px-4 sm:px-6 lg:px-8",
         className,
       ].join(" ")}
     >
-      <div className="flex flex-col gap-2">
-
-        {/* === Título y descripción === */}
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {title}
-          </h1>
-          {description && (
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-          )}
-        </div>
-      </div>
-
-      {/* === Acciones (botones, toggles, etc.) === */}
-      {actions ? (
-        <div className="flex shrink-0 items-center gap-2">{actions}</div>
-      ) : null}
+      <PageTitle
+        title={title}
+        subtitle={description}
+        iconName={titleIconName}
+        size="lg"
+        gradient="from-indigo-600 via-violet-600 to-fuchsia-600"
+      />
     </header>
   );
 }

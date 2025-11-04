@@ -8,18 +8,17 @@ import LocationRowActions from "@/app/components/admin/LocationRowActions";
 import { useAdminLocations } from "@/hooks/useAdminLocations";
 import AdminSearch from "@/app/components/admin/AdminSearch";
 
+/* ───────── Helpers de formato: solo se usan cuando hydrated === true ───────── */
 function formatTimeISO(iso: string | null | undefined) {
   if (!iso) return "—";
   const d = new Date(iso);
   return new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(d);
 }
-
 function formatDateISO(iso: string | null | undefined) {
   if (!iso) return "—";
   const d = new Date(iso);
   return new Intl.DateTimeFormat("es-ES", { year: "numeric", month: "short", day: "2-digit" }).format(d);
 }
-
 function timeAgoOrDashISO(iso: string | null | undefined) {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -65,23 +64,34 @@ export default function LocationsTable({
   upage?: number;
   cq?: string;
   cpage?: number;
-})
- {
+}) {
   const take = 10;
+
+  // 🚫 Importante: bloquea datos variables hasta que el cliente esté montado
+  const [hydrated, setHydrated] = React.useState(false);
+  React.useEffect(() => {
+    setHydrated(true);
+  }, []);
+
   const { data, isLoading, error } = useAdminLocations(lq ?? "", lpage || 1, take);
 
-  const total = data?.total ?? 0;
-  const page = data?.page ?? Math.max(1, lpage || 1);
+  // Durante la hidratación, fuerza snapshot estable = 0/[] para que coincida con el HTML del SSR
+  const total = hydrated ? (data?.total ?? 0) : 0;
+  const page = hydrated ? (data?.page ?? Math.max(1, lpage || 1)) : Math.max(1, lpage || 1);
   const pages = Math.max(1, Math.ceil(total / take));
-  const locations = data?.locations ?? [];
+  const locations = hydrated ? (data?.locations ?? []) : [];
 
+  const showSkeleton = !hydrated || isLoading;
 
   return (
     <section>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-neutral-900 tracking-tight">Ubicaciones</h2>
-          <p className="text-sm text-neutral-500">{total} ubicacione{total === 1 ? "" : "s"} en total</p>
+          {/* Evita mismatch: texto estable hasta que hydrated sea true */}
+          <p className="text-sm text-neutral-500" suppressHydrationWarning>
+            {total} ubicacione{total === 1 ? "" : "s"} en total
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -109,7 +119,7 @@ export default function LocationsTable({
         </div>
         <hr className="border-neutral-200" />
 
-        {isLoading && (
+        {showSkeleton && (
           <ul className="divide-y divide-neutral-200">
             {Array.from({ length: 5 }).map((_, i) => (
               <li key={i} className="grid grid-cols-12 gap-2 px-4 py-4">
@@ -119,11 +129,11 @@ export default function LocationsTable({
           </ul>
         )}
 
-        {!isLoading && error && (
+        {!showSkeleton && error && (
           <div className="px-4 py-8 text-sm text-red-600">Error cargando ubicaciones.</div>
         )}
 
-        {!isLoading && !error && (
+        {!showSkeleton && !error && (
           <ul className="divide-y divide-neutral-200">
             {locations.map((loc) => {
               const connected = Boolean(loc.googlePlaceId || loc.ExternalConnection?.id);
@@ -135,12 +145,14 @@ export default function LocationsTable({
               const typeName = loc.type?.name ?? null;
               const category = typeName ?? activityName ?? "—";
 
+              // Formateos SOLO cuando hydrated === true (ya garantizado en este bloque)
               const createdTime = formatTimeISO(loc.createdAt);
               const createdDate = formatDateISO(loc.createdAt);
 
-              const rating = typeof loc.reviewsAvg === "number"
-                ? loc.reviewsAvg
-                : Number(loc.reviewsAvg ?? 0) || 0;
+              const rating =
+                typeof loc.reviewsAvg === "number"
+                  ? loc.reviewsAvg
+                  : Number(loc.reviewsAvg ?? 0) || 0;
 
               const reviews = loc.reviewsCount ?? 0;
               const monthlyReviews = 0;
@@ -148,17 +160,26 @@ export default function LocationsTable({
               const lastSync = timeAgoOrDashISO(loc.lastSyncAt);
 
               const status =
-                loc.status === "ACTIVE" ? "active"
-                : loc.status === "PENDING_VERIFICATION" ? "pending"
-                : connected ? "active"
-                : "disconnected";
+                loc.status === "ACTIVE"
+                  ? "active"
+                  : loc.status === "PENDING_VERIFICATION"
+                  ? "pending"
+                  : connected
+                  ? "active"
+                  : "disconnected";
 
               return (
                 <li key={loc.id} className="grid grid-cols-12 gap-2 px-4 py-4 items-center">
                   <div className="col-span-3 min-w-0 text-left">
-                    <div className="truncate font-semibold text-neutral-900" title={companyName}>{companyName}</div>
-                    <div className="text-xs text-neutral-500 truncate" title={city}>{city}</div>
-                    <div className="text-xs text-neutral-500 truncate" title={street}>{street}</div>
+                    <div className="truncate font-semibold text-neutral-900" title={companyName}>
+                      {companyName}
+                    </div>
+                    <div className="text-xs text-neutral-500 truncate" title={city}>
+                      {city}
+                    </div>
+                    <div className="text-xs text-neutral-500 truncate" title={street}>
+                      {street}
+                    </div>
                   </div>
 
                   <div className="col-span-1 text-center">
@@ -181,7 +202,9 @@ export default function LocationsTable({
                     </div>
                   </div>
 
-                  <div className="col-span-1 text-center font-medium text-neutral-800 whitespace-nowrap">{reviews}</div>
+                  <div className="col-span-1 text-center font-medium text-neutral-800 whitespace-nowrap">
+                    {reviews}
+                  </div>
 
                   <div className="col-span-1 text-center whitespace-nowrap">
                     <Badge variant={monthlyReviews > 0 ? "default" : "secondary"}>
@@ -190,11 +213,15 @@ export default function LocationsTable({
                   </div>
 
                   <div className="col-span-1 text-center whitespace-nowrap">
-                    <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      responseRate >= 90 ? "bg-green-100 text-green-700"
-                      : responseRate >= 70 ? "bg-yellow-100 text-yellow-700"
-                      : "bg-red-100 text-red-700"
-                    }`}>
+                    <div
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        responseRate >= 90
+                          ? "bg-green-100 text-green-700"
+                          : responseRate >= 70
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
                       {responseRate}%
                     </div>
                   </div>
@@ -221,7 +248,9 @@ export default function LocationsTable({
 
       {/* Paginación */}
       <div className="mt-4 flex items-center justify-between text-sm text-neutral-600">
-        <div>Página {page} de {pages} · Mostrando {locations.length} / {total}</div>
+        <div suppressHydrationWarning>
+          Página {page} de {pages} · Mostrando {locations.length} / {total}
+        </div>
         <div className="flex items-center gap-2">
           <Link
             href={`/admin?${new URLSearchParams({

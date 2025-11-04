@@ -1,15 +1,15 @@
-// app/components/layouts/PageShell.tsx
 "use client";
 
 import { ReactNode, Suspense, useEffect, useRef } from "react";
+import { SessionProvider } from "next-auth/react";
 import RouteTransitionOverlay from "./RouteTransitionOverlay";
 import PageBody from "./PageBody";
-import Breadcrumbs from "@/app/components/crussader/navigation/Breadcrumbs";
-import PageTitle from "./PageTitle";
+import PageHeader from "./PageHeader";
+import Spinner from "@/app/components/crussader/UX/Spinner"; // ⬅️ NUEVO
 
 export default function PageShell({
   title,
-  titleIconName, // <- la page decide el icono por nombre
+  titleIconName,
   description,
   toolbar,
   headerBand,
@@ -18,7 +18,7 @@ export default function PageShell({
   hideHeaderArea = false,
 }: {
   title: string;
-  titleIconName?: React.ComponentProps<typeof PageTitle>["iconName"]; // <- tip sacado del propio PageTitle
+  titleIconName?: React.ComponentProps<typeof import("./PageTitle").default>["iconName"];
   description?: string;
   toolbar?: ReactNode;
   headerBand?: ReactNode;
@@ -51,54 +51,55 @@ export default function PageShell({
   }, []);
 
   return (
-    <div ref={shellRef} className="relative w-full h-full">
-      <RouteTransitionOverlay scope="container" className="z-50" />
+    <SessionProvider refetchOnWindowFocus={false}>
+      <div ref={shellRef} className="relative w-full h-full">
+        <RouteTransitionOverlay scope="container" className="z-50" />
 
-      {/* ===== HEADER ===== */}
-      {!hideHeaderArea && (
-        <div className="w-full bg-white border-b border-slate-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            {/* Breadcrumbs con iconos (gris) */}
-            <div className="mb-3">
-              <Breadcrumbs rootHref="/dashboard" />
-            </div>
-
-            {/* Título con icono grande y gradiente (la page decide iconName y title) */}
-            <PageTitle
+        {/* ===== HEADER ===== */}
+        {!hideHeaderArea && (
+          <>
+            <PageHeader
               title={title}
-              subtitle={description || undefined}
-              iconName={titleIconName}
-              size="lg"
-              gradient="from-indigo-600 via-violet-600 to-fuchsia-600"
+              description={description}
+              titleIconName={titleIconName}
             />
 
-            {/* Toolbar justo bajo el título */}
-            {toolbar ? <div className="mt-4">{toolbar}</div> : null}
-          </div>
-        </div>
-      )}
+            {toolbar ? (
+              <div className="w-full bg-white border-b border-slate-200">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+                  {toolbar}
+                </div>
+              </div>
+            ) : null}
+          </>
+        )}
 
-      {/* ===== Banda opcional ===== */}
-      {headerBand && (
-        <div className="w-full bg-white border-b border-slate-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">{headerBand}</div>
-        </div>
-      )}
-
-      {/* ===== BODY ===== */}
-      <Suspense
-        fallback={
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="space-y-4">
-              <div className="h-10 w-1/3 animate-pulse rounded bg-muted" />
-              <div className="h-24 w-full animate-pulse rounded bg-muted" />
-              <div className="h-64 w-full animate-pulse rounded bg-muted" />
+        {/* ===== BANDA OPCIONAL ===== */}
+        {headerBand && (
+          <div className="w-full bg-white border-b border-slate-200">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              {headerBand}
             </div>
           </div>
-        }
-      >
-        <PageBody variant={variant}>{children}</PageBody>
-      </Suspense>
-    </div>
+        )}
+
+        {/* ===== BODY ===== */}
+        <Suspense
+          fallback={
+            <div
+              className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10"
+              aria-busy="true"
+              aria-live="polite"
+            >
+              <div className="h-[40vh] flex items-center justify-center">
+                <Spinner centered size={48} color="#6366f1" />
+              </div>
+            </div>
+          }
+        >
+          <PageBody variant={variant}>{children}</PageBody>
+        </Suspense>
+      </div>
+    </SessionProvider>
   );
 }

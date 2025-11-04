@@ -13,7 +13,7 @@ export default function PageBody({
 }) {
   const width =
     variant === "full"
-      ? "max-w-[100vw]"
+      ? "max-w-none w-full"
       : variant === "narrow"
       ? "max-w-2xl"
       : "max-w-7xl";
@@ -21,9 +21,9 @@ export default function PageBody({
   return (
     <main
       role="main"
-      className={`w-full  bg-dark ${width} mx-auto px-4 sm:px-6 lg:px-8 py-4`}
+      className={`w-full bg-dark ${width} mx-auto`}
     >
-      {toolbar && <div className="mb-4">{toolbar}</div>}
+      {toolbar && <div>{toolbar}</div>}
       {children}
     </main>
   );

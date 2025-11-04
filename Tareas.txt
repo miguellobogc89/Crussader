@@ -13,8 +13,8 @@ Roadmap:
 - Montar todos los gráficos
 - Arreglar el puñetero webchat y crearle un panel d econfiguración para controlarlo
 
-- ^Pulir la sidbar
-- Renderizar la web para portatil y tablet como minimo
+- Pulir la sidbar
+- Renderizar la web para portatil, tablet y móvil
 
 
 -------- Una vez tengamos la API de Google --------------

@@ -1,3 +1,4 @@
+// app/components/reviews/summary/ReviewCard/Review.tsx
 "use client";
 
 import Image from "next/image";
@@ -49,10 +50,12 @@ export default function Review({ author, content, rating, dateISO, avatarUrl }: 
 
   return (
     <div
-      className="
-        p-2
-        max-w-[520px] w-full
-      "
+      className="p-2 max-w-[520px] w-full text-neutral-900 subpixel-antialiased"
+      style={{
+        fontFamily:
+          '"Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, "Noto Sans", sans-serif',
+        fontWeight: 400,
+      }}
     >
       {/* Cabecera: avatar + nombre + fecha */}
       <div className="flex items-start gap-[clamp(10px,1.8vw,14px)]">
@@ -78,7 +81,7 @@ export default function Review({ author, content, rating, dateISO, avatarUrl }: 
           )}
         </div>
 
-        {/* Nombre y fecha */}
+        {/* Nombre, estrellas y fecha */}
         <div className="flex-1 min-w-0">
           <div
             className="font-semibold text-neutral-900 truncate"
@@ -86,18 +89,18 @@ export default function Review({ author, content, rating, dateISO, avatarUrl }: 
           >
             {author}
           </div>
-          <div
-            className="text-neutral-500"
-            style={{ fontSize: "clamp(11px,0.8vw,13px)" }}
-          >
-            {when}
+
+          <div className="flex items-center gap-2 mt-[clamp(4px,0.8vw,6px)]">
+            <Stars value={rating} />
+            <span
+              className="text-neutral-500"
+              style={{ fontSize: "clamp(11px,0.8vw,13px)" }}
+            >
+              {when}
+            </span>
           </div>
         </div>
-      </div>
 
-      {/* Estrellas: ahora están debajo del header */}
-      <div className="mt-[clamp(6px,1vw,10px)]">
-        <Stars value={rating} />
       </div>
 
       {/* Texto de la reseña */}
@@ -106,6 +109,7 @@ export default function Review({ author, content, rating, dateISO, avatarUrl }: 
         style={{
           fontSize: "clamp(14px,1.0vw,15px)",
           lineHeight: "clamp(20px,2.2vw,24px)",
+          letterSpacing: "0.005em",
         }}
       >
         {content}

@@ -16,6 +16,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/app/components/ui/button";
 
 type SectionKey = "trends" | "analysis" | "locations" | "performance";
 
@@ -53,11 +54,11 @@ function getHashSection(): SectionKey {
 }
 
 type TrendRow = {
-  month: string;     // "YYYY-MM"
-  avgRating: number; // rating medio del mes (1..5)
-  reviews: number;   // nº reseñas del mes
-  cumAvg?: number;   // rating acumulado (1..5)
-  cumReviews?: number; // volumen acumulado
+  month: string;        // "YYYY-MM"
+  avgRating: number;    // rating medio del mes (1..5)
+  reviews: number;      // nº reseñas del mes
+  cumAvg?: number;      // rating acumulado (1..5)
+  cumReviews?: number;  // volumen acumulado
 };
 
 const GOOGLE_BLUE = "#4285F4";
@@ -66,6 +67,7 @@ export default function ReportsPage() {
   const [section, setSection] = useState<SectionKey>(() => getHashSection());
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<TrendRow[]>([]);
+  const [rangeMonths, setRangeMonths] = useState<number>(12); // selector 3/6/12/24
 
   // Navegación por hash
   useEffect(() => {
@@ -75,7 +77,7 @@ export default function ReportsPage() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
-  // Fetch mensual + cálculo de acumulados
+  // Fetch mensual + cálculo de acumulados (depende de sección y rango temporal)
   useEffect(() => {
     if (section !== "trends") return;
 
@@ -83,7 +85,9 @@ export default function ReportsPage() {
       setLoading(true);
       try {
         const now = new Date();
-        const start = new Date(now.getFullYear() - 1, now.getMonth(), 1); // últimos 12 meses
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        // retrocede 'rangeMonths - 1' desde el primer día del mes actual
+        start.setMonth(start.getMonth() - (rangeMonths - 1));
         const from = start.toISOString().slice(0, 10);
         const to = now.toISOString().slice(0, 10);
 
@@ -122,7 +126,7 @@ export default function ReportsPage() {
     };
 
     fetchData();
-  }, [section]);
+  }, [section, rangeMonths]);
 
   const meta = useMemo(() => SECTION_META[section], [section]);
 
@@ -144,13 +148,34 @@ export default function ReportsPage() {
     return lines;
   }, [data]);
 
+  // Selector de rango (botones)
+  const RangeSelector = (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs text-muted-foreground">Rango:</span>
+      {[3, 6, 12, 24].map((m) => (
+        <Button
+          key={m}
+          variant={rangeMonths === m ? "default" : "outline"}
+          size="sm"
+          className="h-8"
+          onClick={() => setRangeMonths(m)}
+        >
+          {m} meses
+        </Button>
+      ))}
+    </div>
+  );
+
   return (
     <div className="mx-auto w-full max-w-screen-2xl px-3 sm:px-6 py-6 space-y-6">
       <TabMenu items={TABS} />
 
-      <header>
-        <h2 className="text-xl font-semibold tracking-tight">{meta.title}</h2>
-        <p className="text-sm text-muted-foreground">{meta.desc}</p>
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">{meta.title}</h2>
+          <p className="text-sm text-muted-foreground">{meta.desc}</p>
+        </div>
+        {section === "trends" && RangeSelector}
       </header>
 
       {section === "trends" && (

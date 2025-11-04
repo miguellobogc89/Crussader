@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -13,6 +13,7 @@ import { Brand } from "@/app/components/sidebar/Brand";
 import { CompanyChip } from "@/app/components/sidebar/CompanyChip";
 import { UserFooter } from "@/app/components/sidebar/UserFooter";
 import TrialBanner from "@/app/components/sidebar/TrialBanner";
+import { Menu } from "lucide-react";
 
 /* ======== util ======== */
 function isActivePath(pathname: string, href: string) {
@@ -90,10 +91,11 @@ export function AppSidebar() {
   const isMobile = useIsMobile();
   const { data: session } = useSession();
 
-  const [collapsed, setCollapsed] = useState<boolean>(false);
+  // En móvil arrancamos colapsado (solo top bar). En desktop como antes.
+  const [collapsed, setCollapsed] = useState<boolean>(isMobile);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  // ===== admin flag (igual que tenías)
+  // ===== admin flag
   const user = session?.user;
   const roleRaw = (user as any)?.role ?? (user as any)?.companyRole ?? "";
   const rolesArrRaw = (user as any)?.roles ?? [];
@@ -110,12 +112,6 @@ export function AppSidebar() {
     e_forceAdminLocal: typeof window !== "undefined" && localStorage.getItem("forceAdmin") === "1",
   };
   const isAdmin = Object.values(adminFlags).some(Boolean);
-
-  useEffect(() => {
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[Sidebar admin debug]", { user, roleRaw, roleNormalized: role, rolesArr, permsArr, adminFlags, isAdmin });
-    }
-  }, [user, isAdmin, role, rolesArr.length, permsArr.length]);
 
   // ===== grupos (inyecta admin si aplica)
   const ADMIN_GROUP: NavGroup | null = isAdmin
@@ -155,6 +151,7 @@ export function AppSidebar() {
   };
   const width = isOverlay ? "100vw" : collapsed ? "4rem" : "18rem";
 
+  // Bloquea el scroll del body cuando el overlay está abierto
   useEffect(() => {
     if (isOverlay) {
       const prev = document.body.style.overflow;
@@ -165,6 +162,7 @@ export function AppSidebar() {
     }
   }, [isOverlay]);
 
+  // Cerrar overlay con Escape
   useEffect(() => {
     if (!isOverlay) return;
     const onKey = (e: KeyboardEvent) => {
@@ -179,6 +177,63 @@ export function AppSidebar() {
     setOpenGroupId((prev) => (prev === id ? null : id));
   }
 
+/* ─────────────────────────────────────────────
+   AUTO-HIDE TOP BAR (solo móvil + colapsado)
+   Activador: tocar la pantalla (toggle)
+   ───────────────────────────────────────────── */
+const [showTopBar, setShowTopBar] = useState(true);
+
+useEffect(() => {
+  if (!(isMobile && collapsed)) return;
+
+  const onPointerDown = (ev: PointerEvent) => {
+    const target = ev.target as HTMLElement | null;
+    // ¿el toque fue sobre la topbar?
+    const hitBar = target?.closest?.('[data-topbar="true"]');
+    if (hitBar) return; // si tocan la barra, no auto-ocultamos/mostramos
+
+    // Tocar fuera de la barra → alterna visibilidad
+    setShowTopBar((prev) => !prev);
+  };
+
+  window.addEventListener("pointerdown", onPointerDown, { passive: true });
+  return () => window.removeEventListener("pointerdown", onPointerDown);
+}, [isMobile, collapsed]);
+
+
+  /* ─────────────────────────────────────────────
+     MODO MÓVIL COLAPSADO → SOLO TOP BAR (auto-hide)
+     ───────────────────────────────────────────── */
+  if (isMobile && collapsed) {
+    return (
+      <>
+        <div
+          data-topbar="true"
+          className={[
+            "fixed top-0 inset-x-0 h-12 bg-slate-900 border-b border-slate-800 z-40 flex items-center justify-between px-3",
+            "transition-transform duration-300 will-change-transform",
+            showTopBar ? "translate-y-0" : "-translate-y-full",
+          ].join(" ")}
+        >
+          <button
+            onClick={() => setCollapsed(false)}
+            aria-label="Abrir menú"
+            className="inline-flex items-center justify-center h-9 w-9 rounded-lg hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-700"
+          >
+            <Menu className="h-5 w-5 text-slate-200" />
+          </button>
+
+          <span className="text-slate-200 text-sm font-semibold tracking-wide">Crussader</span>
+          <span className="h-9 w-9" />
+        </div>
+        {/* Asegúrate de dejar sitio al contenido: p.ej. pt-12 en tu layout del cuerpo */}
+      </>
+    );
+  }
+
+  /* ─────────────────────────────────────────────
+     SIDEBAR (desktop normal o móvil abierto en overlay)
+     ───────────────────────────────────────────── */
   return (
     <aside
       style={{ width }}
@@ -190,7 +245,7 @@ export function AppSidebar() {
       {/* marca + botón colapsar */}
       <Brand collapsed={collapsed} setCollapsed={setCollapsed} />
 
-      {/* chip de empresa + botón switch (usa /dashboard/company?modal=switch) */}
+      {/* chip de empresa */}
       <CompanyChip collapsed={collapsed} />
 
       {/* navegación */}
@@ -236,7 +291,7 @@ export function AppSidebar() {
       <UserFooter
         collapsed={collapsed}
         userMenuOpen={userMenuOpen}
-        setUserMenuOpen={setUserMenuOpen} 
+        setUserMenuOpen={setUserMenuOpen}
         onItemNavigate={onItemNavigate}
       />
     </aside>

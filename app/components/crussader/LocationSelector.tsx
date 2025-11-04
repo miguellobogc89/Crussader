@@ -72,27 +72,28 @@ export default function LocationSelector({
   }
 
   return (
-    <div className="flex items-center gap-2 h-9">
+    <div className="flex items-center gap-2 h-9 w-full">
       <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
-            className="group inline-flex items-center gap-2 rounded-md bg-transparent 
-                       px-2 py-1.5 text-sm font-medium text-foreground 
-                       transition-all whitespace-nowrap max-w-[260px] overflow-hidden text-ellipsis"
+            className="group inline-flex items-center justify-between gap-2 rounded-md bg-transparent
+                       px-2 py-1.5 text-sm font-medium text-foreground transition-all w-full
+                       border"
           >
-            <span className="truncate">
+            <span className="truncate text-left flex-1">
               {selectedLocationId === null
                 ? "Todas las ubicaciones"
                 : selected
-                ? `${selected.title}${selected.city ? " · " + selected.city : ""}`
+                ? `${selected.title}${selected.city ? " — " + selected.city : ""}`
                 : "Selecciona ubicación"}
             </span>
-            <ChevronDown className="h-4 w-4 text-foreground/50 group-hover:text-foreground/70 transition-colors" />
+            <ChevronDown className="h-4 w-4 text-foreground/50 group-hover:text-foreground/70 transition-colors shrink-0" />
           </button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="start" className="w-[280px]">
+        <DropdownMenuContent align="start" className="w-[280px] max-w-full">
           <DropdownMenuItem
             onClick={() => handleSelect(null)}
             className={`font-medium text-foreground ${

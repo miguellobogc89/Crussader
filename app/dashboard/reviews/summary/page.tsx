@@ -1,3 +1,4 @@
+// app/dashboard/reviews/summary/page.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -11,6 +12,9 @@ import ReviewsFilterPanel, {
   type DateRange,
 } from "@/app/components/reviews/summary/ReviewsFilterPanel";
 import ModernPaginator from "@/app/components/crussader/navigation/NavPagination";
+
+// ⬇️ NUEVO: animaciones
+import { AnimatePresence, motion } from "framer-motion";
 
 type ReviewForCard = {
   id: string;
@@ -152,74 +156,87 @@ export default function ReviewsSummaryPage() {
   ]);
 
   return (
-    <div className="py-6 sm:py-8 border bg-gray-50 p-5 rounded-lg overflow-x-hidden">
-        <div className="mb-6">
-          <ReviewsFilterPanel
-            locationSelectorSlot={
-              <LocationSelector
-                onSelect={(locationId, location) => {
-                  if (locationId && location) {
-                    setActiveEst(makeEstablishmentFromLocation(location));
-                    setRefreshTick((t) => t + 1);
-                    setTimeout(() => gridTopRef.current?.scrollIntoView({ behavior: "smooth" }), 0);
-                  }
-                }}
-              />
-            }
-            dateRange={dateRange}
-            onChangeDateRange={setDateRange}
-            searchQuery={searchQuery}
-            onChangeSearchQuery={setSearchQuery}
-            sortBy={sortBy}
-            onChangeSortBy={setSortBy}
-            showUnresponded={showUnresponded}
-            onToggleUnresponded={setShowUnresponded}
-            showResponded={showResponded}
-            onToggleResponded={setShowResponded}
-            selectedStars={selectedStars}
-            onToggleStar={toggleStar}
-            onClearAllFilters={() => {
-              setDateRange("all");
-              setShowUnresponded(false);
-              setShowResponded(false);
-              setSelectedStars(new Set());
-              setSearchQuery("");
-              setSortBy("date-desc");
-            }}
-            onRefresh={() => setRefreshTick((t) => t + 1)}
-            refreshDisabled={loading || !activeEst?.id}
-          />
-
-        </div>
+    <div className="py-6 sm:py-8 overflow-x-hidden">
+      <div className="mb-6">
+        <ReviewsFilterPanel
+          locationSelectorSlot={
+            <LocationSelector
+              onSelect={(locationId, location) => {
+                if (locationId && location) {
+                  setActiveEst(makeEstablishmentFromLocation(location));
+                  setRefreshTick((t) => t + 1);
+                  setTimeout(() => gridTopRef.current?.scrollIntoView({ behavior: "smooth" }), 0);
+                }
+              }}
+            />
+          }
+          dateRange={dateRange}
+          onChangeDateRange={setDateRange}
+          searchQuery={searchQuery}
+          onChangeSearchQuery={setSearchQuery}
+          sortBy={sortBy}
+          onChangeSortBy={setSortBy}
+          showUnresponded={showUnresponded}
+          onToggleUnresponded={setShowUnresponded}
+          showResponded={showResponded}
+          onToggleResponded={setShowResponded}
+          selectedStars={selectedStars}
+          onToggleStar={toggleStar}
+          onClearAllFilters={() => {
+            setDateRange("all");
+            setShowUnresponded(false);
+            setShowResponded(false);
+            setSelectedStars(new Set());
+            setSearchQuery("");
+            setSortBy("date-desc");
+          }}
+          onRefresh={() => setRefreshTick((t) => t + 1)}
+          refreshDisabled={loading || !activeEst?.id}
+        />
+      </div>
 
       <SectionWrapper topPadding="pt-6 sm:pt-10">
-        <div
+        {/* ⬇️ Grid animable */}
+        <motion.div
           ref={gridTopRef}
           className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 justify-items-center"
+          layout
         >
-          {pagedReviews.map((r) => (
-            <div
-              key={r.id}
-              className="
-                w-[80vw] 
-                sm:w-[85%] 
-                md:w-full 
-                max-w-[720px]
-              "
-            >
-              <ReviewCard review={r} />
-            </div>
-          ))}
+          <AnimatePresence mode="popLayout">
+            {pagedReviews.map((r) => (
+              <motion.div
+                key={r.id}
+                layout
+                layoutId={r.id} // suaviza reordenado entre renders
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="
+                  w-[80vw]
+                  sm:w-[85%]
+                  md:w-full
+                  max-w-[720px]
+                "
+              >
+                <ReviewCard review={r} />
+              </motion.div>
+            ))}
 
-          {!loading && pagedReviews.length === 0 && (
-            <div className="col-span-full text-muted-foreground">
-              No hay reseñas.
-            </div>
-          )}
-        </div>
+            {!loading && pagedReviews.length === 0 && (
+              <motion.div
+                key="empty"
+                className="col-span-full text-muted-foreground"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                No hay reseñas.
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
       </SectionWrapper>
-
-
     </div>
   );
 }

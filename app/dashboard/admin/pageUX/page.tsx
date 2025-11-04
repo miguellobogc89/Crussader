@@ -17,11 +17,6 @@ export default function PageUX() {
       title="Reseñas"
       titleIconName="MessageSquare"        // icono a color grande
       description="Lee y responde a tus reseñas"
-      toolbar={
-        <div className="rounded-md border bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          <Chip label="Toolbar" /> Esta barra vive dentro del área de encabezado.
-        </div>
-      }
     >
       {/* ======= BODY: todo lo que pongas aquí vive dentro de PageBody ======= */}
       <div className="space-y-6">
