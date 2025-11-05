@@ -1,4 +1,4 @@
-// app/api/connect/google-business/test/route.ts  (ajusta la ruta si tu archivo está en otro sitio)
+// app/api/connect/google-business/test/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";

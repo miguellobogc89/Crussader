@@ -43,6 +43,13 @@ const REVIEWS: NavItem = {
   description: "Automatización de reseñas",
 };
 
+const INTEGRATIONS: NavItem = {
+  title: "Conexiones",
+  href: "/dashboard/integrations-test-2",
+  icon: "🔌",
+  description: "Conecta tus plataformas sociales",
+};
+
 const SETTINGS: NavItem = {
   title: "Configuración",
   href: "/dashboard/settings",
@@ -268,6 +275,7 @@ useEffect(() => {
         <SidebarItem item={PRICING} active={isActivePath(pathname, PRICING.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
         <SidebarItem item={REVIEWS} active={isActivePath(pathname, REVIEWS.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
         <SidebarItem item={SETTINGS} active={isActivePath(pathname, SETTINGS.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
+        <SidebarItem item={INTEGRATIONS} active={isActivePath(pathname, INTEGRATIONS.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
 
         <div className="mt-2 space-y-1">
           {GROUPS.map((g) => (
