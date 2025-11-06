@@ -1,96 +1,179 @@
+// app/components/integrations/IntegrationPlatformCard.tsx
 "use client";
 
 import * as React from "react";
 import { Card, CardContent } from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/app/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { useBootstrapData } from "@/app/providers/bootstrap-store";
+import { RefreshCcw } from "lucide-react";
 
-export type Status = "connected" | "pending" | "disconnected" | "coming-soon";
+export type IntegrationStatusKey =
+  | "CONNECTED"
+  | "LIMITED"
+  | "EXPIRED"
+  | "REVOKED"
+  | "SYNC_ERROR"
+  | "DISCONNECTED"
+  | "UNKNOWN";
+
+export type ExternalConnInfo = {
+  id: string;
+  companyId: string;
+  provider: string;
+  accountEmail?: string | null;
+  access_token?: string | null;
+  refresh_token?: string | null;
+  expires_at?: Date | null;
+  createdAt?: string | Date | null;
+  updatedAt?: string | Date | null;
+  state?: "NONE" | "EXISTS_NO_TOKEN" | "HAS_TOKEN" | "TOKEN_EXPIRED";
+  hasToken?: boolean;
+  tokenExpired?: boolean;
+};
 
 export type Provider = {
   key: string;
   name: string;
-  status: Status;
-  brandIcon: React.ReactNode; // normalmente <Image> envuelto a 28x28
-  description?: string;
-  clickable?: boolean;        // opcional
+  description: string;
+  brandIcon: React.ReactNode;
+  status?: IntegrationStatusKey;
+  connectUrl?: string;
+  comingSoon?: boolean;
+
+  companyId?: string;
+  providerSlug?: string;
+  externalConnection?: ExternalConnInfo | null;
 };
 
-function SoonBadge() {
-  return (
-    <Badge variant="secondary" className="rounded-full border border-dashed">
-      Próximamente
-    </Badge>
-  );
-}
-
-function StatusBadge({ status }: { status: Status }) {
-  if (status === "connected") return <Badge className="rounded-full bg-emerald-600 hover:bg-emerald-600">Conectado</Badge>;
-  if (status === "pending") return <Badge className="rounded-full bg-amber-500 hover:bg-amber-500">Pendiente</Badge>;
-  if (status === "disconnected") return <Badge variant="outline" className="rounded-full">Sin conexión</Badge>;
-  return <SoonBadge />;
-}
+const STATUS_META: Record<
+  IntegrationStatusKey,
+  { label: string; badgeVariant: "default" | "secondary" | "destructive" | "outline" | null }
+> = {
+  CONNECTED:     { label: "Conectado",    badgeVariant: "default" },
+  LIMITED:       { label: "Limitado",     badgeVariant: "outline" },
+  EXPIRED:       { label: "Expirada",     badgeVariant: "destructive" },
+  REVOKED:       { label: "Revocada",     badgeVariant: "destructive" },
+  SYNC_ERROR:    { label: "Con errores",  badgeVariant: "destructive" },
+  DISCONNECTED:  { label: "Desconectado", badgeVariant: "secondary" },
+  UNKNOWN:       { label: "—",            badgeVariant: "secondary" },
+};
 
 type Props = {
   provider: Provider;
-  /**
-   * Callback de conexión. Si no se pasa, el botón no hará nada (o irá disabled si es "coming-soon").
-   */
-  onConnect?: (providerKey: string) => void | Promise<void>;
+  className?: string;
+  onConnect?: (p: Provider) => void;
+  fixedHeight?: boolean;
 };
 
-export default function IntegrationPlatformCard({ provider, onConnect }: Props) {
-  const [busy, setBusy] = React.useState(false);
+function fmtDate(dt?: string | Date | null): string {
+  if (!dt) return "—";
+  const d = typeof dt === "string" ? new Date(dt) : dt;
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("es-ES", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
 
-  const disabled =
-    provider.status === "coming-soon" ||
-    (provider.status === "connected" && !onConnect); // nada que hacer si ya está conectada
+export default function IntegrationPlatformCard({ provider, className, onConnect, fixedHeight = true }: Props) {
+  const bootstrap = useBootstrapData() as any;
 
-  async function handleConnect() {
-    if (!onConnect || disabled) return;
+  const activeCompanyId: string | undefined =
+    provider.companyId ??
+    bootstrap?.activeCompanyResolved?.id ??
+    bootstrap?.activeCompany?.id ??
+    bootstrap?.company?.id ??
+    bootstrap?.companyId ??
+    bootstrap?.activeCompanyId;
+
+  const ext = provider.externalConnection;
+  const computedState = ext?.state ?? (ext ? (ext.hasToken ? "HAS_TOKEN" : "EXISTS_NO_TOKEN") : "NONE");
+
+  let visualStatus: IntegrationStatusKey = "DISCONNECTED";
+  if (computedState === "HAS_TOKEN") visualStatus = "CONNECTED";
+  if (computedState === "TOKEN_EXPIRED") visualStatus = "EXPIRED";
+
+  const meta = STATUS_META[visualStatus] ?? STATUS_META.UNKNOWN;
+  const [loading, setLoading] = React.useState(false);
+
+  const handleConnect = React.useCallback(() => {
+    if (provider.comingSoon) return;
+    if (!provider.connectUrl) return;
+    setLoading(true);
     try {
-      setBusy(true);
-      await onConnect(provider.key);
+      onConnect?.(provider);
+      window.location.href = provider.connectUrl;
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
-  }
+  }, [onConnect, provider]);
+
+  const handleSync = React.useCallback(() => {
+    // TODO: pegar a tu endpoint de sincronización cuando lo tengas
+  }, []);
+
+  const cta =
+    computedState === "NONE" ? "CREAR"
+    : computedState === "EXISTS_NO_TOKEN" ? "CONNECT"
+    : computedState === "TOKEN_EXPIRED" ? "CONNECT"
+    : "SYNC";
+
+  const needsUrl = cta === "CREAR" || cta === "CONNECT";
+  const canClick = provider.connectUrl && !loading;
 
   return (
-    <Card className="group relative overflow-hidden">
-      <CardContent className="p-5">
-        {/* Header: icono + nombre + estado */}
-        <div className="flex items-center gap-3">
-          <div className="shrink-0">{provider.brandIcon}</div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold">{provider.name}</h3>
-              <StatusBadge status={provider.status} />
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Card
+          className={cn("relative overflow-hidden border transition-all hover:shadow-md", fixedHeight && "h-[200px]", className)}
+          tabIndex={0}
+        >
+          <CardContent className="h-full p-4 flex flex-col">
+            <div className="flex items-start justify-between">
+              <Badge variant={meta.badgeVariant ?? undefined} className="rounded-full">{meta.label}</Badge>
+              <div className="ml-2">{provider.brandIcon}</div>
             </div>
-            {provider.description ? (
-              <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                {provider.description}
-              </p>
-            ) : null}
-          </div>
-        </div>
 
-        {/* Footer: botón a la derecha, estilo discreto */}
-        <div className="mt-4 flex items-center">
-          <div className="ml-auto">
-            <Button
-              onClick={handleConnect}
-              disabled={disabled || busy}
-              // estilo más elegante/discreto: outline suave + fondo leve al hover
-              variant="outline"
-              className="border-muted-foreground/20 text-foreground hover:bg-muted"
-            >
-              {busy ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Conectando…</> : "Conectar"}
-            </Button>
-          </div>
+            <div className="mt-3 space-y-1">
+              <h3 className="text-sm font-semibold leading-none">{provider.name}</h3>
+              <p className="line-clamp-2 text-sm text-muted-foreground">{provider.description}</p>
+            </div>
+
+            <div className="mt-auto pt-4 flex items-end justify-between">
+              <div className="text-xs text-muted-foreground leading-5">
+                <div>Creado: {fmtDate(ext?.createdAt)}</div>
+                <div>Actualizado: {fmtDate(ext?.updatedAt)}</div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {cta === "SYNC" ? (
+                  <Button size="sm" variant="secondary" onClick={handleSync} className="px-2" aria-label="Sincronizar" title="Sincronizar">
+                    <RefreshCcw className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={needsUrl && (!provider.connectUrl || !canClick)}
+                    onClick={handleConnect}
+                    className={cn(needsUrl && !provider.connectUrl && "opacity-60 cursor-not-allowed")}
+                  >
+                    {cta === "CREAR" ? "Crear conexión" : "Conectar"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </TooltipTrigger>
+
+      <TooltipContent side="top" align="center">
+        <div className="space-y-1">
+          <p className="text-xs">Company ID: {activeCompanyId ?? "—"}</p>
+          <p className="text-xs">Provider: {provider.providerSlug ?? provider.key}</p>
+          <p className="text-xs">ExternalConnection ID: {ext?.id ?? "—"}</p>
         </div>
-      </CardContent>
-    </Card>
+      </TooltipContent>
+    </Tooltip>
   );
 }

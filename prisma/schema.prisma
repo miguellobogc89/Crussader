@@ -123,66 +123,68 @@ model ExternalConnection {
 }
 
 model Company {
-  id                   String                @id @default(cuid())
-  name                 String
-  createdById          String
-  createdAt            DateTime              @default(now())
-  activity             String?               @db.VarChar(64)
-  cif                  String?               @db.VarChar(32)
-  employeesBand        String?               @db.VarChar(32)
-  logoUrl              String?
-  address              String?
-  brandColor           String?               @db.VarChar(16)
-  city                 String?
-  country              String?
-  countryCode          String?               @db.VarChar(2)
-  description          String?
-  email                String?
-  facebookUrl          String?
-  instagramUrl         String?
-  lastSyncAt           DateTime?
-  linkedinUrl          String?
-  matrix               String?               @db.VarChar(128)
-  phone                String?
-  postalCode           String?
-  region               String?
-  registryId           String?               @db.VarChar(64)
-  reviewsAvg           Decimal?              @db.Decimal(3, 2)
-  reviewsCount         Int                   @default(0)
-  twitterUrl           String?
-  updatedAt            DateTime              @default(now()) @updatedAt
-  vatNumber            String?               @db.VarChar(32)
-  website              String?
-  plan                 String?               @default("free")
-  planRenewsAt         DateTime?
-  stripeCustomerId     String?
-  stripeSubscriptionId String?
-  agentSettings        Json?
-  voiceAgentId         String?
-  account_id           String?               @db.Uuid
-  Agents               Agent[]
-  AgentSessions        AgentSession[]
-  voiceAgent           VoiceAgent?           @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id])
-  account              account?              @relation(fields: [account_id], references: [id], onUpdate: NoAction, map: "fk_company_account")
-  customers            CompanyCustomer[]
-  jobs                 Job[]
-  knowledgeItems       KnowledgeItem[]
-  knowledgeSections    KnowledgeSection[]
-  knowledgeSpaces      KnowledgeSpace[]
-  Lead                 Lead[]
-  Location             Location[]
-  LocationKpiDaily     LocationKpiDaily[]    @relation("CompanyToKpiDaily")
-  responseSettings     ResponseSettings?
-  Reviews              Review[]              @relation("CompanyReviews")
-  UserCompany          UserCompany[]
-  WebchatSites         WebchatSite[]         @relation("CompanyToWebchatSite")
-  billing_account      billing_account?
-  discount_redemption  discount_redemption[]
-  entitlement          entitlement[]
-  invoice              invoice[]
-  subscription         subscription[]
-  theme_candidate      theme_candidate[]
-  themes               themes[]
+  id                          String                        @id @default(cuid())
+  name                        String
+  createdById                 String
+  createdAt                   DateTime                      @default(now())
+  activity                    String?                       @db.VarChar(64)
+  cif                         String?                       @db.VarChar(32)
+  employeesBand               String?                       @db.VarChar(32)
+  logoUrl                     String?
+  address                     String?
+  brandColor                  String?                       @db.VarChar(16)
+  city                        String?
+  country                     String?
+  countryCode                 String?                       @db.VarChar(2)
+  description                 String?
+  email                       String?
+  facebookUrl                 String?
+  instagramUrl                String?
+  lastSyncAt                  DateTime?
+  linkedinUrl                 String?
+  matrix                      String?                       @db.VarChar(128)
+  phone                       String?
+  postalCode                  String?
+  region                      String?
+  registryId                  String?                       @db.VarChar(64)
+  reviewsAvg                  Decimal?                      @db.Decimal(3, 2)
+  reviewsCount                Int                           @default(0)
+  twitterUrl                  String?
+  updatedAt                   DateTime                      @default(now()) @updatedAt
+  vatNumber                   String?                       @db.VarChar(32)
+  website                     String?
+  plan                        String?                       @default("free")
+  planRenewsAt                DateTime?
+  stripeCustomerId            String?
+  stripeSubscriptionId        String?
+  agentSettings               Json?
+  voiceAgentId                String?
+  account_id                  String?                       @db.Uuid
+  Agents                      Agent[]
+  AgentSessions               AgentSession[]
+  voiceAgent                  VoiceAgent?                   @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id])
+  account                     account?                      @relation(fields: [account_id], references: [id], onUpdate: NoAction, map: "fk_company_account")
+  customers                   CompanyCustomer[]
+  jobs                        Job[]
+  knowledgeItems              KnowledgeItem[]
+  knowledgeSections           KnowledgeSection[]
+  knowledgeSpaces             KnowledgeSpace[]
+  Lead                        Lead[]
+  Location                    Location[]
+  LocationKpiDaily            LocationKpiDaily[]            @relation("CompanyToKpiDaily")
+  LocationReviewHourlyMonthly LocationReviewHourlyMonthly[]
+  LocationReviewMonthly       LocationReviewMonthly[]
+  responseSettings            ResponseSettings?
+  Reviews                     Review[]                      @relation("CompanyReviews")
+  UserCompany                 UserCompany[]
+  WebchatSites                WebchatSite[]                 @relation("CompanyToWebchatSite")
+  billing_account             billing_account?
+  discount_redemption         discount_redemption[]
+  entitlement                 entitlement[]
+  invoice                     invoice[]
+  subscription                subscription[]
+  theme_candidate             theme_candidate[]
+  themes                      themes[]
 
   @@index([name])
   @@index([activity])
@@ -224,60 +226,62 @@ model Lead {
 }
 
 model Location {
-  id                   String              @id @default(cuid())
-  companyId            String
-  title                String
-  address              String?
-  city                 String?
-  region               String?
-  country              String?
-  postalCode           String?
-  phone                String?
-  website              String?
-  googleName           String?
-  googlePlaceId        String?             @unique
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @default(now()) @updatedAt
-  address2             String?
-  countryCode          String?             @db.VarChar(2)
-  email                String?
-  externalConnectionId String?
-  facebookUrl          String?
-  featuredImageUrl     String?
-  googleAccountId      String?
-  googleLocationId     String?
-  instagramUrl         String?
-  lastSyncAt           DateTime?
-  latitude             Decimal?            @db.Decimal(10, 7)
-  longitude            Decimal?            @db.Decimal(10, 7)
-  openingHours         Json?
-  reviewsAvg           Decimal?            @db.Decimal(3, 2)
-  reviewsCount         Int                 @default(0)
-  slug                 String?             @unique
-  status               LocationStatus?     @default(DRAFT)
-  timezone             String?
-  isFeatured           Boolean             @default(false)
-  activityId           String?
-  typeId               String?
-  exceptions           Json?
-  agentSessions        AgentSession[]
-  appointments         Appointment[]
-  employeeLinks        EmployeeLocation[]
-  employeeTimeOffs     EmployeeTimeOff[]
-  jobs                 Job[]
-  activity             Activity?           @relation(fields: [activityId], references: [id])
-  company              Company             @relation(fields: [companyId], references: [id])
-  ExternalConnection   ExternalConnection? @relation(fields: [externalConnectionId], references: [id])
-  type                 Type?               @relation(fields: [typeId], references: [id])
-  KpiDaily             LocationKpiDaily[]  @relation("LocationToKpiDaily")
-  resources            Resource[]
-  resourceTimeOffs     ResourceTimeOff[]
-  Reviews              Review[]            @relation("LocationReviews")
-  services             Service[]
-  UserLocation         UserLocation[]
-  WebchatSites         WebchatSite[]       @relation("LocationToWebchatSite")
-  theme_candidate      theme_candidate[]
-  themes               themes[]
+  id                          String                        @id @default(cuid())
+  companyId                   String
+  title                       String
+  address                     String?
+  city                        String?
+  region                      String?
+  country                     String?
+  postalCode                  String?
+  phone                       String?
+  website                     String?
+  googleName                  String?
+  googlePlaceId               String?                       @unique
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime                      @default(now()) @updatedAt
+  address2                    String?
+  countryCode                 String?                       @db.VarChar(2)
+  email                       String?
+  externalConnectionId        String?
+  facebookUrl                 String?
+  featuredImageUrl            String?
+  googleAccountId             String?
+  googleLocationId            String?
+  instagramUrl                String?
+  lastSyncAt                  DateTime?
+  latitude                    Decimal?                      @db.Decimal(10, 7)
+  longitude                   Decimal?                      @db.Decimal(10, 7)
+  openingHours                Json?
+  reviewsAvg                  Decimal?                      @db.Decimal(3, 2)
+  reviewsCount                Int                           @default(0)
+  slug                        String?                       @unique
+  status                      LocationStatus?               @default(DRAFT)
+  timezone                    String?
+  isFeatured                  Boolean                       @default(false)
+  activityId                  String?
+  typeId                      String?
+  exceptions                  Json?
+  agentSessions               AgentSession[]
+  appointments                Appointment[]
+  employeeLinks               EmployeeLocation[]
+  employeeTimeOffs            EmployeeTimeOff[]
+  jobs                        Job[]
+  activity                    Activity?                     @relation(fields: [activityId], references: [id])
+  company                     Company                       @relation(fields: [companyId], references: [id])
+  ExternalConnection          ExternalConnection?           @relation(fields: [externalConnectionId], references: [id])
+  type                        Type?                         @relation(fields: [typeId], references: [id])
+  KpiDaily                    LocationKpiDaily[]            @relation("LocationToKpiDaily")
+  LocationReviewHourlyMonthly LocationReviewHourlyMonthly[]
+  LocationReviewMonthly       LocationReviewMonthly[]
+  resources                   Resource[]
+  resourceTimeOffs            ResourceTimeOff[]
+  Reviews                     Review[]                      @relation("LocationReviews")
+  services                    Service[]
+  UserLocation                UserLocation[]
+  WebchatSites                WebchatSite[]                 @relation("LocationToWebchatSite")
+  theme_candidate             theme_candidate[]
+  themes                      themes[]
 
   @@index([companyId])
   @@index([googleAccountId])
@@ -319,6 +323,10 @@ model Review {
   updatedAt         DateTime        @default(now()) @updatedAt
   isTest            Boolean         @default(false)
   is_conceptualized Boolean         @default(false)
+  responded         Boolean         @default(false)
+  respondedAt       DateTime?       @db.Timestamptz(6)
+  respondedSource   ResponseOrigin?
+  responseDelaySec  Int?
   jobs              Job[]
   Notification      Notification[]
   responses         Response[]
@@ -1404,6 +1412,7 @@ model concept {
   assigned_at DateTime? @db.Timestamptz(6)
   rating      Int?
   review_date DateTime? @db.Timestamptz(6)
+  location_id String?
   review      Review?   @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   topic       topic?    @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
 
@@ -1572,6 +1581,43 @@ model Notification {
   @@index([notified_at(sort: Desc)], map: "idx_notification_notified")
   @@index([object_id], map: "idx_notification_object_id")
   @@index([status], map: "idx_notification_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model LocationReviewHourlyMonthly {
+  companyId    String
+  locationId   String
+  monthDate    DateTime @db.Date
+  hourlyCounts Int[]    @default([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+  computedAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @db.Timestamptz(6)
+  Company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LocationReviewHourlyMonthly_company_fkey")
+  Location     Location @relation(fields: [locationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LocationReviewHourlyMonthly_location_fkey")
+
+  @@id([locationId, monthDate])
+  @@index([companyId, monthDate], map: "LocationReviewHourlyMonthly_company_month_idx")
+}
+
+model LocationReviewMonthly {
+  companyId      String
+  locationId     String
+  monthDate      DateTime @db.Date
+  reviewsCount   Int      @default(0)
+  avgRating      Decimal? @db.Decimal(3, 2)
+  answeredCount  Int      @default(0)
+  star1Count     Int      @default(0)
+  star2Count     Int      @default(0)
+  star3Count     Int      @default(0)
+  star4Count     Int      @default(0)
+  star5Count     Int      @default(0)
+  answeredByStar Json     @default("{}")
+  computedAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @db.Timestamptz(6)
+  Company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LocationReviewMonthly_company_fkey")
+  Location       Location @relation(fields: [locationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LocationReviewMonthly_location_fkey")
+
+  @@id([locationId, monthDate])
+  @@index([companyId, monthDate], map: "LocationReviewMonthly_company_month_idx")
 }
 
 /// *
@@ -1854,4 +1900,9 @@ enum SubscriptionStatus {
   ACTIVE
   CANCELED
   EXPIRED
+}
+
+enum ResponseOrigin {
+  GOOGLE
+  CRUSSADER
 }
