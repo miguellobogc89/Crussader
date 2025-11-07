@@ -3,27 +3,38 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import IntegrationPlatformCard, { type Provider, type ExternalConnInfo } from "@/app/components/integrations/IntegrationPlatformCard";
+import IntegrationPlatformCard, {
+  type Provider,
+  type ExternalConnInfo,
+} from "@/app/components/integrations/IntegrationPlatformCard";
 import { useBootstrapData } from "@/app/providers/bootstrap-store";
-import { TooltipProvider } from "@/app/components/ui/tooltip";
 
 /** Slug EXACTO como se guarda en ExternalConnection.provider */
 function mapKeyToProviderSlug(key: string): string {
   switch (key) {
     case "google":
       return "google-business";
+    case "facebook":
+      return "facebook";
+    case "calendar":
+      return "google-calendar";
+    case "instagram":
+      return "instagram";
     default:
       return key;
   }
 }
 
-/** GET /api/integrations?companyId=...&provider=...&debug=1  -> { data: ExternalConnInfo | null } */
-async function fetchExternalConnectionInfo(providerSlug: string, companyIdRaw: string): Promise<ExternalConnInfo | null> {
+/** GET /api/integrations?companyId=...&provider=... -> { data: ExternalConnInfo | null } */
+async function fetchExternalConnectionInfo(
+  providerSlug: string,
+  companyIdRaw: string
+): Promise<ExternalConnInfo | null> {
   try {
     const companyId = (companyIdRaw ?? "").trim();
     if (!companyId) return null;
 
-    const qs = new URLSearchParams({ provider: providerSlug, companyId, debug: "1" }); // debug=1 temporal
+    const qs = new URLSearchParams({ provider: providerSlug, companyId });
     const res = await fetch(`/api/integrations?${qs.toString()}`, {
       method: "GET",
       credentials: "include",
@@ -53,18 +64,14 @@ export default function IntegrationsGridClient({
     if (b.company?.id) return String(b.company.id).trim();
     if (typeof b.activeCompanyId === "string") return b.activeCompanyId.trim();
     if (typeof b.companyId === "string") return b.companyId.trim();
-    if (Array.isArray(b.companiesResolved) && b.companiesResolved[0]?.id) return String(b.companiesResolved[0].id).trim();
+    if (Array.isArray(b.companiesResolved) && b.companiesResolved[0]?.id)
+      return String(b.companiesResolved[0].id).trim();
     return undefined;
   }, [bootstrap]);
 
-  const [returnTo, setReturnTo] = React.useState<string>("/dashboard/integrations-test-2");
-  React.useEffect(() => {
-    if (typeof window !== "undefined" && window.location?.pathname) {
-      setReturnTo(window.location.pathname);
-    }
-  }, []);
-
-  const [externalInfoMap, setExternalInfoMap] = React.useState<Record<string, ExternalConnInfo | null>>({});
+  const [externalInfoMap, setExternalInfoMap] = React.useState<
+    Record<string, ExternalConnInfo | null>
+  >({});
 
   React.useEffect(() => {
     let cancelled = false;
@@ -84,47 +91,52 @@ export default function IntegrationsGridClient({
       }
     }
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [companyId, providers]);
 
   const eased = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
   return (
-    <TooltipProvider delayDuration={150}>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {providers.map((p, idx) => {
-          const providerSlug = mapKeyToProviderSlug(p.key);
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {providers.map((p, idx) => {
+        const providerSlug = mapKeyToProviderSlug(p.key);
 
-          let url = p.connectUrl ?? connectUrls?.[p.key];
-          if (url) {
-            const base = typeof window !== "undefined" && window.location?.origin ? window.location.origin : "http://localhost";
-            const u = new URL(url, base);
-            if (!u.searchParams.get("returnTo") && returnTo) u.searchParams.set("returnTo", returnTo);
-            if (companyId && !u.searchParams.get("companyId")) u.searchParams.set("companyId", companyId);
-            const qs = u.searchParams.toString();
-            url = qs ? `${u.pathname}?${qs}` : u.pathname;
+        // Construir connectUrl con returnTo y companyId
+        let url = p.connectUrl ?? connectUrls?.[p.key];
+        if (url) {
+          const base =
+            typeof window !== "undefined" && window.location?.origin
+              ? window.location.origin
+              : "http://localhost";
+          const u = new URL(url, base);
+          if (companyId && !u.searchParams.get("companyId")) {
+            u.searchParams.set("companyId", companyId);
           }
+          const qs = u.searchParams.toString();
+          url = qs ? `${u.pathname}?${qs}` : u.pathname;
+        }
 
-          const provider: Provider = {
-            ...p,
-            connectUrl: url,
-            companyId,
-            providerSlug,
-            externalConnection: externalInfoMap[p.key] ?? null,
-          };
+        const provider: Provider = {
+          ...p,
+          connectUrl: url,
+          companyId,
+          providerSlug,
+          externalConnection: externalInfoMap[p.key] ?? null,
+        };
 
-          return (
-            <motion.div
-              key={p.key}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, ease: eased, delay: idx * 0.04 }}
-            >
-              <IntegrationPlatformCard provider={provider} fixedHeight />
-            </motion.div>
-          );
-        })}
-      </div>
-    </TooltipProvider>
+        return (
+          <motion.div
+            key={p.key}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: eased, delay: idx * 0.04 }}
+          >
+            <IntegrationPlatformCard provider={provider} fixedHeight />
+          </motion.div>
+        );
+      })}
+    </div>
   );
 }

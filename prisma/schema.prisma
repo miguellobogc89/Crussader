@@ -40,6 +40,11 @@ model User {
   updatedAt                           DateTime             @updatedAt
   onboardingStatus                    OnboardingStatus     @default(PENDING)
   account_id                          String?              @db.Uuid
+  pendingEmail                        String?
+  pendingEmailToken                   String?
+  pendingEmailTokenExpiresAt          DateTime?            @db.Timestamptz(6)
+  phoneVerifiedAt                     DateTime?            @db.Timestamptz(6)
+  uiTheme                             String               @default("system")
   AuthAccount                         AuthAccount[]
   ExternalConnection                  ExternalConnection[]
   Notification                        Notification[]
