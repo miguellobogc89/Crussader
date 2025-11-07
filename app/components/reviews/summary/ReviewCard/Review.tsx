@@ -3,6 +3,7 @@
 
 import Image from "next/image";
 import { Star } from "lucide-react";
+import type { CSSProperties } from "react";
 
 type Props = {
   author: string;
@@ -10,6 +11,7 @@ type Props = {
   rating: number;
   dateISO: string;
   avatarUrl?: string;
+  maxLines?: number; // 👉 opcional, no rompe nada si no se usa
 };
 
 function timeAgoEs(iso: string) {
@@ -44,9 +46,26 @@ function Stars({ value }: { value: number }) {
   );
 }
 
-export default function Review({ author, content, rating, dateISO, avatarUrl }: Props) {
+export default function Review({ author, content, rating, dateISO, avatarUrl, maxLines }: Props) {
   const when = timeAgoEs(dateISO);
   const initial = (author || "?").charAt(0).toUpperCase();
+
+  const baseTextStyle: CSSProperties = {
+    fontSize: "clamp(14px,1.0vw,15px)",
+    lineHeight: "clamp(20px,2.2vw,24px)",
+    letterSpacing: "0.005em",
+  };
+
+  const textStyle: CSSProperties = maxLines
+    ? {
+        ...baseTextStyle,
+        display: "-webkit-box",
+        WebkitLineClamp: maxLines,
+        WebkitBoxOrient: "vertical",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }
+    : baseTextStyle;
 
   return (
     <div
@@ -100,17 +119,12 @@ export default function Review({ author, content, rating, dateISO, avatarUrl }: 
             </span>
           </div>
         </div>
-
       </div>
 
       {/* Texto de la reseña */}
       <p
         className="mt-[clamp(10px,1.8vw,6px)] text-neutral-900 whitespace-pre-wrap"
-        style={{
-          fontSize: "clamp(14px,1.0vw,15px)",
-          lineHeight: "clamp(20px,2.2vw,24px)",
-          letterSpacing: "0.005em",
-        }}
+        style={textStyle}
       >
         {content}
       </p>

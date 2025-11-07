@@ -1,3 +1,4 @@
+// app/components/reviews/summary/ReviewCard/ReviewCard.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -5,7 +6,6 @@ import { Card, CardContent } from "@/app/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import Review from "@/app/components/reviews/summary/ReviewCard/Review";
 import Response, { type UIStatus } from "@/app/components/reviews/summary/ReviewCard/Response";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
 /* ------------------------- Tipos ------------------------- */
 interface ReviewT {
@@ -39,42 +39,65 @@ function normalizeStatus(s: string | undefined): UIStatus {
   return "draft";
 }
 
-/* Badge flotante (esquina superior derecha) — tonos claros */
+/* Badge flotante (esquina superior derecha) */
 function CornerBadge({
   reviewPublished,
+  hasResponse,
   onClick,
 }: {
   reviewPublished: boolean;
+  hasResponse: boolean;
   onClick?: () => void;
 }) {
-  // Pediste que el chip de la REVIEW refleje: Pendiente hasta publicar, y Publicada si hay publicación
-  const cfg = reviewPublished
-    ? { label: "Publicada", cls: "bg-emerald-50 text-emerald-800 border border-emerald-200" }
-    : { label: "Pendiente", cls: "bg-amber-50 text-amber-800 border border-amber-200" };
+  let label: string;
+  let cls: string;
+
+  if (!hasResponse) {
+    label = "Sin respuesta";
+    cls = "bg-neutral-50 text-neutral-600 border border-neutral-200";
+  } else if (reviewPublished) {
+    label = "Publicada";
+    cls = "bg-emerald-50 text-emerald-800 border border-emerald-200";
+  } else {
+    label = "Pendiente";
+    cls = "bg-amber-50 text-amber-800 border border-amber-200";
+  }
 
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (onClick) onClick();
+      }}
       className={`
         absolute top-3 right-3 z-10
         inline-flex items-center justify-center
         h-7 px-3 rounded-full text-[11px] font-medium shadow-sm
-        ${cfg.cls}
+        ${cls}
       `}
-      aria-label={cfg.label}
-      title={cfg.label}
+      aria-label={label}
+      title={label}
     >
-      {cfg.label}
+      {label}
     </button>
   );
 }
 
 /* ======================================================= */
-export default function ReviewCard({ review, businessResponse, responses }: ReviewCardProps) {
+export default function ReviewCard({
+  review,
+  businessResponse,
+  responses,
+}: ReviewCardProps) {
   // Lista y versión activa (index 0 = la más reciente)
   const initialList = useMemo<BusinessResponse[]>(
-    () => (responses?.length ? responses : businessResponse ? [businessResponse] : []),
+    () =>
+      responses?.length
+        ? responses
+        : businessResponse
+        ? [businessResponse]
+        : [],
     [responses, businessResponse]
   );
   const [list, setList] = useState<BusinessResponse[]>(initialList);
@@ -89,9 +112,10 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
 
   const respText = current?.content ?? "";
   const hasResponse = respText.trim().length > 0;
-  const isPublished = Boolean(current?.published || current?.status === "published");
+  const isPublished = Boolean(
+    current?.published || current?.status === "published"
+  );
 
-  // El chip de la REVIEW: publicado si existe alguna publicada, si no -> pendiente
   const reviewPublished = useMemo(
     () => list.some((r) => r.published || r.status === "published"),
     [list]
@@ -104,7 +128,10 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
 
     (async () => {
       try {
-        const res = await fetch(`/api/reviews/${review.id}/responses?latest=1`, { cache: "no-store" });
+        const res = await fetch(
+          `/api/reviews/${review.id}/responses?latest=1`,
+          { cache: "no-store" }
+        );
         if (!res.ok) return;
         const json = await res.json();
         const latest = json?.responses?.[0] ?? json?.response ?? null;
@@ -121,7 +148,10 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
           setIdx(0);
         }
       } catch {
-        toast({ variant: "error", title: "Error cargando respuestas" });
+        toast({
+          variant: "error",
+          title: "Error cargando respuestas",
+        });
       }
     })();
 
@@ -130,12 +160,16 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
     };
   }, [review.id, businessResponse, responses]);
 
-  // Medida para la animación del acordeón
+  // Medida para la animación del acordeón:
+  // misma lógica SIEMPRE, sin depender del estado (draft/published),
+  // solo del contenido actual.
+  // Medida para la animación del acordeón (deps tamaño fijo)
   useEffect(() => {
     if (contentRef.current) {
       setMaxH(contentRef.current.scrollHeight);
     }
-  }, [isExpanded, respText, list.length, idx, isPublished]);
+  }, [isExpanded, respText, list.length, idx, hasResponse]);
+
 
   async function regenerate() {
     setBusy(true);
@@ -148,7 +182,9 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
       });
       const data = await res.json();
       if (!res.ok || !data?.ok || !data?.response) {
-        throw new Error(data?.error || "No se pudo generar la respuesta");
+        throw new Error(
+          data?.error || "No se pudo generar la respuesta"
+        );
       }
       const r = data.response;
       const normalized: BusinessResponse = {
@@ -159,12 +195,19 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
         edited: Boolean(r.edited),
         createdAt: r.createdAt,
       };
-      setList((prev) => [normalized, ...prev]); // prepend = nueva versión
+      setList((prev) => [normalized, ...prev]);
       setIdx(0);
-      setIsExpanded(true); // abrir al generar
-      toast({ title: "Respuesta generada", description: "Revisa y publica cuando quieras." });
+      setIsExpanded(true);
+      toast({
+        title: "Respuesta generada",
+        description: "Revisa y publica cuando quieras.",
+      });
     } catch (e: any) {
-      toast({ variant: "error", title: "Error", description: String(e.message || e) });
+      toast({
+        variant: "error",
+        title: "Error",
+        description: String(e.message || e),
+      });
     } finally {
       setBusy(false);
     }
@@ -174,20 +217,40 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
     if (!current?.id) return;
     setBusy(true);
     const prev = { ...current };
-    // Optimista
     setList((prevList) =>
-      prevList.map((r, i) => (i === idx ? { ...r, published: true, status: "published" } : r))
+      prevList.map((r, i) =>
+        i === idx
+          ? { ...r, published: true, status: "published" }
+          : r
+      )
     );
     try {
-      const res = await fetch(`/api/responses/${current.id}/publish`, { method: "POST", cache: "no-store" });
+      const res = await fetch(`/api/responses/${current.id}/publish`, {
+        method: "POST",
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error("No se pudo publicar");
-      toast({ title: "Publicado", description: "La respuesta se ha publicado correctamente." });
+      toast({
+        title: "Publicado",
+        description: "La respuesta se ha publicado correctamente.",
+      });
     } catch (e: any) {
-      // rollback
       setList((prevList) =>
-        prevList.map((r, i) => (i === idx ? { ...r, published: prev.published, status: prev.status } : r))
+        prevList.map((r, i) =>
+          i === idx
+            ? {
+                ...r,
+                published: prev.published,
+                status: prev.status,
+              }
+            : r
+        )
       );
-      toast({ variant: "error", title: "Error publicando", description: String(e.message || e) });
+      toast({
+        variant: "error",
+        title: "Error publicando",
+        description: String(e.message || e),
+      });
     } finally {
       setBusy(false);
     }
@@ -204,20 +267,39 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
         cache: "no-store",
       });
       const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "No se pudo guardar la respuesta");
+      if (!res.ok || !data?.ok) {
+        throw new Error(
+          data?.error || "No se pudo guardar la respuesta"
+        );
+      }
       const updated = data?.response as any;
       const normalized: BusinessResponse = {
         id: updated?.id ?? current.id,
         content: updated?.content ?? newContent,
-        status: normalizeStatus(updated?.status ?? current.status),
-        published: Boolean(updated?.published ?? current.published),
+        status: normalizeStatus(
+          updated?.status ?? current.status
+        ),
+        published: Boolean(
+          updated?.published ?? current.published
+        ),
         edited: true,
         createdAt: updated?.createdAt ?? current.createdAt,
       };
-      setList((prev) => prev.map((r, i) => (i === idx ? { ...r, ...normalized } : r)));
-      toast({ title: "Guardada", description: "Los cambios se han guardado." });
+      setList((prev) =>
+        prev.map((r, i) =>
+          i === idx ? { ...r, ...normalized } : r
+        )
+      );
+      toast({
+        title: "Guardada",
+        description: "Los cambios se han guardado.",
+      });
     } catch (e: any) {
-      toast({ variant: "error", title: "Error guardando", description: String(e.message || e) });
+      toast({
+        variant: "error",
+        title: "Error guardando",
+        description: String(e.message || e),
+      });
     } finally {
       setBusy(false);
     }
@@ -225,30 +307,41 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
 
   async function removeCurrent() {
     if (!current?.id) return;
-    const ok = confirm("¿Seguro que deseas borrar esta respuesta?");
+    const ok = confirm(
+      "¿Seguro que deseas borrar esta respuesta?"
+    );
     if (!ok) return;
 
     setBusy(true);
     try {
-      // Si tienes endpoint DELETE por ID directo:
-      const res = await fetch(`/api/responses/${current.id}`, { method: "DELETE", cache: "no-store" });
-      if (!res.ok) throw new Error("No se pudo borrar la respuesta");
+      const res = await fetch(`/api/responses/${current.id}`, {
+        method: "DELETE",
+        cache: "no-store",
+      });
+      if (!res.ok)
+        throw new Error("No se pudo borrar la respuesta");
 
       setList((prev) => {
         const next = prev.filter((_, i) => i !== idx);
-        // Recolocar índice
         if (next.length === 0) {
           setIdx(-1);
         } else if (idx >= next.length) {
           setIdx(next.length - 1);
         } else {
-          setIdx(idx); // mismo índice, ahora otro elemento
+          setIdx(idx);
         }
         return next;
       });
-      toast({ title: "Eliminada", description: "La respuesta se ha borrado." });
+      toast({
+        title: "Eliminada",
+        description: "La respuesta se ha borrado.",
+      });
     } catch (e: any) {
-      toast({ variant: "error", title: "Error borrando", description: String(e.message || e) });
+      toast({
+        variant: "error",
+        title: "Error borrando",
+        description: String(e.message || e),
+      });
     } finally {
       setBusy(false);
     }
@@ -258,40 +351,60 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
     if (list.length <= 1) return;
     setIdx((i) => (i <= 0 ? list.length - 1 : i - 1));
   }
+
   function goNext() {
     if (list.length <= 1) return;
     setIdx((i) => (i >= list.length - 1 ? 0 : i + 1));
   }
 
+  // --- Layout colapsado: altura fija + clamps ---
+  const showGenerateCTA =
+    !isExpanded && !reviewPublished && !hasResponse;
+
+  const reviewMaxLines = !isExpanded
+    ? showGenerateCTA
+      ? 2 // sin respuesta → 2 líneas + botón abajo
+      : 4 // con respuesta/publicada → más espacio para leer
+    : undefined; // expandido → texto completo
+
+  function handleCardClick() {
+    setIsExpanded((v) => !v);
+  }
+
   return (
     <Card
-      className="
+      className={`
         group relative
         hover:shadow-[var(--shadow-hover)]
         transition-all duration-300
         border-border bg-white from-card to-muted/20
         w-full max-w-full overflow-hidden
-      "
-      onClick={() => setIsExpanded((v) => !v)}
+        ${!isExpanded ? "h-[230px]" : ""}
+      `}
+      onClick={handleCardClick}
       role="button"
       aria-expanded={isExpanded}
     >
-      {/* Badge top-right SIEMPRE visible (no desaparece al expandir) */}
-      <CornerBadge reviewPublished={reviewPublished} onClick={() => setIsExpanded(true)} />
+      <CornerBadge
+        reviewPublished={reviewPublished}
+        hasResponse={hasResponse}
+        onClick={() => setIsExpanded(true)}
+      />
 
-      <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-5">
-        {/* REVIEW */}
+      <CardContent className="flex flex-col h-full p-4 sm:p-6">
+        {/* REVIEW con clamp dinámico */}
         <Review
           author={review.author}
           content={review.content}
           rating={review.rating}
           dateISO={review.date}
           avatarUrl={review.avatar}
+          maxLines={reviewMaxLines}
         />
 
-        {/* CTA morado abajo-derecha SOLO si está Pendiente (no hay ninguna publicada) y la card está colapsada */}
-        {!isExpanded && !reviewPublished && !hasResponse && (
-          <div className="absolute bottom-3 right-3">
+        {/* CTA inferior solo sin respuesta (2 líneas arriba) */}
+        {showGenerateCTA && (
+          <div className="mt-auto pt-3">
             <button
               type="button"
               onClick={(e) => {
@@ -300,14 +413,29 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
               }}
               disabled={busy}
               className="
-                inline-flex items-center gap-2 rounded-full
-                bg-violet-600 text-white hover:bg-violet-700
-                h-8 px-3 text-xs disabled:opacity-50 shadow
+                w-full
+                flex items-center justify-center gap-2
+                rounded-xl border border-dashed border-neutral-200
+                bg-neutral-50/80
+                px-4 py-3
+                text-xs font-medium text-neutral-600
+                hover:bg-neutral-100 hover:text-neutral-800
+                disabled:opacity-50
+                transition-colors
               "
-              title="Generar respuesta"
-              aria-label="Generar respuesta"
+              title="Generar respuesta con IA"
+              aria-label="Generar respuesta con IA"
             >
-              Generar respuesta
+              <span
+                className="
+                  inline-flex items-center justify-center
+                  w-5 h-5 rounded-full border border-neutral-300
+                  text-[10px] leading-none
+                "
+              >
+                ↻
+              </span>
+              <span>Generar respuesta con IA</span>
             </button>
           </div>
         )}
@@ -322,10 +450,7 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
           `}
           style={{ maxHeight: isExpanded ? maxH : 0 }}
         >
-          {/* Separador */}
-          <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mb-3" />
-
-          {/* Si no hay ninguna respuesta aún: CTA morado interno */}
+          {/* Si no hay ninguna respuesta aún: CTA interno */}
           {!hasResponse && !reviewPublished && (
             <div className="flex justify-end">
               <button
@@ -345,9 +470,12 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
             </div>
           )}
 
-          {/* Con respuesta: mostramos Response con sus acciones contextuales */}
+          {/* Con respuesta: separador + Response, mismo layout para todos los estados */}
           {hasResponse && (
             <>
+              {/* Línea SIEMPRE que hay respuesta, dentro del panel, igual para publicada / pendiente */}
+              <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mb-3" />
+
               <Response
                 reviewId={review.id}
                 responseId={current?.id}
@@ -356,44 +484,24 @@ export default function ReviewCard({ review, businessResponse, responses }: Revi
                 published={isPublished}
                 edited={current?.edited}
                 busy={busy}
-                // acciones (publicación / regeneración sólo si no publicada)
                 allowRegenerate={!isPublished}
                 allowPublish={!isPublished}
-                allowEdit={true} // Google permite editar también publicadas
+                allowEdit={true}
                 onRegenerate={regenerate}
                 onPublish={publish}
                 onSave={save}
                 onDelete={removeCurrent}
+                versionInfo={
+                  list.length
+                    ? {
+                        index: Math.max(idx, 0),
+                        total: list.length,
+                        onPrev: list.length > 1 ? goPrev : undefined,
+                        onNext: list.length > 1 ? goNext : undefined,
+                      }
+                    : undefined
+                }
               />
-
-              {/* Paginación de versiones (abajo-dcha) */}
-              {list.length > 1 && (
-                <div className="mt-3 flex items-center justify-end gap-2">
-                  <button
-                    className="rounded-full border px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
-                    onClick={goPrev}
-                    disabled={busy}
-                    title="Anterior"
-                    aria-label="Anterior"
-                    type="button"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <div className="px-2 text-xs text-neutral-500">
-                    {idx + 1} / {list.length}
-                  </div>
-                  <button
-                    className="rounded-full border px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
-                    onClick={goNext}
-                    disabled={busy}
-                    title="Siguiente"
-                    aria-label="Siguiente"
-                    type="button"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
             </>
           )}
         </div>

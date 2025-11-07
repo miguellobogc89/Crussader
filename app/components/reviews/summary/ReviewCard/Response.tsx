@@ -1,17 +1,27 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { RotateCcw, Edit3, Save, X, Send, MoreVertical, Trash2 } from "lucide-react";
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from "@/app/components/ui/dropdown-menu";
+  RotateCcw,
+  Edit3,
+  Save,
+  X,
+  Send,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
 
 export type UIStatus = "pending" | "published" | "draft";
+
+type VersionInfo = {
+  index: number; // índice actual (0-based)
+  total: number; // total de versiones
+  onPrev?: () => void;
+  onNext?: () => void;
+};
 
 type Props = {
   content: string;
@@ -35,14 +45,16 @@ type Props = {
   responseId?: string;
 
   defaultEditing?: boolean;
+
+  versionInfo?: VersionInfo;
 };
 
 export default function Response({
   content,
   status = "draft",
   published,
-  edited,
-  title = "Respuesta del negocio",
+  edited, // mantenido por compat aunque no se pinte
+  title = "Respuesta generada con IA",
 
   allowRegenerate = true,
   allowPublish = true,
@@ -56,6 +68,7 @@ export default function Response({
   onDelete,
 
   defaultEditing = false,
+  versionInfo,
 }: Props) {
   const isPublished = useMemo(() => {
     if (typeof published === "boolean") return published;
@@ -70,53 +83,45 @@ export default function Response({
     setDraft(content);
     setIsEditing(true);
   }
+
   function cancelEdit() {
     if (busy) return;
     setIsEditing(false);
     setDraft(content);
   }
+
   async function saveEdit() {
     if (!onSave || busy) return;
     const next = draft.trim();
-    if (next.length === 0) return;
+    if (!next.length) return;
     await onSave(next);
     setIsEditing(false);
   }
 
+  const canRegenerate = !!onRegenerate && allowRegenerate && !isPublished;
+  const canPublish = !!onPublish && allowPublish && !isPublished;
+
   return (
     <section
-      className="
-        rounded-xl border border-border/70 bg-gradient-to-br from-white to-muted/20
-        p-3 sm:p-4 space-y-3 sm:space-y-4 max-w-full
-      "
+      className="relative p-3 sm:p-4 max-w-full space-y-3 sm:space-y-4 rounded-xl"
       aria-live="polite"
     >
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <h5 className="font-medium text-foreground" style={{ fontSize: "clamp(13px,1.2vw,14px)" }}>
+      {/* Overlay spinner mientras está ocupado */}
+      {busy && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[1px]">
+          <Loader2 className="w-6 h-6 animate-spin text-neutral-500" />
+        </div>
+      )}
+
+      {/* Header: icono + título */}
+      <div className="flex items-center gap-2">
+        <Sparkles className="w-4 h-4 text-violet-500" />
+        <h5
+          className="font-medium text-foreground"
+          style={{ fontSize: "clamp(13px,1.2vw,14px)" }}
+        >
           {title}
         </h5>
-
-        {/* Acciones de cabecera */}
-        {isPublished ? (
-          // Publicada → menú de 3 puntitos (Editar / Eliminar)
-          <DropdownThreeDots
-            disabled={busy}
-            onEdit={allowEdit ? () => startEdit() : undefined}
-            onDelete={onDelete}
-          />
-        ) : (
-          // No publicada → badge sutil + (acciones redondas abajo)
-          <small
-            className="
-              inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium
-              bg-neutral-50 text-neutral-700 border-neutral-200
-            "
-          >
-            {status === "draft" ? "Borrador" : status === "pending" ? "Pendiente" : "Publicado"}
-            {edited ? " · editada" : ""}
-          </small>
-        )}
       </div>
 
       {/* Contenido */}
@@ -140,67 +145,97 @@ export default function Response({
         </div>
       )}
 
-      {/* Toolbar de acciones */}
+      {/* Footer: siempre misma línea horizontal */}
       <div className="pt-2">
-        {/* No publicada: botones redondos inline */}
-        {!isPublished && !isEditing && (
-          <div className="flex items-center gap-2 max-w-full overflow-x-auto">
-            {/* Regenerar */}
-            {onRegenerate && (
-              <IconRoundButton
-                icon={<RotateCcw className="h-4 w-4" />}
-                srLabel="Regenerar"
-                onClick={onRegenerate}
-                disabled={busy || !allowRegenerate}
-              />
+        {/* Modo no edición: misma fila tanto para draft como publicado */}
+        {!isEditing && (
+          <div className="flex items-center gap-2 flex-nowrap w-full">
+            {/* Draft / pendiente: botones activos */}
+            {!isPublished && (
+              <>
+                {canRegenerate && (
+                  <IconButton
+                    icon={<RotateCcw className="h-4 w-4" />}
+                    label="Regenerar"
+                    onClick={onRegenerate}
+                    disabled={busy}
+                  />
+                )}
+
+                {allowEdit && (
+                  <IconButton
+                    icon={<Edit3 className="h-4 w-4" />}
+                    label="Editar"
+                    onClick={startEdit}
+                    disabled={busy}
+                  />
+                )}
+
+                {canPublish && (
+                  <IconButton
+                    icon={<Send className="h-4 w-4" />}
+                    label="Publicar"
+                    onClick={onPublish}
+                    disabled={busy}
+                  />
+                )}
+              </>
             )}
 
-            {/* Editar */}
-            {allowEdit && (
-              <IconRoundButton
-                icon={<Edit3 className="h-4 w-4" />}
-                srLabel="Editar"
-                onClick={startEdit}
-                disabled={busy}
-              />
-            )}
-
-            {/* Publicar */}
-            {onPublish && (
-              <IconRoundButton
-                icon={<Send className="h-4 w-4" />}
-                srLabel="Publicar"
-                onClick={onPublish}
-                disabled={busy || !allowPublish}
-              />
-            )}
-
-            {/* Borrar */}
+            {/* Borrar: único botón visible cuando está publicada */}
             {onDelete && (
-              <IconRoundButton
-                icon={<Trash2 className="h-4 w-4" />}
-                srLabel="Borrar respuesta"
+              <button
+                type="button"
                 onClick={onDelete}
                 disabled={busy}
-                variant="danger"
-              />
+                title="Eliminar"
+                aria-label="Eliminar"
+                className="ml-1 text-neutral-400 hover:text-red-600 disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+
+            {/* Selector de versiones: siempre en la misma fila, pegado a la derecha */}
+            {versionInfo && (
+              <div className="ml-auto flex items-center gap-1 text-xs text-neutral-500">
+                <button
+                  type="button"
+                  onClick={versionInfo.onPrev}
+                  disabled={busy || versionInfo.total <= 1}
+                  className="h-6 w-6 flex items-center justify-center rounded-full border border-neutral-200 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-neutral-400"
+                >
+                  <ChevronLeft className="h-3 w-3" />
+                </button>
+                <span className="px-1 min-w-[40px] text-center text-neutral-500">
+                  {versionInfo.index + 1}/{versionInfo.total}
+                </span>
+                <button
+                  type="button"
+                  onClick={versionInfo.onNext}
+                  disabled={busy || versionInfo.total <= 1}
+                  className="h-6 w-6 flex items-center justify-center rounded-full border border-neutral-200 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-neutral-400"
+                >
+                  <ChevronRight className="h-3 w-3" />
+                </button>
+              </div>
             )}
           </div>
         )}
 
-        {/* Edición (para publicadas y no publicadas) */}
+        {/* Modo edición */}
         {isEditing && (
           <div className="flex items-center gap-2">
-            <IconRoundButton
-              variant="solid"
+            <IconButton
               icon={<Save className="h-4 w-4" />}
-              srLabel="Guardar"
+              label="Guardar"
               onClick={saveEdit}
               disabled={busy || draft.trim().length === 0}
+              solid
             />
-            <IconRoundButton
+            <IconButton
               icon={<X className="h-4 w-4" />}
-              srLabel="Cancelar"
+              label="Cancelar"
               onClick={cancelEdit}
               disabled={busy}
             />
@@ -211,89 +246,36 @@ export default function Response({
   );
 }
 
-/* ======= Menú 3 puntitos para publicadas ======= */
-function DropdownThreeDots({
-  disabled,
-  onEdit,
-  onDelete,
-}: {
-  disabled?: boolean;
-  onEdit?: () => void;
-  onDelete?: () => void | Promise<void>;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        asChild
-      >
-        <button
-          type="button"
-          disabled={disabled}
-          className="
-            inline-flex items-center justify-center rounded-md border border-border/70
-            h-8 w-8 bg-background hover:bg-muted transition-colors disabled:opacity-50
-          "
-          aria-label="Acciones"
-          title="Acciones"
-        >
-          <MoreVertical className="w-4 h-4" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-        <DropdownMenuItem
-          className="cursor-pointer"
-          onClick={() => onEdit?.()}
-        >
-          Editar
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="cursor-pointer text-red-600 focus:text-red-600"
-          onClick={() => onDelete?.()}
-        >
-          Eliminar
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-/* ======= Botón redondo ======= */
-function IconRoundButton({
+/* ======= Botón icono para toolbar ======= */
+function IconButton({
   icon,
-  srLabel,
+  label,
   onClick,
   disabled,
-  variant = "ghost",
+  solid,
 }: {
   icon: React.ReactNode;
-  srLabel: string;
+  label: string;
   onClick?: () => void | Promise<void>;
   disabled?: boolean;
-  variant?: "ghost" | "solid" | "danger";
+  solid?: boolean;
 }) {
-  const base =
-    "inline-flex items-center justify-center rounded-full text-xs transition-colors h-10 w-10 shrink-0";
-  const ghost = "border border-border bg-white hover:bg-muted/50 disabled:opacity-50";
-  const solid = "bg-foreground text-background hover:brightness-95 disabled:opacity-50";
-  const danger = "border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50";
-
-  let cls = ghost;
-  if (variant === "solid") cls = solid;
-  if (variant === "danger") cls = danger;
-
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`${base} ${cls}`}
-      title={srLabel}
-      aria-label={srLabel}
+      title={label}
+      aria-label={label}
+      className={`
+        inline-flex items-center justify-center h-8 w-8 rounded-md text-neutral-600
+        transition-colors disabled:opacity-50
+        ${solid
+          ? "bg-foreground text-white hover:brightness-95"
+          : "hover:text-foreground"}
+      `}
     >
       {icon}
-      <span className="sr-only">{srLabel}</span>
     </button>
   );
 }

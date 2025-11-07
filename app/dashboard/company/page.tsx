@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/app/components/ui/button";
 import { Plus, Building2 } from "lucide-react";
 
+import PageShell from "@/app/components/layouts/PageShell";
 import ListToolbar from "@/app/components/ListToolbar";
-import SectionLayout from "@/app/components/layouts/SectionLayout";
 import PreloadCompanyBuffer from "@/app/components/buffer/PreloadCompanyBuffer";
 
 import {
@@ -16,11 +16,9 @@ import {
 } from "@/app/components/company/CompanyModal";
 
 import CompanyKpiRow from "@/app/components/company/cards/CompanyKpiRow";
-import { AddLocationsModal, type NewLocation } from "@/app/components/company/AddLocationsModal";
 import { EstablishmentCard } from "@/app/components/company/EstablishmentCard";
 import type { LocationRow } from "@/hooks/useCompanyLocations";
 import { useCompanySummary } from "@/hooks/useCompanySummary";
-
 
 /* ----------------------- helpers (fetchers) ----------------------- */
 
@@ -39,7 +37,7 @@ type CompanyDetails = {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
-  employeesBand?: string | null; // banda (p.e. 1-10, 11-50)
+  employeesBand?: string | null;
 };
 
 async function fetchCompanyDetails(companyId: string): Promise<CompanyDetails | null> {
@@ -64,11 +62,10 @@ export default function CompanyPage() {
   const [companyName, setCompanyName] = React.useState("Empresa");
   const [details, setDetails] = React.useState<CompanyDetails | null>(null);
 
-  // derive: hasCompany
   const hasCompany = !!companyId;
 
   // métricas (buffer / react query)
-  const { data: metrics /*, isLoading: metricsLoading*/ } = useCompanySummary(companyId);
+  useCompanySummary(companyId); // ya precalienta datos para CompanyKpiRow, etc.
 
   // modal empresa (crear/editar)
   const [companyModalOpen, setCompanyModalOpen] = React.useState(false);
@@ -89,11 +86,7 @@ export default function CompanyPage() {
   const [locsLoading, setLocsLoading] = React.useState(false);
   const [locsError, setLocsError] = React.useState<string | null>(null);
 
-  // modal añadir locations
-  const [addOpen, setAddOpen] = React.useState(false);
-  const [adding, setAdding] = React.useState(false);
-
-  // Nudge modal (bloqueante) si no hay empresa
+  // Nudge modal (solo si no hay empresa)
   const [showNudge, setShowNudge] = React.useState(false);
   const openedOnceRef = React.useRef(false);
 
@@ -106,7 +99,7 @@ export default function CompanyPage() {
       if (abort) return;
 
       if (list.length > 0) {
-        const c = list[0]; // si soportas multi-empresa, cambia selección
+        const c = list[0]; // si soportas multi-empresa, aquí iría la selección
         setCompanyId(c.id);
         setCompanyName(c.name ?? "Empresa");
 
@@ -126,11 +119,10 @@ export default function CompanyPage() {
     };
   }, []);
 
-  // Abrir modal nudge cuando no hay empresa (solo una vez)
+  // Abrir modal nudge cuando no hay empresa
   React.useEffect(() => {
     if (!loading && !hasCompany && !openedOnceRef.current) {
       openedOnceRef.current = true;
-      // pequeña pausa para evitar "pop" visual al hidratar
       const t = setTimeout(() => setShowNudge(true), 150);
       return () => clearTimeout(t);
     }
@@ -154,10 +146,12 @@ export default function CompanyPage() {
   }, [companyId]);
 
   React.useEffect(() => {
-    if (hasCompany && companyId) loadLocations();
+    if (hasCompany && companyId) {
+      loadLocations();
+    }
   }, [hasCompany, companyId, loadLocations]);
 
-  /* --------- acciones modal empresa --------- */
+  /* --------- acciones empresa --------- */
 
   function openCreate() {
     setForm({ name: "", email: "", phone: "", address: "", employeesBand: "" });
@@ -189,7 +183,7 @@ export default function CompanyPage() {
       if (!res.ok || !j?.company?.id) throw new Error(j?.error || `HTTP ${res.status}`);
 
       setCompanyModalOpen(false);
-      // Navegamos a la vista de la empresa recién creada
+      // tras crear, navegamos a la vista detallada de la empresa
       router.push(`/dashboard/company/${j.company.id}`);
     } catch (err: any) {
       alert(err?.message || String(err));
@@ -255,46 +249,6 @@ export default function CompanyPage() {
     }
   }
 
-  async function onSubmitSingle(loc: NewLocation) {
-    if (!companyId) return;
-    setAdding(true);
-    try {
-      const res = await fetch(`/api/companies/${companyId}/locations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(loc),
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
-      setAddOpen(false);
-      await loadLocations();
-    } catch (e: any) {
-      alert(e?.message || String(e));
-    } finally {
-      setAdding(false);
-    }
-  }
-
-  async function onSubmitBulk(locsInput: NewLocation[]) {
-    if (!companyId) return;
-    setAdding(true);
-    try {
-      const res = await fetch(`/api/companies/${companyId}/locations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ locations: locsInput }),
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
-      setAddOpen(false);
-      await loadLocations();
-    } catch (e: any) {
-      alert(e?.message || String(e));
-    } finally {
-      setAdding(false);
-    }
-  }
-
   /* --------- formatos para cards --------- */
 
   const infoEmail = details?.email ?? "—";
@@ -306,47 +260,26 @@ export default function CompanyPage() {
 
   return (
     <>
-      {/* (Opcional) precarga de buffers para KPIs, etc. */}
       <PreloadCompanyBuffer companyId={companyId} />
 
-      <SectionLayout
-        icon={Building2}
+      <PageShell
         title={companyName}
-        subtitle="Gestiona tu empresa y sus establecimientos"
-        headerContent={
-          <>
-            {/* Acciones a la derecha del header */}
-            <div className="flex items-center justify-end">
-              {hasCompany && companyId ? (
-                <Button variant="secondary" onClick={openEdit}>
-                  Gestionar empresa
-                </Button>
-              ) : (
-                <Button onClick={openCreate}>
-                  <Plus size={16} className="mr-2" />
-                  Crear empresa
-                </Button>
-              )}
-            </div>
-
-            {/* KPIs cuando existe empresa */}
-            {hasCompany && (
-              <div className="mt-4">
-                <CompanyKpiRow
-                  key={companyId ?? "none"}
-                  companyId={companyId}
-                  name={companyName}
-                  email={infoEmail}
-                  phone={infoPhone}
-                  address={infoAddress}
-                  employeesText={infoEmployees}
-                />
-              </div>
-            )}
-          </>
+        description="Gestiona los datos de tu empresa y las ubicaciones conectadas."
+        icon={Building2}
+        actions={
+          hasCompany && companyId ? (
+            <Button variant="outline" size="sm" onClick={openEdit}>
+              Editar empresa
+            </Button>
+          ) : (
+            <Button size="sm" onClick={openCreate}>
+              <Plus size={16} className="mr-2" />
+              Crear empresa
+            </Button>
+          )
         }
       >
-        {/* Vacío (sin empresa): mostramos un “hero card” limpio + CTA; el modal nudge se abre encima */}
+        {/* Estado sin empresa */}
         {!hasCompany ? (
           <div className="py-14">
             <div className="mx-auto max-w-2xl rounded-3xl border bg-card shadow-sm p-8 text-center">
@@ -355,14 +288,17 @@ export default function CompanyPage() {
               </div>
               <h2 className="text-xl font-semibold">Aún no tienes ninguna empresa</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Crea tu empresa o solicita unirte a una existente para comenzar.
+                Crea tu empresa o solicita unirte a una existente para empezar a trabajar con Crussader.
               </p>
               <div className="mt-5 flex items-center justify-center gap-2">
                 <Button onClick={openCreate}>
                   <Plus size={16} className="mr-2" />
                   Crear empresa
                 </Button>
-                <Button variant="outline" onClick={() => router.push("/dashboard/company/join")}>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push("/dashboard/company/join")}
+                >
                   Solicitar unirme
                 </Button>
               </div>
@@ -370,32 +306,46 @@ export default function CompanyPage() {
           </div>
         ) : (
           <>
-            {/* Establecimientos */}
+            {/* KPIs de empresa */}
+            <div className="mb-6">
+              <CompanyKpiRow
+                key={companyId ?? "none"}
+                companyId={companyId}
+                name={companyName}
+                email={infoEmail}
+                phone={infoPhone}
+                address={infoAddress}
+                employeesText={infoEmployees}
+              />
+            </div>
+
+            {/* Listado de ubicaciones */}
             <section className="space-y-3">
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  {companyId && (
-                    <Button onClick={() => setAddOpen(true)}>
-                      <Plus size={16} className="mr-2" />
-                      Añadir ubicación
-                    </Button>
-                  )}
+                <div className="text-sm font-medium text-muted-foreground">
+                  Ubicaciones vinculadas a tu empresa
                 </div>
-
                 <ListToolbar />
               </div>
 
-              {locsError && <div className="text-sm text-red-600">{locsError}</div>}
+              {locsError && (
+                <div className="text-sm text-red-600">
+                  {locsError}
+                </div>
+              )}
 
               {locsLoading ? (
                 <div className="grid gap-3">
                   {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="h-20 rounded border bg-gray-50 animate-pulse" />
+                    <div
+                      key={i}
+                      className="h-20 rounded-xl border bg-muted/40 animate-pulse"
+                    />
                   ))}
                 </div>
               ) : locs.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-8 text-center">
-                  No hay ubicaciones todavía.
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  No hay ubicaciones todavía. Crea tu primera ubicación desde el flujo guiado.
                 </div>
               ) : (
                 <div className="grid gap-4">
@@ -413,26 +363,20 @@ export default function CompanyPage() {
           </>
         )}
 
-        {/* Modales */}
+        {/* Modal empresa (crear / editar) */}
         <CompanyModal
-          open={companyModalOpen}
-          onOpenChange={setCompanyModalOpen}
+          open={companyModalOpen || showNudge}
+          onOpenChange={(open) => {
+            setCompanyModalOpen(open);
+            if (!open) setShowNudge(false);
+          }}
           mode={hasCompany ? "edit" : "create"}
           values={form}
           onChange={modalChange}
           onSubmit={hasCompany ? onSubmitEdit : onSubmitCreate}
           submitting={submittingCompany}
         />
-
-        <AddLocationsModal
-          open={addOpen}
-          onOpenChange={setAddOpen}
-          onSubmitSingle={onSubmitSingle}
-          onSubmitBulk={onSubmitBulk}
-          submitting={adding}
-        />
-      </SectionLayout>
-
+      </PageShell>
     </>
   );
 }

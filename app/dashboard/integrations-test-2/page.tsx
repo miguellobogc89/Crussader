@@ -28,7 +28,7 @@ export default async function IntegrationsPage() {
     {
       key: "google",
       name: "Google Business Profile",
-      description: "Conecta tu ficha de empresa para sincronizar reseñas y responder con IA.",
+      description: "Conecta tu ficha de empresa.",
       brandIcon: <PlatformImg src="/platform-icons/google-business.png" alt="Google Business" />,
       connectUrl: "/api/integrations/google/business-profile/connect",
     },
