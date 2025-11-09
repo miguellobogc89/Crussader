@@ -29,9 +29,9 @@ export default async function IntegrationsPage() {
   const available: Provider[] = [
     {
       key: "google",
-      name: "Google Reviews",
-      description: "Conecta tu ficha para sincronizar reseñas y responder con IA.",
-      brandIcon: <PlatformImg src="/platform-icons/google-business.png" alt="Google Reviews" />,
+      name: "Google Business Profile",
+      description: "Conecta tu ficha de empresa.",
+      brandIcon: <PlatformImg src="/platform-icons/google-business.png" alt="Google Business" />,
       connectUrl: "/api/integrations/google/business-profile/connect",
     },
     {
