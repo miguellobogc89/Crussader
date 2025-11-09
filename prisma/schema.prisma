@@ -164,11 +164,11 @@ model Company {
   stripeSubscriptionId        String?
   agentSettings               Json?
   voiceAgentId                String?
-  account_id                  String?                       @db.Uuid
+  account_id                  String                        @unique(map: "company_account_id_unique") @db.Uuid
   Agents                      Agent[]
   AgentSessions               AgentSession[]
   voiceAgent                  VoiceAgent?                   @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id])
-  account                     account?                      @relation(fields: [account_id], references: [id], onUpdate: NoAction, map: "fk_company_account")
+  account                     account                       @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_company_account")
   customers                   CompanyCustomer[]
   jobs                        Job[]
   knowledgeItems              KnowledgeItem[]
@@ -185,7 +185,6 @@ model Company {
   WebchatSites                WebchatSite[]                 @relation("CompanyToWebchatSite")
   billing_account             billing_account?
   discount_redemption         discount_redemption[]
-  entitlement                 entitlement[]
   invoice                     invoice[]
   subscription                subscription[]
   theme_candidate             theme_candidate[]
@@ -1142,7 +1141,6 @@ model discount_redemption {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model entitlement {
   id         String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  company_id String
   product_id String             @db.Uuid
   source     entitlement_source @default(SUBSCRIPTION)
   quantity   Int                @default(1)
@@ -1152,10 +1150,9 @@ model entitlement {
   meta       Json?
   created_at DateTime           @default(now()) @db.Timestamptz(6)
   updated_at DateTime           @default(now()) @db.Timestamptz(6)
-  Company    Company            @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ent_company")
+  account_id String             @db.Uuid
   product    product            @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ent_product")
-
-  @@index([company_id, product_id, active], map: "idx_ent_company_product")
+  account    account            @relation(fields: [account_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_entitlement_account")
 }
 
 model invoice {
@@ -1553,11 +1550,12 @@ model account {
   created_at                       DateTime           @default(now()) @db.Timestamptz(6)
   updated_at                       DateTime           @default(now()) @db.Timestamptz(6)
   subscription_status              SubscriptionStatus @default(NONE)
-  Company                          Company[]
+  Company                          Company?
   Notification                     Notification[]
   User_User_account_idToaccount    User[]             @relation("User_account_idToaccount")
   User_account_owner_user_idToUser User?              @relation("account_owner_user_idToUser", fields: [owner_user_id], references: [id], onUpdate: NoAction)
   billing_account                  billing_account[]
+  entitlement                      entitlement[]
 
   @@index([owner_user_id], map: "idx_account_owner")
   @@index([plan_slug], map: "idx_account_plan_slug")
@@ -1623,6 +1621,51 @@ model LocationReviewMonthly {
 
   @@id([locationId, monthDate])
   @@index([companyId, monthDate], map: "LocationReviewMonthly_company_month_idx")
+}
+
+model external_location_mapping {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider               String
+  external_connection_id String
+  company_id             String
+  location_id            String?
+  external_location_name String
+  external_account_name  String?
+  place_id               String?
+  title                  String?
+  address                String?
+  primary_category       String?
+  rating                 Decimal? @db.Decimal(3, 2)
+  total_review_count     Int?
+  status                 String   @default("available")
+  meta                   Json?
+  created_at             DateTime @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([company_id], map: "idx_ext_loc_map_company")
+  @@index([external_connection_id], map: "idx_ext_loc_map_extconn")
+  @@index([location_id], map: "idx_ext_loc_map_location")
+  @@index([provider], map: "idx_ext_loc_map_provider")
+  @@index([status], map: "idx_ext_loc_map_status")
+}
+
+model external_raw_payload {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider               String
+  resource_type          String
+  external_name          String?
+  external_id            String?
+  company_id             String?
+  location_id            String?
+  external_connection_id String?
+  payload                Json
+  fetched_at             DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([company_id], map: "idx_external_raw_payload_company")
+  @@index([external_connection_id], map: "idx_external_raw_payload_extconn")
+  @@index([location_id], map: "idx_external_raw_payload_location")
+  @@index([provider], map: "idx_external_raw_payload_provider")
+  @@index([resource_type], map: "idx_external_raw_payload_resource_type")
 }
 
 /// *
