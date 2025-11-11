@@ -39,7 +39,7 @@ export default async function IntegrationsPage() {
       name: "Facebook",
       description: "Conecta tu página de Facebook para centralizar reseñas y mensajes.",
       brandIcon: <PlatformImg src="/platform-icons/facebook.png" alt="Facebook" />,
-      connectUrl: "/api/integrations/facebook/connect", // placeholder
+      connectUrl: "/api/integrations/meta/facebook/login",
     },
     {
       key: "calendar",
@@ -53,7 +53,7 @@ export default async function IntegrationsPage() {
       name: "Instagram",
       description: "Gestiona mensajes y comentarios desde tu cuenta de empresa.",
       brandIcon: <PlatformImg src="/platform-icons/instagram.png" alt="Instagram" />,
-      connectUrl: "/api/integrations/instagram/connect", // placeholder
+      connectUrl: "/api/integrations/meta/instagram/login",
     },
     {
       key: "gmail",

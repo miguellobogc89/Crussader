@@ -1,4 +1,3 @@
-// app/api/auth/[...nextauth]/route.ts
 import NextAuth, { type NextAuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
@@ -13,6 +12,23 @@ const adminEmail = "miguel.lobogc.89@gmail.com";
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
+
+  /* 🔹 BLOQUE NUEVO: cookies dev/producción */
+  cookies: {
+    sessionToken: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-next-auth.session-token"
+          : "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+  },
+  /* 🔹 FIN DEL BLOQUE NUEVO */
 
   providers: [
     // --- Credenciales (email + password) ---
@@ -99,19 +115,16 @@ export const authOptions: NextAuthOptions = {
       const email = (user?.email || "").toLowerCase().trim();
       if (!email) return false;
 
-      // ¿Viene verificado por Google?
       const emailVerifiedGoogle =
         (profile as any)?.email_verified === true ||
         (profile as any)?.email_verified === "true";
 
       const existing = await prisma.user.findUnique({ where: { email } });
 
-      // Si ya existe
       if (existing) {
         if (existing.isSuspended) return false;
         if (!existing.isActive) return false;
 
-        // Marcar verificado si procede
         if (emailVerifiedGoogle && !existing.emailVerified) {
           await prisma.user.update({
             where: { id: existing.id },
@@ -121,7 +134,6 @@ export const authOptions: NextAuthOptions = {
         return true;
       }
 
-      // Alta automática con Google
       await prisma.user.create({
         data: {
           email,
@@ -138,7 +150,6 @@ export const authOptions: NextAuthOptions = {
 
     // 🔹 Construir JWT
     async jwt({ token, user, account, profile }) {
-      // Roles / IDs personalizados
       if (user && (user as any).role)
         (token as any).role = (user as any).role;
       if (!(token as any).role && token?.email) {
@@ -147,7 +158,6 @@ export const authOptions: NextAuthOptions = {
       }
       if (user && (user as any).id) (token as any).uid = (user as any).id;
 
-      // Si es Google: añade nombre/foto/email
       if (account?.provider === "google" && profile) {
         token.name = (profile as any).name ?? token.name;
         token.email = (profile as any).email ?? token.email;
@@ -158,7 +168,6 @@ export const authOptions: NextAuthOptions = {
         token.sub = token.sub ?? (profile as any).sub;
       }
 
-      // Guardar tokens de Google
       if (account?.provider === "google") {
         (token as any).google_access_token = account.access_token;
         (token as any).google_refresh_token =
@@ -166,7 +175,6 @@ export const authOptions: NextAuthOptions = {
         (token as any).google_expires_at = account.expires_at;
       }
 
-      // Refrescar access_token cuando falte ~1 min
       const exp = (token as any).google_expires_at as number | undefined;
       const needsRefresh = !!exp && Date.now() / 1000 > exp - 60;
       if (needsRefresh && (token as any).google_refresh_token) {

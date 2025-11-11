@@ -129,6 +129,7 @@ export function AppSidebar() {
         items: [
           { title: "Usuarios y roles", href: "/dashboard/admin/users", icon: "👥", description: "Altas, permisos y equipos" },
           { title: "UI & Dessign", href: "/dashboard/admin/UI_and_Dessign", icon: "🤖", description: "Diseño de la interfaz" },
+          { title: "Leads", href: "/dashboard/crm/leads", icon: "🏪", description: "Invitaciones a nuevos usuarios" },
           { title: "Empresas y establecimientos", href: "/dashboard/admin/companies", icon: "🏪", description: "Estructura, sedes y negocios" },
           { title: "Integraciones", href: "/dashboard/admin/integrations", icon: "🔌", description: "Conexiones externas" },
           { title: "Finanzas", href: "/dashboard/admin/finance", icon: "💰", description: "Pagos, costes y facturas" },

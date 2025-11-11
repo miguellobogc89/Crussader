@@ -5,7 +5,7 @@ import { SessionProvider } from "next-auth/react";
 import RouteTransitionOverlay from "./RouteTransitionOverlay";
 import PageBody from "./PageBody";
 import PageHeader from "./PageHeader";
-import Spinner from "@/app/components/crussader/UX/Spinner"; // ⬅️ NUEVO
+import Spinner from "@/app/components/crussader/UX/Spinner";
 
 export default function PageShell({
   title,
@@ -57,21 +57,14 @@ export default function PageShell({
 
         {/* ===== HEADER ===== */}
         {!hideHeaderArea && (
-          <>
-            <PageHeader
-              title={title}
-              description={description}
-              titleIconName={titleIconName}
-            />
-
-            {toolbar ? (
-              <div className="w-full bg-white border-b border-slate-200">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-                  {toolbar}
-                </div>
-              </div>
-            ) : null}
-          </>
+          <PageHeader
+            title={title}
+            description={description}
+            titleIconName={titleIconName}
+            // Si la página pasa toolbar, se pinta a la derecha;
+            // si no, el header se ve exactamente como antes.
+            rightSlot={toolbar}
+          />
         )}
 
         {/* ===== BANDA OPCIONAL ===== */}

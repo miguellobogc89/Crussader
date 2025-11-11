@@ -77,6 +77,52 @@ const RESET_EMAIL_HTML = `<!DOCTYPE html>
   </body>
 </html>`;
 
+const BETA_INVITE_HTML = `<!DOCTYPE html>
+<html lang="es">
+  <head><meta charset="UTF-8" /><title>Invitación beta privada - Crussader</title></head>
+  <body style="margin:0; padding:0; background-color:#f9fafb; font-family: Inter, Arial, sans-serif;">
+    <table width="100%" cellspacing="0" cellpadding="0" style="background-color:#f9fafb; padding: 40px 0;">
+      <tr><td align="center">
+        <table width="600" cellspacing="0" cellpadding="0" style="background:white; border-radius:16px; box-shadow:0 4px 12px rgba(0,0,0,0.05); overflow:hidden;">
+          <tr><td style="background:linear-gradient(135deg, #7c3aed, #2563eb); padding:24px; text-align:center;">
+            <h1 style="margin:0; font-size:24px; color:white; font-weight:700;">Invitación a la beta privada</h1>
+          </td></tr>
+          <tr><td style="padding:32px 28px; color:#111827; text-align:left;">
+            <p style="font-size:16px; color:#4b5563; line-height:1.6;">Hola {{name}},</p>
+            <p style="font-size:16px; color:#4b5563; line-height:1.6;">
+              Te hemos invitado a probar la beta privada de <strong>Crussader</strong>, la plataforma para centralizar y automatizar las respuestas a reseñas.
+            </p>
+            <p style="font-size:15px; color:#4b5563; line-height:1.6;">
+              Accede con tu código exclusivo y completa el registro desde este enlace:
+            </p>
+            <table cellspacing="0" cellpadding="0" style="margin:24px 0; text-align:left;">
+              <tr><td>
+                <a href="{{url}}" style="background:linear-gradient(135deg, #7c3aed, #2563eb); color:white; text-decoration:none; padding:12px 24px; border-radius:999px; font-size:15px; font-weight:600; display:inline-block;">
+                  Acceder a la beta
+                </a>
+              </td></tr>
+            </table>
+            <p style="font-size:15px; color:#4b5563; line-height:1.6;">
+              Código de invitación:
+              <strong style="font-family:monospace; font-size:17px;">{{code}}</strong>
+            </p>
+            <p style="font-size:13px; color:#6b7280; line-height:1.6; margin-top:18px;">
+              Si el botón no funciona, copia y pega esta URL en tu navegador:<br />
+              <span style="font-family:monospace; font-size:12px; color:#4b5563;">{{url}}</span>
+            </p>
+          </td></tr>
+          <tr><td style="background-color:#f3f4f6; padding:18px; text-align:center; font-size:11px; color:#6b7280;">
+            Esta invitación es personal y puede caducar. Si no esperabas este correo, puedes ignorarlo.<br/>
+            © 2025 Crussader. Todos los derechos reservados.
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`;
+
+
+
 /** ============ Sender helpers ============ */
 
 async function sendEmail({
@@ -137,6 +183,39 @@ Si no solicitaste este cambio, ignora este mensaje.`;
   return sendEmail({
     to,
     subject: "Restablecer contraseña - Crussader",
+    html,
+    text,
+  });
+}
+
+/** ============ Send Invitation email ============ */
+
+export async function sendBetaInviteEmail(params: {
+  to: string;
+  name: string;
+  code: string;
+  url: string;
+}) {
+  const safeName = params.name || params.to;
+  const html = BETA_INVITE_HTML
+    .replace(/{{name}}/g, safeName)
+    .replace(/{{code}}/g, params.code)
+    .replace(/{{url}}/g, params.url);
+
+  const text = `Hola ${safeName},
+
+Te hemos invitado a la beta privada de Crussader.
+
+Accede desde este enlace:
+${params.url}
+
+Código de invitación: ${params.code}
+
+Si no esperabas este correo, puedes ignorarlo.`;
+
+  return sendEmail({
+    to: params.to,
+    subject: "Invitación beta privada - Crussader",
     html,
     text,
   });

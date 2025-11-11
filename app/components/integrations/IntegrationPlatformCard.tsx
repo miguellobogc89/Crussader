@@ -90,7 +90,7 @@ export default function IntegrationPlatformCard({
   provider,
   className,
   onConnect,
-  fixedHeight = true,
+  fixedHeight = true, 
   onTestModal,
 }: Props) {
   const bootstrap = useBootstrapData() as any;

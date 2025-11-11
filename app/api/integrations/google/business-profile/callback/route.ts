@@ -1,132 +1,143 @@
 // app/api/integrations/google/business-profile/callback/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { google } from "googleapis";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/app/server/db";
-import { cookies } from "next/headers";
 
-export const runtime = "nodejs";
-
-/* ─────────────────────────────
-   Helpers
-   ───────────────────────────── */
-async function getUserIdFromSession() {
-  const jar = await cookies();
-  const sessionToken =
-    jar.get("__Secure-next-auth.session-token")?.value ??
-    jar.get("next-auth.session-token")?.value;
-
-  if (!sessionToken) return null;
-
-  const session = await prisma.session.findFirst({
-    where: { sessionToken },
-    select: { userId: true },
-  });
-
-  return session?.userId ?? null;
-}
-
-/* ─────────────────────────────
-   Callback principal
-   ───────────────────────────── */
 export async function GET(req: NextRequest) {
-  const origin = req.nextUrl.origin;
-  const code = req.nextUrl.searchParams.get("code");
-  const error = req.nextUrl.searchParams.get("error");
+  const session = await getServerSession(authOptions);
+  const url = new URL(req.url);
+  const code = url.searchParams.get("code");
+  const stateParam = url.searchParams.get("state");
 
-  if (error) {
-    return NextResponse.redirect(
-      `${origin}/dashboard/integrations-test-2?error=${encodeURIComponent(error)}`
-    );
+  let redirectAfter =
+    process.env.GOOGLE_BUSINESS_RETURN_URI ||
+    `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/integrations-test-2`;
+
+  let companyId: string | null = null;
+
+  if (stateParam) {
+    try {
+      const parsed = JSON.parse(stateParam);
+      if (parsed && typeof parsed.redirect_after === "string") {
+        redirectAfter = parsed.redirect_after.startsWith("http")
+          ? parsed.redirect_after
+          : `${process.env.NEXT_PUBLIC_APP_URL}${parsed.redirect_after}`;
+      }
+      if (parsed && typeof parsed.companyId === "string") {
+        companyId = parsed.companyId;
+      }
+    } catch {
+      // ignore
+    }
   }
 
   if (!code) {
-    return new NextResponse("Missing OAuth code", { status: 400 });
+    return NextResponse.redirect(`${redirectAfter}?error=missing_code`);
   }
 
-  const userId = await getUserIdFromSession();
-  if (!userId) {
-    return NextResponse.redirect(`${origin}/login`);
+  if (!session || !session.user || !(session.user as any).id) {
+    return NextResponse.redirect(`${redirectAfter}?error=not_authenticated`);
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID!;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET!;
-  if (!clientId || !clientSecret) {
-    return new NextResponse("Missing Google OAuth credentials", { status: 500 });
-  }
+  const sessionUserId = (session.user as any).id as string;
+  const sessionEmail = session.user.email ?? null;
 
-  const redirectUri = `${origin}/api/integrations/google/business-profile/callback`;
+  const redirectUri =
+    process.env.GOOGLE_BUSINESS_REDIRECT_URI ||
+    `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/google/business-profile/callback`;
 
-  // 1) Intercambiar el code por tokens
-  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
-      grant_type: "authorization_code",
-    }),
-  });
-
-  if (!tokenRes.ok) {
-    const txt = await tokenRes.text();
-    return new NextResponse(`Token exchange failed: ${txt}`, { status: 400 });
-  }
-
-  const tokenJson = await tokenRes.json();
-  const accessToken: string = tokenJson.access_token;
-  const refreshToken: string | null = tokenJson.refresh_token ?? null;
-  const expiresIn: number = tokenJson.expires_in ?? 0;
-  const scope: string | null = tokenJson.scope ?? null;
-  const expiresAt = Math.floor(Date.now() / 1000) + expiresIn;
-
-  // 2) Obtener userinfo básico
-  let email: string | null = null;
-  let name: string | null = null;
-  let sub: string | null = null;
-
-  const userinfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (userinfoRes.ok) {
-    const u = await userinfoRes.json();
-    email = u.email ?? null;
-    name = u.name ?? null;
-    sub = u.sub ?? null;
-  }
-
-  // 3) Guardar/actualizar ExternalConnection
-  await prisma.externalConnection.upsert({
-    where: {
-      userId_provider: {
-        userId,
-        provider: "google-business-profile",
-      },
-    },
-    update: {
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      expires_at: expiresAt,
-      scope,
-      accountEmail: email,
-      accountName: name,
-      providerUserId: sub,
-    },
-    create: {
-      userId,
-      provider: "google-business-profile",
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      expires_at: expiresAt,
-      scope,
-      accountEmail: email,
-      accountName: name,
-      providerUserId: sub,
-    },
-  });
-
-  // 4) Redirigir al dashboard
-  return NextResponse.redirect(
-    `${origin}/dashboard/integrations-test-2?connected=google-business-profile`
+  const client = new google.auth.OAuth2(
+    process.env.GOOGLE_BUSINESS_CLIENT_ID!,
+    process.env.GOOGLE_BUSINESS_CLIENT_SECRET!,
+    redirectUri
   );
+
+  try {
+    const tokenResp = await client.getToken(code);
+    const tokens = tokenResp.tokens;
+    client.setCredentials(tokens);
+
+    let accessToken: string | null = null;
+    if (typeof tokens.access_token === "string" && tokens.access_token.length > 0) {
+      accessToken = tokens.access_token;
+    }
+
+    let refreshToken: string | null = null;
+    if (typeof tokens.refresh_token === "string" && tokens.refresh_token.length > 0) {
+      refreshToken = tokens.refresh_token;
+    }
+
+    let expiresAtSec: number | null = null;
+    if (typeof tokens.expiry_date === "number") {
+      expiresAtSec = Math.floor(tokens.expiry_date / 1000);
+    }
+
+    let scopeStr: string | null = null;
+    const rawScope: unknown = (tokens as any).scope;
+    if (typeof rawScope === "string") scopeStr = rawScope;
+    else if (Array.isArray(rawScope)) scopeStr = rawScope.join(" ");
+
+    // Resolver user
+    let dbUser = await prisma.user.findUnique({ where: { id: sessionUserId } });
+
+    if (!dbUser && typeof sessionEmail === "string") {
+      const byEmail = await prisma.user.findUnique({ where: { email: sessionEmail } });
+      if (byEmail) dbUser = byEmail;
+    }
+
+    if (!dbUser) {
+      dbUser = await prisma.user.create({
+        data: {
+          email: sessionEmail || undefined,
+          name: session.user.name || null,
+          role: "user",
+          emailVerified: new Date(),
+        },
+      });
+    }
+
+    const ownerUserId = dbUser.id;
+    const provider = "google-business" as const;
+    const accountEmail = sessionEmail || null;
+
+    // upsert ExternalConnection con companyId
+    const existing = await prisma.externalConnection.findUnique({
+      where: { userId_provider: { userId: ownerUserId, provider } },
+    });
+
+    if (existing) {
+      const updateData: any = {};
+      if (accountEmail !== null) updateData.accountEmail = accountEmail;
+      if (typeof accessToken === "string") updateData.access_token = accessToken;
+      if (typeof refreshToken === "string") updateData.refresh_token = refreshToken;
+      if (typeof expiresAtSec === "number") updateData.expires_at = expiresAtSec;
+      if (typeof scopeStr === "string") updateData.scope = scopeStr;
+      if (companyId) updateData.companyId = companyId;
+
+      await prisma.externalConnection.update({
+        where: { id: existing.id },
+        data: updateData,
+      });
+    } else {
+      const createData: any = {
+        userId: ownerUserId,
+        provider,
+      };
+      if (companyId) createData.companyId = companyId;
+      if (typeof accessToken === "string") createData.access_token = accessToken;
+      if (typeof refreshToken === "string") createData.refresh_token = refreshToken;
+      if (typeof expiresAtSec === "number") createData.expires_at = expiresAtSec;
+      if (typeof scopeStr === "string") createData.scope = scopeStr;
+      if (accountEmail !== null) createData.accountEmail = accountEmail;
+
+      await prisma.externalConnection.create({ data: createData });
+    }
+
+    return NextResponse.redirect(`${redirectAfter}?connected=google_business`);
+  } catch (err) {
+    console.error("[Google Business Callback] Error:", err);
+    return NextResponse.redirect(`${redirectAfter}?error=google_business_callback`);
+  }
 }

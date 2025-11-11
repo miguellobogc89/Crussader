@@ -45,13 +45,16 @@ model User {
   pendingEmailTokenExpiresAt          DateTime?            @db.Timestamptz(6)
   phoneVerifiedAt                     DateTime?            @db.Timestamptz(6)
   uiTheme                             String               @default("system")
+  invited_via_id                      String?
   AuthAccount                         AuthAccount[]
   ExternalConnection                  ExternalConnection[]
+  Invite_Invite_invited_by_idToUser   Invite[]             @relation("Invite_invited_by_idToUser")
   Notification                        Notification[]
   phasesCreated                       Phase[]              @relation("UserPhasesCreated")
   responsesCreated                    Response[]           @relation("ResponseCreatedBy")
   responsesEdited                     Response[]           @relation("ResponseEditedBy")
   Session                             Session[]
+  Invite_User_invited_via_idToInvite  Invite?              @relation("User_invited_via_idToInvite", fields: [invited_via_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   account_User_account_idToaccount    account?             @relation("User_account_idToaccount", fields: [account_id], references: [id], onUpdate: NoAction, map: "fk_user_account")
   UserCompany                         UserCompany[]
   UserLocation                        UserLocation[]
@@ -63,6 +66,7 @@ model User {
   @@index([isActive, isSuspended])
   @@index([lastLoginAt])
   @@index([account_id], map: "idx_user_account")
+  @@index([invited_via_id], map: "idx_user_invited_via")
 }
 
 model Session {
@@ -222,6 +226,8 @@ model Lead {
   notes     String?
   createdAt DateTime   @default(now())
   updatedAt DateTime   @default(now()) @updatedAt
+  type      LeadType   @default(TEST_USER)
+  Invite    Invite[]
   company   Company    @relation(fields: [companyId], references: [id])
 
   @@index([companyId])
@@ -1550,7 +1556,9 @@ model account {
   created_at                       DateTime           @default(now()) @db.Timestamptz(6)
   updated_at                       DateTime           @default(now()) @db.Timestamptz(6)
   subscription_status              SubscriptionStatus @default(NONE)
+  is_beta_trial                    Boolean?           @default(false)
   Company                          Company?
+  Invite                           Invite[]
   Notification                     Notification[]
   User_User_account_idToaccount    User[]             @relation("User_account_idToaccount")
   User_account_owner_user_idToUser User?              @relation("account_owner_user_idToUser", fields: [owner_user_id], references: [id], onUpdate: NoAction)
@@ -1666,6 +1674,29 @@ model external_raw_payload {
   @@index([location_id], map: "idx_external_raw_payload_location")
   @@index([provider], map: "idx_external_raw_payload_provider")
   @@index([resource_type], map: "idx_external_raw_payload_resource_type")
+}
+
+model Invite {
+  id                               String        @id @default(dbgenerated("gen_random_uuid()"))
+  code                             String        @unique
+  email                            String?
+  account_id                       String?       @db.Uuid
+  lead_id                          String?
+  invited_by_id                    String
+  max_uses                         Int           @default(1)
+  used_count                       Int           @default(0)
+  status                           invite_status @default(PENDING)
+  meta                             Json?
+  expires_at                       DateTime?     @db.Timestamptz(6)
+  created_at                       DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at                       DateTime      @default(now()) @db.Timestamptz(6)
+  account                          account?      @relation(fields: [account_id], references: [id], onUpdate: NoAction, map: "fk_invite_account")
+  User_Invite_invited_by_idToUser  User          @relation("Invite_invited_by_idToUser", fields: [invited_by_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_invite_invited_by")
+  Lead                             Lead?         @relation(fields: [lead_id], references: [id], onUpdate: NoAction, map: "fk_invite_lead")
+  User_User_invited_via_idToInvite User[]        @relation("User_invited_via_idToInvite")
+
+  @@index([email], map: "idx_invite_email")
+  @@index([status], map: "idx_invite_status")
 }
 
 /// *
@@ -1953,4 +1984,19 @@ enum SubscriptionStatus {
 enum ResponseOrigin {
   GOOGLE
   CRUSSADER
+}
+
+enum LeadType {
+  TEST_USER
+  BETA
+  CUSTOMER
+  PARTNER
+  OTHER
+}
+
+enum invite_status {
+  PENDING
+  USED
+  EXPIRED
+  REVOKED
 }

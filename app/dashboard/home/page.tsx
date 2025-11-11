@@ -44,11 +44,8 @@ export default function DashboardHomePage() {
   const { user, company, locations, integrations, metrics } = mock;
 
   return (
-    <PageShell
-      title="Panel de inicio"
-      description="Resumen rápido de tu cuenta, reseñas e integraciones."
-    >
-      <div className="w-full space-y-6">
+
+      <div className="mx-36 space-y-6 my-12">
         <HomeWelcomeHeader name={user.name} />
 
         <HomeQuickStats
@@ -59,16 +56,13 @@ export default function DashboardHomePage() {
         <div className="grid gap-6 md:grid-cols-2">
           {/* ⬇️ Ahora esta card usa datos reales del endpoint */}
           <HomeSubscriptionCard />
-          <HomeCompanyCard company={company} user={{ memberSince: user.memberSince }} />
+          <HomeCompanyCard />
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          <HomeLocationsCard locations={locations} />
-          <HomeIntegrationsCard integrations={integrations} />
+          <HomeLocationsCard />
+          <HomeIntegrationsCard />
         </div>
-
-        <HomeQuickActions />
       </div>
-    </PageShell>
   );
 }

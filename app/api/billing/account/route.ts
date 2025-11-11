@@ -1,77 +1,151 @@
 // app/api/billing/account/route.ts
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
-import { getUserAuth } from "@/lib/authz";
+import { getBootstrapData } from "@/lib/bootstrap";
 
-function toSlug(s: string) {
-  return (s || "mi-cuenta")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48);
-}
+export const dynamic = "force-dynamic";
 
 export async function POST() {
   try {
-    const { userId } = await getUserAuth();
+    const session = await getServerSession(authOptions);
+    const email = session?.user?.email ?? null;
 
-    // 1) Empresa del usuario
-    const uc = await prisma.userCompany.findFirst({
-      where: { userId },
-      include: { Company: true, User: true },
-      orderBy: { createdAt: "asc" },
+    if (!email) {
+      return NextResponse.json(
+        { ok: false, error: "UNAUTHORIZED" },
+        { status: 401 }
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, account_id: true },
     });
-    if (!uc?.Company) {
-      return NextResponse.json({ ok: false, error: "company_not_found" }, { status: 404 });
-    }
-    const company = uc.Company;
-    const user = uc.User;
 
-    // 2) Si ya hay account enlazada a Company → úsala
-    if (company.account_id) {
-      return NextResponse.json({ ok: true, accountId: company.account_id, created: false }, { status: 200 });
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: "USER_NOT_FOUND" },
+        { status: 404 }
+      );
     }
 
-    // 3) Si el user ya tiene account_id (y existe), enlazamos también la Company
+    // 1) Bootstrap para detectar company activa
+    let bootstrap = null;
+    try {
+      bootstrap = await getBootstrapData();
+    } catch {
+      // si falla bootstrap seguimos
+    }
+
+    const activeCompanyId = bootstrap?.activeCompany?.id ?? null;
+    const firstCompanyId =
+      bootstrap?.companiesResolved?.[0]?.id ??
+      bootstrap?.companies?.[0]?.companyId ??
+      null;
+    const targetCompanyId = activeCompanyId ?? firstCompanyId ?? null;
+
+    // 2) Si el usuario ya tiene account_id y existe, reutilizar
     if (user.account_id) {
-      const existing = await prisma.account.findUnique({ where: { id: user.account_id } });
+      const existing = await prisma.account.findUnique({
+        where: { id: user.account_id },
+      });
+
       if (existing) {
-        await prisma.company.update({
-          where: { id: company.id },
-          data: { account_id: existing.id },
+        if (targetCompanyId) {
+          // Forzamos que esa company apunte a esta account
+          await prisma.company.updateMany({
+            where: { id: targetCompanyId },
+            data: { account_id: existing.id },
+          });
+        }
+
+        return NextResponse.json({
+          ok: true,
+          account: {
+            id: existing.id,
+            subscriptionStatus: existing.subscription_status,
+          },
         });
-        return NextResponse.json({ ok: true, accountId: existing.id, created: false }, { status: 200 });
       }
     }
 
-    // 4) Crear account nueva (sin plan ni producto)
-    const baseSlug = toSlug(company.name || user?.email || "mi-cuenta");
-    let slug = baseSlug;
-
-    const conflict = await prisma.account.findFirst({
-      where: { slug: { equals: slug, mode: "insensitive" } },
-      select: { id: true },
+    // 3) Si hay account con owner_user_id = user.id, reutilizar
+    const owned = await prisma.account.findFirst({
+      where: { owner_user_id: user.id },
     });
-    if (conflict) slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
+
+    if (owned) {
+      if (!user.account_id) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { account_id: owned.id },
+        });
+      }
+
+      if (targetCompanyId) {
+        await prisma.company.updateMany({
+          where: { id: targetCompanyId },
+          data: { account_id: owned.id },
+        });
+      }
+
+      return NextResponse.json({
+        ok: true,
+        account: {
+          id: owned.id,
+          subscriptionStatus: owned.subscription_status,
+        },
+      });
+    }
+
+    // 4) No existe account -> crear en TRIAL
+    const now = new Date();
+    const trialDays = 7;
+    const trialEnd = new Date(
+      now.getTime() + trialDays * 24 * 60 * 60 * 1000
+    );
 
     const created = await prisma.account.create({
       data: {
-        name: company.name || user?.email || "Mi cuenta",
-        slug,
-        owner_user_id: userId,
+        name: `Cuenta ${user.id.slice(0, 6)}`,
+        slug: `acct-${user.id.slice(0, 6)}-${now.getTime().toString(36)}`,
+        owner_user_id: user.id,
         status: "active",
-        // No seteamos plan_slug ni fechas aquí para no “ensuciar” con producto
+        subscription_status: "TRIAL",
+        trial_start_at: now,
+        trial_end_at: trialEnd,
+        trial_used: false,
       },
     });
 
-    // 5) Enlazar en User y Company
-    await Promise.all([
-      prisma.user.update({ where: { id: userId }, data: { account_id: created.id } }),
-      prisma.company.update({ where: { id: company.id }, data: { account_id: created.id } }),
-    ]);
+    // 5) Linkear company si hay target
+    if (targetCompanyId) {
+      await prisma.company.updateMany({
+        where: { id: targetCompanyId },
+        data: { account_id: created.id },
+      });
+    }
 
-    return NextResponse.json({ ok: true, accountId: created.id, created: true }, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err?.message ?? "account_init_failed" }, { status: 500 });
+    // 6) Linkear user.account_id
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { account_id: created.id },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      account: {
+        id: created.id,
+        subscriptionStatus: created.subscription_status,
+      },
+    });
+  } catch (err) {
+    console.error("[POST /api/billing/account] error:", err);
+    return NextResponse.json(
+      { ok: false, error: "INTERNAL_ERROR" },
+      { status: 500 }
+    );
   }
 }
