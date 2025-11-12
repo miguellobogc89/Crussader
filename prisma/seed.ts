@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { PrismaClient, ReviewProvider } from "@prisma/client";
 
 const prisma = new PrismaClient();

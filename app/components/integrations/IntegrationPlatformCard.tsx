@@ -66,10 +66,6 @@ type Props = {
   className?: string;
   onConnect?: (p: Provider) => void;
   fixedHeight?: boolean;
-  /**
-   * Opcional: handler para el botón "Probar modal" (solo se usa en Google Business).
-   * Si no se pasa, no se muestra nada extra.
-   */
   onTestModal?: (p: Provider) => void;
 };
 
@@ -90,7 +86,7 @@ export default function IntegrationPlatformCard({
   provider,
   className,
   onConnect,
-  fixedHeight = true, 
+  fixedHeight = true,
   onTestModal,
 }: Props) {
   const bootstrap = useBootstrapData() as any;
@@ -102,6 +98,9 @@ export default function IntegrationPlatformCard({
     bootstrap?.company?.id ??
     bootstrap?.companyId ??
     bootstrap?.activeCompanyId;
+
+  const userId: string | undefined = bootstrap?.user?.id;
+  const accountEmail: string | undefined = bootstrap?.user?.email;
 
   const ext = provider.externalConnection;
   const computedState =
@@ -118,14 +117,21 @@ export default function IntegrationPlatformCard({
   const handleConnect = React.useCallback(() => {
     if (provider.comingSoon) return;
     if (!provider.connectUrl) return;
+
+    // ✅ Adjuntar userId, companyId y accountEmail si existen
+    const url = new URL(provider.connectUrl, window.location.origin);
+    if (activeCompanyId) url.searchParams.set("companyId", activeCompanyId);
+    if (userId) url.searchParams.set("userId", userId);
+    if (accountEmail) url.searchParams.set("accountEmail", accountEmail);
+
     setLoading(true);
     try {
       onConnect?.(provider);
-      window.location.href = provider.connectUrl;
+      window.location.href = url.toString();
     } finally {
       setLoading(false);
     }
-  }, [onConnect, provider]);
+  }, [onConnect, provider, activeCompanyId, userId, accountEmail]);
 
   const handleSync = React.useCallback(() => {
     // TODO: pegar a tu endpoint de sincronización cuando lo tengas
@@ -146,7 +152,7 @@ export default function IntegrationPlatformCard({
   const isGoogleBusiness =
     provider.providerSlug === "google-business" ||
     provider.key === "google-business" ||
-    provider.key === "google"; // ajusta si tu key real es otra
+    provider.key === "google";
 
   return (
     <Tooltip>
@@ -160,7 +166,6 @@ export default function IntegrationPlatformCard({
           tabIndex={0}
         >
           <CardContent className="h-full p-4 flex flex-col">
-            {/* Estado + icono */}
             <div className="flex items-start justify-between">
               <Badge variant={meta.badgeVariant ?? undefined} className="rounded-full">
                 {meta.label}
@@ -168,7 +173,6 @@ export default function IntegrationPlatformCard({
               <div className="ml-2">{provider.brandIcon}</div>
             </div>
 
-            {/* Título + descripción */}
             <div className="mt-3 space-y-1">
               <h3 className="text-sm font-semibold leading-none">{provider.name}</h3>
               <p className="line-clamp-2 text-sm text-muted-foreground">
@@ -176,7 +180,6 @@ export default function IntegrationPlatformCard({
               </p>
             </div>
 
-            {/* Footer */}
             <div className="mt-auto pt-4 flex items-end justify-between">
               <div className="text-xs text-muted-foreground leading-5">
                 <div>Creado: {fmtDate(ext?.createdAt)}</div>
@@ -211,7 +214,6 @@ export default function IntegrationPlatformCard({
                   </Button>
                 )}
 
-                {/* Botón "Probar modal" opcional, sin romper nada */}
                 {isGoogleBusiness && onTestModal && (
                   <Button
                     size="sm"
@@ -231,9 +233,12 @@ export default function IntegrationPlatformCard({
         </Card>
       </TooltipTrigger>
 
+      {/* ✅ Tooltip ampliado */}
       <TooltipContent side="top" align="center">
         <div className="space-y-1">
           <p className="text-xs">Company ID: {activeCompanyId ?? "—"}</p>
+          <p className="text-xs">User ID: {userId ?? "—"}</p>
+          <p className="text-xs">Account Email: {accountEmail ?? "—"}</p>
           <p className="text-xs">
             Provider: {provider.providerSlug ?? provider.key}
           </p>

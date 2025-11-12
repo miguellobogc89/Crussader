@@ -1,79 +1,79 @@
+// app/api/integrations/google/business-profile/accounts/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/app/server/db";
-import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
 
-/**
- * Decodifica el JWT de NextAuth y devuelve el userId (uid) si existe.
- * Funciona con session: { strategy: "jwt" } y usa NEXTAUTH_SECRET.
- */
-async function getUserIdFromJWT(): Promise<string | null> {
-  try {
-    const jar = await cookies();
-    const token =
-      jar.get("next-auth.session-token")?.value ??
-      jar.get("__Secure-next-auth.session-token")?.value ??
-      null;
-
-    if (!token) return null;
-
-    const secret = process.env.NEXTAUTH_SECRET;
-    if (!secret) {
-      console.error("[GBP_ACCOUNTS] Falta NEXTAUTH_SECRET");
-      return null;
-    }
-
-    const decoded: any = jwt.verify(token, secret);
-    return decoded?.uid ?? null;
-  } catch (e) {
-    console.error("[GBP_ACCOUNTS] Error al decodificar JWT:", e);
-    return null;
-  }
-}
+const isDev = process.env.NODE_ENV !== "production";
 
 export async function GET(req: NextRequest) {
-  try {
-    // 1️⃣ Obtener userId desde el JWT
-    const userId = await getUserIdFromJWT();
-    if (!userId) {
-      return NextResponse.json({ ok: false, error: "no_session" }, { status: 401 });
-    }
+  const diag: Record<string, unknown> = { step: "init" };
 
-    // 2️⃣ Buscar la conexión de Google Business
+  try {
+    // 1) Sesión (JWT strategy)
+    diag.step = "get_session";
+    const session = await getServerSession(authOptions);
+    diag.session_ok = !!(session && session.user);
+    diag.session_user_id = (session?.user as any)?.id || null;
+
+    if (!session || !session.user || !(session.user as any).id) {
+      return NextResponse.json(
+        isDev ? { ok: false, error: "no_session", diag } : { ok: false, error: "no_session" },
+        { status: 401 }
+      );
+    }
+    const userId = (session.user as any).id as string;
+
+    // 2) ExternalConnection (provider google-business)
+    diag.step = "find_external_connection";
     const conn = await prisma.externalConnection.findFirst({
       where: { userId, provider: "google-business" },
-      select: { access_token: true },
+      select: { id: true, access_token: true, companyId: true, createdAt: true, updatedAt: true },
     });
+    diag.external_found = !!conn;
+    diag.external_id = conn?.id || null;
+    diag.external_companyId = conn?.companyId || null;
 
     if (!conn?.access_token) {
       return NextResponse.json(
-        { ok: false, error: "no_google_business_connection" },
+        isDev ? { ok: false, error: "no_google_business_connection", diag } : { ok: false, error: "no_google_business_connection" },
         { status: 404 }
       );
     }
 
-    // 3️⃣ Llamar a la API de Google Business Profile (Accounts)
-    const res = await fetch("https://mybusiness.googleapis.com/v4/accounts", {
+    // 3) Llamada correcta: Account Management v1 (no v4)
+    //    Con scope aprobado `https://www.googleapis.com/auth/business.manage`
+    diag.step = "google_accounts_fetch_v1";
+    const url = "https://mybusinessaccountmanagement.googleapis.com/v1/accounts";
+    const res = await fetch(url, {
       headers: { Authorization: `Bearer ${conn.access_token}` },
     });
 
-    const data = await res.json();
+    const bodyText = await res.text(); // Leer UNA vez
+    let data: any = null;
+    try {
+      data = bodyText ? JSON.parse(bodyText) : {};
+    } catch {
+      data = { _non_json_body: bodyText };
+    }
+    diag.google_status = res.status;
 
     if (!res.ok) {
       return NextResponse.json(
-        { ok: false, error: "google_api_error", details: data },
+        isDev ? { ok: false, error: "google_api_error", details: data, diag } : { ok: false, error: "google_api_error", details: data },
         { status: res.status }
       );
     }
 
-    // 4️⃣ Devolver la lista de cuentas
     return NextResponse.json({
       ok: true,
       accounts: data.accounts ?? [],
-      raw: data,
+      raw: isDev ? data : undefined,
+      diag: isDev ? diag : undefined,
     });
-  } catch (e) {
-    console.error("[GBP_ACCOUNTS] Exception:", e);
-    return NextResponse.json({ ok: false, error: "exception" }, { status: 500 });
+  } catch (e: any) {
+    diag.step = "exception";
+    diag.message = e?.message || String(e);
+    return NextResponse.json(isDev ? { ok: false, error: "exception", diag } : { ok: false, error: "exception" }, { status: 500 });
   }
 }

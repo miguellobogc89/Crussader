@@ -1,51 +1,39 @@
+// app/api/integrations/google/calendar/callback/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
   const url = new URL(req.url);
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || url.origin;
+
   const code = url.searchParams.get("code");
   const stateParam = url.searchParams.get("state");
 
   let redirectAfter =
     process.env.GOOGLE_CALENDAR_RETURN_URI ||
-    `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/integrations-test-2`;
+    `${baseUrl}/dashboard/integrations-test-2`;
 
   let companyId: string | null = null;
+  let userId: string | null = null;
+  let accountEmail: string | null = null;
 
   if (stateParam) {
     try {
       const parsed = JSON.parse(stateParam);
-      if (parsed && typeof parsed.redirect_after === "string") {
-        redirectAfter = parsed.redirect_after.startsWith("http")
-          ? parsed.redirect_after
-          : `${process.env.NEXT_PUBLIC_APP_URL}${parsed.redirect_after}`;
-      }
-      if (parsed && typeof parsed.companyId === "string") {
-        companyId = parsed.companyId;
-      }
-    } catch {
-      // ignore
-    }
+      if (typeof parsed.redirect_after === "string") redirectAfter = parsed.redirect_after;
+      if (typeof parsed.companyId === "string") companyId = parsed.companyId;
+      if (typeof parsed.userId === "string") userId = parsed.userId;
+      if (typeof parsed.accountEmail === "string") accountEmail = parsed.accountEmail;
+    } catch {}
   }
 
-  if (!code) {
-    return NextResponse.redirect(`${redirectAfter}?error=missing_code`);
-  }
-
-  if (!session || !session.user || !(session.user as any).id) {
-    return NextResponse.redirect(`${redirectAfter}?error=not_authenticated`);
-  }
-
-  const sessionUserId = (session.user as any).id as string;
-  const sessionEmail = session.user.email ?? null;
+  if (!code) return NextResponse.redirect(`${redirectAfter}?error=missing_code`);
+  if (!userId) return NextResponse.redirect(`${redirectAfter}?error=missing_user`);
 
   const redirectUri =
     process.env.GOOGLE_CALENDAR_REDIRECT_URI ||
-    `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/google/calendar/callback`;
+    `${baseUrl}/api/integrations/google/calendar/callback`;
 
   const client = new google.auth.OAuth2(
     process.env.GOOGLE_CALENDAR_CLIENT_ID!,
@@ -54,84 +42,50 @@ export async function GET(req: NextRequest) {
   );
 
   try {
-    const tokenResp = await client.getToken(code);
-    const tokens = tokenResp.tokens;
-    client.setCredentials(tokens);
+    const { tokens } = await client.getToken(code);
 
-    let accessToken: string | null = null;
-    if (typeof tokens.access_token === "string" && tokens.access_token.length > 0) {
-      accessToken = tokens.access_token;
-    }
+    const accessToken = typeof tokens.access_token === "string" ? tokens.access_token : null;
+    const refreshToken = typeof tokens.refresh_token === "string" ? tokens.refresh_token : null;
+    const expiresAtSec =
+      typeof tokens.expiry_date === "number" ? Math.floor(tokens.expiry_date / 1000) : null;
+    const scopeStr =
+      Array.isArray((tokens as any).scope)
+        ? (tokens as any).scope.join(" ")
+        : typeof (tokens as any).scope === "string"
+        ? (tokens as any).scope
+        : null;
 
-    let refreshToken: string | null = null;
-    if (typeof tokens.refresh_token === "string" && tokens.refresh_token.length > 0) {
-      refreshToken = tokens.refresh_token;
-    }
-
-    let expiresAtSec: number | null = null;
-    if (typeof tokens.expiry_date === "number") {
-      expiresAtSec = Math.floor(tokens.expiry_date / 1000);
-    }
-
-    let scopeStr: string | null = null;
-    const rawScope: unknown = (tokens as any).scope;
-    if (typeof rawScope === "string") scopeStr = rawScope;
-    else if (Array.isArray(rawScope)) scopeStr = rawScope.join(" ");
-
-    // Resolver user
-    let dbUser = await prisma.user.findUnique({ where: { id: sessionUserId } });
-
-    if (!dbUser && typeof sessionEmail === "string") {
-      const byEmail = await prisma.user.findUnique({ where: { email: sessionEmail } });
-      if (byEmail) dbUser = byEmail;
-    }
-
-    if (!dbUser) {
-      dbUser = await prisma.user.create({
-        data: {
-          email: sessionEmail || undefined,
-          name: session.user.name || null,
-          role: "user",
-          emailVerified: new Date(),
-        },
-      });
-    }
-
-    const ownerUserId = dbUser.id;
     const provider = "google-calendar" as const;
-    const accountEmail = sessionEmail || null;
 
-    // upsert ExternalConnection con companyId
     const existing = await prisma.externalConnection.findUnique({
-      where: { userId_provider: { userId: ownerUserId, provider } },
+      where: { userId_provider: { userId, provider } },
     });
 
     if (existing) {
-      const updateData: any = {};
-      if (accountEmail !== null) updateData.accountEmail = accountEmail;
-      if (typeof accessToken === "string") updateData.access_token = accessToken;
-      if (typeof refreshToken === "string") updateData.refresh_token = refreshToken;
-      if (typeof expiresAtSec === "number") updateData.expires_at = expiresAtSec;
-      if (typeof scopeStr === "string") updateData.scope = scopeStr;
-      if (companyId) updateData.companyId = companyId;
-
       await prisma.externalConnection.update({
         where: { id: existing.id },
-        data: updateData,
+        data: {
+          access_token: accessToken!,                 // requerido por tu modelo
+          refresh_token: refreshToken || undefined,
+          expires_at: expiresAtSec || undefined,
+          scope: scopeStr || undefined,
+          companyId: companyId || undefined,
+          accountEmail: accountEmail || undefined,
+        },
       });
     } else {
-      const createData: any = {
-        userId: ownerUserId,
-        provider,
-      };
-      if (companyId) createData.companyId = companyId;
-      if (typeof accessToken === "string") createData.access_token = accessToken;
-      if (typeof refreshToken === "string") createData.refresh_token = refreshToken;
-      if (typeof expiresAtSec === "number") createData.expires_at = expiresAtSec;
-      if (typeof scopeStr === "string") createData.scope = scopeStr;
-      if (accountEmail !== null) createData.accountEmail = accountEmail;
-
-      await prisma.externalConnection.create({ data: createData });
+      await prisma.externalConnection.create({
+        data: {
+          userId,
+          provider,
+          access_token: accessToken!,                 // requerido por tu modelo
+          refresh_token: refreshToken || undefined,
+          expires_at: expiresAtSec || undefined,
+          scope: scopeStr || undefined,
+          companyId: companyId || undefined,
+          accountEmail: accountEmail || undefined,
+        },
+      });
     }
 
     return NextResponse.redirect(`${redirectAfter}?connected=google_calendar`);

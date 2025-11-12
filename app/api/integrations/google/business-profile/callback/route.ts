@@ -1,12 +1,8 @@
-// app/api/integrations/google/business-profile/callback/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { prisma } from "@/app/server/db";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const stateParam = url.searchParams.get("state");
@@ -16,20 +12,19 @@ export async function GET(req: NextRequest) {
     `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/integrations-test-2`;
 
   let companyId: string | null = null;
+  let userId: string | null = null;
+  let accountEmail: string | null = null;
 
+  // ✅ Leer los datos enviados desde connect
   if (stateParam) {
     try {
       const parsed = JSON.parse(stateParam);
-      if (parsed && typeof parsed.redirect_after === "string") {
-        redirectAfter = parsed.redirect_after.startsWith("http")
-          ? parsed.redirect_after
-          : `${process.env.NEXT_PUBLIC_APP_URL}${parsed.redirect_after}`;
-      }
-      if (parsed && typeof parsed.companyId === "string") {
-        companyId = parsed.companyId;
-      }
+      if (parsed.redirect_after) redirectAfter = parsed.redirect_after;
+      if (parsed.companyId) companyId = parsed.companyId;
+      if (parsed.userId) userId = parsed.userId;
+      if (parsed.accountEmail) accountEmail = parsed.accountEmail;
     } catch {
-      // ignore
+      // ignorar errores
     }
   }
 
@@ -37,12 +32,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${redirectAfter}?error=missing_code`);
   }
 
-  if (!session || !session.user || !(session.user as any).id) {
-    return NextResponse.redirect(`${redirectAfter}?error=not_authenticated`);
+  if (!userId) {
+    console.error("[Google Business Callback] Missing userId in state");
+    return NextResponse.redirect(`${redirectAfter}?error=missing_user`);
   }
-
-  const sessionUserId = (session.user as any).id as string;
-  const sessionEmail = session.user.email ?? null;
 
   const redirectUri =
     process.env.GOOGLE_BUSINESS_REDIRECT_URI ||
@@ -59,80 +52,50 @@ export async function GET(req: NextRequest) {
     const tokens = tokenResp.tokens;
     client.setCredentials(tokens);
 
-    let accessToken: string | null = null;
-    if (typeof tokens.access_token === "string" && tokens.access_token.length > 0) {
-      accessToken = tokens.access_token;
-    }
+    const accessToken = tokens.access_token ?? null;
+    const refreshToken = tokens.refresh_token ?? null;
+    const expiresAtSec = tokens.expiry_date
+      ? Math.floor(tokens.expiry_date / 1000)
+      : null;
+    const scopeStr = Array.isArray(tokens.scope)
+      ? tokens.scope.join(" ")
+      : typeof tokens.scope === "string"
+      ? tokens.scope
+      : null;
 
-    let refreshToken: string | null = null;
-    if (typeof tokens.refresh_token === "string" && tokens.refresh_token.length > 0) {
-      refreshToken = tokens.refresh_token;
-    }
-
-    let expiresAtSec: number | null = null;
-    if (typeof tokens.expiry_date === "number") {
-      expiresAtSec = Math.floor(tokens.expiry_date / 1000);
-    }
-
-    let scopeStr: string | null = null;
-    const rawScope: unknown = (tokens as any).scope;
-    if (typeof rawScope === "string") scopeStr = rawScope;
-    else if (Array.isArray(rawScope)) scopeStr = rawScope.join(" ");
-
-    // Resolver user
-    let dbUser = await prisma.user.findUnique({ where: { id: sessionUserId } });
-
-    if (!dbUser && typeof sessionEmail === "string") {
-      const byEmail = await prisma.user.findUnique({ where: { email: sessionEmail } });
-      if (byEmail) dbUser = byEmail;
-    }
-
-    if (!dbUser) {
-      dbUser = await prisma.user.create({
-        data: {
-          email: sessionEmail || undefined,
-          name: session.user.name || null,
-          role: "user",
-          emailVerified: new Date(),
-        },
-      });
-    }
-
-    const ownerUserId = dbUser.id;
     const provider = "google-business" as const;
-    const accountEmail = sessionEmail || null;
 
-    // upsert ExternalConnection con companyId
+    // 🔹 Crear o actualizar ExternalConnection directamente con los datos recibidos
     const existing = await prisma.externalConnection.findUnique({
-      where: { userId_provider: { userId: ownerUserId, provider } },
+      where: { userId_provider: { userId, provider } },
     });
 
     if (existing) {
-      const updateData: any = {};
-      if (accountEmail !== null) updateData.accountEmail = accountEmail;
-      if (typeof accessToken === "string") updateData.access_token = accessToken;
-      if (typeof refreshToken === "string") updateData.refresh_token = refreshToken;
-      if (typeof expiresAtSec === "number") updateData.expires_at = expiresAtSec;
-      if (typeof scopeStr === "string") updateData.scope = scopeStr;
+      const updateData: any = {
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        expires_at: expiresAtSec,
+        scope: scopeStr,
+      };
       if (companyId) updateData.companyId = companyId;
-
+      if (accountEmail) updateData.accountEmail = accountEmail;
       await prisma.externalConnection.update({
         where: { id: existing.id },
         data: updateData,
       });
     } else {
-      const createData: any = {
-        userId: ownerUserId,
-        provider,
-      };
-      if (companyId) createData.companyId = companyId;
-      if (typeof accessToken === "string") createData.access_token = accessToken;
-      if (typeof refreshToken === "string") createData.refresh_token = refreshToken;
-      if (typeof expiresAtSec === "number") createData.expires_at = expiresAtSec;
-      if (typeof scopeStr === "string") createData.scope = scopeStr;
-      if (accountEmail !== null) createData.accountEmail = accountEmail;
-
-      await prisma.externalConnection.create({ data: createData });
+      await prisma.externalConnection.create({
+        data: {
+          userId,
+          provider,
+          access_token: accessToken!,
+          refresh_token: refreshToken || undefined,
+          expires_at: expiresAtSec || undefined,
+          scope: scopeStr || undefined,
+          companyId: companyId || undefined,
+          accountEmail: accountEmail || undefined,
+        },
+      });
     }
 
     return NextResponse.redirect(`${redirectAfter}?connected=google_business`);

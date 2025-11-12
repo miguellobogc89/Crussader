@@ -1,4 +1,4 @@
-// app/api/companies/routes.ts
+// app/api/companies/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
@@ -13,23 +13,38 @@ export async function GET(req: NextRequest) {
     const email = session?.user?.email ?? null;
     const role = (session?.user as any)?.role ?? "user";
     const isSystemAdmin = role === "system_admin";
-    if (!email && !isSystemAdmin) return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+    if (!email && !isSystemAdmin) {
+      return NextResponse.json({ ok: false, error: "unauth" }, { status: 401 });
+    }
 
     const all = req.nextUrl.searchParams.get("all") === "1";
 
-    // 1) Cargar companies visibles
-    let companies: Array<{ id: string; name: string; brandColor: string | null; logoUrl: string | null; createdAt: Date }> = [];
+    let companies: Array<{
+      id: string;
+      name: string;
+      brandColor: string | null;
+      logoUrl: string | null;
+      createdAt: Date;
+    }> = [];
+
     if (isSystemAdmin && all) {
       companies = await prisma.company.findMany({
         select: { id: true, name: true, brandColor: true, logoUrl: true, createdAt: true },
         orderBy: { name: "asc" },
       });
     } else {
-      const me = email ? await prisma.user.findUnique({ where: { email }, select: { id: true } }) : null;
+      const me = email
+        ? await prisma.user.findUnique({ where: { email }, select: { id: true } })
+        : null;
       if (!me) return NextResponse.json({ ok: true, companies: [] });
-      const memberships = await prisma.userCompany.findMany({ where: { userId: me.id }, select: { companyId: true } });
-      const companyIds = memberships.map(m => m.companyId);
+
+      const memberships = await prisma.userCompany.findMany({
+        where: { userId: me.id },
+        select: { companyId: true },
+      });
+      const companyIds = memberships.map((m) => m.companyId);
       if (companyIds.length === 0) return NextResponse.json({ ok: true, companies: [] });
+
       companies = await prisma.company.findMany({
         where: { id: { in: companyIds } },
         select: { id: true, name: true, brandColor: true, logoUrl: true, createdAt: true },
@@ -37,19 +52,18 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // 2) Calcular locationsCount por company
-    const ids = companies.map(c => c.id);
+    const ids = companies.map((c) => c.id);
     let countsMap = new Map<string, number>();
     if (ids.length) {
       const grouped = await prisma.location.groupBy({
         by: ["companyId"],
-        where: { companyId: { in: ids } }, // si quieres solo activas: add status: "ACTIVE"
+        where: { companyId: { in: ids } },
         _count: { _all: true },
       });
-      countsMap = new Map(grouped.map(g => [g.companyId, g._count._all]));
+      countsMap = new Map(grouped.map((g) => [g.companyId, g._count._all]));
     }
 
-    const rows = companies.map(c => ({
+    const rows = companies.map((c) => ({
       id: c.id,
       name: c.name,
       color: c.brandColor ?? null,
@@ -64,7 +78,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
   }
 }
-  
 
 export async function POST(req: NextRequest) {
   try {
@@ -88,11 +101,30 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      // 1) Crear account por SQL crudo con valores por defecto (id UUID autogenerado)
+      const createdAccounts = await tx.$queryRaw<Array<{ id: string }>>`
+        INSERT INTO "account" DEFAULT VALUES
+        RETURNING id
+      `;
+      const accountId = createdAccounts[0]?.id;
+
+      if (!accountId) {
+        throw new Error("account_create_failed");
+      }
+
+      // 2) Crear la company conectando el account recién creado
       const company = await tx.company.create({
-        data: { name: cleanName, createdById: me.id },
+        data: {
+          name: cleanName,
+          createdById: me.id,
+          account: {
+            connect: { id: accountId },
+          },
+        },
         select: { id: true, name: true, createdAt: true },
       });
 
+      // 3) Dar membership OWNER al creador
       await tx.userCompany.create({
         data: { userId: me.id, companyId: company.id, role: CompanyRole.OWNER },
       });

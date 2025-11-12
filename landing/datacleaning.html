@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Eliminación de datos — Crussader</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" href="favicon.ico">
+</head>
+<body class="bg-white text-black">
+  <!-- Header -->
+  <header class="border-b border-gray-200">
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+      <a href="index.html" class="text-xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent">
+        Crussader
+      </a>
+      <nav class="hidden gap-6 text-sm text-gray-600 md:flex">
+        <a href="index.html#features" class="hover:text-gray-900">Características</a>
+        <a href="index.html#how" class="hover:text-gray-900">Cómo funciona</a>
+        <a href="support.html" class="hover:text-gray-900">Soporte</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="mx-auto max-w-3xl px-4 py-12">
+    <h1 class="text-3xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent">
+      Eliminación de datos de usuario
+    </h1>
+    <p class="mt-2 text-sm text-gray-500">Última actualización: <span id="date"></span></p>
+
+    <section class="mt-6 space-y-4 text-gray-700">
+      <p>
+        Crussader ofrece un método directo para borrar tu cuenta y eliminar todos los
+        datos asociados a tu perfil.
+      </p>
+
+      <h2 class="text-xl font-semibold">Cómo borrar tu cuenta (recomendado)</h2>
+      <ol class="list-decimal pl-5 space-y-2">
+        <li>Accede a tu cuenta de Crussader.</li>
+        <li>Ve a <strong>Configuración &rarr; Usuario</strong>.</li>
+        <li>Selecciona <strong>“Borrar cuenta”</strong> y confirma.</li>
+      </ol>
+      <p>
+        Este proceso elimina permanentemente tu cuenta y todos los datos vinculados (incluyendo
+        ajustes, conexiones y contenido generado) en un plazo máximo de 30 días,
+        conforme a nuestros procedimientos internos de seguridad y retención.
+      </p>
+
+      <h2 class="text-xl font-semibold">Alternativa: solicitarlo por email</h2>
+      <p>
+        Si no puedes acceder a tu cuenta, escribe a
+        <a href="mailto:admin@crussader.com" class="text-violet-700 underline">admin@crussader.com</a>
+        con el asunto <strong>“Eliminación de datos”</strong> indicando:
+      </p>
+      <ul class="list-disc pl-5 space-y-2">
+        <li>Tu nombre completo.</li>
+        <li>El correo electrónico asociado a tu cuenta.</li>
+        <li>Cualquier información adicional que ayude a verificar tu identidad.</li>
+      </ul>
+      <p>
+        Procesaremos tu solicitud en el mismo plazo y te confirmaremos por email cuando se complete.
+      </p>
+
+      <p class="text-sm text-gray-600">
+        Para más información sobre cómo tratamos tus datos, consulta nuestra
+        <a href="privacy.html" class="text-violet-700 underline">Política de privacidad</a>.
+      </p>
+    </section>
+
+    <div class="mt-8">
+      <a href="index.html" class="inline-flex items-center justify-center rounded-md border px-4 py-2 hover:bg-gray-50">
+        Volver al inicio
+      </a>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-200">
+    <div class="mx-auto max-w-6xl px-4 py-10 text-center text-sm text-gray-600">
+      <a href="terms.html" class="hover:text-gray-900">Términos</a> •
+      <a href="privacy.html" class="hover:text-gray-900">Privacidad</a> •
+      <a href="support.html" class="hover:text-gray-900">Soporte</a> •
+      <a href="index.html" class="hover:text-gray-900">Inicio</a>
+      <p class="mt-2 text-xs text-gray-500">© <span id="year"></span> Crussader.</p>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const d = new Date();
+    document.getElementById('date').textContent =
+      `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  </script>
+</body>
+</html>

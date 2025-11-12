@@ -265,19 +265,7 @@ export default function CompanyPage() {
       <PageShell
         title={companyName}
         description="Gestiona los datos de tu empresa y las ubicaciones conectadas."
-        icon={Building2}
-        actions={
-          hasCompany && companyId ? (
-            <Button variant="outline" size="sm" onClick={openEdit}>
-              Editar empresa
-            </Button>
-          ) : (
-            <Button size="sm" onClick={openCreate}>
-              <Plus size={16} className="mr-2" />
-              Crear empresa
-            </Button>
-          )
-        }
+
       >
         {/* Estado sin empresa */}
         {!hasCompany ? (

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Soporte — Crussader</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" href="favicon.ico">
+</head>
+<body class="bg-white text-black">
+  <header class="border-b border-gray-200">
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+      <a href="index.html" class="flex items-center gap-2">
+        <img src="img/logo.png" alt="Crussader" class="h-8 w-8"/>
+        <span class="text-xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent">Crussader</span>
+      </a>
+      <nav class="hidden gap-6 text-sm text-gray-600 md:flex">
+        <a href="index.html#features" class="hover:text-gray-900">Características</a>
+        <a href="index.html#how" class="hover:text-gray-900">Cómo funciona</a>
+        <a href="support.html" class="hover:text-gray-900">Soporte</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-3xl px-4 py-12">
+    <h1 class="text-3xl font-bold">Soporte</h1>
+    <p class="mt-2 text-gray-700">¿Necesitas ayuda? Escríbenos y te respondemos lo antes posible.</p>
+
+    <div class="mt-6 space-y-3 text-gray-700">
+      <p>✉️ Email: <a href="mailto:admin@crussader.com" class="text-violet-700 underline">admin@crussader.com</a></p>
+      <p>📑 FAQ: próximamente</p>
+    </div>
+
+    <div class="mt-8">
+      <a href="index.html" class="inline-flex items-center justify-center rounded-md border px-4 py-2 hover:bg-gray-50">Volver a inicio</a>
+    </div>
+  </main>
+
+  <footer class="border-t border-gray-200">
+    <div class="mx-auto max-w-6xl px-4 py-10 text-center text-sm text-gray-600">
+      <a href="terms.html" class="hover:text-gray-900">Términos</a> •
+      <a href="privacy.html" class="hover:text-gray-900">Privacidad</a> •
+      <a href="support.html" class="hover:text-gray-900">Soporte</a> •
+      <a href="index.html" class="hover:text-gray-900">Inicio</a>
+      <p class="mt-2 text-xs text-gray-500">© <span id="year"></span> Crussader.</p>
+    </div>
+  </footer>
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Política de privacidad — Crussader</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" href="favicon.ico">
+</head>
+<body class="bg-white text-black">
+  <header class="border-b border-gray-200">
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+      <a href="index.html" class="flex items-center gap-2">
+        <img src="img/logo.png" alt="Crussader" class="h-8 w-8"/>
+        <span class="text-xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent">Crussader</span>
+      </a>
+      <nav class="hidden gap-6 text-sm text-gray-600 md:flex">
+        <a href="index.html#features" class="hover:text-gray-900">Características</a>
+        <a href="index.html#how" class="hover:text-gray-900">Cómo funciona</a>
+        <a href="support.html" class="hover:text-gray-900">Soporte</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-3xl px-4 py-12">
+    <h1 class="text-3xl font-bold">Política de privacidad</h1>
+    <p class="mt-2 text-sm text-gray-500">Última actualización: <span id="date"></span></p>
+
+    <h2 class="mt-8 text-xl font-semibold">1. Responsable y contacto</h2>
+    <p class="mt-2 text-gray-700">
+      Crussader (titular: Miguel Lobo Gómez Calero). Contacto: 
+      <a href="mailto:admin@crussader.com" class="text-violet-700 underline">admin@crussader.com</a>.
+    </p>
+
+    <h2 class="mt-6 text-xl font-semibold">2. Datos que tratamos</h2>
+    <ul class="mt-2 list-disc pl-6 text-gray-700 space-y-1">
+      <li>Identificativos (nombre, email de contacto).</li>
+      <li>Datos de cuentas conectadas en plataformas (Facebook/Instagram): 
+        IDs de página/cuenta, publicaciones, comentarios, reacciones y metadatos proporcionados por la API.</li>
+      <li>Datos técnicos: logs, IP parcial, agente de usuario para seguridad y métricas.</li>
+    </ul>
+
+    <h2 class="mt-6 text-xl font-semibold">3. Finalidades y base legal</h2>
+    <ul class="mt-2 list-disc pl-6 text-gray-700 space-y-1">
+      <li>Obtener y mostrar comentarios de tus páginas, y avisarte cuando lleguen nuevos — 
+          <span class="italic">ejecución del contrato</span>.</li>
+      <li>Responder a reseñas y gestionar flujos de moderación — 
+          <span class="italic">ejecución del contrato</span>.</li>
+      <li>Mejora del servicio y seguridad — 
+          <span class="italic">interés legítimo</span>.</li>
+      <li>Obligaciones legales (facturación, cumplimiento) — 
+          <span class="italic">obligación legal</span>.</li>
+    </ul>
+
+    <h2 class="mt-6 text-xl font-semibold">4. Origen de los datos de Meta</h2>
+    <p class="mt-2 text-gray-700">
+      Accedemos a datos de Facebook/Instagram exclusivamente a través de las APIs oficiales (Facebook Pages API / Instagram Graph API)
+      y con los permisos autorizados por el titular de la cuenta. No compartimos datos con terceros salvo obligación legal o
+      encargados de tratamiento necesarios para la prestación del servicio.
+    </p>
+
+    <h2 class="mt-6 text-xl font-semibold">5. Conservación</h2>
+    <p class="mt-2 text-gray-700">
+      Conservamos los datos mientras mantengas la cuenta activa y, tras su cierre, el tiempo estrictamente necesario 
+      para cumplir obligaciones legales. Puedes solicitar la eliminación en cualquier momento (ver 
+      <a href="datacleaning.html" class="text-violet-700 underline">Eliminación de datos</a>).
+    </p>
+
+    <h2 class="mt-6 text-xl font-semibold">6. Derechos</h2>
+    <p class="mt-2 text-gray-700">
+      Puedes ejercer acceso, rectificación, supresión, oposición, limitación y portabilidad escribiendo a 
+      <a href="mailto:admin@crussader.com" class="text-violet-700 underline">admin@crussader.com</a>.
+      Si consideras que tus derechos no han sido atendidos, puedes reclamar ante la autoridad de control competente.
+    </p>
+
+    <h2 class="mt-6 text-xl font-semibold">7. Seguridad</h2>
+    <p class="mt-2 text-gray-700">
+      Aplicamos cifrado en tránsito (HTTPS), controles de acceso, registros de actividad y prácticas de minimización
+      de datos. Realizamos revisiones periódicas de permisos y accesos.
+    </p>
+  </main>
+
+  <footer class="border-t border-gray-200">
+    <div class="mx-auto max-w-6xl px-4 py-10 text-center text-sm text-gray-600">
+      <a href="terms.html" class="hover:text-gray-900">Términos</a> •
+      <a href="privacy.html" class="hover:text-gray-900">Privacidad</a> •
+      <a href="support.html" class="hover:text-gray-900">Soporte</a> •
+      <a href="index.html" class="hover:text-gray-900">Inicio</a>
+      <p class="mt-2 text-xs text-gray-500">© <span id="year"></span> Crussader.</p>
+    </div>
+  </footer>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    const d = new Date();
+    document.getElementById('date').textContent =
+      `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  </script>
+</body>
+</html>
