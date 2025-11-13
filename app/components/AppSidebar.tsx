@@ -75,9 +75,30 @@ const GROUPS: NavGroup[] = [
     title: "Mi Negocio",
     icon: "🏢",
     items: [
-      { title: "Empresa", href: "/dashboard/company", icon: "🏛️", description: "Información de la empresa" },
-      { title: "Empleados", href: "/dashboard/myusers", icon: "👥", description: "Empleados y roles" },
-      { title: "Calendario", href: "/dashboard/calendar", icon: "📅", description: "Gestión de reservas" },
+      {
+        title: "Empresa",
+        href: "/dashboard/company",
+        icon: "🏛️",
+        description: "Información de la empresa",
+      },
+      {
+        title: "Empleados",
+        href: "/dashboard/myusers",
+        icon: "👥",
+        description: "Empleados y roles",
+      },
+      {
+        title: "Turnos del personal",
+        href: "/dashboard/shifts",
+        icon: "🗓️",
+        description: "Horarios, vacaciones y festivos",
+      },
+      {
+        title: "Calendario de reservas",
+        href: "/dashboard/calendar",
+        icon: "📅",
+        description: "Gestión de citas y agenda",
+      },
     ],
   },
   {
@@ -92,6 +113,7 @@ const GROUPS: NavGroup[] = [
     ],
   },
 ];
+
 
 export function AppSidebar() {
   const pathname = usePathname() ?? "";

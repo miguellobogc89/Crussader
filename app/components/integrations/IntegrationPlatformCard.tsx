@@ -103,13 +103,33 @@ export default function IntegrationPlatformCard({
   const accountEmail: string | undefined = bootstrap?.user?.email;
 
   const ext = provider.externalConnection;
-  const computedState =
+
+  const isGoogleProvider =
+    provider.providerSlug?.startsWith("google") ||
+    provider.key.startsWith("google");
+
+  // Estado base (respetando lo que venga del backend)
+  let computedState =
     ext?.state ??
     (ext ? (ext.hasToken ? "HAS_TOKEN" : "EXISTS_NO_TOKEN") : "NONE");
+
+  // ⬇️ Ajuste específico para Google: si hay refresh_token, lo consideramos conectado
+  if (isGoogleProvider && ext) {
+    if (ext.refresh_token) {
+      computedState = "HAS_TOKEN";
+    } else if (!ext.access_token) {
+      computedState = "EXISTS_NO_TOKEN";
+    }
+  }
 
   let visualStatus: IntegrationStatusKey = "DISCONNECTED";
   if (computedState === "HAS_TOKEN") visualStatus = "CONNECTED";
   if (computedState === "TOKEN_EXPIRED") visualStatus = "EXPIRED";
+
+  // Para Google, si hay refresh_token, nunca mostramos "Expirada"
+  if (isGoogleProvider && ext?.refresh_token) {
+    visualStatus = "CONNECTED";
+  }
 
   const meta = STATUS_META[visualStatus] ?? STATUS_META.UNKNOWN;
   const [loading, setLoading] = React.useState(false);
@@ -118,7 +138,6 @@ export default function IntegrationPlatformCard({
     if (provider.comingSoon) return;
     if (!provider.connectUrl) return;
 
-    // ✅ Adjuntar userId, companyId y accountEmail si existen
     const url = new URL(provider.connectUrl, window.location.origin);
     if (activeCompanyId) url.searchParams.set("companyId", activeCompanyId);
     if (userId) url.searchParams.set("userId", userId);
@@ -154,6 +173,8 @@ export default function IntegrationPlatformCard({
     provider.key === "google-business" ||
     provider.key === "google";
 
+  const isConnected = visualStatus === "CONNECTED";
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -166,26 +187,39 @@ export default function IntegrationPlatformCard({
           tabIndex={0}
         >
           <CardContent className="h-full p-4 flex flex-col">
-            <div className="flex items-start justify-between">
-              <Badge variant={meta.badgeVariant ?? undefined} className="rounded-full">
+            {/* Header: icono izquierda, chip derecha, alineados */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {/* Icono */}
+                <div>{provider.brandIcon}</div>
+
+                {/* Nombre */}
+                <h3 className="text-md font-semibold leading-none">
+                  {provider.name}
+                </h3>
+              </div>
+
+              {/* Chip */}
+              <Badge
+                variant={meta.badgeVariant ?? undefined}
+                className={cn(
+                  "rounded-full",
+                  isConnected && "bg-[#34A853] text-white border-transparent"
+                )}
+              >
                 {meta.label}
               </Badge>
-              <div className="ml-2">{provider.brandIcon}</div>
             </div>
 
+
             <div className="mt-3 space-y-1">
-              <h3 className="text-sm font-semibold leading-none">{provider.name}</h3>
               <p className="line-clamp-2 text-sm text-muted-foreground">
                 {provider.description}
               </p>
             </div>
 
             <div className="mt-auto pt-4 flex items-end justify-between">
-              <div className="text-xs text-muted-foreground leading-5">
-                <div>Creado: {fmtDate(ext?.createdAt)}</div>
-                <div>Actualizado: {fmtDate(ext?.updatedAt)}</div>
-              </div>
-
+              <div></div> {/* vacío para mantener el layout sin romper nada */}
               <div className="flex items-center gap-2">
                 {cta === "SYNC" ? (
                   <Button
@@ -205,9 +239,7 @@ export default function IntegrationPlatformCard({
                     disabled={needsUrl && (!provider.connectUrl || !canClick)}
                     onClick={handleConnect}
                     className={cn(
-                      needsUrl &&
-                        !provider.connectUrl &&
-                        "opacity-60 cursor-not-allowed",
+                      needsUrl && !provider.connectUrl && "opacity-60 cursor-not-allowed",
                     )}
                   >
                     {cta === "CREAR" ? "Crear conexión" : "Conectar"}
@@ -229,11 +261,11 @@ export default function IntegrationPlatformCard({
                 )}
               </div>
             </div>
+
           </CardContent>
         </Card>
       </TooltipTrigger>
 
-      {/* ✅ Tooltip ampliado */}
       <TooltipContent side="top" align="center">
         <div className="space-y-1">
           <p className="text-xs">Company ID: {activeCompanyId ?? "—"}</p>

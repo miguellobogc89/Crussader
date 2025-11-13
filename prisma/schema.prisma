@@ -174,6 +174,8 @@ model Company {
   voiceAgent                  VoiceAgent?                   @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id])
   account                     account                       @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_company_account")
   customers                   CompanyCustomer[]
+  CompanyHoliday              CompanyHoliday[]
+  EmployeeShift               EmployeeShift[]
   jobs                        Job[]
   knowledgeItems              KnowledgeItem[]
   knowledgeSections           KnowledgeSection[]
@@ -185,6 +187,7 @@ model Company {
   LocationReviewMonthly       LocationReviewMonthly[]
   responseSettings            ResponseSettings?
   Reviews                     Review[]                      @relation("CompanyReviews")
+  ShiftEvent                  ShiftEvent[]
   UserCompany                 UserCompany[]
   WebchatSites                WebchatSite[]                 @relation("CompanyToWebchatSite")
   billing_account             billing_account?
@@ -274,7 +277,9 @@ model Location {
   exceptions                  Json?
   agentSessions               AgentSession[]
   appointments                Appointment[]
+  CompanyHoliday              CompanyHoliday[]
   employeeLinks               EmployeeLocation[]
+  EmployeeShift               EmployeeShift[]
   employeeTimeOffs            EmployeeTimeOff[]
   jobs                        Job[]
   activity                    Activity?                     @relation(fields: [activityId], references: [id])
@@ -288,6 +293,7 @@ model Location {
   resourceTimeOffs            ResourceTimeOff[]
   Reviews                     Review[]                      @relation("LocationReviews")
   services                    Service[]
+  ShiftEvent                  ShiftEvent[]
   UserLocation                UserLocation[]
   WebchatSites                WebchatSite[]                 @relation("LocationToWebchatSite")
   theme_candidate             theme_candidate[]
@@ -572,20 +578,22 @@ model KnowledgeItem {
 }
 
 model Employee {
-  id           String             @id @default(cuid())
-  name         String
-  notes        String?
-  color        String?
-  active       Boolean            @default(true)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  exceptions   Json?
-  openingHours Json?
-  timezone     String             @default("Europe/Madrid")
-  appointments Appointment[]
-  locations    EmployeeLocation[]
-  roles        EmployeeRole[]
-  timeOffs     EmployeeTimeOff[]
+  id            String             @id @default(cuid())
+  name          String
+  notes         String?
+  color         String?
+  active        Boolean            @default(true)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  exceptions    Json?
+  openingHours  Json?
+  timezone      String             @default("Europe/Madrid")
+  appointments  Appointment[]
+  locations     EmployeeLocation[]
+  roles         EmployeeRole[]
+  EmployeeShift EmployeeShift[]
+  timeOffs      EmployeeTimeOff[]
+  ShiftEvent    ShiftEvent[]
 
   @@index([active])
 }
@@ -1699,6 +1707,66 @@ model Invite {
   @@index([status], map: "idx_invite_status")
 }
 
+model CompanyHoliday {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String
+  locationId String?
+  date       DateTime  @db.Date
+  name       String
+  isClosed   Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime  @default(now()) @db.Timestamptz(6)
+  Company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Location   Location? @relation(fields: [locationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([companyId, date], map: "idx_company_holiday_company_date")
+  @@index([locationId, date], map: "idx_company_holiday_location_date")
+}
+
+model EmployeeShift {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String
+  locationId String
+  employeeId String
+  startAt    DateTime  @db.Timestamptz(6)
+  endAt      DateTime  @db.Timestamptz(6)
+  type       ShiftType @default(FULL_DAY)
+  label      String?
+  color      String?
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime  @default(now()) @db.Timestamptz(6)
+  Company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Location   Location  @relation(fields: [locationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([companyId, locationId, startAt], map: "idx_shift_company_location_start")
+  @@index([employeeId, startAt], map: "idx_shift_employee_start")
+}
+
+model ShiftEvent {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId          String
+  locationId         String?
+  employeeId         String?
+  startAt            DateTime         @db.Timestamptz(6)
+  endAt              DateTime         @db.Timestamptz(6)
+  kind               shift_event_kind @default(WORK)
+  label              String?
+  externalProvider   String?
+  externalCalendarId String?
+  externalEventId    String?
+  createdAt          DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime         @default(now()) @db.Timestamptz(6)
+  Company            Company          @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Employee           Employee?        @relation(fields: [employeeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Location           Location?        @relation(fields: [locationId], references: [id], onUpdate: NoAction)
+
+  @@index([companyId], map: "ShiftEvent_company_idx")
+  @@index([employeeId], map: "ShiftEvent_employee_idx")
+  @@index([locationId], map: "ShiftEvent_location_idx")
+  @@index([startAt])
+}
+
 /// *
 /// * =========================
 /// * Enums
@@ -1999,4 +2067,23 @@ enum invite_status {
   USED
   EXPIRED
   REVOKED
+}
+
+enum ShiftType {
+  MORNING
+  AFTERNOON
+  FULL_DAY
+  CUSTOM
+  OFF
+  VACATION
+  SICK
+}
+
+enum shift_event_kind {
+  WORK
+  VACATION
+  OFF
+  SICK
+  HOLIDAY
+  OTHER
 }
