@@ -1,186 +1,232 @@
 // app/api/integrations/google/business-profile/locations/select/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-type Body = {
-  companyId?: string;
-  selectedIds?: string[];
-};
+export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const { companyId, selectedIds }: Body = await req.json();
+    const body = await req.json();
 
-    if (!companyId || !selectedIds || selectedIds.length === 0) {
+    const companyId = (body.companyId ?? "").trim();
+    const selectedIds = Array.isArray(body.selectedIds)
+      ? (body.selectedIds as string[])
+      : [];
+
+    if (!companyId) {
       return NextResponse.json(
-        { error: "companyId y selectedIds son requeridos" },
+        { error: "Falta companyId" },
         { status: 400 },
       );
     }
 
-    const provider = "GBP";
-
-    const mappings: any[] = await prisma.$queryRawUnsafe(
-      `
-      SELECT
-        id,
-        external_location_name,
-        external_connection_id,
-        company_id,
-        place_id,
-        title,
-        address,
-        primary_category,
-        location_id
-      FROM external_location_mapping
-      WHERE provider = $1
-        AND company_id = $2
-        AND id = ANY($3::uuid[])
-      `,
-      provider,
-      companyId,
-      selectedIds,
-    );
-
-    if (!mappings || mappings.length === 0) {
+    if (selectedIds.length === 0) {
       return NextResponse.json(
-        { error: "No se han encontrado mappings para los IDs seleccionados" },
-        { status: 404 },
+        { error: "No hay ubicaciones seleccionadas" },
+        { status: 400 },
       );
     }
 
-    const linked: { mappingId: string; locationId: string; title: string }[] = [];
+    // 1) ExternalConnection de GBP para esta company
+    const externalConn = await prisma.externalConnection.findFirst({
+      where: {
+        provider: "google-business",
+        companyId,
+      },
+    });
 
-    for (const m of mappings) {
-      let location = null;
+    if (!externalConn) {
+      return NextResponse.json(
+        { error: "No hay conexión de Google Business para esta empresa" },
+        { status: 400 },
+      );
+    }
 
-      // 1) Si ya está enlazado, usar esa Location
-      if (m.location_id) {
-        location = await prisma.location.findUnique({
-          where: { id: String(m.location_id) },
-        });
-      }
+    if (!externalConn.access_token) {
+      return NextResponse.json(
+        { error: "La conexión de Google Business no tiene access_token" },
+        { status: 400 },
+      );
+    }
 
-      // 2) Buscar por googleLocationId / googlePlaceId
-      if (!location) {
-        const or: any[] = [];
-        if (m.external_location_name) {
-          or.push({ googleLocationId: String(m.external_location_name) });
-        }
-        if (m.place_id) {
-          or.push({ googlePlaceId: String(m.place_id) });
-        }
+    // 2) google_gbp_account para esa conexión
+    const gbpAccount = await prisma.google_gbp_account.findFirst({
+      where: {
+        company_id: companyId,
+        external_connection_id: externalConn.id,
+      },
+    });
 
-        if (or.length) {
-          location = await prisma.location.findFirst({
-            where: {
-              companyId,
-              OR: or,
-            },
-          });
-        }
-      }
+    if (!gbpAccount) {
+      return NextResponse.json(
+        {
+          error:
+            "No se ha encontrado la cuenta de Google Business (google_gbp_account) para esta empresa",
+        },
+        { status: 400 },
+      );
+    }
 
-      // 3) Crear Location si no existe
-      if (!location) {
-        const parsed = roughParseAddress(m.address);
+    // 🔑 AQUÍ está la clave:
+    // account_id en google_gbp_location = gbpAccount.id (UUID), NO companyId
+    const accountUuid = gbpAccount.id;
 
-        // Solo usamos externalConnectionId si realmente existe
-        let safeExternalConnectionId: string | undefined;
-        if (m.external_connection_id) {
-          const existingExt = await prisma.externalConnection
-            .findUnique({
-              where: { id: String(m.external_connection_id) },
-            })
-            .catch(() => null);
-          if (existingExt) {
-            safeExternalConnectionId = existingExt.id;
-          }
-        }
+    // 3) Volvemos a leer las locations de Google y filtramos por las seleccionadas
+    const readMask = [
+      "name",
+      "title",
+      "storeCode",
+      "metadata",
+      "regularHours",
+      "serviceArea",
+      "websiteUri",
+      "phoneNumbers",
+      "languageCode",
+    ].join(",");
 
-        location = await prisma.location.create({
-          data: {
-            companyId,
-            title:
-              m.title ||
-              m.primary_category ||
-              m.external_location_name ||
-              "Establecimiento sin nombre",
-            address: m.address || null,
-            city: parsed.city,
-            region: parsed.region,
-            postalCode: parsed.postalCode,
-            country: parsed.countryCode,
-            googlePlaceId: m.place_id || null,
-            googleLocationId: m.external_location_name || null,
-            externalConnectionId: safeExternalConnectionId, // ahora seguro o undefined
-            status: "ACTIVE",
+    const url = `https://mybusinessbusinessinformation.googleapis.com/v1/accounts/${encodeURIComponent(
+      gbpAccount.google_account_id,
+    )}/locations?readMask=${encodeURIComponent(readMask)}`;
+
+    const apiRes = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${externalConn.access_token}`,
+      },
+    });
+
+    if (!apiRes.ok) {
+      const text = await apiRes.text().catch(() => "");
+      console.error("[GBP][select] fallo al leer locations de Google:", apiRes.status, text);
+      return NextResponse.json(
+        {
+          error: "No se han podido leer las ubicaciones desde Google Business",
+          status: apiRes.status,
+        },
+        { status: 502 },
+      );
+    }
+
+    const apiJson: any = await apiRes.json();
+    const apiLocations: any[] = Array.isArray(apiJson.locations)
+      ? apiJson.locations
+      : [];
+
+    const selectedSet = new Set(selectedIds);
+
+    // Nos quedamos solo con las locations cuyo name está en selectedIds
+    const toLink = apiLocations.filter((loc) => {
+      const name = typeof loc.name === "string" ? loc.name : "";
+      return name && selectedSet.has(name);
+    });
+
+    const linkedIds: string[] = [];
+
+    for (const loc of toLink) {
+      const googleLocationName: string = loc.name; // p.ej: "locations/2386772236926619617"
+      const googleLocationId: string = googleLocationName; // usamos el resource name completo
+
+      const title: string | null = loc.title ?? null;
+      const storeCode: string | null = loc.storeCode ?? null;
+      const metadata: any = loc.metadata ?? null;
+      const serviceArea: any = loc.serviceArea ?? null;
+      const regularHours: any = loc.regularHours ?? null;
+      const websiteUri: string | null = loc.websiteUri ?? null;
+
+      const primaryPhone: string | null =
+        loc.phoneNumbers && typeof loc.phoneNumbers.primaryPhone === "string"
+          ? loc.phoneNumbers.primaryPhone
+          : null;
+
+      const regionCode: string | null = serviceArea?.regionCode ?? null;
+      const placeName: string | null =
+        serviceArea?.places?.placeInfos?.[0]?.placeName ?? null;
+
+      const placeId: string | null =
+        metadata?.placeId ??
+        serviceArea?.places?.placeInfos?.[0]?.placeId ??
+        null;
+
+      const mapsUri: string | null = metadata?.mapsUri ?? null;
+      const newReviewUri: string | null = metadata?.newReviewUri ?? null;
+      const businessType: string | null = serviceArea?.businessType ?? null;
+
+      // 4) Upsert en google_gbp_location (combinación company_id + google_location_id)
+      const rec = await prisma.google_gbp_location.upsert({
+        where: {
+          company_id_google_location_id: {
+            company_id: companyId,
+            google_location_id: googleLocationId,
           },
-        });
-      }
+        },
+        create: {
+          company_id: companyId,
+          account_id: accountUuid,              // ✅ UUID correcto
+          external_connection_id: externalConn.id,
+          google_location_id: googleLocationId,
+          google_location_title: title,
+          google_place_id: placeId,
+          address: placeName,
+          raw_json: loc,
+          status: "active",
 
-      // 4) Enlazar mapping -> location
-      await prisma.$executeRawUnsafe(
-        `
-        UPDATE external_location_mapping
-        SET location_id = $1,
-            status = 'active'
-        WHERE id = $2::uuid
-        `,
-        location.id,
-        m.id,
-      );
+          google_location_name: googleLocationName,
+          store_code: storeCode,
+          title,
+          primary_phone: primaryPhone,
+          website_uri: websiteUri,
+          region_code: regionCode,
+          language_code: loc.languageCode ?? null,
+          place_id: placeId,
+          maps_uri: mapsUri,
+          new_review_uri: newReviewUri,
+          business_type: businessType,
+          service_area: serviceArea,
+          regular_hours: regularHours,
+          metadata,
+        },
+        update: {
+          google_location_title: title,
+          google_place_id: placeId,
+          address: placeName,
+          raw_json: loc,
+          status: "active",
 
-      linked.push({
-        mappingId: String(m.id),
-        locationId: String(location.id),
-        title: location.title,
+          google_location_name: googleLocationName,
+          store_code: storeCode,
+          title,
+          primary_phone: primaryPhone,
+          website_uri: websiteUri,
+          region_code: regionCode,
+          language_code: loc.languageCode ?? null,
+          place_id: placeId,
+          maps_uri: mapsUri,
+          new_review_uri: newReviewUri,
+          business_type: businessType,
+          service_area: serviceArea,
+          regular_hours: regularHours,
+          metadata,
+        },
       });
+
+      linkedIds.push(rec.id);
     }
 
-    return NextResponse.json({ ok: true, linked });
-  } catch (error: any) {
-    console.error("[GBP][locations/select] error", error);
+    return NextResponse.json(
+      {
+        ok: true,
+        linkedCount: linkedIds.length,
+        linked: linkedIds,
+      },
+      { status: 200 },
+    );
+  } catch (err: any) {
+    console.error("[GBP][locations/select] error", err);
     return NextResponse.json(
       {
         error: "Error interno al vincular ubicaciones",
-        details: String(error?.message ?? ""),
+        details: String(err),
       },
       { status: 500 },
     );
   }
-}
-
-/**
- * Parser sencillo de direcciones tipo:
- * "Calle X 1, Ciudad, 41001, ES"
- */
-function roughParseAddress(address?: string | null) {
-  if (!address) {
-    return {
-      city: null,
-      region: null,
-      postalCode: null,
-      countryCode: null,
-    };
-  }
-
-  const parts = address.split(",").map((p) => p.trim());
-  const len = parts.length;
-
-  let city: string | null = null;
-  let region: string | null = null;
-  let postalCode: string | null = null;
-  let countryCode: string | null = null;
-
-  if (len >= 3) {
-    // Ejemplo: "... , Sevilla, 41001, ES"
-    city = parts[len - 3] || null;
-    const cpPart = parts[len - 2] || "";
-    const cpMatch = cpPart.match(/(\d{4,6})/);
-    postalCode = cpMatch ? cpMatch[1] : null;
-    countryCode = (parts[len - 1] || "").slice(0, 2).toUpperCase() || null;
-  }
-
-  return { city, region, postalCode, countryCode };
 }

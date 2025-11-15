@@ -43,6 +43,13 @@ const REVIEWS: NavItem = {
   description: "Automatización de reseñas",
 };
 
+const MYBUSINESS: NavItem = {
+  title: "Mi negocio",
+  href: "/dashboard/mybusiness",
+  icon: "⚙️",
+  description: "Gestión de mis establecimientos",
+};
+
 const INTEGRATIONS: NavItem = {
   title: "Conexiones",
   href: "/dashboard/integrations-test-2",
@@ -297,6 +304,7 @@ useEffect(() => {
         <SidebarItem item={HOME} active={isActivePath(pathname, HOME.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
         <SidebarItem item={PRICING} active={isActivePath(pathname, PRICING.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
         <SidebarItem item={REVIEWS} active={isActivePath(pathname, REVIEWS.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
+        <SidebarItem item={MYBUSINESS} active={isActivePath(pathname, MYBUSINESS.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
         <SidebarItem item={SETTINGS} active={isActivePath(pathname, SETTINGS.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
         <SidebarItem item={INTEGRATIONS} active={isActivePath(pathname, INTEGRATIONS.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
 

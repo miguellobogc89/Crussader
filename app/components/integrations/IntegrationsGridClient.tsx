@@ -24,7 +24,7 @@ function mapKeyToProviderSlug(key: string): string {
   }
 }
 
-/** GET /api/integrations?companyId=...&provider=...&debug=1  -> { data: ExternalConnInfo | null } */
+/** GET /api/integrations?companyId=.&provider=.&debug=1  -> { data: ExternalConnInfo | null } */
 async function fetchExternalConnectionInfo(
   providerSlug: string,
   companyIdRaw: string,
@@ -60,7 +60,7 @@ export default function IntegrationsGridClient({
 }) {
   const bootstrap = useBootstrapData();
 
-  // === Company ID (tu lógica original) ===
+  // === Company ID ===
   const companyId = React.useMemo((): string | undefined => {
     const b = bootstrap as any;
     if (!b) return undefined;
@@ -74,7 +74,7 @@ export default function IntegrationsGridClient({
     return undefined;
   }, [bootstrap]);
 
-  // === returnTo (tu lógica original) ===
+  // === returnTo ===
   const [returnTo, setReturnTo] = React.useState<string>("/dashboard/integrations-test-2");
   React.useEffect(() => {
     if (typeof window !== "undefined" && window.location?.pathname) {
@@ -82,7 +82,7 @@ export default function IntegrationsGridClient({
     }
   }, []);
 
-  // === External connections (tu lógica original) ===
+  // === External connections ===
   const [externalInfoMap, setExternalInfoMap] = React.useState<
     Record<string, ExternalConnInfo | null>
   >({});
@@ -110,7 +110,7 @@ export default function IntegrationsGridClient({
     };
   }, [companyId, providers]);
 
-  // === Estado del modal GBP ===
+  // === Modal GBP ===
   const [gbpModalOpen, setGbpModalOpen] = React.useState(false);
   const [gbpLoading, setGbpLoading] = React.useState(false);
   const [gbpError, setGbpError] = React.useState<string | null>(null);
@@ -119,7 +119,13 @@ export default function IntegrationsGridClient({
   const [gbpSelectedIds, setGbpSelectedIds] = React.useState<string[]>([]);
   const [gbpConfirming, setGbpConfirming] = React.useState(false);
 
-  // Cargar ubicaciones desde TU BD cuando se pulsa "Probar modal"
+
+  
+
+
+
+
+
   const handleOpenGbpModal = React.useCallback(
     async (_provider: Provider) => {
       if (!companyId) {
@@ -137,8 +143,9 @@ export default function IntegrationsGridClient({
       setGbpSelectedIds([]);
 
       try {
+        // 1) Sincronizar y leer LOCATIONS
         const res = await fetch(
-          "/api/integrations/google/business-profile/locations",
+          "/api/integrations/google/business-profile/sync/locations",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -147,7 +154,8 @@ export default function IntegrationsGridClient({
         );
 
         if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
+          const text = await res.text().catch(() => "");
+          throw new Error(`HTTP ${res.status} - ${text}`);
         }
 
         const data = await res.json();
@@ -181,17 +189,39 @@ export default function IntegrationsGridClient({
             ? data.maxConnectable
             : 1,
         );
+
+        // 2) Disparar SYNC DE REVIEWS en segundo plano (no bloquea el modal)
+        try {
+          await fetch(
+            "/api/integrations/google/business-profile/sync/reviews",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ companyId }),
+            },
+          );
+        } catch (syncErr) {
+          console.error("[GBP][reviews sync] error", syncErr);
+        }
       } catch (err) {
-        console.error("[GBP][locations] error", err);
+        console.error("[GBP][locations sync] error", err);
         setGbpError(
-          "No se han podido cargar las ubicaciones. Asegúrate de haber sincronizado primero desde Google o tener datos en la tabla.",
+          "No se han podido cargar las ubicaciones. Asegúrate de haber completado la conexión con Google Business.",
         );
       } finally {
         setGbpLoading(false);
       }
     },
     [companyId],
-  );
+);
+
+
+
+
+
+
+
+
 
   const handleToggleSelect = React.useCallback(
     (id: string) => {
@@ -209,9 +239,8 @@ export default function IntegrationsGridClient({
     [gbpMaxConnectable],
   );
 
-  // Aquí es donde insertamos/enlazamos Locations de verdad
   const handleConfirmSelection = React.useCallback(async () => {
-    if (!companyId || gbpSelectedIds.length === 0) {
+    if (!companyId) {
       setGbpModalOpen(false);
       return;
     }
@@ -220,7 +249,7 @@ export default function IntegrationsGridClient({
       setGbpConfirming(true);
 
       const res = await fetch(
-        "/api/integrations/google/business-profile/locations/select",
+        "/api/integrations/google/business-profile/locations/activate",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -233,19 +262,38 @@ export default function IntegrationsGridClient({
 
       if (!res.ok) {
         const errText = await res.text().catch(() => "");
-        console.error("[GBP][select] HTTP error", res.status, errText);
+        console.error("[GBP][activate] HTTP error", res.status, errText);
       } else {
         const data = await res.json();
-        console.log("[GBP][select] Vinculadas:", data.linked);
-        // Aquí en futuro puedes refrescar Locations o mostrar toast
+        console.log("[GBP][activate] Activadas:", data.activatedIds);
+        // Aquí en el futuro: refrescar grid o mostrar toast
       }
     } catch (err) {
-      console.error("[GBP][select] error", err);
+      console.error("[GBP][activate] error", err);
     } finally {
       setGbpConfirming(false);
       setGbpModalOpen(false);
     }
   }, [companyId, gbpSelectedIds]);
+
+
+  // Autoabrir modal al volver del callback OAuth
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get("connected");
+
+    if (connected === "google_business") {
+      handleOpenGbpModal({ key: "google-business" } as Provider);
+
+      params.delete("connected");
+      const newSearch = params.toString();
+      const newUrl =
+        window.location.pathname + (newSearch ? `?${newSearch}` : "");
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, [handleOpenGbpModal]);
 
   const eased = [0.16, 1, 0.3, 1] as [number, number, number, number];
 
@@ -316,7 +364,7 @@ export default function IntegrationsGridClient({
         onConfirm={handleConfirmSelection}
         loading={gbpLoading || gbpConfirming}
         error={gbpError}
-        demo
+        demo={false}
       />
     </TooltipProvider>
   );

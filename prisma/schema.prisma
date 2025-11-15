@@ -111,21 +111,23 @@ model UserStatusEvent {
 }
 
 model ExternalConnection {
-  id             String     @id @default(cuid())
-  userId         String
-  provider       String
-  accountEmail   String?
-  access_token   String
-  refresh_token  String?
-  expires_at     Int?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  companyId      String?
-  accountName    String?
-  providerUserId String?
-  scope          String?
-  User           User       @relation(fields: [userId], references: [id])
-  Location       Location[]
+  id                  String                @id @default(cuid())
+  userId              String
+  provider            String
+  accountEmail        String?
+  access_token        String
+  refresh_token       String?
+  expires_at          Int?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  companyId           String?
+  accountName         String?
+  providerUserId      String?
+  scope               String?
+  User                User                  @relation(fields: [userId], references: [id])
+  Location            Location[]
+  google_gbp_account  google_gbp_account[]
+  google_gbp_location google_gbp_location[]
 
   @@unique([userId, provider])
   @@index([companyId])
@@ -192,6 +194,9 @@ model Company {
   WebchatSites                WebchatSite[]                 @relation("CompanyToWebchatSite")
   billing_account             billing_account?
   discount_redemption         discount_redemption[]
+  google_gbp_account          google_gbp_account[]
+  google_gbp_location         google_gbp_location[]
+  google_gbp_reviews          google_gbp_reviews[]
   invoice                     invoice[]
   subscription                subscription[]
   theme_candidate             theme_candidate[]
@@ -296,6 +301,8 @@ model Location {
   ShiftEvent                  ShiftEvent[]
   UserLocation                UserLocation[]
   WebchatSites                WebchatSite[]                 @relation("LocationToWebchatSite")
+  google_gbp_location         google_gbp_location[]
+  google_gbp_reviews          google_gbp_reviews[]
   theme_candidate             theme_candidate[]
   themes                      themes[]
 
@@ -1767,6 +1774,94 @@ model ShiftEvent {
   @@index([startAt])
 }
 
+model google_gbp_account {
+  id                     String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id             String
+  external_connection_id String
+  google_account_id      String
+  google_account_name    String?
+  status                 String                @default("active")
+  meta                   Json?
+  created_at             DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime              @default(now()) @db.Timestamptz(6)
+  Company                Company               @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_google_gbp_account_company")
+  ExternalConnection     ExternalConnection    @relation(fields: [external_connection_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_google_gbp_account_extconn")
+  google_gbp_location    google_gbp_location[]
+
+  @@unique([company_id, google_account_id], map: "ux_google_gbp_account_company_google")
+  @@index([external_connection_id], map: "idx_google_gbp_account_extconn")
+  @@index([status], map: "idx_google_gbp_account_status")
+}
+
+model google_gbp_location {
+  id                     String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id             String
+  account_id             String               @db.Uuid
+  external_connection_id String
+  google_location_id     String
+  google_location_title  String?
+  google_place_id        String?
+  address                String?
+  raw_json               Json
+  status                 String               @default("active")
+  created_at             DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime             @default(now()) @db.Timestamptz(6)
+  google_location_name   String?
+  store_code             String?
+  title                  String?
+  primary_phone          String?
+  website_uri            String?
+  region_code            String?
+  language_code          String?
+  place_id               String?
+  maps_uri               String?
+  new_review_uri         String?
+  business_type          String?
+  service_area           Json?
+  regular_hours          Json?
+  metadata               Json?
+  location_id            String?
+  is_active              Boolean              @default(false)
+  google_gbp_account     google_gbp_account   @relation(fields: [account_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_loc_account")
+  Company                Company              @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_loc_company")
+  ExternalConnection     ExternalConnection   @relation(fields: [external_connection_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_loc_extconn")
+  Location               Location?            @relation(fields: [location_id], references: [id], onUpdate: NoAction, map: "fk_gbp_loc_location")
+  google_gbp_reviews     google_gbp_reviews[]
+
+  @@unique([company_id, google_location_id], map: "ux_gbp_location_company_google")
+  @@index([account_id], map: "idx_gbp_location_account")
+  @@index([external_connection_id], map: "idx_gbp_location_extconn")
+  @@index([status], map: "idx_gbp_location_status")
+  @@index([location_id], map: "idx_gbp_location_location")
+}
+
+model google_gbp_reviews {
+  id                         String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id                 String
+  location_id                String?
+  gbp_location_id            String?              @db.Uuid
+  google_review_id           String
+  resource_name              String
+  reviewer_display_name      String?
+  reviewer_profile_photo_url String?
+  star_rating                String
+  comment                    String?
+  create_time                DateTime             @db.Timestamptz(6)
+  update_time                DateTime             @db.Timestamptz(6)
+  average_rating             Decimal?             @db.Decimal(3, 2)
+  total_review_count         Int?
+  created_at                 DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime             @default(now()) @db.Timestamptz(6)
+  Company                    Company              @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_google_gbp_reviews_company")
+  google_gbp_location        google_gbp_location? @relation(fields: [gbp_location_id], references: [id], onUpdate: NoAction, map: "fk_google_gbp_reviews_gbp_location")
+  Location                   Location?            @relation(fields: [location_id], references: [id], onUpdate: NoAction, map: "fk_google_gbp_reviews_location")
+
+  @@unique([company_id, google_review_id], map: "google_gbp_reviews_uniq_company_review")
+  @@index([company_id], map: "idx_google_gbp_reviews_company")
+  @@index([gbp_location_id], map: "idx_google_gbp_reviews_gbp_location")
+  @@index([location_id], map: "idx_google_gbp_reviews_location")
+}
+
 /// *
 /// * =========================
 /// * Enums
@@ -1788,6 +1883,7 @@ enum LeadStatus {
 enum OnboardingStatus {
   PENDING
   IN_PROGRESS
+  REQUEST_SENT
   COMPLETED
 }
 

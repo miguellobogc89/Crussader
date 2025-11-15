@@ -2,13 +2,15 @@
 import { Resend } from "resend";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
-const EMAIL_FROM = process.env.EMAIL_FROM ?? "Crussader <no-reply@crussader.com>";
-const REPLY_TO = process.env.EMAIL_REPLY_TO ?? "soporte@tu-dominio.com";
+const EMAIL_FROM =
+  process.env.EMAIL_FROM ?? "Crussader <no-reply@crussader.com>";
+const REPLY_TO =
+  process.env.EMAIL_REPLY_TO ?? "soporte@tu-dominio.com";
 
 let resendSingleton: Resend | null = null;
 function getResend(): Resend | null {
   if (resendSingleton) return resendSingleton;
-  if (!RESEND_API_KEY) return null;            // ⚠️ sin key -> no instanciar (evita crash en build)
+  if (!RESEND_API_KEY) return null; // ⚠️ sin key -> no instanciar (evita crash en build)
   resendSingleton = new Resend(RESEND_API_KEY);
   return resendSingleton;
 }
@@ -121,7 +123,57 @@ const BETA_INVITE_HTML = `<!DOCTYPE html>
   </body>
 </html>`;
 
+/** Template solicitud de acceso (onboarding) */
+const ACCESS_REQUEST_HTML = `<!DOCTYPE html>
+<html lang="es">
+  <head><meta charset="UTF-8" /><title>Solicitud de acceso a tu empresa - Crussader</title></head>
+  <body style="margin:0; padding:0; background-color:#f9fafb; font-family: Inter, Arial, sans-serif;">
+    <table width="100%" cellspacing="0" cellpadding="0" style="background-color:#f9fafb; padding: 40px 0;">
+      <tr><td align="center">
+        <table width="600" cellspacing="0" cellpadding="0" style="background:white; border-radius:16px; box-shadow:0 4px 12px rgba(0,0,0,0.05); overflow:hidden;">
+          <tr>
+            <td style="background:linear-gradient(135deg, #7c3aed, #2563eb); padding:24px; text-align:center;">
+              <h1 style="margin:0; font-size:24px; color:white; font-weight:700;">Nueva solicitud de acceso</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 28px; color:#111827; text-align:left;">
+              <p style="font-size:16px; color:#4b5563; line-height:1.6;">
+                Hola,
+              </p>
+              <p style="font-size:16px; color:#4b5563; line-height:1.6;">
+                <strong>{{requesterName}}</strong> (<a href="mailto:{{requesterEmail}}" style="color:#2563eb; text-decoration:none;">{{requesterEmail}}</a>)
+                ha solicitado unirse a vuestra empresa en <strong>Crussader</strong>.
+              </p>
+              <p style="font-size:15px; color:#4b5563; line-height:1.6; margin-top:16px;">
+                Si reconoces a esta persona y quieres que forme parte de tu cuenta, aprueba el acceso desde el siguiente botón.
+              </p>
 
+              <table cellspacing="0" cellpadding="0" style="margin:28px 0; text-align:center; width:100%;">
+                <tr><td align="center">
+                  <a href="{{approveUrl}}"
+                     style="background:linear-gradient(135deg, #7c3aed, #2563eb); color:white; text-decoration:none; padding:14px 30px; border-radius:999px; font-size:15px; font-weight:600; display:inline-block;">
+                    Aprobar acceso
+                  </a>
+                </td></tr>
+              </table>
+
+              <p style="font-size:13px; color:#6b7280; line-height:1.6;">
+                Si no conoces a esta persona o no quieres concederle acceso, simplemente ignora este mensaje y no se realizará ningún cambio en tu cuenta.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#f3f4f6; padding:18px; text-align:center; font-size:11px; color:#6b7280;">
+              Este mensaje se ha enviado porque alguien ha indicado que formas parte del equipo de tu empresa en Crussader.<br/>
+              © 2025 Crussader. Todos los derechos reservados.
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`;
 
 /** ============ Sender helpers ============ */
 
@@ -138,7 +190,10 @@ async function sendEmail({
 }) {
   const resend = getResend();
   if (!resend) {
-    console.warn("[email] RESEND_API_KEY missing — email suppressed", { to, subject });
+    console.warn("[email] RESEND_API_KEY missing — email suppressed", {
+      to,
+      subject,
+    });
     return { id: "noop", suppressed: true } as const;
   }
   const { data, error } = await resend.emails.send({
@@ -171,7 +226,10 @@ Si no has solicitado esta cuenta, ignora este mensaje.`;
   });
 }
 
-export async function sendPasswordResetEmail(to: string, resetUrl: string) {
+export async function sendPasswordResetEmail(
+  to: string,
+  resetUrl: string
+) {
   const html = RESET_EMAIL_HTML.replace(/{{resetUrl}}/g, resetUrl);
   const text = `Crussader
 
@@ -220,3 +278,46 @@ Si no esperabas este correo, puedes ignorarlo.`;
     text,
   });
 }
+
+/** ============ Access request email (onboarding) ============ */
+
+export async function sendAccessRequestEmail(params: {
+  to: string;              // <- AHORA es un solo email
+  requesterName: string;
+  requesterEmail: string;
+  approveUrl: string;
+}) {
+  const { to, requesterName, requesterEmail, approveUrl } = params;
+
+  const safeName =
+    typeof requesterName === "string" && requesterName.trim().length > 0
+      ? requesterName.trim()
+      : "Usuario";
+
+  const safeEmail =
+    typeof requesterEmail === "string" && requesterEmail.trim().length > 0
+      ? requesterEmail.trim()
+      : "desconocido@correo.com";
+
+  const html = ACCESS_REQUEST_HTML
+    .replace(/{{requesterName}}/g, safeName)
+    .replace(/{{requesterEmail}}/g, safeEmail)
+    .replace(/{{approveUrl}}/g, approveUrl);
+
+  const text = `Nueva solicitud de acceso en Crussader.
+
+${safeName} (${safeEmail}) ha solicitado unirse a vuestra empresa.
+
+Si quieres aprobar el acceso, abre este enlace:
+${approveUrl}
+
+Si no reconoces a esta persona, puedes ignorar este mensaje.`;
+
+  return sendEmail({
+    to,
+    subject: "Nueva solicitud de acceso a tu empresa - Crussader",
+    html,
+    text,
+  });
+}
+

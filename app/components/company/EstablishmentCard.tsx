@@ -13,12 +13,12 @@ import {
   Settings,
 } from "lucide-react";
 import type { LocationRow } from "@/hooks/useCompanyLocations";
-import { ConnectButton } from "@/app/components/company/ConnectButton";
 import { useBillingStatus } from "@/hooks/useBillingStatus";
 import { getBusinessIcon } from "@/lib/businessTypeIcons";
 import LocationSettingsModal, {
   type LocationForm,
 } from "@/app/components/company/LocationSettingsModal";
+import { Button } from "@/app/components/ui/button";
 
 type Props = {
   location: LocationRow;
@@ -149,22 +149,24 @@ export function EstablishmentCard({ location, onSync, onConnect }: Props) {
                 </div>
               </div>
 
-              {/* BOTÓN CONECTAR (sin cambios) */}
-              {!connected && onConnect && !loading && (
-                <ConnectButton
-                  canConnect={canConnect}
-                  onConnect={onConnect}
-                  onViewPlans={() =>
-                    window.open(
-                      "/dashboard/billing/plans",
-                      "_blank"
-                    )
-                  }
-                />
+              {/* BOTÓN CONECTAR → abre modal (lo gestionará el padre vía onConnect) */}
+              {!connected && onConnect && (
+                <button
+                  onClick={onConnect}
+                  className="px-2 py-1 rounded border text-sm hover:bg-gray-50 inline-flex items-center gap-1"
+                >
+                  Conectar
+                </button>
               )}
+
               {!connected && loading && (
                 <p className="text-xs text-muted-foreground">
                   Comprobando suscripción…
+                </p>
+              )}
+              {!connected && !loading && !canConnect && (
+                <p className="text-[10px] text-muted-foreground">
+                  Tu plan actual no permite conectar más ubicaciones.
                 </p>
               )}
             </div>
@@ -202,7 +204,7 @@ export function EstablishmentCard({ location, onSync, onConnect }: Props) {
                 Sincronizar
               </button>
 
-              {/* Nuevo botón configuración */}
+              {/* Botón configuración */}
               <button
                 onClick={() => setSettingsOpen(true)}
                 className="mt-1 px-2 py-1 rounded text-xs text-muted-foreground hover:bg-gray-50 inline-flex items-center gap-1"
