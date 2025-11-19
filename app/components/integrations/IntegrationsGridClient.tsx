@@ -1,4 +1,3 @@
-// app/components/integrations/IntegrationsGridClient.tsx
 "use client";
 
 import * as React from "react";
@@ -14,7 +13,6 @@ import {
   type GbpLocationOption,
 } from "@/app/components/integrations/GbpLocationSelectionModal";
 
-/** Slug EXACTO como se guarda en ExternalConnection.provider */
 function mapKeyToProviderSlug(key: string): string {
   switch (key) {
     case "google":
@@ -24,7 +22,6 @@ function mapKeyToProviderSlug(key: string): string {
   }
 }
 
-/** GET /api/integrations?companyId=.&provider=.&debug=1  -> { data: ExternalConnInfo | null } */
 async function fetchExternalConnectionInfo(
   providerSlug: string,
   companyIdRaw: string,
@@ -60,7 +57,6 @@ export default function IntegrationsGridClient({
 }) {
   const bootstrap = useBootstrapData();
 
-  // === Company ID ===
   const companyId = React.useMemo((): string | undefined => {
     const b = bootstrap as any;
     if (!b) return undefined;
@@ -74,15 +70,6 @@ export default function IntegrationsGridClient({
     return undefined;
   }, [bootstrap]);
 
-  // === returnTo ===
-  const [returnTo, setReturnTo] = React.useState<string>("/dashboard/integrations-test-2");
-  React.useEffect(() => {
-    if (typeof window !== "undefined" && window.location?.pathname) {
-      setReturnTo(window.location.pathname);
-    }
-  }, []);
-
-  // === External connections ===
   const [externalInfoMap, setExternalInfoMap] = React.useState<
     Record<string, ExternalConnInfo | null>
   >({});
@@ -110,7 +97,6 @@ export default function IntegrationsGridClient({
     };
   }, [companyId, providers]);
 
-  // === Modal GBP ===
   const [gbpModalOpen, setGbpModalOpen] = React.useState(false);
   const [gbpLoading, setGbpLoading] = React.useState(false);
   const [gbpError, setGbpError] = React.useState<string | null>(null);
@@ -118,13 +104,6 @@ export default function IntegrationsGridClient({
   const [gbpMaxConnectable, setGbpMaxConnectable] = React.useState<number>(1);
   const [gbpSelectedIds, setGbpSelectedIds] = React.useState<string[]>([]);
   const [gbpConfirming, setGbpConfirming] = React.useState(false);
-
-
-  
-
-
-
-
 
   const handleOpenGbpModal = React.useCallback(
     async (_provider: Provider) => {
@@ -143,7 +122,6 @@ export default function IntegrationsGridClient({
       setGbpSelectedIds([]);
 
       try {
-        // 1) Sincronizar y leer LOCATIONS
         const res = await fetch(
           "/api/integrations/google/business-profile/sync/locations",
           {
@@ -190,7 +168,6 @@ export default function IntegrationsGridClient({
             : 1,
         );
 
-        // 2) Disparar SYNC DE REVIEWS en segundo plano (no bloquea el modal)
         try {
           await fetch(
             "/api/integrations/google/business-profile/sync/reviews",
@@ -213,15 +190,7 @@ export default function IntegrationsGridClient({
       }
     },
     [companyId],
-);
-
-
-
-
-
-
-
-
+  );
 
   const handleToggleSelect = React.useCallback(
     (id: string) => {
@@ -266,7 +235,6 @@ export default function IntegrationsGridClient({
       } else {
         const data = await res.json();
         console.log("[GBP][activate] Activadas:", data.activatedIds);
-        // Aquí en el futuro: refrescar grid o mostrar toast
       }
     } catch (err) {
       console.error("[GBP][activate] error", err);
@@ -276,8 +244,6 @@ export default function IntegrationsGridClient({
     }
   }, [companyId, gbpSelectedIds]);
 
-
-  // Autoabrir modal al volver del callback OAuth
   React.useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -310,12 +276,11 @@ export default function IntegrationsGridClient({
                 ? window.location.origin
                 : "http://localhost";
             const u = new URL(url, base);
-            if (!u.searchParams.get("returnTo") && returnTo) {
-              u.searchParams.set("returnTo", returnTo);
-            }
+
             if (companyId && !u.searchParams.get("companyId")) {
               u.searchParams.set("companyId", companyId);
             }
+
             const qs = u.searchParams.toString();
             url = qs ? `${u.pathname}?${qs}` : u.pathname;
           }

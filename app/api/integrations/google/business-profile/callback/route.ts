@@ -8,24 +8,33 @@ export async function GET(req: NextRequest) {
   const code = url.searchParams.get("code");
   const stateParam = url.searchParams.get("state");
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+  // Fallback por si no hubiera state o no trajera redirect_after
   let redirectAfter =
     process.env.GOOGLE_BUSINESS_RETURN_URI ||
-    `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/integrations-test-2`;
+    `${appUrl}/dashboard/mybusiness`;
 
   let companyId: string | null = null;
   let userId: string | null = null;
   let accountEmail: string | null = null;
 
-  // ✅ Leer los datos enviados desde connect
+  // Leer los datos enviados desde connect
   if (stateParam) {
     try {
       const parsed = JSON.parse(stateParam);
-      if (parsed.redirect_after) redirectAfter = parsed.redirect_after;
+      if (
+        parsed &&
+        typeof parsed.redirect_after === "string" &&
+        parsed.redirect_after.trim().length > 0
+      ) {
+        redirectAfter = parsed.redirect_after;
+      }
       if (parsed.companyId) companyId = parsed.companyId;
       if (parsed.userId) userId = parsed.userId;
       if (parsed.accountEmail) accountEmail = parsed.accountEmail;
     } catch {
-      // ignorar errores de parseo
+      // ignorar errores de parseo, usamos el fallback
     }
   }
 
@@ -40,7 +49,7 @@ export async function GET(req: NextRequest) {
 
   const redirectUri =
     process.env.GOOGLE_BUSINESS_REDIRECT_URI ||
-    `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/google/business-profile/callback`;
+    `${appUrl}/api/integrations/google/business-profile/callback`;
 
   const client = new google.auth.OAuth2(
     process.env.GOOGLE_BUSINESS_CLIENT_ID!,
@@ -75,6 +84,19 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // 1.bis) Si no viene companyId en state, usamos la última company creada por este usuario
+    if (!companyId) {
+      const lastCompany = await prisma.company.findFirst({
+        where: { createdById: userId },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+
+      if (lastCompany) {
+        companyId = lastCompany.id;
+      }
+    }
+
     // 2) Crear o actualizar ExternalConnection
     const existing = await prisma.externalConnection.findUnique({
       where: { userId_provider: { userId, provider } },
@@ -89,6 +111,7 @@ export async function GET(req: NextRequest) {
         expires_at: expiresAtSec,
         scope: scopeStr,
       };
+      // ahora companyId casi siempre viene relleno (state o fallback)
       if (companyId) updateData.companyId = companyId;
       if (accountEmail) updateData.accountEmail = accountEmail;
 
@@ -107,7 +130,7 @@ export async function GET(req: NextRequest) {
           refresh_token: refreshToken || undefined,
           expires_at: expiresAtSec || undefined,
           scope: scopeStr || undefined,
-          companyId: companyId || undefined,
+          companyId: companyId || undefined, // 👈 aquí también
           accountEmail: accountEmail || undefined,
         },
       });
@@ -115,7 +138,7 @@ export async function GET(req: NextRequest) {
       externalConnectionId = created.id;
     }
 
-    // 3) Si tenemos companyId, llamar a accounts.list y guardar en google_gbp_account
+    // 3) Si tenemos companyId, sincronizar cuentas/ubicaciones y reviews
     if (companyId) {
       try {
         const accountsResp = await fetch(
@@ -141,13 +164,12 @@ export async function GET(req: NextRequest) {
           const account = data.accounts && data.accounts[0];
 
           if (account && account.name) {
-            const rawName = account.name; // "accounts/118141498427943054563"
+            const rawName = account.name; // "accounts/123..."
             const googleAccountId = rawName.includes("/")
               ? rawName.split("/")[1]
               : rawName;
             const googleAccountName = account.accountName ?? null;
 
-            // UPSERT en google_gbp_account
             await prisma.$queryRawUnsafe(
               `
               INSERT INTO google_gbp_account
@@ -175,32 +197,52 @@ export async function GET(req: NextRequest) {
       } catch (err) {
         console.error("[Google Business Callback] Error fetching accounts:", err);
       }
+      // 4) Disparar sincronización de locations en segundo plano
+try {
+  const baseUrl = appUrl;
+  const respLoc = await fetch(
+    `${baseUrl}/api/integrations/google/business-profile/sync/locations`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companyId }),
+    },
+  );
 
-      // 4) Disparar sincronización de reviews (todas las ubicaciones de esta company)
+  if (!respLoc.ok) {
+    const text = await respLoc.text().catch(() => "");
+    console.error(
+      "[Google Business Callback] locations sync failed",
+      respLoc.status,
+      text.slice(0, 300),
+    );
+  }
+} catch (err) {
+  console.error(
+    "[Google Business Callback] Error lanzando sync de locations:",
+    err,
+  );
+}
+
+      // 4) Disparar sincronización de reviews en segundo plano
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
-        if (!baseUrl) {
-          console.error(
-            "[Google Business Callback] NEXT_PUBLIC_APP_URL no definido, no se lanza sync de reviews",
-          );
-        } else {
-          const resp = await fetch(
-            `${baseUrl}/api/integrations/google/business-profile/reviews`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ companyId }),
-            },
-          );
+        const baseUrl = appUrl;
+        const resp = await fetch(
+          `${baseUrl}/api/integrations/google/business-profile/reviews`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ companyId }),
+          },
+        );
 
-          if (!resp.ok) {
-            const text = await resp.text().catch(() => "");
-            console.error(
-              "[Google Business Callback] reviews sync failed",
-              resp.status,
-              text.slice(0, 300),
-            );
-          }
+        if (!resp.ok) {
+          const text = await resp.text().catch(() => "");
+          console.error(
+            "[Google Business Callback] reviews sync failed",
+            resp.status,
+            text.slice(0, 300),
+          );
         }
       } catch (err) {
         console.error(
@@ -210,9 +252,21 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.redirect(
-      `${redirectAfter}?connected=google_business`,
-    );
+    // 5) Marcar google_connected=1 en la URL de vuelta (estándar y reutilizable)
+    try {
+      const redirectUrl = new URL(redirectAfter);
+      redirectUrl.searchParams.set("google_connected", "1");
+      redirectAfter = redirectUrl.toString();
+    } catch (e) {
+      console.error(
+        "[Google Business Callback] invalid redirectAfter URL:",
+        redirectAfter,
+        e,
+      );
+    }
+
+    // 🔚 Volver SIEMPRE a redirectAfter (lo decide quien llamó a /connect)
+    return NextResponse.redirect(redirectAfter);
   } catch (err) {
     console.error("[Google Business Callback] Error:", err);
     return NextResponse.redirect(

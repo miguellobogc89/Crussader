@@ -1,24 +1,27 @@
 // app/api/integrations/google/business-profile/locations/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { google } from "googleapis";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/app/server/db";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import type { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";
 
-type GbpLocationWire = {
-  id: string;
-  externalLocationName?: string;
-  title?: string;
-  address?: string;
-  rating?: number | string;
-  totalReviewCount?: number;
-  status?: "available" | "active" | "pending_upgrade" | "blocked";
-};
-
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+
+    if (!session || !session.user || !(session.user as any).id) {
+      return NextResponse.json(
+        { ok: false, error: "NO_SESSION" },
+        { status: 401 },
+      );
+    }
+
+    const userId = (session.user as any).id as string;
+
     const body = await req.json().catch(() => null);
-    const companyId = (body?.companyId as string | undefined)?.trim();
+    const companyId = (body?.companyId ?? "").trim();
 
     if (!companyId) {
       return NextResponse.json(
@@ -27,342 +30,97 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1) ExternalConnection de GOOGLE BUSINESS para esa company
-    const provider = "google-business";
-
-    const ext = await prisma.externalConnection.findFirst({
+    // 1) Locations GBP de esta company, SOLO de cuentas conectadas por ESTE usuario
+    const rows = await prisma.google_gbp_location.findMany({
       where: {
-        companyId,
-        provider,
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (!ext) {
-      return NextResponse.json(
-        { ok: false, error: "no_external_connection" },
-        { status: 404 },
-      );
-    }
-
-    if (!ext.access_token && !ext.refresh_token) {
-      return NextResponse.json(
-        { ok: false, error: "no_tokens_for_connection" },
-        { status: 400 },
-      );
-    }
-
-    // 2) Buscar la cuenta GBP asociada a esa ExternalConnection
-    const gbpAccounts = await prisma.$queryRaw<
-      {
-        id: string;
-        company_id: string;
-        external_connection_id: string;
-        google_account_id: string;
-        google_account_name: string | null;
-      }[]
-    >`SELECT id, company_id, external_connection_id, google_account_id, google_account_name
-      FROM google_gbp_account
-      WHERE external_connection_id = ${ext.id}
-      ORDER BY created_at DESC
-      LIMIT 1`;
-
-    if (!gbpAccounts || gbpAccounts.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: "no_gbp_account_for_connection" },
-        { status: 404 },
-      );
-    }
-
-    const gbpAccount = gbpAccounts[0];
-
-    // Puede que hayas guardado "1181414..." o "accounts/1181414..."
-    let googleAccountName = gbpAccount.google_account_id?.trim();
-    if (!googleAccountName) {
-      return NextResponse.json(
-        { ok: false, error: "invalid_gbp_account_id" },
-        { status: 500 },
-      );
-    }
-    if (!googleAccountName.startsWith("accounts/")) {
-      googleAccountName = `accounts/${googleAccountName}`;
-    }
-
-    // 3) Resolver access_token válido
-    const redirectUri =
-      process.env.GOOGLE_BUSINESS_REDIRECT_URI ||
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/google/business-profile/callback`;
-
-    const client = new google.auth.OAuth2(
-      process.env.GOOGLE_BUSINESS_CLIENT_ID!,
-      process.env.GOOGLE_BUSINESS_CLIENT_SECRET!,
-      redirectUri,
-    );
-
-    let accessToken = ext.access_token ?? null;
-
-    const nowSec = Math.floor(Date.now() / 1000);
-    const isExpired =
-      typeof ext.expires_at === "number" && ext.expires_at < nowSec - 60;
-
-    if ((!accessToken || isExpired) && ext.refresh_token) {
-      try {
-        client.setCredentials({ refresh_token: ext.refresh_token });
-        const newTokenResp = await client.getAccessToken();
-        const newAccessToken = newTokenResp?.token ?? null;
-
-        if (!newAccessToken) {
-          throw new Error("empty_access_token_after_refresh");
-        }
-
-        accessToken = newAccessToken;
-
-        const expiryMs = client.credentials.expiry_date;
-        const newExpiresAtSec =
-          typeof expiryMs === "number"
-            ? Math.floor(expiryMs / 1000)
-            : null;
-
-        await prisma.externalConnection.update({
-          where: { id: ext.id },
-          data: {
-            access_token: newAccessToken,
-            expires_at: newExpiresAtSec ?? undefined,
+        company_id: companyId,
+        google_gbp_account: {
+          ExternalConnection: {
+            userId,
           },
-        });
-      } catch (err) {
-        console.error("[GBP][locations] error refreshing token:", err);
-        return NextResponse.json(
-          { ok: false, error: "token_refresh_failed" },
-          { status: 401 },
-        );
-      }
-    }
-
-    if (!accessToken) {
-      return NextResponse.json(
-        { ok: false, error: "no_valid_access_token" },
-        { status: 401 },
-      );
-    }
-
-    // 4) Llamada REAL al endpoint de locations (Business Information v1)
-    const readMask =
-      "name,title,storeCode,metadata,regularHours,moreHours,serviceArea,websiteUri,phoneNumbers,languageCode";
-
-    const url = `https://mybusinessbusinessinformation.googleapis.com/v1/${googleAccountName}/locations?readMask=${encodeURIComponent(
-      readMask,
-    )}`;
-
-    const resp = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
+        },
       },
+      orderBy: { created_at: "desc" },
     });
 
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => "");
-      console.error(
-        "[GBP][locations] Google API error",
-        resp.status,
-        text,
-      );
+    if (rows.length === 0) {
       return NextResponse.json(
         {
-          ok: false,
-          error: "google_api_error",
-          status: resp.status,
-          message: text || undefined,
+          ok: true,
+          locations: [],
+          total: 0,
         },
-        { status: 502 },
+        { status: 200 },
       );
     }
 
-    const json = (await resp.json()) as any;
-    const rawLocations = Array.isArray(json.locations)
-      ? json.locations
-      : [];
+    // 2) Stats de reviews por ubicación GBP (media y nº total)
+    const gbpLocationIds = rows.map((r) => r.id);
 
-    // 5) Sincronizar en BD: google_gbp_location (UPSERT por company_id + google_location_id)
-    const upserted = await prisma.$transaction(async (tx) => {
-      const results: Array<{ google_location_id: string } | null> = [];
-
-      for (const loc of rawLocations) {
-        const name: string = String(loc.name ?? "").trim();
-        if (!name) {
-          results.push(null);
-          continue;
-        }
-
-        // name: "accounts/1181414.../locations/2386..."
-        const googleLocationId = name.split("/").pop() ?? "";
-        if (!googleLocationId) {
-          results.push(null);
-          continue;
-        }
-
-        const title: string = String(
-          loc.title ?? loc.locationName ?? "Sin nombre",
-        );
-
-        // Dirección legible (igual que para el modal)
-        let address = "";
-        const storefront =
-          loc.storefrontAddress ??
-          loc.locationAddress ??
-          loc.address;
-
-        if (storefront) {
-          const parts: string[] = [];
-
-          if (Array.isArray(storefront.addressLines)) {
-            parts.push(...storefront.addressLines);
-          }
-          if (storefront.postalCode) parts.push(storefront.postalCode);
-          if (storefront.locality) parts.push(storefront.locality);
-          if (storefront.administrativeArea) {
-            parts.push(storefront.administrativeArea);
-          }
-          if (storefront.countryCode) parts.push(storefront.countryCode);
-
-          address = parts.filter(Boolean).join(", ");
-        }
-
-        if (!address) {
-          const placeName =
-            loc?.serviceArea?.places?.placeInfos?.[0]?.placeName ??
-            null;
-          if (placeName) address = placeName;
-        }
-
-        // Phone (si viene en phoneNumbers)
-        let primaryPhone: string | null = null;
-        if (loc.phoneNumbers) {
-          if (typeof loc.phoneNumbers.primaryPhone === "string") {
-            primaryPhone = loc.phoneNumbers.primaryPhone;
-          } else if (
-            loc.phoneNumbers.primaryPhone &&
-            typeof loc.phoneNumbers.primaryPhone.number === "string"
-          ) {
-            primaryPhone = loc.phoneNumbers.primaryPhone.number;
-          }
-        }
-
-        // placeId si aparece en metadata (no siempre)
-        const placeId: string | null =
-          (loc.metadata && loc.metadata.placeId) || null;
-
-        const businessType: string | null =
-          (loc.metadata && loc.metadata.primaryCategoryName) || null;
-
-        const record = await tx.google_gbp_location.upsert({
-          where: {
-            company_id_google_location_id: {
-              company_id: companyId,
-              google_location_id: googleLocationId,
-            },
-          },
-          create: {
-            company_id: companyId,
-            account_id: gbpAccount.id,
-            external_connection_id: ext.id,
-            google_location_id: googleLocationId,
-            google_location_title: title,
-            google_location_name: name,
-            address,
-            status: "active",
-            title,
-            primary_phone: primaryPhone,
-            google_place_id: placeId,
-            place_id: placeId,
-            business_type: businessType,
-            service_area: loc.serviceArea ?? undefined,
-            regular_hours: loc.regularHours ?? undefined,
-            metadata: loc.metadata ?? undefined,
-            raw_json: loc,
-          },
-          update: {
-            google_location_title: title,
-            google_location_name: name,
-            address,
-            status: "active",
-            title,
-            primary_phone: primaryPhone,
-            google_place_id: placeId,
-            place_id: placeId,
-            business_type: businessType,
-            service_area: loc.serviceArea ?? undefined,
-            regular_hours: loc.regularHours ?? undefined,
-            metadata: loc.metadata ?? undefined,
-            raw_json: loc,
-          },
-        });
-
-        results.push({ google_location_id: record.google_location_id });
-      }
-
-      return results;
+    const stats = await prisma.google_gbp_reviews.groupBy({
+      by: ["gbp_location_id"],
+      where: {
+        company_id: companyId,
+        gbp_location_id: { in: gbpLocationIds },
+      },
+      _avg: {
+        average_rating: true,
+      },
+      _max: {
+        total_review_count: true,
+      },
     });
 
-    const upsertedCount = upserted.filter(Boolean).length;
+    const statsMap = new Map<
+      string,
+      { averageRating: Prisma.Decimal | null; totalReviewCount: number | null }
+    >();
 
-    // 6) Mapear al formato del modal (igual que antes)
-    const locations: GbpLocationWire[] = rawLocations.map((loc: any) => {
-      const name: string = String(loc.name ?? "");
-      const title: string = String(
-        loc.title ?? loc.locationName ?? "Sin nombre",
-      );
+    for (const s of stats) {
+      const key = s.gbp_location_id;
+      if (!key) continue;
 
-      let address = "";
-      const storefront =
-        loc.storefrontAddress ?? loc.locationAddress ?? loc.address;
+      statsMap.set(key, {
+        averageRating: s._avg.average_rating ?? null,
+        totalReviewCount: s._max.total_review_count ?? null,
+      });
+    }
 
-      if (storefront) {
-        const parts: string[] = [];
+    // 3) Mapear locations incluyendo rating y nº de reseñas
+    const locations = rows.map((row) => {
+      const s = statsMap.get(row.id);
 
-        if (Array.isArray(storefront.addressLines)) {
-          parts.push(...storefront.addressLines);
-        }
-        if (storefront.postalCode) parts.push(storefront.postalCode);
-        if (storefront.locality) parts.push(storefront.locality);
-        if (storefront.administrativeArea) {
-          parts.push(storefront.administrativeArea);
-        }
-        if (storefront.countryCode) parts.push(storefront.countryCode);
+      const rating =
+        s && s.averageRating !== null
+          ? Number(s.averageRating)
+          : null;
 
-        address = parts.filter(Boolean).join(", ");
-      }
-
-      if (!address) {
-        const placeName =
-          loc?.serviceArea?.places?.placeInfos?.[0]?.placeName ?? null;
-        if (placeName) address = placeName;
-      }
+      const totalReviewCount =
+        s && typeof s.totalReviewCount === "number"
+          ? s.totalReviewCount
+          : 0;
 
       return {
-        id: name, // accounts/.../locations/...
-        externalLocationName: name,
-        title,
-        address,
-        rating: undefined,
-        totalReviewCount: undefined,
-        status: "available",
+        id: row.id,
+        companyId: row.company_id,
+        accountId: row.account_id, // camelCase para el front
+        googleLocationId: row.google_location_id,
+        title: row.title ?? row.google_location_title ?? "Sin nombre",
+        address: row.address ?? "",
+        status: row.status ?? "available",
+        rating,
+        totalReviewCount,
       };
     });
 
-    // 7) De momento, 1 local incluido para conectar en el modal
-    const maxConnectable = 1;
-
-    return NextResponse.json({
-      ok: true,
-      locations,
-      maxConnectable,
-      synced: {
-        totalFromGoogle: rawLocations.length,
-        upserted: upsertedCount,
+    return NextResponse.json(
+      {
+        ok: true,
+        locations,
+        total: locations.length,
       },
-    });
+      { status: 200 },
+    );
   } catch (err) {
     console.error("[GBP][locations] unexpected error:", err);
     return NextResponse.json(

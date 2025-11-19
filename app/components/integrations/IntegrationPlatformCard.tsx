@@ -138,10 +138,23 @@ export default function IntegrationPlatformCard({
     if (provider.comingSoon) return;
     if (!provider.connectUrl) return;
 
-    const url = new URL(provider.connectUrl, window.location.origin);
-    if (activeCompanyId) url.searchParams.set("companyId", activeCompanyId);
-    if (userId) url.searchParams.set("userId", userId);
-    if (accountEmail) url.searchParams.set("accountEmail", accountEmail);
+const url = new URL(provider.connectUrl, window.location.origin);
+
+// Preservar `returnTo` si ya viene del connectUrl generado dinámicamente
+if (!url.searchParams.has("returnTo") && typeof window !== "undefined") {
+  url.searchParams.set("returnTo", window.location.pathname);
+}
+
+if (activeCompanyId && !url.searchParams.has("companyId")) {
+  url.searchParams.set("companyId", activeCompanyId);
+}
+if (userId && !url.searchParams.has("userId")) {
+  url.searchParams.set("userId", userId);
+}
+if (accountEmail && !url.searchParams.has("accountEmail")) {
+  url.searchParams.set("accountEmail", accountEmail);
+}
+
 
     setLoading(true);
     try {

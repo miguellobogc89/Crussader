@@ -10,18 +10,22 @@ export async function POST(req: NextRequest) {
   try {
     const { emails, requesterName, requesterEmail } = await req.json();
 
-    const toEmails: string[] = Array.isArray(emails)
+    // Normalizamos lista de correos introducidos por el usuario
+    const rawEmails: string[] = Array.isArray(emails)
       ? emails
           .map((e: unknown) => String(e ?? "").trim())
           .filter((e: string) => e.length > 0)
       : [];
 
-    if (!toEmails.length) {
+    if (!rawEmails.length) {
       return NextResponse.json(
         { ok: false, error: "NO_EMAILS" },
         { status: 400 }
       );
     }
+
+    // Quitamos duplicados manteniendo orden
+    const toEmails = Array.from(new Set(rawEmails));
 
     const safeRequesterName =
       typeof requesterName === "string" && requesterName.trim().length > 0
@@ -46,56 +50,62 @@ export async function POST(req: NextRequest) {
         "[access-request] requester email no vinculado a ningún usuario:",
         safeRequesterEmail
       );
+      // aun así devolvemos ok para no romper onboarding visualmente
     }
 
-    // Enviar un correo POR destinatario, con su propio approveUrl
-    for (const raw of toEmails) {
-      const to = raw.trim();
-      if (!to) continue;
+    // ============================
+    // Recorremos TODOS los correos:
+    //   - solo usuarios activos y no suspendidos
+    //   - solo si tienen al menos una company
+    //   - un email -> un approveUrl con (userId + companyId)
+    // ============================
 
-      let approveUrl = origin;
-
-      if (requesterUser) {
-        // Usuario que RECIBE el correo (posible aprobador)
+    if (requesterUser) {
+      for (const email of toEmails) {
         const approver = await prisma.user.findFirst({
-          where: { email: to },
+          where: {
+            email,
+            isActive: true,
+            isSuspended: false,
+          },
           select: {
             id: true,
             UserCompany: {
               select: { companyId: true, createdAt: true },
               orderBy: { createdAt: "asc" },
-              take: 1,
+              take: 1, // si tiene varias empresas, usamos la primera (más antigua)
             },
           },
         });
 
-        const companyId =
-          approver?.UserCompany && approver.UserCompany.length > 0
-            ? approver.UserCompany[0].companyId
-            : null;
-
-        if (companyId) {
-          // Enlace que asignará al solicitante a LA COMPANY del aprobador
-          approveUrl = `${origin}/api/onboarding/access-approve?userId=${encodeURIComponent(
-            requesterUser.id
-          )}&companyId=${encodeURIComponent(companyId)}`;
-        } else {
-          // Fallback: sin company, al menos aprobará el onboarding
-          approveUrl = `${origin}/api/onboarding/access-approve?userId=${encodeURIComponent(
-            requesterUser.id
-          )}`;
+        if (!approver) {
+          continue; // sin usuario válido para este email
         }
-      }
 
-      await sendAccessRequestEmail({
-        to,
-        requesterName: safeRequesterName,
-        requesterEmail: safeRequesterEmail,
-        approveUrl,
-      });
+        if (!approver.UserCompany || approver.UserCompany.length === 0) {
+          continue; // usuario sin empresa -> no sirve como aprobador
+        }
+
+        const companyId = approver.UserCompany[0].companyId;
+
+        const approveUrl = `${origin}/api/onboarding/access-approve?userId=${encodeURIComponent(
+          requesterUser.id
+        )}&companyId=${encodeURIComponent(companyId)}`;
+
+        await sendAccessRequestEmail({
+          to: email,
+          requesterName: safeRequesterName,
+          requesterEmail: safeRequesterEmail,
+          approveUrl,
+        });
+      }
+    } else {
+      console.warn(
+        "[access-request] No requesterUser, se omite envío de correos."
+      );
     }
 
-    // Actualizar estado de onboarding del solicitante (si lo encontramos)
+    // Actualizar estado de onboarding del solicitante (si existe)
     if (requesterUser) {
       await prisma.user.update({
         where: { id: requesterUser.id },

@@ -125,7 +125,7 @@ export default async function IntegrationsPage() {
               Selecciona la plataforma que quieres conectar.
             </p>
           </div>
-          <IntegrationsGridClient providers={available} />
+          <IntegrationsGridClient providers={available} connectUrls={{}} />
 
           {/* Separador visual */}
           <div className="my-6 h-px bg-border" />

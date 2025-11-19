@@ -46,7 +46,7 @@ const REVIEWS: NavItem = {
 const MYBUSINESS: NavItem = {
   title: "Mi negocio",
   href: "/dashboard/mybusiness",
-  icon: "⚙️",
+  icon: "🏢",
   description: "Gestión de mis establecimientos",
 };
 

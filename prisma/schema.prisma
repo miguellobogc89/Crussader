@@ -170,7 +170,8 @@ model Company {
   stripeSubscriptionId        String?
   agentSettings               Json?
   voiceAgentId                String?
-  account_id                  String                        @unique(map: "company_account_id_unique") @db.Uuid
+  account_id                  String                         @db.Uuid
+
   Agents                      Agent[]
   AgentSessions               AgentSession[]
   voiceAgent                  VoiceAgent?                   @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id])
@@ -1572,7 +1573,7 @@ model account {
   updated_at                       DateTime           @default(now()) @db.Timestamptz(6)
   subscription_status              SubscriptionStatus @default(NONE)
   is_beta_trial                    Boolean?           @default(false)
-  Company                          Company?
+  Company                          Company[]
   Invite                           Invite[]
   Notification                     Notification[]
   User_User_account_idToaccount    User[]             @relation("User_account_idToaccount")

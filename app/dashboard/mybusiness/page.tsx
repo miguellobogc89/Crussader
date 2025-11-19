@@ -4,10 +4,9 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/app/components/ui/button";
-import { Plus, Building2 } from "lucide-react";
+import { Plus, Building2, Pencil } from "lucide-react";
 
 import PageShell from "@/app/components/layouts/PageShell";
-import ListToolbar from "@/app/components/ListToolbar";
 import PreloadCompanyBuffer from "@/app/components/buffer/PreloadCompanyBuffer";
 
 import {
@@ -15,7 +14,7 @@ import {
   type CompanyForm,
 } from "@/app/components/company/CompanyModal";
 
-import { LocationCard } from "@/app/components/mybusiness/locations//LocationCard";
+import { LocationCard } from "@/app/components/mybusiness/locations/LocationCard";
 import type { LocationRow } from "@/hooks/useCompanyLocations";
 import { GoogleLocationLinkModal } from "@/app/components/mybusiness/locations/GoogleLocationLinkModal";
 
@@ -283,7 +282,21 @@ export default function CompanyPage() {
 
       <PageShell
         title={companyName}
+        titleIconName="building2"
         description="Gestiona los datos de tu empresa y las ubicaciones conectadas."
+        toolbar={
+          hasCompany ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openEdit}
+              className="inline-flex items-center gap-2"
+            >
+              <Pencil className="h-4 w-4" />
+              <span>Editar empresa</span>
+            </Button>
+          ) : undefined
+        }
       >
         {!hasCompany ? (
           <div className="py-14">
@@ -314,12 +327,9 @@ export default function CompanyPage() {
           </div>
         ) : (
           <>
-            <section className="space-y-3">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div className="text-sm font-medium text-muted-foreground">
-                  Ubicaciones vinculadas a tu empresa
-                </div>
-                <ListToolbar />
+            <section className="mt-6 space-y-3">
+              <div className="text-sm font-medium text-muted-foreground">
+                Ubicaciones vinculadas a tu empresa
               </div>
 
               {locsError && (
