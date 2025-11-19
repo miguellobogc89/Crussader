@@ -1,14 +1,15 @@
+// app/api/integrations/google/business-profile/reviews/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { google } from "googleapis";
 
 export const runtime = "nodejs";
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const { companyId } = await req.json();
+    const companyId = req.nextUrl.searchParams.get("companyId")?.trim();
 
-    if (!companyId || typeof companyId !== "string") {
+    if (!companyId) {
       return NextResponse.json(
         { ok: false, error: "missing_company_id" },
         { status: 400 }
@@ -17,18 +18,27 @@ export async function POST(req: NextRequest) {
 
     const provider = "google-business";
 
+    // 1) ExternalConnection GOOGLE BUSINESS de esa company
     const ext = await prisma.externalConnection.findFirst({
       where: { companyId, provider },
       orderBy: { createdAt: "desc" },
     });
 
-    if (!ext || (!ext.access_token && !ext.refresh_token)) {
+    if (!ext) {
       return NextResponse.json(
-        { ok: false, error: "no_valid_connection" },
+        { ok: false, error: "no_external_connection" },
         { status: 404 }
       );
     }
 
+    if (!ext.access_token && !ext.refresh_token) {
+      return NextResponse.json(
+        { ok: false, error: "no_tokens_for_connection" },
+        { status: 400 }
+      );
+    }
+
+    // 2) Resolver access_token válido
     const redirectUri =
       process.env.GOOGLE_BUSINESS_REDIRECT_URI ||
       `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/google/business-profile/callback`;
@@ -40,6 +50,7 @@ export async function POST(req: NextRequest) {
     );
 
     let accessToken = ext.access_token ?? null;
+
     const nowSec = Math.floor(Date.now() / 1000);
     const isExpired =
       typeof ext.expires_at === "number" && ext.expires_at < nowSec - 60;
@@ -85,6 +96,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 3) Todas las google_gbp_location activas de esa company
     const gbpLocations = await prisma.google_gbp_location.findMany({
       where: {
         company_id: companyId,
@@ -103,10 +115,11 @@ export async function POST(req: NextRequest) {
           reviewsUpserted: 0,
           perLocation: [],
         },
-        warning: "no_active_locations",
+        warning: "No hay google_gbp_location activas para esa company",
       });
     }
 
+    // Map de rating enum → string que guardamos tal cual
     const starMap: Record<string, string> = {
       ONE: "ONE",
       TWO: "TWO",
@@ -122,6 +135,7 @@ export async function POST(req: NextRequest) {
       upserted: number;
     }> = [];
 
+    // 4) Por cada ubicación GBP, llamar al endpoint v4 de reviews y upsert
     for (const loc of gbpLocations) {
       const account = loc.google_gbp_account;
       if (!account || !account.google_account_id) {
@@ -143,6 +157,7 @@ export async function POST(req: NextRequest) {
       let pageToken: string | undefined = undefined;
       let upsertedForLoc = 0;
 
+      // Paginación v4
       while (true) {
         let url = basePath;
         if (pageToken) {
@@ -176,6 +191,7 @@ export async function POST(req: NextRequest) {
             : null;
 
         for (const r of reviews) {
+          // --- Campos básicos del JSON ---
           const reviewId: string =
             typeof r.reviewId === "string"
               ? r.reviewId
@@ -187,20 +203,27 @@ export async function POST(req: NextRequest) {
 
           const resourceName: string =
             typeof r.name === "string" ? r.name : `reviews/${reviewId}`;
-          const reviewerName: string | null = r.reviewer?.displayName ?? null;
+
+          const reviewerName: string | null =
+            r.reviewer?.displayName ?? null;
           const reviewerPhoto: string | null =
             r.reviewer?.profilePhotoUrl ?? null;
+
           const starRatingStr: string | null =
             typeof r.starRating === "string" ? r.starRating : null;
           const starRating: string =
             (starRatingStr && starMap[starRatingStr]) || "UNKNOWN";
+
           const comment: string | null =
             typeof r.comment === "string" ? r.comment : null;
+
+          // Tu modelo requiere DateTime no opcionales → siempre ponemos Date válida
           const createTime: Date =
             r.createTime ? new Date(r.createTime) : new Date();
           const updateTime: Date =
             r.updateTime ? new Date(r.updateTime) : createTime;
 
+          // --- UPSERT respetando tu unique (company_id, google_review_id) ---
           await prisma.google_gbp_reviews.upsert({
             where: {
               company_id_google_review_id: {

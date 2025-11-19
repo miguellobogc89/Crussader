@@ -227,15 +227,15 @@ try {
 // 4) Disparar sincronización de reviews en segundo plano
 try {
   const baseUrl = appUrl;
-  const resp = await fetch(
-    `${baseUrl}/api/integrations/google/business-profile/reviews?companyId=${encodeURIComponent(
-      companyId!,
-    )}`,
-    {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    },
-  );
+const resp = await fetch(
+  `${baseUrl}/api/integrations/google/business-profile/reviews`,
+  {
+    method: "POST",  // ← Usa POST, como define el endpoint
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ companyId }),
+  },
+);
+
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
