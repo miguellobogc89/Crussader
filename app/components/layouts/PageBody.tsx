@@ -21,9 +21,9 @@ export default function PageBody({
   return (
     <main
       role="main"
-      className={`w-full bg-dark ${width} mx-auto`}
+      className={`w-full bg-dark ${width} mx-auto px-4 py-6 sm:px-6 lg:px-8`}
     >
-      {toolbar && <div>{toolbar}</div>}
+      {toolbar && <div className="mb-4">{toolbar}</div>}
       {children}
     </main>
   );

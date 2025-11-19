@@ -7,10 +7,16 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const locationId = url.searchParams.get("locationId");
     const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
-    const size = Math.min(50, Math.max(1, parseInt(url.searchParams.get("size") ?? "9", 10) || 9)); // tu grid 3x3
+    const size = Math.min(
+      50,
+      Math.max(1, parseInt(url.searchParams.get("size") ?? "9", 10) || 9)
+    ); // tu grid 3x3
 
     if (!locationId) {
-      return NextResponse.json({ ok: false, error: "missing_locationId" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "missing_locationId" },
+        { status: 400 }
+      );
     }
 
     const total = await prisma.review.count({ where: { locationId } });
@@ -27,18 +33,19 @@ export async function GET(req: NextRequest) {
         id: true,
         rating: true,
         reviewerName: true,
+        reviewerPhoto: true,   // 👈 AÑADIDO
         comment: true,
         createdAtG: true,
       },
     });
 
-    // 🔧 mapeo al shape que espera ReviewCard (date siempre string)
     const rows = reviews.map((r) => ({
       id: r.id,
       author: r.reviewerName ?? "Anónimo",
       content: r.comment ?? "",
       rating: r.rating ?? 0,
       date: r.createdAtG ? new Date(r.createdAtG).toISOString() : "",
+      avatar: r.reviewerPhoto ?? undefined, // 👈 AÑADIDO: encaja con ReviewCard.avatar
     }));
 
     return NextResponse.json({
@@ -51,6 +58,9 @@ export async function GET(req: NextRequest) {
     });
   } catch (e) {
     console.error("[GET /api/reviews]", e);
-    return NextResponse.json({ ok: false, error: "internal_error" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "internal_error" },
+      { status: 500 }
+    );
   }
 }

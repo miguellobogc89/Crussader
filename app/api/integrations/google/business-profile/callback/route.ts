@@ -224,32 +224,34 @@ try {
   );
 }
 
-      // 4) Disparar sincronización de reviews en segundo plano
-      try {
-        const baseUrl = appUrl;
-        const resp = await fetch(
-          `${baseUrl}/api/integrations/google/business-profile/reviews`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ companyId }),
-          },
-        );
+// 4) Disparar sincronización de reviews en segundo plano
+try {
+  const baseUrl = appUrl;
+  const resp = await fetch(
+    `${baseUrl}/api/integrations/google/business-profile/reviews?companyId=${encodeURIComponent(
+      companyId!,
+    )}`,
+    {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 
-        if (!resp.ok) {
-          const text = await resp.text().catch(() => "");
-          console.error(
-            "[Google Business Callback] reviews sync failed",
-            resp.status,
-            text.slice(0, 300),
-          );
-        }
-      } catch (err) {
-        console.error(
-          "[Google Business Callback] Error lanzando sync de reviews:",
-          err,
-        );
-      }
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    console.error(
+      "[Google Business Callback] reviews sync failed",
+      resp.status,
+      text.slice(0, 300),
+    );
+  }
+} catch (err) {
+  console.error(
+    "[Google Business Callback] Error lanzando sync de reviews:",
+    err,
+  );
+}
+
     }
 
     // 5) Marcar google_connected=1 en la URL de vuelta (estándar y reutilizable)

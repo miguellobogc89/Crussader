@@ -1,29 +1,24 @@
 // app/auth/AuthClient.tsx
 "use client";
 
-import { signIn } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
+
+import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
+import { Label } from "@/app/components/ui/label";
+import { Card, CardContent, CardHeader } from "@/app/components/ui/card";
+import { Shield, Eye, EyeOff } from "lucide-react";
 
 type Props = { initialTab: "login" | "register" };
 
 export default function AuthClient({ initialTab }: Props) {
   const [tab, setTab] = useState<"login" | "register">(initialTab);
 
-  // URL params (para post-verify)
+  // URL params (para post-verify / next)
   const params = useSearchParams();
   const [nextUrl, setNextUrl] = useState("/dashboard");
-
-  useEffect(() => {
-    const v = params.get("verified");
-    const em = params.get("email");
-    const n = params.get("next");
-    if (v === "1") {
-      setTab("login");
-      if (em) setLoginEmail(em); // pre-rellena email tras verificar
-    }
-    if (n) setNextUrl(n);
-  }, [params]);
 
   // LOGIN state
   const [loginEmail, setLoginEmail] = useState("");
@@ -31,6 +26,7 @@ export default function AuthClient({ initialTab }: Props) {
   const [remember, setRemember] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // REGISTER state
   const [name, setName] = useState("");
@@ -42,6 +38,23 @@ export default function AuthClient({ initialTab }: Props) {
   const [regError, setRegError] = useState<string | null>(null);
   const [regSuccess, setRegSuccess] = useState(false);
   const [devVerifyUrl, setDevVerifyUrl] = useState<string | null>(null); // solo dev
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirm, setShowRegConfirm] = useState(false);
+
+  // Leer parámetros de verificación y next
+  useEffect(() => {
+    const v = params.get("verified");
+    const em = params.get("email");
+    const n = params.get("next");
+
+    if (v === "1") {
+      setTab("login");
+      if (em) setLoginEmail(em); // pre-rellena email tras verificar
+    }
+    if (n) setNextUrl(n);
+  }, [params]);
+
+  const verifiedBanner = params.get("verified") === "1";
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -51,7 +64,7 @@ export default function AuthClient({ initialTab }: Props) {
     const res = await signIn("credentials", {
       email: loginEmail,
       password: loginPassword,
-      callbackUrl: nextUrl, // ⬅️ respeta ?next o /dashboard
+      callbackUrl: nextUrl, // respeta ?next o /dashboard
       redirect: false,
     });
 
@@ -121,113 +134,145 @@ export default function AuthClient({ initialTab }: Props) {
     }
   }
 
-  const verifiedBanner = params.get("verified") === "1";
-
   return (
-    <div className="min-h-screen bg-[radial-gradient(60%_80%_at_50%_-10%,#a78bfa_0%,transparent_60%),linear-gradient(180deg,#0b0514_0%,#0b0514_35%,#0e0a1a_100%)] text-white flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Card */}
-        <div className="relative rounded-2xl p-[1px] bg-gradient-to-br from-purple-500/80 via-fuchsia-500/60 to-sky-500/70 shadow-[0_10px_40px_-10px_rgba(79,70,229,0.5)]">
-          <div className="rounded-2xl bg-white/10 backdrop-blur-xl p-8">
-            {/* Header */}
-            <div className="text-center mb-6">
-              <h2 className="text-3xl font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-purple-200 to-white">
-                Bienvenido
-              </h2>
-              <p className="text-white/70 mt-1">
-                {tab === "login" ? "Inicia sesión para continuar" : "Crea tu cuenta para empezar"}
-              </p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 p-4 relative overflow-hidden">
+      {/* Gradient mesh background */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(262,83%,58%,0.15)_0%,transparent_50%),radial-gradient(ellipse_at_bottom_right,hsl(217,91%,60%,0.15)_0%,transparent_50%)]" />
+
+      <Card className="w-full max-w-md relative backdrop-blur-sm bg-card/95 border-border shadow-elegant">
+        <CardHeader className="space-y-6 pb-4">
+          {/* Logo */}
+          <div className="flex flex-col items-center space-y-3">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary via-accent to-[hsl(280,100%,70%)] flex items-center justify-center shadow-glow">
+              <Shield className="w-8 h-8 text-white" />
             </div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary via-accent to-[hsl(280,100%,70%)] bg-clip-text text-transparent">
+              Crussader
+            </h1>
+          </div>
 
-            {/* Aviso tras verificar */}
-            {verifiedBanner && tab === "login" && (
-              <div className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                ¡Correo verificado! Ahora introduce tu contraseña para entrar.
-              </div>
-            )}
+          {/* Tabs login / register */}
+          <div className="flex gap-2 p-1 bg-muted rounded-lg">
+            <button
+              type="button"
+              onClick={() => setTab("login")}
+              className={`flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                tab === "login"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Iniciar sesión
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("register")}
+              className={`flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                tab === "register"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Crear cuenta
+            </button>
+          </div>
+        </CardHeader>
 
-            {/* Tabs */}
-            <div className="grid grid-cols-2 rounded-xl bg-white/10 p-1 mb-6">
-              <button
-                onClick={() => setTab("login")}
-                className={`py-2 text-sm font-medium rounded-lg transition ${
-                  tab === "login" ? "bg-white text-purple-700 shadow" : "text-white/70 hover:text-white"
-                }`}
-              >
-                Iniciar sesión
-              </button>
-              <button
-                onClick={() => setTab("register")}
-                className={`py-2 text-sm font-medium rounded-lg transition ${
-                  tab === "register" ? "bg-white text-purple-700 shadow" : "text-white/70 hover:text-white"
-                }`}
-              >
-                Crear cuenta
-              </button>
+        <CardContent>
+          {/* Aviso tras verificar */}
+          {verifiedBanner && tab === "login" && (
+            <div className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              ¡Correo verificado! Ahora introduce tu contraseña para entrar.
             </div>
+          )}
 
-            {/* Forms */}
+          <form
+            onSubmit={tab === "login" ? handleLogin : handleRegister}
+            className="space-y-4"
+          >
             {tab === "login" ? (
-              <form className="space-y-4" onSubmit={handleLogin}>
+              <>
                 {loginError && (
                   <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
                     {loginError}
                   </div>
                 )}
-                <div>
-                  <label className="block text-sm text-white/80 mb-1">Email</label>
-                  <input
+
+                <div className="space-y-2">
+                  <Label htmlFor="login-email" className="text-foreground">
+                    Correo electrónico
+                  </Label>
+                  <Input
+                    id="login-email"
                     type="email"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
+                    required
+                    className="bg-background border-border focus:border-primary transition-colors"
                     placeholder="tu@email.com"
-                    className="w-full px-3 py-2 rounded-lg bg-white/90 text-gray-900 placeholder-gray-500 outline-none ring-2 ring-transparent focus:ring-purple-400 transition"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-white/80 mb-1">Contraseña</label>
-                  <input
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="••••••"
-                    className="w-full px-3 py-2 rounded-lg bg-white/90 text-gray-900 placeholder-gray-500 outline-none ring-2 ring-transparent focus:ring-purple-400 transition"
-                    required
                   />
                 </div>
 
-                <div className="flex items-center justify-between text-sm">
-                  <label className="inline-flex items-center gap-2 text-white/80">
+                <div className="space-y-2">
+                  <Label htmlFor="login-password" className="text-foreground">
+                    Contraseña
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="login-password"
+                      type={showLoginPassword ? "text" : "password"}
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      required
+                      className="bg-background border-border focus:border-primary transition-colors pr-10"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showLoginPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <label className="inline-flex items-center gap-2">
                     <input
                       type="checkbox"
-                      className="accent-purple-600"
+                      className="accent-primary"
                       checked={remember}
                       onChange={(e) => setRemember(e.target.checked)}
                     />
-                    Recordar sesión
+                    <span>Recordar sesión</span>
                   </label>
                   <a
                     href="/auth/forgot"
-                    className="text-purple-200 hover:text-white underline-offset-4 hover:underline"
+                    className="text-primary hover:underline underline-offset-4"
                   >
                     Olvidé mi contraseña
                   </a>
                 </div>
 
-                <button
+                <Button
                   type="submit"
                   disabled={loginLoading}
-                  className="w-full py-2 rounded-lg bg-gradient-to-r from-purple-600 via-fuchsia-600 to-sky-600 text-white font-medium hover:opacity-95 active:opacity-90 transition disabled:opacity-60"
+                  className="w-full bg-gradient-to-r from-primary via-accent to-[hsl(280,100%,70%)] hover:opacity-90 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-60"
                 >
                   {loginLoading ? "Entrando…" : "Iniciar sesión"}
-                </button>
-              </form>
+                </Button>
+              </>
             ) : (
-              <form className="space-y-4" onSubmit={handleRegister}>
+              <>
                 {regSuccess ? (
                   <div className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                    Te hemos enviado un correo para verificar tu cuenta. Revisa tu bandeja.
+                    Te hemos enviado un correo para verificar tu cuenta. Revisa tu
+                    bandeja.
                     {devVerifyUrl && process.env.NODE_ENV !== "production" && (
                       <>
                         {" "}
@@ -248,130 +293,142 @@ export default function AuthClient({ initialTab }: Props) {
                   </div>
                 ) : null}
 
-                <div>
-                  <label className="block text-sm text-white/80 mb-1">Nombre</label>
-                  <input
+                <div className="space-y-2">
+                  <Label htmlFor="reg-name" className="text-foreground">
+                    Nombre
+                  </Label>
+                  <Input
+                    id="reg-name"
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    className="bg-background border-border focus:border-primary transition-colors"
                     placeholder="Tu nombre"
-                    className="w-full px-3 py-2 rounded-lg bg-white/90 text-gray-900 placeholder-gray-500 outline-none ring-2 ring-transparent focus:ring-purple-400 transition"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm text-white/80 mb-1">Email</label>
-                  <input
+
+                <div className="space-y-2">
+                  <Label htmlFor="reg-email" className="text-foreground">
+                    Correo electrónico
+                  </Label>
+                  <Input
+                    id="reg-email"
                     type="email"
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="tu@email.com"
-                    className="w-full px-3 py-2 rounded-lg bg-white/90 text-gray-900 placeholder-gray-500 outline-none ring-2 ring-transparent focus:ring-purple-400 transition"
                     required
+                    className="bg-background border-border focus:border-primary transition-colors"
+                    placeholder="tu@email.com"
                   />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm text-white/80 mb-1">Contraseña</label>
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••"
-                      className="w-full px-3 py-2 rounded-lg bg-white/90 text-gray-900 placeholder-gray-500 outline-none ring-2 ring-transparent focus:ring-purple-400 transition"
-                      required
-                    />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reg-password" className="text-foreground">
+                      Contraseña
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="reg-password"
+                        type={showRegPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="bg-background border-border focus:border-primary transition-colors pr-10"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegPassword(!showRegPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {showRegPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm text-white/80 mb-1">Confirmar</label>
-                    <input
-                      type="password"
-                      value={confirm}
-                      onChange={(e) => setConfirm(e.target.value)}
-                      placeholder="Repite la contraseña"
-                      className="w-full px-3 py-2 rounded-lg bg-white/90 text-gray-900 placeholder-gray-500 outline-none ring-2 ring-transparent focus:ring-purple-400 transition"
-                      required
-                    />
+
+                  <div className="space-y-2">
+                    <Label htmlFor="reg-confirm" className="text-foreground">
+                      Confirmar contraseña
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="reg-confirm"
+                        type={showRegConfirm ? "text" : "password"}
+                        value={confirm}
+                        onChange={(e) => setConfirm(e.target.value)}
+                        required
+                        className="bg-background border-border focus:border-primary transition-colors pr-10"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegConfirm(!showRegConfirm)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {showRegConfirm ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <label className="flex items-start gap-3 text-sm text-white/80">
+                <label className="flex items-start gap-3 text-xs text-muted-foreground">
                   <input
                     type="checkbox"
-                    className="mt-1 accent-purple-600"
+                    className="mt-1 accent-primary"
                     checked={accept}
                     onChange={(e) => setAccept(e.target.checked)}
                   />
                   <span>
                     Acepto los{" "}
-                    <a href="/legal/terms" className="text-purple-200 hover:text-white underline">
+                    <a
+                      href="/legal/terms"
+                      className="text-primary hover:underline"
+                    >
                       Términos y Condiciones
                     </a>{" "}
                     y la{" "}
-                    <a href="/legal/privacy" className="text-purple-200 hover:text-white underline">
+                    <a
+                      href="/legal/privacy"
+                      className="text-primary hover:underline"
+                    >
                       Política de Privacidad
                     </a>
                     .
                   </span>
                 </label>
 
-                <button
+                <Button
                   type="submit"
                   disabled={regLoading || regSuccess}
-                  className="w-full py-2 rounded-lg bg-gradient-to-r from-purple-600 via-fuchsia-600 to-sky-600 text-white font-medium hover:opacity-95 active:opacity-90 transition disabled:opacity-60"
+                  className="w-full bg-gradient-to-r from-primary via-accent to-[hsl(280,100%,70%)] hover:opacity-90 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-60"
                 >
-                  {regLoading ? "Creando cuenta…" : regSuccess ? "Correo enviado" : "Crear cuenta"}
-                </button>
-              </form>
+                  {regLoading
+                    ? "Creando cuenta…"
+                    : regSuccess
+                    ? "Correo enviado"
+                    : "Crear cuenta"}
+                </Button>
+              </>
             )}
+          </form>
 
-            {/* Divider */}
-            <div className="flex items-center my-6 gap-3">
-              <div className="flex-1 h-px bg-white/20" />
-              <span className="text-xs text-white/60">O CONTINÚA CON</span>
-              <div className="flex-1 h-px bg-white/20" />
-            </div>
-
-            {/* Social */}
-            <div className="grid grid-cols-1 gap-3">
-              <button
-                onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-                className="w-full flex items-center justify-center gap-3 rounded-lg bg-white text-gray-900 py-2 hover:bg-white/90 transition"
-              >
-                <img
-                  src="https://www.svgrepo.com/show/475656/google-color.svg"
-                  alt="Google"
-                  className="w-5 h-5"
-                />
-                <span className="font-medium">
-                  {tab === "login" ? "Entrar con Google" : "Crear cuenta con Google"}
-                </span>
-              </button>
-
-              <button
-                onClick={() => {
-                  /* TODO: signIn("facebook", { callbackUrl: "/dashboard" }) */
-                }}
-                className="w-full flex items-center justify-center gap-3 rounded-lg bg-[#1877F2] py-2 hover:brightness-110 transition"
-              >
-                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white">
-                  <path d="M22 12.06C22 6.48 17.52 2 11.94 2S2 6.48 2 12.06c0 4.99 3.66 9.13 8.44 9.94v-7.03H7.9V12.06h2.54V9.86c0-2.5 1.49-3.89 3.77-3.89 1.09 0 2.24.2 2.24.2v2.47h-1.26c-1.24 0-1.63.77-1.63 1.56v1.86h2.78l-.44 2.91h-2.34V22c4.78-.81 8.44-4.95 8.44-9.94Z" />
-                </svg>
-                <span className="font-medium text-white">
-                  {tab === "login" ? "Entrar con Facebook" : "Crear cuenta con Facebook"}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer mini */}
-        <p className="text-center text-xs text-white/60 mt-4">
-          ¿Problemas para entrar?{" "}
-          <a href="/support" className="underline hover:text-white">
-            Soporte
-          </a>
-        </p>
-      </div>
+          <p className="mt-6 text-center text-[11px] text-muted-foreground">
+            ¿Problemas para entrar?{" "}
+            <a href="/support" className="text-primary hover:underline">
+              Soporte
+            </a>
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

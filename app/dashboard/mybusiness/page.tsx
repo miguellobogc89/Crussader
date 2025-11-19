@@ -5,7 +5,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/app/components/ui/button";
 import { Plus, Building2, Pencil } from "lucide-react";
-
+import GoogleBusinessConnectBanner from "@/app/components/mybusiness/GoogleBusinessConnectBanner";
 import PageShell from "@/app/components/layouts/PageShell";
 import PreloadCompanyBuffer from "@/app/components/buffer/PreloadCompanyBuffer";
 
@@ -53,16 +53,17 @@ async function fetchCompanyDetails(
 
 /* ----------------------- page ----------------------- */
 
-export default function CompanyPage() {
+export default function MyBusinessPage() {
   const router = useRouter();
 
+  // ----- estado empresa -----
   const [loading, setLoading] = React.useState(true);
   const [companyId, setCompanyId] = React.useState<string | null>(null);
-  const [companyName, setCompanyName] = React.useState("Empresa");
+  const [companyName, setCompanyName] = React.useState("Mi empresa");
   const [details, setDetails] = React.useState<CompanyDetails | null>(null);
-
   const hasCompany = !!companyId;
 
+  // modal empresa
   const [companyModalOpen, setCompanyModalOpen] = React.useState(false);
   const [submittingCompany, setSubmittingCompany] = React.useState(false);
   const [form, setForm] = React.useState<CompanyForm>({
@@ -76,21 +77,24 @@ export default function CompanyPage() {
     setForm((prev) => ({ ...prev, ...patch }));
   }
 
+  // locations
   const [locs, setLocs] = React.useState<LocationRow[]>([]);
   const [locsLoading, setLocsLoading] = React.useState(false);
   const [locsError, setLocsError] = React.useState<string | null>(null);
 
-  const [showNudge, setShowNudge] = React.useState(false);
+  // auto-open modal create una sola vez si no hay empresa
   const openedOnceRef = React.useRef(false);
 
+  // vincular Google Location
   const [linkModalOpen, setLinkModalOpen] = React.useState(false);
   const [linkLocationId, setLinkLocationId] = React.useState<string | null>(null);
   const [linkLocationName, setLinkLocationName] =
     React.useState<string | null>(null);
 
-  // Carga inicial
+  // Carga inicial: primera empresa + detalles
   React.useEffect(() => {
     let abort = false;
+
     (async () => {
       setLoading(true);
       const list = await fetchMyCompanies();
@@ -99,7 +103,7 @@ export default function CompanyPage() {
       if (list.length > 0) {
         const c = list[0];
         setCompanyId(c.id);
-        setCompanyName(c.name ?? "Empresa");
+        setCompanyName(c.name ?? "Mi empresa");
 
         const d = await fetchCompanyDetails(c.id);
         if (abort) return;
@@ -117,16 +121,7 @@ export default function CompanyPage() {
     };
   }, []);
 
-  // Modal nudge si no hay empresa
-  React.useEffect(() => {
-    if (!loading && !hasCompany && !openedOnceRef.current) {
-      openedOnceRef.current = true;
-      const t = setTimeout(() => setShowNudge(true), 150);
-      return () => clearTimeout(t);
-    }
-  }, [loading, hasCompany]);
-
-  // Cargar locations
+  // Cargar locations cuando ya sabemos la company
   const loadLocations = React.useCallback(async () => {
     if (!companyId) return;
     setLocsLoading(true);
@@ -150,6 +145,14 @@ export default function CompanyPage() {
       loadLocations();
     }
   }, [hasCompany, companyId, loadLocations]);
+
+  // Auto-abrir modal de crear empresa una vez cuando no hay company
+  React.useEffect(() => {
+    if (!loading && !hasCompany && !openedOnceRef.current) {
+      openedOnceRef.current = true;
+      setCompanyModalOpen(true);
+    }
+  }, [loading, hasCompany]);
 
   /* --------- acciones empresa --------- */
 
@@ -225,11 +228,13 @@ export default function CompanyPage() {
   /* --------- acciones locations --------- */
 
   function handleConnect(location: LocationRow) {
-    setLinkLocationId((location as any).id ?? null);
+    const id = (location as any).id ?? null;
     const name =
       (location as any).title ??
       (location as any).name ??
       "Ubicación";
+
+    setLinkLocationId(id);
     setLinkLocationName(name);
     setLinkModalOpen(true);
   }
@@ -276,13 +281,15 @@ export default function CompanyPage() {
 
   /* ----------------------- render ----------------------- */
 
+  const showEmptyState = !loading && !hasCompany;
+
   return (
     <>
       <PreloadCompanyBuffer companyId={companyId} />
 
       <PageShell
         title={companyName}
-        titleIconName="building2"
+        titleIconName="Building2"
         description="Gestiona los datos de tu empresa y las ubicaciones conectadas."
         toolbar={
           hasCompany ? (
@@ -297,8 +304,14 @@ export default function CompanyPage() {
             </Button>
           ) : undefined
         }
+        isLoading={loading}
       >
-        {!hasCompany ? (
+        {/* banner en el BODY, arriba del todo */}
+        <div className="mb-4">
+          <GoogleBusinessConnectBanner companyId={companyId} />
+        </div>
+        {/* ── SIN EMPRESA ────────────────────────────── */}
+        {showEmptyState && (
           <div className="py-14">
             <div className="mx-auto max-w-2xl rounded-3xl border bg-card shadow-sm p-8 text-center">
               <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-500 to-sky-500 text-white shadow-lg">
@@ -325,54 +338,53 @@ export default function CompanyPage() {
               </div>
             </div>
           </div>
-        ) : (
-          <>
-            <section className="mt-6 space-y-3">
-              <div className="text-sm font-medium text-muted-foreground">
-                Ubicaciones vinculadas a tu empresa
-              </div>
-
-              {locsError && (
-                <div className="text-sm text-red-600">{locsError}</div>
-              )}
-
-              {locsLoading ? (
-                <div className="grid gap-3">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-20 rounded-xl border bg-muted/40 animate-pulse"
-                    />
-                  ))}
-                </div>
-              ) : locs.length === 0 ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">
-                  No hay ubicaciones todavía. Crea tu primera ubicación desde el
-                  flujo guiado.
-                </div>
-              ) : (
-                <div className="grid gap-4">
-                  {locs.map((loc) => (
-                    <LocationCard
-                      key={(loc as any).id}
-                      location={loc}
-                      onSync={() => handleSync((loc as any).id)}
-                      onConnect={() => handleConnect(loc)}
-                      onDisconnect={() => handleDisconnect(loc)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-          </>
         )}
 
+        {/* ── CON EMPRESA ─────────────────────────────── */}
+        {hasCompany && (
+          <section className="mt-6 space-y-3">
+            <div className="text-sm font-medium text-muted-foreground">
+              Ubicaciones vinculadas a tu empresa
+            </div>
+
+            {locsError && (
+              <div className="text-sm text-red-600">{locsError}</div>
+            )}
+
+            {locsLoading ? (
+              <div className="grid gap-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-20 rounded-xl border bg-muted/40 animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : locs.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                No hay ubicaciones todavía. Crea tu primera ubicación desde el
+                flujo guiado.
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {locs.map((loc) => (
+                  <LocationCard
+                    key={(loc as any).id}
+                    location={loc}
+                    onSync={() => handleSync((loc as any).id)}
+                    onConnect={() => handleConnect(loc)}
+                    onDisconnect={() => handleDisconnect(loc)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ── MODALES ─────────────────────────────────── */}
         <CompanyModal
-          open={companyModalOpen || showNudge}
-          onOpenChange={(open) => {
-            setCompanyModalOpen(open);
-            if (!open) setShowNudge(false);
-          }}
+          open={companyModalOpen}
+          onOpenChange={setCompanyModalOpen}
           mode={hasCompany ? "edit" : "create"}
           values={form}
           onChange={modalChange}

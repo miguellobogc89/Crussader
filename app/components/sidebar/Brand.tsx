@@ -37,7 +37,7 @@ export function Brand({
           title={collapsed ? "Expandir" : undefined}
         >
           <div className="flex h-8 w-8 items-center justify-center">
-            <img src="/img/logo_crussader.svg" alt="Crussader logo" width={32} height={32} />
+            <img src="/logo/Logo 1-05.png" alt="Crussader logo" width={32} height={32} />
           </div>
           {!collapsed && (
             <div className="leading-tight">

@@ -70,11 +70,36 @@ const GROUPS: NavGroup[] = [
     title: "Dashboard",
     icon: "📊",
     items: [
-      { title: "Reseñas", href: "/dashboard/reviews", icon: "💬", description: "Métricas y estadísticas" },
-      { title: "Reportes", href: "/dashboard/reports", icon: "📋", description: "Generación de informes" },
-      { title: "Informes", href: "/dashboard/informes", icon: "📈", description: "Informes real" },
-      { title: "Gráficos", href: "/dashboard/charts-test", icon: "📈", description: "Visualizaciones" },
-      { title: "Reportes de prueba", href: "/dashboard/reports-test", icon: "🧪", description: "Sandbox" },
+      {
+        title: "Reseñas",
+        href: "/dashboard/reviews",
+        icon: "💬",
+        description: "Métricas y estadísticas",
+      },
+      {
+        title: "Reportes",
+        href: "/dashboard/reports",
+        icon: "📋",
+        description: "Generación de informes",
+      },
+      {
+        title: "Informes",
+        href: "/dashboard/informes",
+        icon: "📈",
+        description: "Informes real",
+      },
+      {
+        title: "Gráficos",
+        href: "/dashboard/charts-test",
+        icon: "📈",
+        description: "Visualizaciones",
+      },
+      {
+        title: "Reportes de prueba",
+        href: "/dashboard/reports-test",
+        icon: "🧪",
+        description: "Sandbox",
+      },
     ],
   },
   {
@@ -113,21 +138,39 @@ const GROUPS: NavGroup[] = [
     title: "Productos y Servicios",
     icon: "📦",
     items: [
-      { title: "Conocimientos", href: "/dashboard/knowledge", icon: "📚", description: "Base de conocimiento" },
-      { title: "Agentes de voz IA", href: "/dashboard/integrations-test", icon: "🎙️", description: "Conecta servicios" },
-      { title: "Todos los productos", href: "/dashboard/products", icon: "📦", description: "Productos y servicios" },
-      { title: "WebChat IA", href: "/dashboard/database", icon: "🗄️", description: "Conexiones y datos" },
+      {
+        title: "Conocimientos",
+        href: "/dashboard/knowledge",
+        icon: "📚",
+        description: "Base de conocimiento",
+      },
+      {
+        title: "Agentes de voz IA",
+        href: "/dashboard/integrations-test",
+        icon: "🎙️",
+        description: "Conecta servicios",
+      },
+      {
+        title: "Todos los productos",
+        href: "/dashboard/products",
+        icon: "📦",
+        description: "Productos y servicios",
+      },
+      {
+        title: "WebChat IA",
+        href: "/dashboard/database",
+        icon: "🗄️",
+        description: "Conexiones y datos",
+      },
     ],
   },
 ];
-
 
 export function AppSidebar() {
   const pathname = usePathname() ?? "";
   const isMobile = useIsMobile();
   const { data: session } = useSession();
 
-  // En móvil arrancamos colapsado (solo top bar). En desktop como antes.
   const [collapsed, setCollapsed] = useState<boolean>(isMobile);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
@@ -135,17 +178,37 @@ export function AppSidebar() {
   const user = session?.user;
   const roleRaw = (user as any)?.role ?? (user as any)?.companyRole ?? "";
   const rolesArrRaw = (user as any)?.roles ?? [];
-  const permsArrRaw = (user as any)?.permissions ?? (user as any)?.perms ?? [];
+  const permsArrRaw =
+    (user as any)?.permissions ?? (user as any)?.perms ?? [];
   const role = String(roleRaw || "").toLowerCase();
-  const rolesArr = Array.isArray(rolesArrRaw) ? rolesArrRaw.map((r: any) => String(r).toLowerCase()) : [];
-  const permsArr = Array.isArray(permsArrRaw) ? permsArrRaw.map((p: any) => String(p).toLowerCase()) : [];
-  const ADMIN_ALIASES = new Set(["admin","administrator","owner","superadmin","super_admin","system_admin","sysadmin","root"]);
+  const rolesArr = Array.isArray(rolesArrRaw)
+    ? rolesArrRaw.map((r: any) => String(r).toLowerCase())
+    : [];
+  const permsArr = Array.isArray(permsArrRaw)
+    ? permsArrRaw.map((p: any) => String(p).toLowerCase())
+    : [];
+  const ADMIN_ALIASES = new Set([
+    "admin",
+    "administrator",
+    "owner",
+    "superadmin",
+    "super_admin",
+    "system_admin",
+    "sysadmin",
+    "root",
+  ]);
   const adminFlags = {
     a_isAdminField: (user as any)?.isAdmin === true,
     b_roleEqAdmin: ADMIN_ALIASES.has(role) || /admin/.test(role),
-    c_rolesArrayHasAdmin: rolesArr.some((r) => ADMIN_ALIASES.has(r) || /admin/.test(r)),
-    d_permissionsHaveAdmin: permsArr.some((p) => ADMIN_ALIASES.has(p) || /admin/.test(p)),
-    e_forceAdminLocal: typeof window !== "undefined" && localStorage.getItem("forceAdmin") === "1",
+    c_rolesArrayHasAdmin: rolesArr.some(
+      (r) => ADMIN_ALIASES.has(r) || /admin/.test(r),
+    ),
+    d_permissionsHaveAdmin: permsArr.some(
+      (p) => ADMIN_ALIASES.has(p) || /admin/.test(p),
+    ),
+    e_forceAdminLocal:
+      typeof window !== "undefined" &&
+      localStorage.getItem("forceAdmin") === "1",
   };
   const isAdmin = Object.values(adminFlags).some(Boolean);
 
@@ -156,17 +219,78 @@ export function AppSidebar() {
         title: "Admin",
         icon: "🛡️",
         items: [
-          { title: "Usuarios y roles", href: "/dashboard/admin/users", icon: "👥", description: "Altas, permisos y equipos" },
-          { title: "UI & Dessign", href: "/dashboard/admin/UI_and_Dessign", icon: "🤖", description: "Diseño de la interfaz" },
-          { title: "Leads", href: "/dashboard/crm/leads", icon: "🏪", description: "Invitaciones a nuevos usuarios" },
-          { title: "Empresas y establecimientos", href: "/dashboard/admin/companies", icon: "🏪", description: "Estructura, sedes y negocios" },
-          { title: "Integraciones", href: "/dashboard/admin/integrations", icon: "🔌", description: "Conexiones externas" },
-          { title: "Finanzas", href: "/dashboard/admin/finance", icon: "💰", description: "Pagos, costes y facturas" },
-          { title: "Productos", href: "/dashboard/admin/products", icon: "📦", description: "Configurador de productos" },
-          { title: "Ventas", href: "/dashboard/admin/sales", icon: "🛒", description: "Canales y conversión" },
-          { title: "Permisos y auditoría", href: "/dashboard/admin/audit", icon: "🧾", description: "Logs y cumplimiento" },
-          { title: "Estado del sistema", href: "/dashboard/admin/system", icon: "⚙️", description: "Salud y configuración" },
-          { title: "Agentes IA", href: "/dashboard/admin/voiceagents", icon: "🤖", description: "Constructor de Agentes" },
+          {
+            title: "Usuarios y roles",
+            href: "/dashboard/admin/users",
+            icon: "👥",
+            description: "Altas, permisos y equipos",
+          },
+          {
+            title: "UI & Dessign",
+            href: "/dashboard/admin/UI_and_Dessign",
+            icon: "🤖",
+            description: "Diseño de la interfaz",
+          },
+          {
+            title: "Leads",
+            href: "/dashboard/crm/leads",
+            icon: "🏪",
+            description: "Invitaciones a nuevos usuarios",
+          },
+          {
+            title: "Empresas y establecimientos",
+            href: "/dashboard/admin/companies",
+            icon: "🏪",
+            description: "Estructura, sedes y negocios",
+          },
+          {
+            title: "Integraciones",
+            href: "/dashboard/admin/integrations",
+            icon: "🔌",
+            description: "Conexiones externas",
+          },
+          {
+            title: "Finanzas",
+            href: "/dashboard/admin/finance",
+            icon: "💰",
+            description: "Pagos, costes y facturas",
+          },
+          {
+            title: "Productos",
+            href: "/dashboard/admin/products",
+            icon: "📦",
+            description: "Configurador de productos",
+          },
+          {
+            title: "Ventas",
+            href: "/dashboard/admin/sales",
+            icon: "🛒",
+            description: "Canales y conversión",
+          },
+          {
+            title: "Permisos y auditoría",
+            href: "/dashboard/admin/audit",
+            icon: "🧾",
+            description: "Logs y cumplimiento",
+          },
+          {
+            title: "Estado del sistema",
+            href: "/dashboard/admin/system",
+            icon: "⚙️",
+            description: "Salud y configuración",
+          },
+          {
+            title: "Agentes IA",
+            href: "/dashboard/admin/voiceagents",
+            icon: "🤖",
+            description: "Constructor de Agentes",
+          },
+
+          // 👉 mete PRICING dentro de Admin
+          PRICING,
+
+          // 👉 mete los items de los 3 grupos (dashboard, business, products)
+          ...GROUPS.flatMap((g) => g.items),
         ],
       }
     : null;
@@ -214,32 +338,28 @@ export function AppSidebar() {
     setOpenGroupId((prev) => (prev === id ? null : id));
   }
 
-/* ─────────────────────────────────────────────
-   AUTO-HIDE TOP BAR (solo móvil + colapsado)
-   Activador: tocar la pantalla (toggle)
-   ───────────────────────────────────────────── */
-const [showTopBar, setShowTopBar] = useState(true);
+  /* ─────────────────────────────────────────────
+     AUTO-HIDE TOP BAR (solo móvil + colapsado)
+     ───────────────────────────────────────────── */
+  const [showTopBar, setShowTopBar] = useState(true);
 
-useEffect(() => {
-  if (!(isMobile && collapsed)) return;
+  useEffect(() => {
+    if (!(isMobile && collapsed)) return;
 
-  const onPointerDown = (ev: PointerEvent) => {
-    const target = ev.target as HTMLElement | null;
-    // ¿el toque fue sobre la topbar?
-    const hitBar = target?.closest?.('[data-topbar="true"]');
-    if (hitBar) return; // si tocan la barra, no auto-ocultamos/mostramos
+    const onPointerDown = (ev: PointerEvent) => {
+      const target = ev.target as HTMLElement | null;
+      const hitBar = target?.closest?.('[data-topbar="true"]');
+      if (hitBar) return;
 
-    // Tocar fuera de la barra → alterna visibilidad
-    setShowTopBar((prev) => !prev);
-  };
+      setShowTopBar((prev) => !prev);
+    };
 
-  window.addEventListener("pointerdown", onPointerDown, { passive: true });
-  return () => window.removeEventListener("pointerdown", onPointerDown);
-}, [isMobile, collapsed]);
-
+    window.addEventListener("pointerdown", onPointerDown, { passive: true });
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, [isMobile, collapsed]);
 
   /* ─────────────────────────────────────────────
-     MODO MÓVIL COLAPSADO → SOLO TOP BAR (auto-hide)
+     MODO MÓVIL COLAPSADO → SOLO TOP BAR
      ───────────────────────────────────────────── */
   if (isMobile && collapsed) {
     return (
@@ -260,16 +380,17 @@ useEffect(() => {
             <Menu className="h-5 w-5 text-slate-200" />
           </button>
 
-          <span className="text-slate-200 text-sm font-semibold tracking-wide">Crussader</span>
+          <span className="text-slate-200 text-sm font-semibold tracking-wide">
+            Crussader
+          </span>
           <span className="h-9 w-9" />
         </div>
-        {/* Asegúrate de dejar sitio al contenido: p.ej. pt-12 en tu layout del cuerpo */}
       </>
     );
   }
 
   /* ─────────────────────────────────────────────
-     SIDEBAR (desktop normal o móvil abierto en overlay)
+     SIDEBAR
      ───────────────────────────────────────────── */
   return (
     <aside
@@ -279,13 +400,10 @@ useEffect(() => {
         isOverlay ? "fixed inset-0 z-50" : "",
       ].join(" ")}
     >
-      {/* marca + botón colapsar */}
       <Brand collapsed={collapsed} setCollapsed={setCollapsed} />
 
-      {/* chip de empresa */}
       <CompanyChip collapsed={collapsed} />
 
-      {/* navegación */}
       <nav className="flex-1 overflow-y-auto px-2 py-2">
         {ADMIN_GROUP && (
           <div className="mb-2">
@@ -301,32 +419,70 @@ useEffect(() => {
           </div>
         )}
 
-        <SidebarItem item={HOME} active={isActivePath(pathname, HOME.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
-        <SidebarItem item={PRICING} active={isActivePath(pathname, PRICING.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
-        <SidebarItem item={REVIEWS} active={isActivePath(pathname, REVIEWS.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
-        <SidebarItem item={MYBUSINESS} active={isActivePath(pathname, MYBUSINESS.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
-        <SidebarItem item={SETTINGS} active={isActivePath(pathname, SETTINGS.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
-        <SidebarItem item={INTEGRATIONS} active={isActivePath(pathname, INTEGRATIONS.href)} collapsed={collapsed} onNavigate={onItemNavigate} />
+        {/* HOME siempre visible */}
+        <SidebarItem
+          item={HOME}
+          active={isActivePath(pathname, HOME.href)}
+          collapsed={collapsed}
+          onNavigate={onItemNavigate}
+        />
 
-        <div className="mt-2 space-y-1">
-          {GROUPS.map((g) => (
-            <Group
-              key={g.id}
-              group={g}
-              pathname={pathname}
-              collapsed={collapsed}
-              open={openGroupId === g.id}
-              onHeaderClick={() => handleGroupHeaderClick(g.id)}
-              onRequestExpand={requestExpand}
-              onItemNavigate={onItemNavigate}
-            />
-          ))}
-        </div>
+        {/* PRICING solo fuera de admin; si es admin ya está dentro del grupo Admin */}
+        {!isAdmin && (
+          <SidebarItem
+            item={PRICING}
+            active={isActivePath(pathname, PRICING.href)}
+            collapsed={collapsed}
+            onNavigate={onItemNavigate}
+          />
+        )}
+
+        <SidebarItem
+          item={REVIEWS}
+          active={isActivePath(pathname, REVIEWS.href)}
+          collapsed={collapsed}
+          onNavigate={onItemNavigate}
+        />
+        <SidebarItem
+          item={MYBUSINESS}
+          active={isActivePath(pathname, MYBUSINESS.href)}
+          collapsed={collapsed}
+          onNavigate={onItemNavigate}
+        />
+        <SidebarItem
+          item={SETTINGS}
+          active={isActivePath(pathname, SETTINGS.href)}
+          collapsed={collapsed}
+          onNavigate={onItemNavigate}
+        />
+        <SidebarItem
+          item={INTEGRATIONS}
+          active={isActivePath(pathname, INTEGRATIONS.href)}
+          collapsed={collapsed}
+          onNavigate={onItemNavigate}
+        />
+
+        {/* Grupos solo para NO admins; para admin ya están dentro del grupo Admin */}
+        {!isAdmin && (
+          <div className="mt-2 space-y-1">
+            {GROUPS.map((g) => (
+              <Group
+                key={g.id}
+                group={g}
+                pathname={pathname}
+                collapsed={collapsed}
+                open={openGroupId === g.id}
+                onHeaderClick={() => handleGroupHeaderClick(g.id)}
+                onRequestExpand={requestExpand}
+                onItemNavigate={onItemNavigate}
+              />
+            ))}
+          </div>
+        )}
       </nav>
 
       <TrialBanner collapsed={collapsed} />
 
-      {/* footer usuario */}
       <UserFooter
         collapsed={collapsed}
         userMenuOpen={userMenuOpen}
