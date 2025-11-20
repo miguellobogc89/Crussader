@@ -1,4 +1,3 @@
-// app/components/company/LocationCard.tsx
 "use client";
 
 import * as React from "react";
@@ -9,7 +8,7 @@ import type { LocationRow } from "@/hooks/useCompanyLocations";
 type Props = {
   location: LocationRow;
   onSync: () => void | Promise<void>; // se mantiene por compatibilidad
-  onConnect?: () => void;
+  onConnect?: () => void; // ← usamos este para abrir el modal
   onDisconnect?: () => void;
 };
 

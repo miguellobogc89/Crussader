@@ -1,4 +1,4 @@
-// app/api/mybusiness/locations/[locationId]/link-google/route.ts
+// app/api/mybusiness/locations/[id]/link-google/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/server/db";
 
@@ -27,13 +27,15 @@ function mapStarRatingToInt(star: string | null | undefined): number {
 
 export async function POST(
   req: NextRequest,
-  context: { params: Promise<{ locationId: string }> },
+  context: { params: Promise<{ id: string }> },
 ) {
-  const { locationId } = await context.params;
+  // 👇 ahora el parámetro dinámico es [id]
+  const { id } = await context.params;
+  const locationId = id;
 
   if (!locationId) {
     return NextResponse.json(
-      { error: "locationId requerido en la ruta" },
+      { error: "id (locationId) requerido en la ruta" },
       { status: 400 },
     );
   }
@@ -99,7 +101,10 @@ export async function POST(
 
     if (!account) {
       return NextResponse.json(
-        { error: "Cuenta de Google Business no encontrada para esta ubicación" },
+        {
+          error:
+            "Cuenta de Google Business no encontrada para esta ubicación",
+        },
         { status: 400 },
       );
     }

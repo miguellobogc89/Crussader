@@ -1,4 +1,4 @@
-// app/api/mybusiness/locations/[locationId]/unlink-google/route.ts
+// app/api/mybusiness/locations/[id]/unlink-google/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/server/db";
 
@@ -6,9 +6,9 @@ export const runtime = "nodejs";
 
 export async function POST(
   _req: NextRequest,
-  context: { params: { locationId: string } },
+  context: { params: { id: string } },
 ) {
-  const locationId = context.params.locationId;
+  const locationId = context.params.id;
 
   if (!locationId) {
     return NextResponse.json(

@@ -1,4 +1,4 @@
-// app/api/mybusiness/locations/[locationId]/sync-reviews/route.ts
+// app/api/mybusiness/locations/[id]/sync-reviews/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/server/db";
 import { ReviewProvider } from "@prisma/client";

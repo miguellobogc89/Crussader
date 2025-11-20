@@ -1,6 +1,11 @@
-// app/api/integrations/google/business-profile/sync/locations/route.ts
+// app/api/integrations/google-business/profile/sync/locations/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import {
+  getExternalConnectionForCompany,
+  getValidAccessToken,
+  listGbpLocationsForAccount,
+} from "@/lib/integrations/google-business/client";
 
 export const runtime = "nodejs";
 
@@ -26,33 +31,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1) ExternalConnection de GBP para esta company (igual que en select)
-    const externalConn = await prisma.externalConnection.findFirst({
-      where: {
-        provider: "google-business",
-        companyId,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    // 1) ExternalConnection de GBP para esta company (lógica común)
+    const externalConn = await getExternalConnectionForCompany(companyId);
 
-    if (!externalConn) {
-      return NextResponse.json(
-        { ok: false, error: "no_external_connection_for_company" },
-        { status: 404 },
-      );
-    }
+    // 2) Access token válido (con refresh si hace falta)
+    const accessToken = await getValidAccessToken(externalConn);
 
-    if (!externalConn.access_token) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "external_connection_missing_access_token",
-        },
-        { status: 400 },
-      );
-    }
-
-    // 2) google_gbp_account para esa conexión (igual que en select)
+    // 3) google_gbp_account para esa conexión (igual que en tu versión)
     const gbpAccount = await prisma.google_gbp_account.findFirst({
       where: {
         company_id: companyId,
@@ -65,60 +50,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          error:
-            "no_gbp_account_for_company_and_connection",
+          error: "no_gbp_account_for_company_and_connection",
         },
         { status: 404 },
       );
     }
 
     const accountUuid = gbpAccount.id;
-
-    // 3) Llamada a Business Information v1 para locations
-    const readMask = [
-      "name",
-      "title",
-      "storeCode",
-      "metadata",
-      "regularHours",
-      "serviceArea",
-      "websiteUri",
-      "phoneNumbers",
-      "languageCode",
-    ].join(",");
-
     const accountId = gbpAccount.google_account_id.trim();
-    const url = `https://mybusinessbusinessinformation.googleapis.com/v1/accounts/${encodeURIComponent(
+
+    // 4) Llamada a Business Information v1 para locations usando la librería
+    const apiLocations = await listGbpLocationsForAccount(
       accountId,
-    )}/locations?readMask=${encodeURIComponent(readMask)}`;
+      accessToken,
+    );
 
-    const apiRes = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${externalConn.access_token}`,
-      },
-    });
-
-    if (!apiRes.ok) {
-      const text = await apiRes.text().catch(() => "");
-      console.error("[GBP][sync/locations] Google API error", apiRes.status, text);
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "google_api_error",
-          status: apiRes.status,
-          message: text || undefined,
-        },
-        { status: 502 },
-      );
-    }
-
-    const apiJson: any = await apiRes.json();
-    const apiLocations: any[] = Array.isArray(apiJson.locations)
-      ? apiJson.locations
-      : [];
-
-    // 4) Upsert de TODAS las locations en google_gbp_location
+    // 5) Upsert de TODAS las locations en google_gbp_location
     const upserted = await prisma.$transaction(async (tx) => {
       const results: Array<{ google_location_id: string } | null> = [];
 
@@ -130,7 +77,7 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // Aquí en select usabas el resource completo como ID
+        // En select usabas el resource completo como ID
         const googleLocationId: string = googleLocationName;
 
         const title: string | null = loc.title ?? null;
@@ -141,7 +88,8 @@ export async function POST(req: NextRequest) {
         const websiteUri: string | null = loc.websiteUri ?? null;
 
         const primaryPhone: string | null =
-          loc.phoneNumbers && typeof loc.phoneNumbers.primaryPhone === "string"
+          loc.phoneNumbers &&
+          typeof loc.phoneNumbers.primaryPhone === "string"
             ? loc.phoneNumbers.primaryPhone
             : null;
 
@@ -223,7 +171,7 @@ export async function POST(req: NextRequest) {
 
     const upsertedCount = upserted.filter(Boolean).length;
 
-    // 5) Respuesta para el modal: mapeo a GbpLocationWire
+    // 6) Respuesta para el modal: mapeo a GbpLocationWire (igual)
     const locations: GbpLocationWire[] = apiLocations.map((loc: any) => {
       const name: string = typeof loc.name === "string" ? loc.name : "";
       const title: string =
@@ -270,7 +218,7 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    const maxConnectable = 1; // de momento 1, luego lo ligamos al plan
+    const maxConnectable = 1; // de momento 1
 
     return NextResponse.json({
       ok: true,

@@ -1,4 +1,3 @@
-// app/dashboard/mybusiness/page.tsx
 "use client";
 
 import * as React from "react";
@@ -16,7 +15,7 @@ import {
 
 import { LocationCard } from "@/app/components/mybusiness/locations/LocationCard";
 import type { LocationRow } from "@/hooks/useCompanyLocations";
-import { GoogleLocationLinkModal } from "@/app/components/mybusiness/locations/GoogleLocationLinkModal";
+import LinkGbpLocationModal from "@/app/components/mybusiness/locations/LinkGbpLocationModal";
 
 /* ----------------------- helpers (fetchers) ----------------------- */
 
@@ -85,11 +84,8 @@ export default function MyBusinessPage() {
   // auto-open modal create una sola vez si no hay empresa
   const openedOnceRef = React.useRef(false);
 
-  // vincular Google Location
-  const [linkModalOpen, setLinkModalOpen] = React.useState(false);
+  // vincular Google Location -> solo guardamos la location actual
   const [linkLocationId, setLinkLocationId] = React.useState<string | null>(null);
-  const [linkLocationName, setLinkLocationName] =
-    React.useState<string | null>(null);
 
   // Carga inicial: primera empresa + detalles
   React.useEffect(() => {
@@ -229,14 +225,8 @@ export default function MyBusinessPage() {
 
   function handleConnect(location: LocationRow) {
     const id = (location as any).id ?? null;
-    const name =
-      (location as any).title ??
-      (location as any).name ??
-      "Ubicación";
-
+    if (!id) return;
     setLinkLocationId(id);
-    setLinkLocationName(name);
-    setLinkModalOpen(true);
   }
 
   async function handleDisconnect(location: LocationRow) {
@@ -310,6 +300,7 @@ export default function MyBusinessPage() {
         <div className="mb-4">
           <GoogleBusinessConnectBanner companyId={companyId} />
         </div>
+
         {/* ── SIN EMPRESA ────────────────────────────── */}
         {showEmptyState && (
           <div className="py-14">
@@ -392,44 +383,20 @@ export default function MyBusinessPage() {
           submitting={submittingCompany}
         />
 
-        <GoogleLocationLinkModal
-          open={linkModalOpen}
-          onClose={() => setLinkModalOpen(false)}
-          companyId={companyId}
-          appLocationName={linkLocationName}
-          onSelect={async (
-            _googleLocationId: string,
-            googleLocationDbId: string,
-          ) => {
-            if (!linkLocationId) {
-              setLinkModalOpen(false);
-              return;
-            }
-
-            try {
-              const res = await fetch(
-                `/api/mybusiness/locations/${linkLocationId}/link-google`,
-                {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ gbpLocationId: googleLocationDbId }),
-                },
-              );
-
-              const json = await res.json().catch(() => null);
-
-              if (!res.ok || !json?.ok) {
-                alert(json?.error || `Error al vincular (${res.status})`);
-              } else {
-                await loadLocations();
-              }
-            } catch (e: any) {
-              alert(e?.message || String(e));
-            } finally {
-              setLinkModalOpen(false);
-            }
+        <LinkGbpLocationModal
+          open={!!linkLocationId}
+          locationId={linkLocationId ?? ""}
+          onClose={() => setLinkLocationId(null)}
+          onCompanyResolved={(cid) => {
+            // Solo para debug por ahora, sin lógica extra en la page
+            console.log("CompanyId resuelto en modal:", cid);
+          }}
+          onLinked={async () => {
+            // refrescamos las locations de la empresa al terminar de vincular
+            await loadLocations();
           }}
         />
+
       </PageShell>
     </>
   );

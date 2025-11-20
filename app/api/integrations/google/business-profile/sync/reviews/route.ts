@@ -1,297 +1,224 @@
-// app/api/integrations/google/business-profile/reviews/route.ts
+// app/api/integrations/google/business-profile/sync/reviews/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { google } from "googleapis";
+import {
+  getExternalConnectionForCompany,
+  getValidAccessToken,
+  listGbpReviewsForLocation,
+} from "@/lib/integrations/google-business/client";
 
 export const runtime = "nodejs";
 
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const companyId = req.nextUrl.searchParams.get("companyId")?.trim();
+    const body = await req.json().catch(() => null);
+    const companyId = (body?.companyId as string | undefined)?.trim();
 
     if (!companyId) {
       return NextResponse.json(
         { ok: false, error: "missing_company_id" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const provider = "google-business";
+    // 1) ExternalConnection + accessToken válido
+    const ext = await getExternalConnectionForCompany(companyId);
+    const accessToken = await getValidAccessToken(ext);
 
-    // 1) ExternalConnection GOOGLE BUSINESS de esa company
-    const ext = await prisma.externalConnection.findFirst({
-      where: { companyId, provider },
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (!ext) {
-      return NextResponse.json(
-        { ok: false, error: "no_external_connection" },
-        { status: 404 }
-      );
-    }
-
-    if (!ext.access_token && !ext.refresh_token) {
-      return NextResponse.json(
-        { ok: false, error: "no_tokens_for_connection" },
-        { status: 400 }
-      );
-    }
-
-    // 2) Resolver access_token válido
-    const redirectUri =
-      process.env.GOOGLE_BUSINESS_REDIRECT_URI ||
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/google/business-profile/callback`;
-
-    const client = new google.auth.OAuth2(
-      process.env.GOOGLE_BUSINESS_CLIENT_ID!,
-      process.env.GOOGLE_BUSINESS_CLIENT_SECRET!,
-      redirectUri
-    );
-
-    let accessToken = ext.access_token ?? null;
-
-    const nowSec = Math.floor(Date.now() / 1000);
-    const isExpired =
-      typeof ext.expires_at === "number" && ext.expires_at < nowSec - 60;
-
-    if ((!accessToken || isExpired) && ext.refresh_token) {
-      try {
-        client.setCredentials({ refresh_token: ext.refresh_token });
-        const newTokenResp = await client.getAccessToken();
-        const newAccessToken = newTokenResp?.token ?? null;
-
-        if (!newAccessToken) {
-          throw new Error("empty_access_token_after_refresh");
-        }
-
-        accessToken = newAccessToken;
-
-        const expiryMs = client.credentials.expiry_date;
-        const newExpiresAtSec =
-          typeof expiryMs === "number"
-            ? Math.floor(expiryMs / 1000)
-            : null;
-
-        await prisma.externalConnection.update({
-          where: { id: ext.id },
-          data: {
-            access_token: newAccessToken,
-            expires_at: newExpiresAtSec ?? undefined,
-          },
-        });
-      } catch (err) {
-        console.error("[GBP][reviews] error refreshing token:", err);
-        return NextResponse.json(
-          { ok: false, error: "token_refresh_failed" },
-          { status: 401 }
-        );
-      }
-    }
-
-    if (!accessToken) {
-      return NextResponse.json(
-        { ok: false, error: "no_valid_access_token" },
-        { status: 401 }
-      );
-    }
-
-    // 3) Todas las google_gbp_location activas de esa company
-    const gbpLocations = await prisma.google_gbp_location.findMany({
+    // 2) Cuenta GBP (para tener google_account_id)
+    const gbpAccount = await prisma.google_gbp_account.findFirst({
       where: {
         company_id: companyId,
-        status: "active",
+        external_connection_id: ext.id,
       },
-      include: {
-        google_gbp_account: true,
+      orderBy: { created_at: "desc" },
+    });
+
+    if (!gbpAccount || !gbpAccount.google_account_id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "no_gbp_account_for_company_and_connection",
+        },
+        { status: 404 },
+      );
+    }
+
+    const accountId = gbpAccount.google_account_id.trim();
+
+    // 3) Todas las locations sincronizadas para esta company
+    const locations = await prisma.google_gbp_location.findMany({
+      where: { company_id: companyId },
+      select: {
+        id: true,                  // UUID de google_gbp_location
+        google_location_id: true,  // resource name o id
       },
     });
 
-    if (!gbpLocations || gbpLocations.length === 0) {
+    if (!locations.length) {
       return NextResponse.json({
         ok: true,
-        synced: {
-          locations: 0,
-          reviewsUpserted: 0,
-          perLocation: [],
-        },
-        warning: "No hay google_gbp_location activas para esa company",
+        totalLocations: 0,
+        totalReviews: 0,
+        upserted: 0,
       });
     }
 
-    // Map de rating enum → string que guardamos tal cual
-    const starMap: Record<string, string> = {
-      ONE: "ONE",
-      TWO: "TWO",
-      THREE: "THREE",
-      FOUR: "FOUR",
-      FIVE: "FIVE",
-    };
-
-    let totalUpserted = 0;
-    const perLocation: Array<{
-      gbpLocationId: string;
-      google_location_id: string;
-      upserted: number;
-    }> = [];
-
-    // 4) Por cada ubicación GBP, llamar al endpoint v4 de reviews y upsert
-    for (const loc of gbpLocations) {
-      const account = loc.google_gbp_account;
-      if (!account || !account.google_account_id) {
-        perLocation.push({
-          gbpLocationId: loc.id,
-          google_location_id: loc.google_location_id,
-          upserted: 0,
-        });
-        continue;
+    // Helper: resourceName correcto para v4
+    function buildLocationResourceName(googleLocationId: string): string {
+      const trimmed = googleLocationId.trim();
+      if (!trimmed) {
+        throw new Error("[GBP][reviews] empty google_location_id");
       }
 
-      let googleAccountName = account.google_account_id.trim();
-      if (!googleAccountName.startsWith("accounts/")) {
-        googleAccountName = `accounts/${googleAccountName}`;
+      if (trimmed.startsWith("accounts/")) {
+        return trimmed;
       }
 
-      const basePath = `https://mybusiness.googleapis.com/v4/${googleAccountName}/locations/${loc.google_location_id}/reviews`;
+      if (trimmed.startsWith("locations/")) {
+        return `accounts/${accountId}/${trimmed}`;
+      }
 
-      let pageToken: string | undefined = undefined;
-      let upsertedForLoc = 0;
+      return `accounts/${accountId}/locations/${trimmed}`;
+    }
 
-      // Paginación v4
-      while (true) {
-        let url = basePath;
-        if (pageToken) {
-          url += `?pageToken=${encodeURIComponent(pageToken)}`;
-        }
+    let totalReviews = 0;
+    let upsertedCount = 0;
 
-        const resp = await fetch(url, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
+    // 4) Transaction para upserts de TODAS las reviews
+    await prisma.$transaction(async (tx) => {
+      for (const loc of locations) {
+        if (!loc.google_location_id) continue;
 
-        if (!resp.ok) {
-          const text = await resp.text().catch(() => "");
-          console.error(
-            "[GBP][reviews] Google API error",
-            resp.status,
-            text
-          );
-          break;
-        }
+        const locationResourceName = buildLocationResourceName(
+          loc.google_location_id,
+        );
 
-        const data = (await resp.json()) as any;
-        const reviews = Array.isArray(data.reviews) ? data.reviews : [];
-        const averageRating =
-          typeof data.averageRating === "number" ? data.averageRating : null;
-        const totalReviewCount =
-          typeof data.totalReviewCount === "number"
-            ? data.totalReviewCount
-            : null;
+        let pageToken: string | undefined = undefined;
 
-        for (const r of reviews) {
-          // --- Campos básicos del JSON ---
-          const reviewId: string =
-            typeof r.reviewId === "string"
-              ? r.reviewId
-              : typeof r.name === "string"
-              ? String(r.name).split("/").pop() ?? ""
-              : "";
-
-          if (!reviewId) continue;
-
-          const resourceName: string =
-            typeof r.name === "string" ? r.name : `reviews/${reviewId}`;
-
-          const reviewerName: string | null =
-            r.reviewer?.displayName ?? null;
-          const reviewerPhoto: string | null =
-            r.reviewer?.profilePhotoUrl ?? null;
-
-          const starRatingStr: string | null =
-            typeof r.starRating === "string" ? r.starRating : null;
-          const starRating: string =
-            (starRatingStr && starMap[starRatingStr]) || "UNKNOWN";
-
-          const comment: string | null =
-            typeof r.comment === "string" ? r.comment : null;
-
-          // Tu modelo requiere DateTime no opcionales → siempre ponemos Date válida
-          const createTime: Date =
-            r.createTime ? new Date(r.createTime) : new Date();
-          const updateTime: Date =
-            r.updateTime ? new Date(r.updateTime) : createTime;
-
-          // --- UPSERT respetando tu unique (company_id, google_review_id) ---
-          await prisma.google_gbp_reviews.upsert({
-            where: {
-              company_id_google_review_id: {
-                company_id: companyId,
-                google_review_id: reviewId,
-              },
-            },
-            create: {
-              company_id: companyId,
-              location_id: loc.location_id ?? null,
-              gbp_location_id: loc.id,
-              google_review_id: reviewId,
-              resource_name: resourceName,
-              reviewer_display_name: reviewerName ?? undefined,
-              reviewer_profile_photo_url: reviewerPhoto ?? undefined,
-              star_rating: starRating,
-              comment: comment ?? undefined,
-              create_time: createTime,
-              update_time: updateTime,
-              average_rating: averageRating ?? undefined,
-              total_review_count: totalReviewCount ?? undefined,
-            },
-            update: {
-              location_id: loc.location_id ?? null,
-              gbp_location_id: loc.id,
-              resource_name: resourceName,
-              reviewer_display_name: reviewerName ?? undefined,
-              reviewer_profile_photo_url: reviewerPhoto ?? undefined,
-              star_rating: starRating,
-              comment: comment ?? undefined,
-              create_time: createTime,
-              update_time: updateTime,
-              average_rating: averageRating ?? undefined,
-              total_review_count: totalReviewCount ?? undefined,
-            },
+        do {
+          const { reviews, nextPageToken } = await listGbpReviewsForLocation({
+            locationResourceName,
+            accessToken,
+            pageToken,
           });
 
-          upsertedForLoc += 1;
-        }
+          for (const rev of reviews) {
+            totalReviews += 1;
 
-        if (typeof data.nextPageToken === "string" && data.nextPageToken) {
-          pageToken = data.nextPageToken;
-        } else {
-          break;
-        }
+            const resourceName: string =
+              typeof rev.name === "string" ? rev.name : "";
+            if (!resourceName) {
+              continue;
+            }
+
+            // google_review_id: usamos reviewId si viene, si no el resourceName
+            const googleReviewId: string =
+              typeof rev.reviewId === "string" && rev.reviewId.trim().length > 0
+                ? rev.reviewId.trim()
+                : resourceName;
+
+            // star_rating es STRING en el modelo
+            let starRating: string = "STAR_RATING_UNSPECIFIED";
+            if (typeof rev.starRating === "string") {
+              starRating = rev.starRating;
+            } else if (typeof rev.starRating === "number") {
+              starRating = String(rev.starRating);
+            }
+
+            const comment: string | null =
+              typeof rev.comment === "string" && rev.comment.trim().length > 0
+                ? rev.comment.trim()
+                : null;
+
+
+            const reviewerDisplayName: string | null =
+              typeof rev.reviewer?.displayName === "string"
+                ? rev.reviewer.displayName
+                : null;
+
+            const reviewerProfilePhotoUrl: string | null =
+              typeof rev.reviewer?.profilePhotoUrl === "string"
+                ? rev.reviewer.profilePhotoUrl
+                : null;
+
+            const createTimeStr: string | null =
+              typeof rev.createTime === "string" ? rev.createTime : null;
+            const updateTimeStr: string | null =
+              typeof rev.updateTime === "string" ? rev.updateTime : null;
+
+            const now = new Date();
+
+            const createTime =
+              createTimeStr && !Number.isNaN(Date.parse(createTimeStr))
+                ? new Date(createTimeStr)
+                : now;
+
+            const updateTime =
+              updateTimeStr && !Number.isNaN(Date.parse(updateTimeStr))
+                ? new Date(updateTimeStr)
+                : now;
+
+            const record = await tx.google_gbp_reviews.upsert({
+              where: {
+                company_id_google_review_id: {      // <-- ESTE es el bueno
+                  company_id: companyId,
+                  google_review_id: googleReviewId,
+                },
+              },
+              create: {
+                company_id: companyId,
+                location_id: null,
+                gbp_location_id: loc.id,
+                google_review_id: googleReviewId,
+                resource_name: resourceName,
+                reviewer_display_name: reviewerDisplayName ?? undefined,
+                reviewer_profile_photo_url: reviewerProfilePhotoUrl ?? undefined,
+                star_rating: starRating,
+                comment: comment ?? undefined,
+                create_time: createTime,
+                update_time: updateTime,
+                average_rating: null,
+                total_review_count: null,
+                created_at: now,
+                updated_at: now,
+              },
+              update: {
+                location_id: null,
+                gbp_location_id: loc.id,
+                resource_name: resourceName,
+                reviewer_display_name: reviewerDisplayName ?? undefined,
+                reviewer_profile_photo_url: reviewerProfilePhotoUrl ?? undefined,
+                star_rating: starRating,
+                comment: comment ?? undefined,
+                create_time: createTime,
+                update_time: updateTime,
+                updated_at: now,
+              },
+            });
+
+
+            if (record) {
+              upsertedCount += 1;
+            }
+          }
+
+          pageToken = nextPageToken;
+        } while (pageToken);
       }
-
-      totalUpserted += upsertedForLoc;
-      perLocation.push({
-        gbpLocationId: loc.id,
-        google_location_id: loc.google_location_id,
-        upserted: upsertedForLoc,
-      });
-    }
+    });
 
     return NextResponse.json({
       ok: true,
-      synced: {
-        locations: gbpLocations.length,
-        reviewsUpserted: totalUpserted,
-        perLocation,
-      },
+      totalLocations: locations.length,
+      totalReviews,
+      upserted: upsertedCount,
     });
   } catch (err) {
-    console.error("[GBP][reviews] unexpected error:", err);
+    console.error("[GBP][sync/reviews] unexpected error:", err);
     return NextResponse.json(
       { ok: false, error: "unexpected_error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

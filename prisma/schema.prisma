@@ -5,6 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 /// *
@@ -123,6 +124,7 @@ model ExternalConnection {
   accountName         String?
   providerUserId      String?
   scope               String?
+  status              String                @default("active")
   User                User                  @relation(fields: [userId], references: [id])
   Location            Location[]
   google_gbp_account  google_gbp_account[]
@@ -169,8 +171,7 @@ model Company {
   stripeSubscriptionId        String?
   agentSettings               Json?
   voiceAgentId                String?
-  account_id                  String                         @db.Uuid
-
+  account_id                  String                        @db.Uuid
   Agents                      Agent[]
   AgentSessions               AgentSession[]
   voiceAgent                  VoiceAgent?                   @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id])
@@ -1777,7 +1778,7 @@ model ShiftEvent {
 model google_gbp_account {
   id                     String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   company_id             String
-  external_connection_id String
+  external_connection_id String?
   google_account_id      String
   google_account_name    String?
   status                 String                @default("active")
@@ -1785,7 +1786,7 @@ model google_gbp_account {
   created_at             DateTime              @default(now()) @db.Timestamptz(6)
   updated_at             DateTime              @default(now()) @db.Timestamptz(6)
   Company                Company               @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_google_gbp_account_company")
-  ExternalConnection     ExternalConnection    @relation(fields: [external_connection_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_google_gbp_account_extconn")
+  ExternalConnection     ExternalConnection?   @relation(fields: [external_connection_id], references: [id], onUpdate: NoAction, map: "fk_google_gbp_account_extconn")
   google_gbp_location    google_gbp_location[]
 
   @@unique([company_id, google_account_id], map: "ux_google_gbp_account_company_google")
@@ -1797,7 +1798,7 @@ model google_gbp_location {
   id                     String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   company_id             String
   account_id             String               @db.Uuid
-  external_connection_id String
+  external_connection_id String?
   google_location_id     String
   google_location_title  String?
   google_place_id        String?
@@ -1824,7 +1825,7 @@ model google_gbp_location {
   is_active              Boolean              @default(false)
   google_gbp_account     google_gbp_account   @relation(fields: [account_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_loc_account")
   Company                Company              @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_loc_company")
-  ExternalConnection     ExternalConnection   @relation(fields: [external_connection_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_loc_extconn")
+  ExternalConnection     ExternalConnection?  @relation(fields: [external_connection_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_loc_extconn")
   Location               Location?            @relation(fields: [location_id], references: [id], onUpdate: NoAction, map: "fk_gbp_loc_location")
   google_gbp_reviews     google_gbp_reviews[]
 
@@ -1883,8 +1884,8 @@ enum LeadStatus {
 enum OnboardingStatus {
   PENDING
   IN_PROGRESS
-  REQUEST_SENT
   COMPLETED
+  REQUEST_SENT
 }
 
 enum LeadSource {
