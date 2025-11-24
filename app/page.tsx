@@ -34,35 +34,66 @@ export default function MarketingLandingPage() {
   return (
     <div className="min-h-screen bg-white text-black">
       {/* Header */}
-      <header className="border-b border-gray-200">
+      <header className="border-b border-gray-800 bg-[#0F1117] text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+
+          {/* Logo */}
           <Link
             href="/"
-            className="text-xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent"
+            className="text-xl font-bold bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent hover:opacity-90 transition"
           >
             Crussader
           </Link>
 
-          <nav className="hidden gap-6 text-sm text-gray-600 md:flex">
-            <a href="#features" className="hover:text-gray-900">Características</a>
-            <a href="#how" className="hover:text-gray-900">Cómo funciona</a>
-            <a href="#contact" className="hover:text-gray-900">Contacto</a>
+          {/* Navigation */}
+          <nav className="hidden gap-8 text-sm md:flex">
+            <a
+              href="#features"
+              className="text-gray-300 hover:text-white transition-colors"
+            >
+              Características
+            </a>
+            <a
+              href="#how"
+              className="text-gray-300 hover:text-white transition-colors"
+            >
+              Cómo funciona
+            </a>
+            <a
+              href="#contact"
+              className="text-gray-300 hover:text-white transition-colors"
+            >
+              Contacto
+            </a>
           </nav>
 
+          {/* Buttons */}
           <div className="flex gap-3">
-            <Link href={isLoggedIn ? "/dashboard" : `/auth/login?next=${nextDashboard}`}>
-              <Button variant="outline" className="border-gray-300">
+            {/* Login / Dashboard */}
+            <Link
+              href={isLoggedIn ? "/dashboard" : `/auth/login?next=${nextDashboard}`}
+            >
+              <Button
+                variant="outline"
+                className="border-gray-600 text-gray-200 hover:bg-gray-800 hover:text-white transition-colors"
+              >
                 {isLoggedIn ? "Ir al Dashboard" : "Iniciar sesión"}
               </Button>
             </Link>
+
+            {/* Register */}
             {!isLoggedIn && (
               <Link href={`/auth/register?next=${nextDashboard}`}>
-                <Button className="bg-violet-600 hover:bg-violet-700">Registrarse</Button>
+                <Button className="bg-violet-600 text-white hover:bg-violet-700 transition-colors">
+                  Registrarse
+                </Button>
               </Link>
             )}
           </div>
+
         </div>
       </header>
+
 
       {/* Hero */}
       <section className="px-4 py-16 text-center">

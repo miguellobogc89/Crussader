@@ -9,5 +9,6 @@
   "tailwindCSS.experimental.configFile": "tailwind.config.ts",
 
   // (Solo si sigue marcando @tailwind) silencia ese warning del LSP de CSS
-  "css.lint.unknownAtRules": "ignore"
+  "css.lint.unknownAtRules": "ignore",
+  "prisma.pinToPrisma6": true
 }
