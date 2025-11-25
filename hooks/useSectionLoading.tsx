@@ -2,34 +2,31 @@
 "use client";
 
 import { useState } from "react";
+import Spinner from "@/app/components/crussader/UX/Spinner";
 
 export function useSectionLoading(initial = false) {
   const [loading, setLoading] = useState(initial);
 
   const SectionWrapper = ({
     children,
-    topPadding = "pt-10",
-    minH = "min-h-[50vh]",
+    topPadding = "pt-6 sm:pt-10",
   }: {
     children: React.ReactNode;
     topPadding?: string;
-    minH?: string;
-  }) => (
-    <div className={`relative ${minH}`}>
-      {loading && (
-        <div className={`pointer-events-none absolute inset-0 z-10 bg-background/40 backdrop-blur-sm ${topPadding}`}>
-          <div className="flex w-full justify-center">
-            <div
-              role="status"
-              aria-label="Cargando"
-              className="inline-flex h-10 w-10 animate-spin items-center justify-center rounded-full border-2 border-muted-foreground/40 border-t-foreground"
-            />
+  }) => {
+    if (loading) {
+      return (
+        <div className={`w-full ${topPadding}`}>
+          <div className="flex w-full justify-center py-10">
+            {/* 👉 Spinner estándar Crussader */}
+            <Spinner centered size={48} color="#6366f1" />
           </div>
         </div>
-      )}
-      <div className={loading ? "blur-[1px]" : ""}>{children}</div>
-    </div>
-  );
+      );
+    }
+
+    return <div className={`w-full ${topPadding}`}>{children}</div>;
+  };
 
   return { loading, setLoading, SectionWrapper };
 }

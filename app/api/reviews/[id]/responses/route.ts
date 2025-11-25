@@ -11,9 +11,10 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(
   _req: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = context.params;
+  const { id } = await params;
+
   if (!id) {
     return NextResponse.json(
       { ok: false, error: "id requerido" },
@@ -26,12 +27,13 @@ export async function GET(
     orderBy: [
       { published: "desc" },
       { status: "asc" },
-      { createdAt: "desc" }
+      { createdAt: "desc" },
     ],
   });
 
   return NextResponse.json({ ok: true, responses });
 }
+
 
 /** ---------------- POST ----------------
  * Crear una respuesta:

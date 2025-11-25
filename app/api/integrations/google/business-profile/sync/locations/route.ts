@@ -31,13 +31,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1) ExternalConnection de GBP para esta company (lógica común)
+    // 1) ExternalConnection de GBP para esta company
     const externalConn = await getExternalConnectionForCompany(companyId);
 
     // 2) Access token válido (con refresh si hace falta)
     const accessToken = await getValidAccessToken(externalConn);
 
-    // 3) google_gbp_account para esa conexión (igual que en tu versión)
+    // 3) google_gbp_account para esa conexión
     const gbpAccount = await prisma.google_gbp_account.findFirst({
       where: {
         company_id: companyId,
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        // En select usabas el resource completo como ID
+        // Usamos el resource completo como google_location_id
         const googleLocationId: string = googleLocationName;
 
         const title: string | null = loc.title ?? null;
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
           create: {
             company_id: companyId,
             account_id: accountUuid,
-            external_connection_id: externalConn.id,
+            external_connection_id: externalConn.id, // 👈 SIEMPRE seteado
             google_location_id: googleLocationId,
             google_location_title: title,
             google_place_id: placeId,
@@ -140,6 +140,9 @@ export async function POST(req: NextRequest) {
             metadata,
           },
           update: {
+            // 👇 IMPORTANTE: también aquí, para que nunca quede a null
+            external_connection_id: externalConn.id,
+
             google_location_title: title,
             google_place_id: placeId,
             address: placeName,
@@ -171,7 +174,7 @@ export async function POST(req: NextRequest) {
 
     const upsertedCount = upserted.filter(Boolean).length;
 
-    // 6) Respuesta para el modal: mapeo a GbpLocationWire (igual)
+    // 6) Respuesta para el modal: mapeo a GbpLocationWire
     const locations: GbpLocationWire[] = apiLocations.map((loc: any) => {
       const name: string = typeof loc.name === "string" ? loc.name : "";
       const title: string =
@@ -218,7 +221,7 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    const maxConnectable = 1; // de momento 1
+    const maxConnectable = 1;
 
     return NextResponse.json({
       ok: true,

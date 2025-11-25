@@ -2,17 +2,32 @@
 
 import * as React from "react";
 import { Card, CardContent } from "@/app/components/ui/card";
-import { MapPin, Star, Calendar, Wifi, WifiOff, Store } from "lucide-react";
+import {
+  MapPin,
+  Star,
+  Calendar,
+  Wifi,
+  WifiOff,
+  Store,
+  RotateCcw,
+} from "lucide-react";
 import type { LocationRow } from "@/hooks/useCompanyLocations";
 
 type Props = {
   location: LocationRow;
-  onSync: () => void | Promise<void>; // se mantiene por compatibilidad
-  onConnect?: () => void; // ← usamos este para abrir el modal
+  onConnect?: () => void;
   onDisconnect?: () => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 };
 
-export function LocationCard({ location, onConnect, onDisconnect }: Props) {
+export function LocationCard({
+  location,
+  onConnect,
+  onDisconnect,
+  onRefresh,
+  isRefreshing = false,
+}: Props) {
   const title =
     (location as any).title ??
     (location as any).name ??
@@ -22,13 +37,19 @@ export function LocationCard({ location, onConnect, onDisconnect }: Props) {
     .filter(Boolean)
     .join(", ");
 
+  const googlePlaceId = (location as any).googlePlaceId ?? null;
+  const isLinked = !!googlePlaceId;
+
   const connected = Boolean(
     (location as any).externalConnectionId ||
       (location as any).ExternalConnection?.id ||
       (location as any).googlePlaceId
   );
 
-  const lastSyncAt = (location as any).lastSyncAt as string | Date | undefined;
+  const lastSyncAt = (location as any).lastSyncAt as
+    | string
+    | Date
+    | undefined;
   const lastSyncText = lastSyncAt
     ? new Date(String(lastSyncAt)).toLocaleString()
     : "—";
@@ -52,6 +73,9 @@ export function LocationCard({ location, onConnect, onDisconnect }: Props) {
     null;
 
   const typeLabel = rawTypeName || "Sin tipo";
+
+  const canRefresh = !!onRefresh;
+  const refreshDisabled = !isLinked || !canRefresh || isRefreshing;
 
   return (
     <Card className="relative overflow-hidden hover:shadow-lg transition-all duration-300">
@@ -87,7 +111,7 @@ export function LocationCard({ location, onConnect, onDisconnect }: Props) {
             </div>
           </div>
 
-          {/* Métricas + botón acción */}
+          {/* Métricas + botones acción */}
           <div className="flex items-end justify-between gap-4 flex-wrap">
             <div className="flex flex-col gap-1 text-sm">
               <div className="flex items-center gap-1">
@@ -104,21 +128,47 @@ export function LocationCard({ location, onConnect, onDisconnect }: Props) {
               </div>
             </div>
 
-            {connected ? (
+            <div className="flex items-center gap-2">
+              {isLinked ? (
+                <button
+                  onClick={onDisconnect}
+                  className="px-3 py-1.5 rounded border border-red-200 text-xs text-red-700 hover:bg-red-50 inline-flex items-center gap-1"
+                >
+                  Desvincular
+                </button>
+              ) : (
+                <button
+                  onClick={onConnect}
+                  className="px-3 py-1.5 rounded border text-xs hover:bg-gray-50 inline-flex items-center gap-1"
+                >
+                  Vincular con Google
+                </button>
+              )}
+
+              {/* Botón refrescar, pegado a la derecha */}
               <button
-                onClick={onDisconnect}
-                className="px-3 py-1.5 rounded border border-red-200 text-xs text-red-700 hover:bg-red-50 inline-flex items-center gap-1"
+                type="button"
+                disabled={refreshDisabled}
+                onClick={refreshDisabled ? undefined : onRefresh}
+                className={`h-8 w-8 inline-flex items-center justify-center rounded-full border text-xs transition
+                  ${
+                    refreshDisabled
+                      ? "border-gray-200 text-gray-300 cursor-not-allowed bg-gray-50"
+                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                title={
+                  isLinked
+                    ? "Actualizar reseñas"
+                    : "Vincula la ubicación para refrescar reseñas"
+                }
               >
-                Desvincular
+                <RotateCcw
+                  className={`h-4 w-4 ${
+                    isRefreshing ? "animate-spin" : ""
+                  }`}
+                />
               </button>
-            ) : (
-              <button
-                onClick={onConnect}
-                className="px-3 py-1.5 rounded border text-xs hover:bg-gray-50 inline-flex items-center gap-1"
-              >
-                Vincular con Google
-              </button>
-            )}
+            </div>
           </div>
         </div>
       </CardContent>

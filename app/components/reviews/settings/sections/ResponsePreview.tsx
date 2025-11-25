@@ -1,27 +1,73 @@
-// app/components/reviews/settingsRsections/ResponsePreview.tsx
+// app/components/reviews/sections/ResponsePreview.tsx
 "use client";
 
 import { useMemo, useState } from "react";
 import { Star, Sparkles } from "lucide-react";
 import PromptPreviewBanner from "@/app/components/reviews/settings/PromptPreviewBanner";
+import Spinner from "@/app/components/crussader/UX/Spinner";
+import type { ResponseSettings } from "@/app/schemas/response-settings";
 
 type StarPick = 1 | 3 | 5;
 
 type Props = {
   /** Estado local de settings que se va actualizando con los sliders/toggles del panel */
-  settings: Record<string, any>;
+  settings: ResponseSettings;
 };
 
 export default function ResponsePreview({ settings }: Props) {
   const [stars, setStars] = useState<StarPick>(5);
 
+  const [reply, setReply] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const reviewText = useMemo(() => {
-    if (stars <= 1)
+    if (stars <= 1) {
       return "La experiencia no fue buena. El helado estaba derretido y la espera fue larga.";
-    if (stars === 3)
+    }
+    if (stars === 3) {
       return "Estuvo bien en general, aunque el servicio podría ser un poco más rápido.";
-    return "¡Los helados son increíbles! El de pistacho es mi favorito. El servicio fue excelente y el lugar está muy limpio.";
+    }
+    return "¡Los helados son increíbles! El de piiiiistacho es mi favorito. El servicio fue excelente y el lugar está muy limpio.";
   }, [stars]);
+
+  async function handleGenerate() {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/reviews/preview-response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          stars,
+          reviewText,
+          settings,
+        }),
+      });
+
+      const json = await res.json().catch(() => ({} as any));
+
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || `Error ${res.status}`);
+      }
+
+      const text: string =
+        json.text ??
+        json.responseText ??
+        json.response ??
+        "";
+
+      setReply(text || "La IA no devolvió contenido de respuesta.");
+    } catch (e) {
+      console.error("Error generando preview de respuesta", e);
+      setError("No se pudo generar la respuesta. Inténtalo de nuevo.");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -69,7 +115,7 @@ export default function ResponsePreview({ settings }: Props) {
               </p>
             </div>
 
-            {/* Selector */}
+            {/* Selector de valoración */}
             <div className="mt-4 flex items-center justify-start gap-2">
               <label
                 htmlFor="star-pick"
@@ -105,28 +151,36 @@ export default function ResponsePreview({ settings }: Props) {
                 </span>
               </div>
 
-              <p className="text-[13px] sm:text-sm leading-7 text-foreground/90">
-                <span className="font-medium">¡Muchas gracias María por tu reseña!</span>{" "}
-                {stars >= 5 ? "😊" : stars === 3 ? "🙂" : "🙏"}{" "}
-                {stars >= 5
-                  ? "Nos alegra enormemente saber que disfrutaste nuestros helados, especialmente el de pistacho. Tu satisfacción es nuestra mayor recompensa."
-                  : stars === 3
-                  ? "Nos alegra saber que tu visita fue buena, y tomamos nota para mejorar el servicio."
-                  : "Lamentamos que esta vez no hayamos estado a la altura; lo sentimos y queremos solucionarlo. Tu satisfacción es nuestra prioridad."}
-              </p>
-
-              <p className="mt-4 text-[13px] sm:text-sm text-foreground/80">
-                — Equipo Heladería Brumazul
-              </p>
+              <div className="text-[13px] sm:text-sm leading-7 text-foreground/90 whitespace-pre-wrap">
+                {isGenerating ? (
+                  <div className="py-4">
+                    <Spinner size={24} speed={2.2} color="#6366f1" centered />
+                  </div>
+                ) : error ? (
+                  <span className="text-xs text-red-600">{error}</span>
+                ) : reply ? (
+                  reply
+                ) : (
+                  <>
+                    <span className="font-medium">
+                      Pulsa “Generar respuesta” para ver un ejemplo con tu configuración actual.
+                    </span>{" "}
+                    La respuesta se generará con la misma tubería de IA que se usa para las reseñas
+                    reales (tono, emojis, firma, CTA, longitud, modelo, etc.).
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Botón */}
             <div className="mt-4 flex justify-end">
               <button
                 type="button"
-                className="text-xs font-medium rounded-full px-3 py-2 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white hover:opacity-90"
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                className="text-xs font-medium rounded-full px-3 py-2 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white hover:opacity-90 disabled:opacity-60"
               >
-                Generar respuesta
+                {isGenerating ? "Generando…" : reply ? "Regenerar respuesta" : "Generar respuesta"}
               </button>
             </div>
           </div>

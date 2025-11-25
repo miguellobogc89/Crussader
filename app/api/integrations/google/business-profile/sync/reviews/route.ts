@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
         totalLocations: 0,
         totalReviews: 0,
         upserted: 0,
+        repliesUpdated: 0,
       });
     }
 
@@ -84,6 +85,7 @@ export async function POST(req: NextRequest) {
 
     let totalReviews = 0;
     let upsertedCount = 0;
+    let repliesUpdated = 0;
 
     // 4) Transaction para upserts de TODAS las reviews
     await prisma.$transaction(async (tx) => {
@@ -131,7 +133,6 @@ export async function POST(req: NextRequest) {
                 ? rev.comment.trim()
                 : null;
 
-
             const reviewerDisplayName: string | null =
               typeof rev.reviewer?.displayName === "string"
                 ? rev.reviewer.displayName
@@ -159,9 +160,34 @@ export async function POST(req: NextRequest) {
                 ? new Date(updateTimeStr)
                 : now;
 
+            // --- NUEVO: datos de la respuesta (reviewReply) ---
+            let replyComment: string | null = null;
+            let replyUpdateTime: Date | null = null;
+
+            if (rev.reviewReply) {
+              if (
+                typeof rev.reviewReply.comment === "string" &&
+                rev.reviewReply.comment.trim().length > 0
+              ) {
+                replyComment = rev.reviewReply.comment.trim();
+              }
+
+              const replyUpdateStr: string | null =
+                typeof rev.reviewReply.updateTime === "string"
+                  ? rev.reviewReply.updateTime
+                  : null;
+
+              if (
+                replyUpdateStr &&
+                !Number.isNaN(Date.parse(replyUpdateStr))
+              ) {
+                replyUpdateTime = new Date(replyUpdateStr);
+              }
+            }
+
             const record = await tx.google_gbp_reviews.upsert({
               where: {
-                company_id_google_review_id: {      // <-- ESTE es el bueno
+                company_id_google_review_id: {
                   company_id: companyId,
                   google_review_id: googleReviewId,
                 },
@@ -173,13 +199,16 @@ export async function POST(req: NextRequest) {
                 google_review_id: googleReviewId,
                 resource_name: resourceName,
                 reviewer_display_name: reviewerDisplayName ?? undefined,
-                reviewer_profile_photo_url: reviewerProfilePhotoUrl ?? undefined,
+                reviewer_profile_photo_url:
+                  reviewerProfilePhotoUrl ?? undefined,
                 star_rating: starRating,
                 comment: comment ?? undefined,
                 create_time: createTime,
                 update_time: updateTime,
                 average_rating: null,
                 total_review_count: null,
+                reply_comment: replyComment ?? undefined,
+                reply_update_time: replyUpdateTime ?? undefined,
                 created_at: now,
                 updated_at: now,
               },
@@ -188,18 +217,23 @@ export async function POST(req: NextRequest) {
                 gbp_location_id: loc.id,
                 resource_name: resourceName,
                 reviewer_display_name: reviewerDisplayName ?? undefined,
-                reviewer_profile_photo_url: reviewerProfilePhotoUrl ?? undefined,
+                reviewer_profile_photo_url:
+                  reviewerProfilePhotoUrl ?? undefined,
                 star_rating: starRating,
                 comment: comment ?? undefined,
                 create_time: createTime,
                 update_time: updateTime,
+                reply_comment: replyComment ?? undefined,
+                reply_update_time: replyUpdateTime ?? undefined,
                 updated_at: now,
               },
             });
 
-
             if (record) {
               upsertedCount += 1;
+              if (replyComment || replyUpdateTime) {
+                repliesUpdated += 1;
+              }
             }
           }
 
@@ -213,6 +247,7 @@ export async function POST(req: NextRequest) {
       totalLocations: locations.length,
       totalReviews,
       upserted: upsertedCount,
+      repliesUpdated,
     });
   } catch (err) {
     console.error("[GBP][sync/reviews] unexpected error:", err);

@@ -7,9 +7,9 @@ export const runtime = "nodejs";
 
 export async function POST(
   req: NextRequest,
-  context: { params: { locationId: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const locationId = context.params.locationId;
+  const { id: locationId } = await params;
 
   if (!locationId) {
     return NextResponse.json(
@@ -72,7 +72,7 @@ export async function POST(
       });
     }
 
-    // 4) (Opcional pero útil) Marcar también la location_id en la tabla de GBP
+    // 4) Marcar la location_id también en la tabla de GBP (útil)
     await prisma.google_gbp_reviews.updateMany({
       where: {
         company_id: companyId,
@@ -100,7 +100,6 @@ export async function POST(
           ? ratingMap[r.star_rating]
           : null;
 
-      // Si no tenemos rating interpretable, la ignoramos
       if (rating === null) {
         console.warn(
           "[sync-reviews] review sin rating válido, se omite",
@@ -109,6 +108,17 @@ export async function POST(
         );
         continue;
       }
+
+      const cleanComment =
+        typeof r.comment === "string" && r.comment.trim().length > 0
+          ? r.comment.trim()
+          : null;
+
+      console.log("[sync-reviews] DEBUG REVIEW", {
+        google_review_id: r.google_review_id,
+        comment_original: r.comment,
+        comment_clean: cleanComment,
+      });
 
       await prisma.review.upsert({
         where: {
@@ -126,8 +136,8 @@ export async function POST(
           reviewerPhoto: r.reviewer_profile_photo_url ?? null,
           reviewerAnon: false,
           rating,
-          comment: r.comment ?? null,
-          languageCode: null, // en google_gbp_reviews no tenemos language_code
+          comment: cleanComment,
+          languageCode: null,
           createdAtG: r.create_time,
           updatedAtG: r.update_time,
         },
@@ -137,7 +147,7 @@ export async function POST(
           reviewerName: r.reviewer_display_name ?? null,
           reviewerPhoto: r.reviewer_profile_photo_url ?? null,
           rating,
-          comment: r.comment ?? null,
+          comment: cleanComment,
           updatedAtG: r.update_time,
         },
       });

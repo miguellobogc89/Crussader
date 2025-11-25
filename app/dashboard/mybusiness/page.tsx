@@ -81,11 +81,14 @@ export default function MyBusinessPage() {
   const [locsLoading, setLocsLoading] = React.useState(false);
   const [locsError, setLocsError] = React.useState<string | null>(null);
 
+  // location que abre el modal de vincular
+  const [linkLocationId, setLinkLocationId] = React.useState<string | null>(null);
+
+  // location que se está refrescando (para el spinner)
+  const [refreshingLocationId, setRefreshingLocationId] = React.useState<string | null>(null);
+
   // auto-open modal create una sola vez si no hay empresa
   const openedOnceRef = React.useRef(false);
-
-  // vincular Google Location -> solo guardamos la location actual
-  const [linkLocationId, setLinkLocationId] = React.useState<string | null>(null);
 
   // Carga inicial: primera empresa + detalles
   React.useEffect(() => {
@@ -251,21 +254,27 @@ export default function MyBusinessPage() {
     }
   }
 
-  async function handleSync(locationId: string) {
+  async function refreshReviews(locationId: string) {
     try {
-      const res = await fetch(`/api/locations/${locationId}/sync`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: "manual" }),
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        alert(j?.error || `Sync falló (${res.status})`);
+      setRefreshingLocationId(locationId);
+
+      const res = await fetch(
+        `/api/mybusiness/locations/${locationId}/refresh-reviews`,
+        { method: "POST" },
+      );
+
+      const j = await res.json().catch(() => ({}));
+
+      if (!res.ok || !j?.ok) {
+        alert(j?.error || `Error al refrescar reviews (${res.status})`);
         return;
       }
+
       await loadLocations();
     } catch (e: any) {
       alert(e?.message || String(e));
+    } finally {
+      setRefreshingLocationId(null);
     }
   }
 
@@ -362,9 +371,10 @@ export default function MyBusinessPage() {
                   <LocationCard
                     key={(loc as any).id}
                     location={loc}
-                    onSync={() => handleSync((loc as any).id)}
                     onConnect={() => handleConnect(loc)}
                     onDisconnect={() => handleDisconnect(loc)}
+                    onRefresh={() => refreshReviews((loc as any).id)}
+                    isRefreshing={refreshingLocationId === (loc as any).id}
                   />
                 ))}
               </div>
@@ -388,15 +398,12 @@ export default function MyBusinessPage() {
           locationId={linkLocationId ?? ""}
           onClose={() => setLinkLocationId(null)}
           onCompanyResolved={(cid) => {
-            // Solo para debug por ahora, sin lógica extra en la page
             console.log("CompanyId resuelto en modal:", cid);
           }}
           onLinked={async () => {
-            // refrescamos las locations de la empresa al terminar de vincular
             await loadLocations();
           }}
         />
-
       </PageShell>
     </>
   );

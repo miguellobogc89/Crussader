@@ -16,6 +16,7 @@ import {
 
 import Header from "./Header";
 import PanelSections from "./PanelSections";
+import SettingsChips from "./SettingsChips";
 
 import type { ResponseSettings } from "@/app/schemas/response-settings";
 import { defaultResponseSettings } from "@/app/schemas/default-response-settings";
@@ -113,7 +114,7 @@ export default function ReviewsSettingsPanel() {
   const [settings, setSettings] = useState<ResponseSettings>({
     ...defaultResponseSettings,
     sector: "",
-    standardSignature: "— Equipo Heladería Brumazul", // corregiremos la duplicidad en el siguiente paso
+    standardSignature: "— Añade aquí tu firma desde configuración",
     treatment: "tu",
     tone: 3,
     emojiIntensity: 1,
@@ -129,9 +130,12 @@ export default function ReviewsSettingsPanel() {
     creativity: 0.6,
     maxCharacters: 300,
   });
+  const [hasChanges, setHasChanges] = useState(false);
 
-  const onUpdate = (updates: Partial<ResponseSettings>) =>
-    setSettings((prev) => ({ ...prev, ...updates }));
+const onUpdate = (updates: Partial<ResponseSettings>) => {
+  setSettings((prev) => ({ ...prev, ...updates }));
+  setHasChanges(true);
+};
 
   // Altura disponible
   useLayoutEffect(() => {
@@ -148,16 +152,16 @@ export default function ReviewsSettingsPanel() {
     };
   }, []);
 
-  const MENU_ITEMS: MenuItem[] = [
-    { label: "Preview", value: "preview", icon: Eye },
-    { label: "General", value: "general", icon: SlidersHorizontal },
-    { label: "Idioma", value: "language", icon: Languages },
-    { label: "Reglas por estrellas", value: "stars", icon: Sparkles },
-    { label: "Canales / CTA", value: "channels", icon: Globe },
-    { label: "Políticas", value: "policies", icon: ShieldCheck },
-    { label: "Publicación", value: "publishing", icon: UserCheck },
-    { label: "Modelo (IA)", value: "model", icon: Cpu },
-  ];
+const MENU_ITEMS: MenuItem[] = [
+  { label: "Preview", value: "preview", icon: Eye },
+  { label: "General", value: "general", icon: SlidersHorizontal },
+  { label: "Publicación", value: "publishing", icon: UserCheck },
+  { label: "Reglas por estrellas", value: "stars", icon: Sparkles },
+  { label: "Canales / CTA", value: "channels", icon: Globe },
+  { label: "Políticas", value: "policies", icon: ShieldCheck },
+  { label: "Idioma", value: "language", icon: Languages },
+  { label: "Modelo (IA)", value: "model", icon: Cpu },
+];
 
   const scrollTo = (id: string) => {
     const scroller = scrollRef.current;
@@ -174,7 +178,7 @@ export default function ReviewsSettingsPanel() {
     });
   };
 
-  // Sincroniza menú con sección visible
+  // Sincroniza menú con sección visible (la más cercana al borde superior)
   useEffect(() => {
     const scroller = scrollRef.current;
     if (!scroller) return;
@@ -186,27 +190,44 @@ export default function ReviewsSettingsPanel() {
 
     const io = new IntersectionObserver(
       (entries) => {
-        let best: { id: string; score: number } | null = null;
-        for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          const rect = (e.target as HTMLElement).getBoundingClientRect();
-          const root = scroller.getBoundingClientRect();
-          const centerDist = Math.abs(
-            (rect.top + rect.height / 2) - (root.top + root.height / 2)
-          );
-          const score = 1 / (1 + centerDist);
-          const id = (e.target as HTMLElement).id;
-          if (!best || score > best.score) best = { id, score };
+        let bestId: string | null = null;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        const rootRect = scroller.getBoundingClientRect();
+
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+
+          const el = entry.target as HTMLElement;
+          const rect = el.getBoundingClientRect();
+
+          // Distancia desde el top de la sección al top del scroller
+          const distanceTop = rect.top - rootRect.top;
+
+          // Si el título ya ha pasado por arriba, lo ignoramos como candidato
+          if (distanceTop < 0) continue;
+
+          if (distanceTop < bestDistance) {
+            bestDistance = distanceTop;
+            bestId = el.id;
+          }
         }
-        if (best && best.id && best.id !== active) setActive(best.id);
+
+        if (bestId && bestId !== active) {
+          setActive(bestId);
+        }
       },
-      { root: scroller, rootMargin: "-10% 0% -10% 0%", threshold: [0.1, 0.25, 0.5, 0.75] }
+      {
+        root: scroller,
+        threshold: [0, 0.1],
+        rootMargin: "0px 0px -60% 0px",
+      }
     );
 
     sections.forEach((el) => io.observe(el));
     return () => io.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   // Inicializa companyId y sector desde boot
   useEffect(() => {
@@ -254,7 +275,9 @@ export default function ReviewsSettingsPanel() {
       }
 
       if (json.settings) setSettings(json.settings);
+      setHasChanges(false);
       setSaving(false);
+
     } catch (e) {
       console.error("Save settings exception", e);
       alert("No se pudo guardar (network/JS error). Revisa la consola.");
@@ -266,7 +289,7 @@ export default function ReviewsSettingsPanel() {
     <div
       ref={rootRef}
       style={{ height: availH ? `${availH}px` : undefined }}
-      className="relative overflow-hidden bg-white border rounded-xl"
+      className="relative overflow-hidden bg-white rounded-xl"
     >
       {/* Grid principal */}
       <div className="h-full min-h-0 w-full grid grid-cols-[220px_1px_1fr]">
@@ -314,16 +337,14 @@ export default function ReviewsSettingsPanel() {
 
         {/* Columna derecha */}
         <div className="h-full min-h-0 flex flex-col">
-          {/* Header fijo */}
-          <Header settings={settings} onSave={handleSave} saving={saving} />
+          {/* Header fijo (solo botón guardar) */}
+          <Header
+          settings={settings}
+          onSave={handleSave}
+          saving={saving}
+          hasChanges={hasChanges}
+        />
 
-          {/* 🔎 Info bar visible: Tipo de negocio (sector) */}
-          <div className="px-4 py-2 text-xs border-b bg-muted/30">
-            <span className="text-foreground font-medium">Tipo de negocio:</span>{" "}
-            <span className="text-muted-foreground">
-              {sectorLabel && sectorLabel.length > 0 ? sectorLabel : "—"}
-            </span>
-          </div>
 
           {/* Scroller principal */}
           <main
@@ -336,6 +357,11 @@ export default function ReviewsSettingsPanel() {
               overscrollBehavior: "contain",
             }}
           >
+            {/* 🔹 Chips de resumen al inicio de la primera sección */}
+            <div className="px-6 pt-4 pb-3 border-b border-slate-100 bg-background">
+              <SettingsChips settings={settings} />
+            </div>
+
             <PanelSections settings={settings} onUpdate={onUpdate} />
           </main>
         </div>

@@ -64,7 +64,7 @@ export default function ReviewsLayout({ children }: { children: React.ReactNode 
         </div>
       }
     >
-      <div className="mx-auto w-full max-w-screen-2xl px-3 sm:px-6">
+      <div className="mx-auto w-full max-w-screen-2xl bg-white rounded-xl shadow-sm border">
         {children}
       </div>
     </PageShell>

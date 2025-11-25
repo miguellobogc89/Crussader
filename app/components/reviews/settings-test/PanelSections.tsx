@@ -7,11 +7,11 @@ import type { ResponseSettings } from "@/app/schemas/response-settings";
 // Cuerpos de sección (solo controles)
 import ResponsePreview from "@/app/components/reviews/settings/sections/ResponsePreview"; // ⚠️ usa tu ruta real
 import { BrandIdentitySection } from "@/app/components/reviews/settings/sections/BrandIdentitySection";
-import { LanguageSection } from "@/app/components/reviews/settings/sections/LanguageSection";
+import { PublishingSection } from "@/app/components/reviews/settings/sections/PublishingSection";
 import { StarRulesSection } from "@/app/components/reviews/settings/sections/StarRulesSection";
 import { ChannelsCtaSection } from "@/app/components/reviews/settings/sections/ChannelsCtaSection";
 import { PoliciesSection } from "@/app/components/reviews/settings/sections/PoliciesSection";
-import { PublishingSection } from "@/app/components/reviews/settings/sections/PublishingSection";
+import { LanguageSection } from "@/app/components/reviews/settings/sections/LanguageSection";
 import { ModelAiSection } from "@/app/components/reviews/settings/sections/ModelAiSection";
 
 // Iconos para headers
@@ -54,15 +54,16 @@ export default function PanelSections({
         <BrandIdentitySection settings={settings} onUpdate={onUpdate} />
       </SectionLayout>
 
-      {/* 2) Idioma */}
+      {/* 2) Publicación */}
       <SectionLayout
-        id="language"
-        title="Idioma"
-        subtitle="Idioma por defecto y autodetección para responder según la reseña."
-        icon={Languages}
+        id="publishing"
+        title="Publicación"
+        subtitle="Activa la autopublicación por umbral de estrellas y configura notificaciones."
+        icon={UserCheck}
       >
-        <LanguageSection settings={settings} onUpdate={onUpdate} />
+        <PublishingSection settings={settings} onUpdate={onUpdate} />
       </SectionLayout>
+
 
       {/* 3) Reglas por estrellas */}
       <SectionLayout
@@ -74,12 +75,15 @@ export default function PanelSections({
         <StarRulesSection settings={settings} onUpdate={onUpdate} />
       </SectionLayout>
 
+
       {/* 4) Canales / CTA */}
       <SectionLayout
         id="channels"
         title="Canales / CTA"
         subtitle="Canal y texto de llamada a la acción para cada rango de estrellas."
         icon={Globe}
+        pending
+        muted
       >
         <ChannelsCtaSection settings={settings} onUpdate={onUpdate} />
       </SectionLayout>
@@ -90,19 +94,24 @@ export default function PanelSections({
         title="Políticas y guardarraíles"
         subtitle="Frases prohibidas y restricciones para cumplir con normativa y buenas prácticas."
         icon={ShieldCheck}
+        pending
+        muted
       >
         <PoliciesSection settings={settings} onUpdate={onUpdate} />
       </SectionLayout>
 
-      {/* 6) Publicación */}
+      {/* 6) Idioma */}
       <SectionLayout
-        id="publishing"
-        title="Publicación"
-        subtitle="Activa la autopublicación por umbral de estrellas y configura notificaciones."
-        icon={UserCheck}
+        id="language"
+        title="Idioma"
+        subtitle="Idioma por defecto y autodetección para responder según la reseña."
+        icon={Languages}
+        pending
+        muted
       >
-        <PublishingSection settings={settings} onUpdate={onUpdate} />
+        <LanguageSection settings={settings} onUpdate={onUpdate} />
       </SectionLayout>
+
 
       {/* 7) Modelo (IA) */}
       <SectionLayout
@@ -110,6 +119,8 @@ export default function PanelSections({
         title="Modelo y creatividad (IA)"
         subtitle="Selecciona el modelo y ajusta la creatividad para las respuestas generadas."
         icon={Cpu}
+        pending
+        muted
       >
         <ModelAiSection settings={settings} onUpdate={onUpdate} />
       </SectionLayout>

@@ -1,3 +1,4 @@
+// app/components/reviews/settings/sections/SectionLayout.tsx
 "use client";
 
 import type { ReactNode } from "react";
@@ -14,6 +15,11 @@ type Props = {
   scrollOffset?: number;
   density?: "comfortable" | "compact";
   className?: string;
+
+  /** Muestra el chip "Pendiente" a la derecha del título (si no se pasa rightSlot) */
+  pending?: boolean;
+  /** Aplica estilo muted + desactiva la interacción de la sección */
+  muted?: boolean;
 };
 
 export default function SectionLayout({
@@ -26,14 +32,36 @@ export default function SectionLayout({
   scrollOffset = 16,
   density = "comfortable",
   className,
+  pending = false,
+  muted = false,
 }: Props) {
   const innerPad = density === "compact" ? "p-4" : "p-5";
+
+  const pendingChip =
+    pending && !rightSlot ? (
+      <div
+        className="
+          inline-flex items-center gap-1.5
+          px-3 py-1.5
+          rounded-lg border border-amber-300 bg-amber-50
+          text-amber-800 text-xs font-medium
+          shadow-sm
+        "
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+        <span>Pendiente</span>
+      </div>
+    ) : null;
 
   return (
     <section
       id={id}
       data-section="true"
-      className={clsx("px-6 pt-5 pb-3", className)}
+      className={clsx(
+        "px-6 pt-5 pb-3",
+        muted && "opacity-60 pointer-events-none",
+        className
+      )}
       style={{ scrollMarginTop: scrollOffset }}
     >
       {/* Header */}
@@ -49,7 +77,10 @@ export default function SectionLayout({
             <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
           ) : null}
         </div>
-        {rightSlot ? <div className="flex items-center">{rightSlot}</div> : null}
+
+        <div className="flex items-center">
+          {rightSlot ?? pendingChip}
+        </div>
       </div>
 
       {/* Cuerpo sin borde */}

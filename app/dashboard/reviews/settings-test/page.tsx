@@ -16,7 +16,6 @@ import {
   Globe,
   UserCheck,
 } from "lucide-react";
-import { ResponsePreviewPanel } from "@/app/components/reviews/settings/sections/ResponsePreviewPanel";
 import type { ResponseSettings } from "@/app/schemas/response-settings";
 
 // Secciones
@@ -161,11 +160,6 @@ export default function ReviewsSettingsPage() {
         >
           {/* Preview (sin sombras; pegado arriba) */}
           <section id="preview" className="px-6 py-4 scroll-mt-4">
-            <ResponsePreviewPanel
-              settings={settings}
-              selectedStar={selectedStar}
-              onStarChange={setSelectedStar}
-            />
           </section>
 
           {/* Secciones mapeadas a cada opción del menú */}

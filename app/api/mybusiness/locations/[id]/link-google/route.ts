@@ -5,7 +5,8 @@ import { prisma } from "@/app/server/db";
 export const runtime = "nodejs";
 
 type Body = {
-  gbpLocationId?: string; // id de google_gbp_location (UUID)
+  // id de google_gbp_location (UUID en tu tabla)
+  gbpLocationId?: string;
 };
 
 function mapStarRatingToInt(star: string | null | undefined): number {
@@ -27,15 +28,14 @@ function mapStarRatingToInt(star: string | null | undefined): number {
 
 export async function POST(
   req: NextRequest,
-  context: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  // 👇 ahora el parámetro dinámico es [id]
-  const { id } = await context.params;
-  const locationId = id;
+  // 👇 hay que AWAIT
+  const { id: locationId } = await params;
 
   if (!locationId) {
     return NextResponse.json(
-      { error: "id (locationId) requerido en la ruta" },
+      { ok: false, error: "missing_location_id" },
       { status: 400 },
     );
   }
@@ -109,15 +109,41 @@ export async function POST(
       );
     }
 
-    // 4) Transacción: enlazar ambas tablas
+    // PlaceId que vamos a intentar guardar
+    const newPlaceId = gbpLoc.google_place_id ?? gbpLoc.place_id ?? null;
+
+    // 4) Transacción: enlazar ambas tablas sin romper el unique(googlePlaceId)
     const result = await prisma.$transaction(async (tx) => {
+      let safePlaceId: string | undefined = undefined;
+
+      if (newPlaceId) {
+        const existing = await tx.location.findUnique({
+          where: { googlePlaceId: newPlaceId },
+          select: { id: true },
+        });
+
+        if (!existing || existing.id === locationId) {
+          safePlaceId = newPlaceId;
+        } else {
+          console.warn(
+            "[mybusiness][link-google] googlePlaceId ya en uso, se omite en update",
+            {
+              newPlaceId,
+              existingLocationId: existing.id,
+              currentLocationId: locationId,
+            },
+          );
+        }
+      }
+
       const updatedLocation = await tx.location.update({
         where: { id: locationId },
         data: {
           googleLocationId: gbpLoc.google_location_id,
-          googlePlaceId: gbpLoc.google_place_id ?? gbpLoc.place_id ?? null,
+          // solo tocamos googlePlaceId si es seguro
+          googlePlaceId: safePlaceId ?? undefined,
           googleAccountId: account.google_account_id,
-          externalConnectionId: gbpLoc.external_connection_id,
+          externalConnectionId: gbpLoc.external_connection_id ?? null,
         },
       });
 
@@ -126,6 +152,7 @@ export async function POST(
         data: {
           location_id: locationId,
           status: "linked",
+          is_active: true,
         },
       });
 
@@ -147,13 +174,40 @@ export async function POST(
     );
 
     if (gbpReviews.length > 0) {
+      // 5.a) Copiamos reviews a la tabla Review (local)
       const reviewRows = gbpReviews
         .map((r) => {
           const ratingInt = mapStarRatingToInt(r.star_rating);
           if (ratingInt <= 0) {
-            // Si no podemos mapear el rating, saltamos la fila
+            console.warn(
+              "[mybusiness][link-google] review sin rating válido, se omite",
+              r.google_review_id,
+              r.star_rating,
+            );
             return null;
           }
+
+          // Comentario original tal y como viene de google_gbp_reviews
+          let comment: string | null =
+            r.comment && r.comment.trim().length > 0
+              ? r.comment.trim()
+              : null;
+
+          // Si viene con "(Translated by Google)", nos quedamos SOLO con la parte anterior
+          if (comment) {
+            const marker = "(Translated by Google)";
+            const idx = comment.indexOf(marker);
+            if (idx >= 0) {
+              comment = comment.slice(0, idx).trimEnd();
+            }
+          }
+
+          console.log(
+            "[mybusiness][link-google] mapeando review",
+            r.google_review_id,
+            "comment_sanitized:",
+            comment,
+          );
 
           return {
             companyId: loc.companyId,
@@ -164,26 +218,26 @@ export async function POST(
             reviewerPhoto: r.reviewer_profile_photo_url ?? null,
             reviewerAnon: r.reviewer_display_name ? false : true,
             rating: ratingInt,
-            comment: r.comment ?? null,
+            comment,
             languageCode: null,
             createdAtG: r.create_time,
             updatedAtG: r.update_time,
           };
         })
         .filter(Boolean) as Array<{
-        companyId: string;
-        locationId: string;
-        provider: "GOOGLE";
-        externalId: string;
-        reviewerName: string | null;
-        reviewerPhoto: string | null;
-        reviewerAnon: boolean;
-        rating: number;
-        comment: string | null;
-        languageCode: string | null;
-        createdAtG: Date | null;
-        updatedAtG: Date | null;
-      }>;
+          companyId: string;
+          locationId: string;
+          provider: "GOOGLE";
+          externalId: string;
+          reviewerName: string | null;
+          reviewerPhoto: string | null;
+          reviewerAnon: boolean;
+          rating: number;
+          comment: string | null;
+          languageCode: string | null;
+          createdAtG: Date | null;
+          updatedAtG: Date | null;
+        }>;
 
       if (reviewRows.length > 0) {
         const insertResult = await prisma.review.createMany({
@@ -198,6 +252,101 @@ export async function POST(
       } else {
         console.log(
           "[mybusiness][link-google] no hay reviews válidas (rating) para insertar",
+        );
+      }
+
+      // 5.b) Crear / actualizar Responses locales a partir de reply_comment
+      const gbpReplies = gbpReviews.filter(
+        (r) => r.reply_comment && r.reply_comment.trim().length > 0,
+      );
+
+      if (gbpReplies.length > 0) {
+        const externalIdsWithReplies = gbpReplies.map(
+          (r) => r.google_review_id,
+        );
+
+        // Buscamos las reviews locales correspondientes a esos google_review_id
+        const localReviews = await prisma.review.findMany({
+          where: {
+            companyId: loc.companyId,
+            locationId: loc.id,
+            provider: "GOOGLE",
+            externalId: { in: externalIdsWithReplies },
+          },
+          select: {
+            id: true,
+            externalId: true,
+          },
+        });
+
+        const reviewIdByExternalId = new Map<string, string>();
+        for (const rev of localReviews) {
+          reviewIdByExternalId.set(rev.externalId, rev.id);
+        }
+
+        for (const r of gbpReplies) {
+          const reviewId = reviewIdByExternalId.get(r.google_review_id);
+          if (!reviewId) continue;
+
+          let replyContent = r.reply_comment?.trim() ?? "";
+          if (!replyContent) continue;
+
+          // Limpieza del "(Translated by Google)" también en la respuesta
+          const marker = "(Translated by Google)";
+          const idx = replyContent.indexOf(marker);
+          if (idx >= 0) {
+            replyContent = replyContent.slice(0, idx).trimEnd();
+          }
+
+          let publishedAt: Date | null = null;
+
+          if (r.reply_update_time instanceof Date) {
+            publishedAt = r.reply_update_time;
+          } else if (
+            r.reply_update_time &&
+            !Number.isNaN(Date.parse(String(r.reply_update_time)))
+          ) {
+            publishedAt = new Date(String(r.reply_update_time));
+          } else {
+            publishedAt = new Date();
+          }
+
+          // ¿Ya existe alguna Response para esta review?
+          const existing = await prisma.response.findFirst({
+            where: { reviewId },
+            orderBy: { createdAt: "desc" },
+          });
+
+          if (existing) {
+            // Actualizamos contenido + marca como publicada
+            await prisma.response.update({
+              where: { id: existing.id },
+              data: {
+                content: replyContent,
+                published: true,
+                publishedAt,
+              },
+            });
+          } else {
+            // Creamos Response nueva ligada a la Review
+            await prisma.response.create({
+              data: {
+                reviewId,
+                content: replyContent,
+                published: true,
+                publishedAt,
+              },
+            });
+          }
+        }
+
+        console.log(
+          "[mybusiness][link-google] responses locales sincronizadas desde reply_comment:",
+          gbpReplies.length,
+        );
+      } else {
+        console.log(
+          "[mybusiness][link-google] no hay reply_comment en google_gbp_reviews para esta ubicación",
         );
       }
     } else {

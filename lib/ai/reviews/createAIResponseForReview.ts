@@ -1,4 +1,3 @@
-// lib/ai/reviews/createAIResponseForReview.ts
 import { prisma } from "@/lib/prisma";
 import { buildMessagesFromSettings } from "@/lib/ai/reviews/prompt/promptBuilder";
 import { sanitizeAndConstrain } from "@/lib/ai/policy/postFilters";
@@ -43,25 +42,45 @@ function escRegex(s: string) {
 }
 
 /**
+ * Merge seguro: DEFAULT_SETTINGS + rawConfig → ResponseSettings válido
+ */
+function mergeSettingsWithDefault(rawConfig: unknown): ResponseSettings {
+  const base = {
+    ...DEFAULT_SETTINGS,
+    ...(rawConfig || {}),
+  };
+  // Si falla el parse, tiramos solo de DEFAULT_SETTINGS para no romper
+  const parsed = ResponseSettingsSchema.safeParse(base);
+  if (parsed.success) return parsed.data;
+
+  const fallback = ResponseSettingsSchema.safeParse(DEFAULT_SETTINGS);
+  if (fallback.success) return fallback.data;
+
+  // Último recurso: lanza error (no debería pasar)
+  return ResponseSettingsSchema.parse(DEFAULT_SETTINGS);
+}
+
+/**
  * Elimina firmas al final y añade exactamente "\n\n" + firmaLiteral
  */
 function enforceSingleSignature(text: string, signatureRaw?: string): string {
   const signature = (signatureRaw ?? "").toString().trim();
   let t = (text ?? "").toString().trimEnd();
 
-  // 1) Quitar firmas del final (varios patrones comunes) — iterativo por si hay duplicadas
-  //    - exacta: la firma literal del usuario
-  //    - genéricas: líneas que empiezan por —/-/– y palabras tipo Equipo/Saludos/Atentamente
   const patterns: RegExp[] = [];
 
   if (signature) {
-    patterns.push(new RegExp(`(\\n|\\r|\\s)*${escRegex(signature)}(\\.|\\s|\\u00A0)*$`, "i"));
+    patterns.push(
+      new RegExp(
+        `(\\n|\\r|\\s)*${escRegex(signature)}(\\.|\\s|\\u00A0)*$`,
+        "i"
+      )
+    );
   }
 
-  // Patrones genéricos (firma al final de una o más líneas)
   patterns.push(
-    /(\n|\r|\s)*(—|-|–)\s*[^\n\r]*$/i,                              // línea final con raya + texto
-    /(\n|\r|\s)*(Atentamente|Saludos|Equipo)[^\n\r]*$/i              // despedidas típicas
+    /(\n|\r|\s)*(—|-|–)\s*[^\n\r]*$/i,
+    /(\n|\r|\s)*(Atentamente|Saludos|Equipo)[^\n\r]*$/i
   );
 
   let safety = 0;
@@ -77,7 +96,6 @@ function enforceSingleSignature(text: string, signatureRaw?: string): string {
     safety++;
   }
 
-  // 2) Añadir exactamente 2 saltos de línea + firma literal (si hay)
   if (signature.length > 0) {
     t = `${t}\n\n${signature}`;
   }
@@ -87,28 +105,28 @@ function enforceSingleSignature(text: string, signatureRaw?: string): string {
 
 /**
  * Recorta respetando el límite, preservando la firma completa si existe.
- * - Si hay firma, recorta solo el cuerpo.
- * - Si no hay firma, recorta el texto completo.
  */
-function clampWithSignature(fullText: string, signatureRaw?: string, maxChars?: number | null) {
+function clampWithSignature(
+  fullText: string,
+  signatureRaw?: string,
+  maxChars?: number | null
+) {
   if (!maxChars || maxChars <= 0) return fullText;
 
   const signature = (signatureRaw ?? "").toString().trim();
   if (signature.length === 0) {
-    // Sin firma: recorte estándar
     if (fullText.length <= maxChars) return fullText;
     return fullText.slice(0, maxChars).trimEnd();
   }
 
-  // Con firma: separar cuerpo y firma por el final exacto "\n\n" + firma
   const tail = `\n\n${signature}`;
   if (!fullText.endsWith(tail)) {
-    // Por seguridad, si no coincide, intentar forzar formato y luego seguir
     const enforced = enforceSingleSignature(fullText, signature);
     if (!enforced.endsWith(tail)) {
-      return enforced.length <= maxChars ? enforced : enforced.slice(0, maxChars).trimEnd();
+      return enforced.length <= maxChars
+        ? enforced
+        : enforced.slice(0, maxChars).trimEnd();
     }
-    // Reemplazamos para continuar el flujo normal
     fullText = enforced;
   }
 
@@ -116,16 +134,83 @@ function clampWithSignature(fullText: string, signatureRaw?: string, maxChars?: 
   const maxBody = maxChars - tail.length;
 
   if (maxBody <= 0) {
-    // Si no cabe nada del cuerpo, dejamos solo firma (último recurso)
     return tail.trimStart();
   }
 
-  const clippedBody = body.length <= maxBody ? body : body.slice(0, maxBody).trimEnd();
+  const clippedBody =
+    body.length <= maxBody ? body : body.slice(0, maxBody).trimEnd();
   return `${clippedBody}${tail}`;
 }
 
 /**
+ * Core compartido: genera texto usando cfg + datos de review (SIN persistir).
+ */
+async function generateContentWithConfig(input: {
+  cfg: ResponseSettings;
+  rating: number;
+  comment: string | null;
+  languageCode: string | null;
+  reviewerName: string | null;
+}) {
+  const { cfg, rating, comment, languageCode, reviewerName } = input;
+
+  const {
+    system,
+    user,
+    targetLang,
+    model,
+    temperature,
+    maxChars,
+  } = buildMessagesFromSettings(cfg, {
+    rating,
+    comment,
+    languageCode,
+    reviewerName,
+  });
+
+  const resolvedModel = model ?? process.env.AI_MODEL ?? "gpt-4o-mini";
+  const resolvedTemp = Math.min(Math.max(temperature ?? 0.6, 0), 0.8);
+
+  const raw = await completeOpenAI({
+    system,
+    user,
+    model: resolvedModel,
+    temperature: resolvedTemp,
+    maxTokens: 256,
+  });
+
+  let content = (raw ?? "").trim() || "(sin contenido)";
+
+  const customerFirst =
+    (reviewerName ?? "").trim().split(/\s+/)[0] || null;
+
+  content = sanitizeAndConstrain(content, cfg, {
+    maxChars,
+    lang: targetLang,
+    signature: null,
+    customerName: customerFirst,
+  });
+
+  const signature = (cfg.standardSignature ?? "").toString().trim();
+  content = enforceSingleSignature(content, signature);
+  content = clampWithSignature(
+    content,
+    signature,
+    maxChars ?? cfg.maxCharacters ?? null
+  );
+
+  return {
+    content,
+    targetLang,
+    model: resolvedModel,
+    temperature: resolvedTemp,
+    maxChars: maxChars ?? cfg.maxCharacters ?? null,
+  };
+}
+
+/**
  * Genera, post-filtra y persiste. Devuelve la fila Response creada.
+ * (flujo REAL para reseñas de verdad)
  */
 export async function createAIResponseForReview(reviewId: string) {
   const review = await prisma.review.findUnique({
@@ -143,62 +228,26 @@ export async function createAIResponseForReview(reviewId: string) {
 
   if (!review) throw new Error("Review not found");
 
-  // 1) Cargar settings y validar
   const rs = await prisma.responseSettings.findUnique({
     where: { companyId: review.companyId },
     select: { config: true },
   });
 
-  const parsed = rs?.config ? ResponseSettingsSchema.safeParse(rs.config) : null;
-  const cfg: ResponseSettings = (parsed?.success
-    ? parsed.data
-    : ({ ...DEFAULT_SETTINGS } as ResponseSettings));
+  const cfg = mergeSettingsWithDefault(rs?.config ?? {});
 
-  // 2) Mensajes (system + user)
   const {
-    system,
-    user,
+    content,
     targetLang,
     model,
     temperature,
-    maxChars,
-  } = buildMessagesFromSettings(cfg, {
+  } = await generateContentWithConfig({
+    cfg,
     rating: review.rating,
     comment: review.comment ?? null,
     languageCode: review.languageCode ?? null,
     reviewerName: review.reviewerName ?? null,
   });
 
-  // 3) LLM
-  const raw = await completeOpenAI({
-    system,
-    user,
-    model: model ?? process.env.AI_MODEL ?? "gpt-4o-mini",
-    temperature: Math.min(Math.max(temperature ?? 0.6, 0), 0.8),
-    maxTokens: 256,
-  });
-
-  let content = (raw ?? "").trim() || "(sin contenido)";
-
-  // 4) Post-filtros (¡sin firma aquí!)
-  const customerFirst =
-    (review.reviewerName ?? "").trim().split(/\s+/)[0] || null;
-
-  content = sanitizeAndConstrain(content, cfg, {
-    maxChars,              // se volverá a aplicar tras firma, con preservación
-    lang: targetLang,
-    signature: null,       // <- nunca insertar firma aquí
-    customerName: customerFirst,
-  });
-
-  // 4.1) Firma: quitar duplicados y añadir EXACTAMENTE "\n\n" + firmaLiteral
-  const signature = (cfg.standardSignature ?? "").toString().trim();
-  content = enforceSingleSignature(content, signature);
-
-  // 4.2) Recorte final preservando la firma completa
-  content = clampWithSignature(content, signature, maxChars ?? cfg.maxCharacters ?? null);
-
-  // 5) Persistir
   const saved = await prisma.response.create({
     data: {
       reviewId: review.id,
@@ -210,8 +259,8 @@ export async function createAIResponseForReview(reviewId: string) {
       generationCount: 1,
       lastGeneratedAt: new Date(),
       source: "AI",
-      model: model ?? "gpt-4o-mini",
-      temperature: typeof temperature === "number" ? temperature : 0.6,
+      model,
+      temperature,
       language: targetLang,
       tone: String(cfg.tone),
       businessType: cfg.sector,
@@ -220,4 +269,28 @@ export async function createAIResponseForReview(reviewId: string) {
   });
 
   return saved;
+}
+
+/**
+ * NUEVO: modo PREVIEW
+ * Usa settings enviados desde el panel (sin mirar BBDD) y NO persiste nada.
+ */
+export async function createAIResponsePreviewFromSettings(input: {
+  settings: ResponseSettings;
+  rating: number;
+  comment: string;
+  languageCode?: string | null;
+  reviewerName?: string | null;
+}) {
+  const cfg = mergeSettingsWithDefault(input.settings);
+
+  const result = await generateContentWithConfig({
+    cfg,
+    rating: input.rating,
+    comment: input.comment ?? null,
+    languageCode: input.languageCode ?? null,
+    reviewerName: input.reviewerName ?? null,
+  });
+
+  return result; // { content, targetLang, model, temperature, maxChars }
 }

@@ -6,9 +6,10 @@ export const runtime = "nodejs";
 
 export async function POST(
   _req: NextRequest,
-  context: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const locationId = context.params.id;
+  // 👇 hay que await
+  const { id: locationId } = await params;
 
   if (!locationId) {
     return NextResponse.json(
@@ -51,6 +52,7 @@ export async function POST(
           data: {
             location_id: null,
             status: "unlinked",
+            is_active: false,
           },
         });
       }
