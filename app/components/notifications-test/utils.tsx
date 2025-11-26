@@ -1,8 +1,10 @@
+// app/components/notifications-test/utils.tsx
 import {
   Bell,
   Bot,
   Star,
   CreditCard,
+  Inbox ,
   Settings as SettingsIcon,
   Package,
 } from "lucide-react";
@@ -16,6 +18,7 @@ export const categoryConfig: Record<
   { label: string; icon: LucideIcon; color: string; bgColor: string }
 > = {
   all:        { label: "Todas",        icon: Bell,         color: "text-foreground", bgColor: "bg-primary/10 hover:bg-primary/20 border-primary/30" },
+  general:    { label: "General",      icon: Inbox,         color: "text-slate-600", bgColor: "bg-slate-500/10 hover:bg-slate-500/20 border-slate-500/30" },
   agent:      { label: "Agente IA",    icon: Bot,          color: "text-blue-600",  bgColor: "bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30" },
   reviews:    { label: "Reseñas",      icon: Star,         color: "text-yellow-600",bgColor: "bg-yellow-500/10 hover:bg-yellow-500/20 border-yellow-500/30" },
   billing:    { label: "Facturación",  icon: CreditCard,   color: "text-green-600", bgColor: "bg-green-500/10 hover:bg-green-500/20 border-green-500/30" },
@@ -54,8 +57,10 @@ export function getCategoryFromType(type: string): Notification["category"] {
   if (type.startsWith("billing")) return "billing";
   if (type.startsWith("system")) return "system";
   if (type.startsWith("integration")) return "integrations";
-  return "system";
+
+  return "general"; // 🔹 ahora lo desconocido cae aquí
 }
+
 
 /* Helpers extra (sin cambios) */
 export function formatRelativeTime(date: Date | string, locale = "es"): string {
@@ -82,6 +87,10 @@ export function getNotificationColor(category: Notification["category"]) {
     case "billing":      return "bg-green-500/10 text-green-600 border-green-500/20";
     case "system":       return "bg-purple-500/10 text-purple-600 border-purple-500/20";
     case "integrations": return "bg-orange-500/10 text-orange-600 border-orange-500/20";
+
+    case "general":      return "bg-slate-500/10 text-slate-600 border-slate-500/20"; // 🔹 NUEVO
+
     default:             return "bg-muted text-muted-foreground border-border";
   }
 }
+

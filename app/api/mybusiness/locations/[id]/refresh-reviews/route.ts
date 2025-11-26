@@ -7,6 +7,10 @@ import {
   getValidAccessToken,
   listGbpReviewsForLocation,
 } from "@/lib/integrations/google-business/client";
+import { createAIResponseForReview } from "@/lib/ai/reviews/createAIResponseForReview.adapter";
+
+// 👇 NUEVO: usamos tu librería centralizada
+import { generateNotification } from "@/lib/notifications/generateNotification";
 
 export const runtime = "nodejs";
 
@@ -90,12 +94,11 @@ export async function POST(
     }
 
     const companyId = loc.companyId;
-    
+
     const company = await prisma.company.findUnique({
       where: { id: companyId },
       select: { account_id: true },
     });
-
 
     // 2) google_gbp_location linkada a esta Location
     const gbpLoc = await prisma.google_gbp_location.findFirst({
@@ -401,30 +404,41 @@ export async function POST(
 
       reviewsUpserted += 1;
 
-      // Si es nueva en nuestra BD → crear Notification
+      // ⬇️ NUEVO: si es nueva en nuestra BD → delegamos en generateNotification
       if (isNew) {
-        await prisma.notification.create({
+        await generateNotification({
+          model: "Review",
+          action: "create",
           data: {
-            type: "review.new",
-            object_id: review.id,
-            reviewId: review.id,
+            id: review.id,
+            companyId,
             locationId,
-            accountId: company?.account_id ?? null,
-            status: "unread",
-            subject: "Nueva reseña en Google",
-            comment: review.comment ?? null,
-            body: `Has recibido una nueva reseña con ${review.rating}★.`,
-            metadata: {
-              provider: review.provider,
-              externalId: review.externalId,
-              companyId,
-              locationId,
-            },
+            provider: review.provider,
+            externalId: review.externalId,
+            reviewerName: review.reviewerName ?? undefined,
+            rating: review.rating,
+            comment: review.comment ?? undefined,
+            createdAtG: review.createdAtG ?? undefined,
           },
         });
       }
-    }
 
+      // NUEVO: asegurar borrador IA para cualquier review local sin respuesta
+      const hasGoogleReply =
+        typeof r.reply_comment === "string" &&
+        r.reply_comment.trim().length > 0;
+
+      if (!hasGoogleReply) {
+        const existingLocalResponse = await prisma.response.findFirst({
+          where: { reviewId: review.id },
+          select: { id: true },
+        });
+
+        if (!existingLocalResponse) {
+          await createAIResponseForReview({ reviewId: review.id });
+        }
+      }
+    }
 
     // 9) Responses locales desde reply_comment
     const gbpReplies = gbpReviews.filter(

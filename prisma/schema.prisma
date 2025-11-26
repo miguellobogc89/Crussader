@@ -327,80 +327,6 @@ model UserLocation {
   @@index([locationId])
 }
 
-model Review {
-  id                String          @id @default(cuid())
-  companyId         String
-  locationId        String
-  provider          ReviewProvider
-  externalId        String
-  reviewerName      String?
-  reviewerPhoto     String?
-  reviewerAnon      Boolean?
-  rating            Int
-  comment           String?
-  languageCode      String?         @db.VarChar(8)
-  createdAtG        DateTime?
-  updatedAtG        DateTime?
-  replyComment      String?
-  replyUpdatedAtG   DateTime?
-  ingestedAt        DateTime        @default(now())
-  updatedAt         DateTime        @default(now()) @updatedAt
-  isTest            Boolean         @default(false)
-  is_conceptualized Boolean         @default(false)
-  responded         Boolean         @default(false)
-  respondedAt       DateTime?       @db.Timestamptz(6)
-  respondedSource   ResponseOrigin?
-  responseDelaySec  Int?
-  jobs              Job[]
-  Notification      Notification[]
-  responses         Response[]
-  Company           Company         @relation("CompanyReviews", fields: [companyId], references: [id], onDelete: Cascade)
-  Location          Location        @relation("LocationReviews", fields: [locationId], references: [id], onDelete: Cascade)
-  analysis          ReviewAnalysis?
-  concept           concept[]
-
-  @@unique([provider, externalId])
-  @@index([companyId])
-  @@index([locationId])
-  @@index([rating])
-  @@index([createdAtG])
-}
-
-model Response {
-  id              String               @id @default(cuid())
-  reviewId        String
-  content         String
-  status          ResponseStatus       @default(PENDING)
-  active          Boolean              @default(true)
-  published       Boolean              @default(false)
-  edited          Boolean              @default(false)
-  generationCount Int                  @default(1)
-  lastGeneratedAt DateTime?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  publishedAt     DateTime?
-  createdById     String?
-  editedById      String?
-  source          ResponseSource       @default(AI)
-  model           String?
-  temperature     Float?
-  promptVersion   String?
-  language        String?
-  tone            String?
-  businessType    String?
-  moderationFlag  Boolean              @default(false)
-  moderationNotes String?
-  lastError       String?
-  jobs            Job[]
-  createdBy       User?                @relation("ResponseCreatedBy", fields: [createdById], references: [id])
-  editedBy        User?                @relation("ResponseEditedBy", fields: [editedById], references: [id])
-  review          Review               @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  publishLogs     ResponsePublishLog[]
-
-  @@index([reviewId])
-  @@index([status, published, active])
-}
-
 model LocationKpiDaily {
   id              String   @id @default(cuid())
   companyId       String
@@ -1586,30 +1512,6 @@ model account {
   @@index([status], map: "idx_account_status")
 }
 
-model Notification {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  type        String
-  object_id   String
-  comment     String?
-  notified_at DateTime @default(now()) @db.Timestamptz(6)
-  status      String   @default("unread")
-  created_at  DateTime @default(now()) @db.Timestamptz(6)
-  metadata    Json?
-  locationId  String?
-  userId      String?
-  reviewId    String?
-  accountId   String?  @db.Uuid
-  subject     String?
-  body        String?
-  account     account? @relation(fields: [accountId], references: [id], onUpdate: NoAction, map: "fk_notification_account")
-  Review      Review?  @relation(fields: [reviewId], references: [id], onUpdate: NoAction, map: "fk_notification_review")
-  User        User?    @relation(fields: [userId], references: [id], onUpdate: NoAction, map: "fk_notification_user")
-
-  @@index([notified_at(sort: Desc)], map: "idx_notification_notified")
-  @@index([object_id], map: "idx_notification_object_id")
-  @@index([status], map: "idx_notification_status")
-}
-
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model LocationReviewHourlyMonthly {
   companyId    String
@@ -1879,6 +1781,108 @@ model google_gbp_responses {
   @@unique([company_id, google_review_id], map: "google_gbp_responses_uniq_company_review")
   @@index([company_id], map: "idx_gbp_responses_company")
   @@index([google_review_id], map: "idx_gbp_responses_review")
+}
+
+model Review {
+  id                String          @id @default(cuid())
+  companyId         String
+  locationId        String
+  provider          ReviewProvider
+  externalId        String
+  reviewerName      String?
+  reviewerPhoto     String?
+  reviewerAnon      Boolean?
+  rating            Int
+  comment           String?
+  languageCode      String?         @db.VarChar(8)
+  createdAtG        DateTime?
+  updatedAtG        DateTime?
+  replyComment      String?
+  replyUpdatedAtG   DateTime?
+  ingestedAt        DateTime        @default(now())
+  updatedAt         DateTime        @default(now()) @updatedAt
+  isTest            Boolean         @default(false)
+  is_conceptualized Boolean         @default(false)
+  responded         Boolean         @default(false)
+  respondedAt       DateTime?       @db.Timestamptz(6)
+  respondedSource   ResponseOrigin?
+  responseDelaySec  Int?
+  jobs              Job[]
+  Notification      Notification[]
+  responses         Response[]
+  Company           Company         @relation("CompanyReviews", fields: [companyId], references: [id], onDelete: Cascade)
+  Location          Location        @relation("LocationReviews", fields: [locationId], references: [id], onDelete: Cascade)
+  analysis          ReviewAnalysis?
+  concept           concept[]
+
+  @@unique([provider, externalId])
+  @@index([companyId])
+  @@index([locationId])
+  @@index([rating])
+  @@index([createdAtG])
+}
+
+model Response {
+  id              String               @id @default(cuid())
+  reviewId        String
+  content         String
+  status          ResponseStatus       @default(PENDING)
+  active          Boolean              @default(true)
+  published       Boolean              @default(false)
+  edited          Boolean              @default(false)
+  generationCount Int                  @default(1)
+  lastGeneratedAt DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  publishedAt     DateTime?
+  createdById     String?
+  editedById      String?
+  source          ResponseSource       @default(AI)
+  model           String?
+  temperature     Float?
+  promptVersion   String?
+  language        String?
+  tone            String?
+  businessType    String?
+  moderationFlag  Boolean              @default(false)
+  moderationNotes String?
+  lastError       String?
+  jobs            Job[]
+  createdBy       User?                @relation("ResponseCreatedBy", fields: [createdById], references: [id])
+  editedBy        User?                @relation("ResponseEditedBy", fields: [editedById], references: [id])
+  review          Review               @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  publishLogs     ResponsePublishLog[]
+
+  @@index([reviewId])
+  @@index([status, published, active])
+}
+
+model Notification {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type             String
+  object_id        String
+  comment          String?
+  notified_at      DateTime  @default(now()) @db.Timestamptz(6)
+  status           String    @default("unread")
+  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+  metadata         Json?
+  locationId       String?
+  userId           String?
+  reviewId         String?
+  accountId        String?   @db.Uuid
+  subject          String?
+  body             String?
+  reviewerName     String?
+  createdAtG       DateTime? @db.Timestamptz(6)
+  rating           Int?
+  reviewCreatedAtG DateTime? @db.Timestamptz(6)
+  account          account?  @relation(fields: [accountId], references: [id], onUpdate: NoAction, map: "fk_notification_account")
+  Review           Review?   @relation(fields: [reviewId], references: [id], onUpdate: NoAction, map: "fk_notification_review")
+  User             User?     @relation(fields: [userId], references: [id], onUpdate: NoAction, map: "fk_notification_user")
+
+  @@index([notified_at(sort: Desc)], map: "idx_notification_notified")
+  @@index([object_id], map: "idx_notification_object_id")
+  @@index([status], map: "idx_notification_status")
 }
 
 /// *

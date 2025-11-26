@@ -75,6 +75,7 @@ export default function Response({
     return status === "published";
   }, [published, status]);
 
+  const isGoogle = isPublished;
   const [isEditing, setIsEditing] = useState<boolean>(defaultEditing && !isPublished);
   const [draft, setDraft] = useState<string>(content);
 
@@ -115,14 +116,23 @@ export default function Response({
 
       {/* Header: icono + título */}
       <div className="flex items-center gap-2">
-        <Sparkles className="w-4 h-4 text-violet-500" />
+        {isGoogle ? (
+          <img
+            src="/platform-icons/google-business.png"
+            alt="Google Business Profile"
+            className="w-4 h-4"
+          />
+        ) : (
+          <Sparkles className="w-4 h-4 text-violet-500" />
+        )}
         <h5
           className="font-medium text-foreground"
           style={{ fontSize: "clamp(13px,1.2vw,14px)" }}
         >
-          {title}
+          {isGoogle ? "Respuesta generada desde Google" : title}
         </h5>
       </div>
+
 
       {/* Contenido */}
       {!isEditing ? (

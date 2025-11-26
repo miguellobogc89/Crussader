@@ -7,7 +7,7 @@ import { Plus, Building2, Pencil } from "lucide-react";
 import GoogleBusinessConnectBanner from "@/app/components/mybusiness/GoogleBusinessConnectBanner";
 import PageShell from "@/app/components/layouts/PageShell";
 import PreloadCompanyBuffer from "@/app/components/buffer/PreloadCompanyBuffer";
-
+import { AverageRatingCard } from "@/app/components/mybusiness/cards/AverageRatingCard";
 import {
   CompanyModal,
   type CompanyForm,
@@ -341,46 +341,56 @@ export default function MyBusinessPage() {
         )}
 
         {/* ── CON EMPRESA ─────────────────────────────── */}
-        {hasCompany && (
-          <section className="mt-6 space-y-3">
-            <div className="text-sm font-medium text-muted-foreground">
-              Ubicaciones vinculadas a tu empresa
-            </div>
+{hasCompany && (
+  <section className="mt-6 space-y-6">
+    {/* KPIs generales */}
+    <div className="grid gap-4 md:grid-cols-3">
+      <AverageRatingCard average={4.8} totalReviews={128} />
+      {/* aquí luego podremos añadir más cards de KPIs */}
+    </div>
 
-            {locsError && (
-              <div className="text-sm text-red-600">{locsError}</div>
-            )}
+    {/* listado de ubicaciones */}
+    <div className="space-y-3">
+      <div className="text-sm font-medium text-muted-foreground">
+        Ubicaciones vinculadas a tu empresa
+      </div>
 
-            {locsLoading ? (
-              <div className="grid gap-3">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-20 rounded-xl border bg-muted/40 animate-pulse"
-                  />
-                ))}
-              </div>
-            ) : locs.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">
-                No hay ubicaciones todavía. Crea tu primera ubicación desde el
-                flujo guiado.
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {locs.map((loc) => (
-                  <LocationCard
-                    key={(loc as any).id}
-                    location={loc}
-                    onConnect={() => handleConnect(loc)}
-                    onDisconnect={() => handleDisconnect(loc)}
-                    onRefresh={() => refreshReviews((loc as any).id)}
-                    isRefreshing={refreshingLocationId === (loc as any).id}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-        )}
+      {locsError && (
+        <div className="text-sm text-red-600">{locsError}</div>
+      )}
+
+      {locsLoading ? (
+        <div className="grid gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-20 rounded-xl border bg-muted/40 animate-pulse"
+            />
+          ))}
+        </div>
+      ) : locs.length === 0 ? (
+        <div className="py-8 text-center text-sm text-muted-foreground">
+          No hay ubicaciones todavía. Crea tu primera ubicación desde el
+          flujo guiado.
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {locs.map((loc) => (
+            <LocationCard
+              key={(loc as any).id}
+              location={loc}
+              onConnect={() => handleConnect(loc)}
+              onDisconnect={() => handleDisconnect(loc)}
+              onRefresh={() => refreshReviews((loc as any).id)}
+              isRefreshing={refreshingLocationId === (loc as any).id}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  </section>
+)}
+
 
         {/* ── MODALES ─────────────────────────────────── */}
         <CompanyModal

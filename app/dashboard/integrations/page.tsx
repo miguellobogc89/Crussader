@@ -1,94 +1,152 @@
-// app/api/integrations/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { PrismaClient } from "@prisma/client";
+// app/dashboard/integrations/page.tsx
+import PageShell from "@/app/components/layouts/PageShell";
+import IntegrationsGridClient from "@/app/components/integrations/IntegrationsGridClient";
+import {
+  type Provider,
+} from "@/app/components/integrations/IntegrationPlatformCard";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/app/components/ui/card";
 
-const prisma = new PrismaClient();
+export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  const url = new URL(req.url);
-  const all = url.searchParams.get("all") === "1";
+export default async function IntegrationsPage() {
+  // Plataformas disponibles (ya operativas / prioridad alta)
+  const available: Provider[] = [
+    {
+      key: "google",
+      name: "Google Business Profile",
+      description: "Conecta tu ficha de empresa y sincroniza reseñas.",
+      brandIconSrc: "/platform-icons/google-business.png",
+      brandIconAlt: "Google Business",
+    },
+    {
+      key: "calendar",
+      name: "Google Calendar",
+      description: "Sincroniza citas y disponibilidad con Google Calendar.",
+      brandIconSrc: "/platform-icons/google-calendar.png",
+      brandIconAlt: "Google Calendar",
+    },
+    {
+      key: "whatsapp",
+      name: "WhatsApp",
+      description:
+        "Centraliza conversaciones y automatiza respuestas con WhatsApp.",
+      brandIconSrc: "/platform-icons/whatsapp.png",
+      brandIconAlt: "WhatsApp",
+    },
+    {
+      key: "facebook",
+      name: "Facebook",
+      description:
+        "Conecta tu página para centralizar reseñas y mensajes en un único panel.",
+      brandIconSrc: "/platform-icons/facebook.png",
+      brandIconAlt: "Facebook",
+    },
+    {
+      key: "gmail",
+      name: "Gmail",
+      description: "Conecta tu bandeja de entrada para leer y gestionar emails.",
+      brandIconSrc: "/platform-icons/gmail.png",
+      brandIconAlt: "Gmail",
+    },
+  ];
 
-  // Parámetros para modo "find by company+provider"
-  const companyId = url.searchParams.get("companyId") ?? "";
-  const provider  = url.searchParams.get("provider") ?? "";
+  // Próximamente / en desarrollo
+  const upcoming: Provider[] = [
+    {
+      key: "instagram",
+      name: "Instagram",
+      description:
+        "Gestiona mensajes y comentarios desde tu cuenta profesional.",
+      brandIconSrc: "/platform-icons/instagram.png",
+      brandIconAlt: "Instagram",
+      comingSoon: true,
+    },
+    {
+      key: "tripadvisor",
+      name: "TripAdvisor",
+      description: "Sincroniza reseñas y responde desde Crussader.",
+      brandIconSrc: "/platform-icons/tripadvisor.png",
+      brandIconAlt: "TripAdvisor",
+      comingSoon: true,
+    },
+    {
+      key: "trustpilot",
+      name: "Trustpilot",
+      description: "Importa valoraciones y analiza tendencias.",
+      brandIconSrc: "/platform-icons/trustpilot.png",
+      brandIconAlt: "Trustpilot",
+      comingSoon: true,
+    },
+    {
+      key: "yelp",
+      name: "Yelp",
+      description:
+        "Centraliza tus reseñas de Yelp y automatiza respuestas con IA.",
+      brandIconSrc: "/platform-icons/yelp.png",
+      brandIconAlt: "Yelp",
+      comingSoon: true,
+    },
+    {
+      key: "booking",
+      name: "Booking.com",
+      description: "Conecta tu alojamiento y gestiona reseñas y reservas.",
+      brandIconSrc: "/platform-icons/booking.png",
+      brandIconAlt: "Booking",
+      comingSoon: true,
+    },
+  ];
 
-  // Diagnóstico base
-  const diag: Record<string, unknown> = {
-    ok: true,
-    session_email: session?.user?.email ?? null,
-  };
+  return (
+    <PageShell
+      title="Integraciones"
+      description="Escaparate de integraciones disponibles y próximas para tu cuenta."
+      titleIconName="Plug"
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">
+            Integraciones
+          </CardTitle>
+          <CardDescription>
+            Consulta qué plataformas puedes conectar hoy y cuáles llegarán
+            próximamente.
+          </CardDescription>
+        </CardHeader>
 
-  // ─────────────────────────────────────────────
-  // MODO: listar TODO (solo dev/diagnóstico)
-  // ─────────────────────────────────────────────
-  if (all) {
-    const users = await prisma.user.findMany({ select: { id: true, email: true } });
-    const connections = await prisma.externalConnection.findMany({
-      orderBy: { createdAt: "desc" },
-    });
-    return NextResponse.json({ ...diag, mode: "ALL", users, connections });
-  }
+        <CardContent className="pt-4">
+          {/* Bloque: Plataformas disponibles */}
+          <div className="mb-2">
+            <h3 className="text-sm font-semibold text-foreground">
+              Plataformas disponibles
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Estas integraciones ya están o estarán operativas en Crussader.
+            </p>
+          </div>
+          <IntegrationsGridClient providers={available} />
 
-  // ─────────────────────────────────────────────
-  // MODO: buscar por companyId+provider (id directo)
-  // GET /api/integrations?companyId=...&provider=google-business
-  // ─────────────────────────────────────────────
-  if (companyId && provider) {
-    if (!session?.user?.email) {
-      return NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 });
-    }
+          {/* Separador visual */}
+          <div className="my-6 h-px bg-border" />
 
-    const row = await prisma.externalConnection.findFirst({
-      where: {
-        companyId,
-        provider, // Debe coincidir EXACTAMENTE con el valor guardado en DB, p.ej. "google-business"
-      },
-      select: { id: true, companyId: true, provider: true, updatedAt: true },
-    });
-
-    // Devolvemos null si no existe para que el cliente lo maneje de forma limpia
-    return NextResponse.json({
-      ...diag,
-      mode: "BY_COMPANY_PROVIDER",
-      data: row ? { id: row.id, companyId: row.companyId, provider: row.provider } : null,
-    });
-  }
-
-  // ─────────────────────────────────────────────
-  // MODO: por usuario de sesión (comportamiento anterior)
-  // ─────────────────────────────────────────────
-  if (!session?.user?.email) {
-    return NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 });
-  }
-
-  // Buscar el user de la sesión
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-    select: { id: true, email: true },
-  });
-
-  if (!user) {
-    return NextResponse.json({
-      ...diag,
-      mode: "BY_USER",
-      note: "no_user_for_session_email",
-      connections: [],
-    });
-  }
-
-  // Conexiones por userId
-  const connections = await prisma.externalConnection.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-  });
-
-  return NextResponse.json({
-    ...diag,
-    mode: "BY_USER",
-    userId: user.id,
-    connections,
-  });
+          {/* Bloque: Próximamente */}
+          <div className="mb-2">
+            <h3 className="text-sm font-semibold text-foreground">
+              Próximamente
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Integraciones en desarrollo que se irán activando en los
+              próximos meses.
+            </p>
+          </div>
+          <IntegrationsGridClient providers={upcoming} />
+        </CardContent>
+      </Card>
+    </PageShell>
+  );
 }

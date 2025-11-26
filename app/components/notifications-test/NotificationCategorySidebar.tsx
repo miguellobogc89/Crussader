@@ -1,3 +1,4 @@
+// app/components/notifications-test/NotificationCategorySidebar.tsx
 "use client";
 
 import { Notification } from "./types";
@@ -25,7 +26,7 @@ export default function NotificationCategorySidebar({
     notifications.filter((n) => (cat === "all" ? !n.read : n.category === cat && !n.read)).length;
 
   return (
-    <aside className="flex h-full w-64 flex-shrink-0 flex-col border-r bg-muted/20">
+    <aside className="flex h-full w-full flex-shrink-0 flex-col border-r bg-muted/20">
       {/* header con la misma altura que el panel derecho */}
       <div className="flex h-12 items-center border-b bg-muted/30 px-4">
         <h2 className="text-sm font-semibold tracking-wide text-muted-foreground">Categorías</h2>

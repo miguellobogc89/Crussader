@@ -1,0 +1,64 @@
+// app/(landing)/page.tsx
+import Image from "next/image";
+
+export default function LandingPage() {
+  return (
+    <div className="min-h-screen bg-[#0F1117] text-white">
+      {/* HEADER */}
+      <header className="w-full border-b border-white/10 bg-[#0B0D12]">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-3">
+            <Image
+              src="/public/logo/Logo 1-05.png"
+              alt="Crussader Logo"
+              width={36}
+              height={36}
+            />
+            <span className="text-lg font-semibold tracking-wide">
+              Crussader
+            </span>
+          </div>
+
+          <nav className="hidden md:flex items-center gap-8 text-sm text-white/80">
+            <a href="#features" className="hover:text-white">Características</a>
+            <a href="#how" className="hover:text-white">Cómo funciona</a>
+            <a href="#contact" className="hover:text-white">Contacto</a>
+          </nav>
+        </div>
+      </header>
+
+      {/* HERO */}
+      <section className="relative flex flex-col items-center justify-center h-[calc(100vh-72px)] px-6 text-center">
+        <Image
+          src="/public/logo/Logo 1-05.png"
+          alt="Crussader Logo Big"
+          width={180}
+          height={180}
+          className="opacity-95 mb-8"
+        />
+
+        <h1 className="text-4xl md:text-6xl font-bold">
+          Gestiona tus reseñas como un profesional
+        </h1>
+        <p className="mt-4 max-w-xl text-white/70 text-lg">
+          Automatiza respuestas, analiza métricas y conecta todas tus plataformas.
+        </p>
+
+        <div className="mt-8 flex gap-4">
+          <a
+            href="/auth/register"
+            className="rounded-md bg-white text-black px-6 py-3 font-semibold hover:bg-gray-200"
+          >
+            Probar gratis
+          </a>
+          <a
+            href="#demo"
+            className="rounded-md border border-white/40 px-6 py-3 font-semibold text-white hover:border-white"
+          >
+            Ver demo
+          </a>
+        </div>
+      </section>
+    </div>
+  );
+}

@@ -42,32 +42,40 @@ async function handleReviewCreated(
     console.warn(`[handleReviewCreated] No se pudo obtener accountId:`, error);
   }
 
-  // ⬇️ Render + trazas
   const tpl = await renderTemplate("review_created", review);
-  console.log("[notifications] template result (review_created):", tpl);
 
-  // ⬇️ Forzamos valores seguros (nunca undefined)
   const subject = tpl?.subject ?? "Nueva reseña";
   const body = tpl?.body ?? "";
 
   return await prismaRaw.notification.create({
     data: {
       type: "review_created",
+
       object_id: review.id,
       comment: `Nueva reseña con rating ${review.rating ?? "?"}`,
+
       accountId,
       locationId,
       reviewId,
       userId: null,
+
+      // 🔹 campos nuevos en Notification
+      rating: review.rating ?? null,
+      reviewerName: review.reviewerName ?? null,
+      reviewCreatedAtG: review.createdAtG ?? null,
+
       metadata: {
         provider: review.provider ?? null,
         companyId: review.companyId ?? null,
       },
+
       subject,
       body,
     },
   });
 }
+
+
 
 async function handleUserCreated(
   user: Partial<User> & { id: string }

@@ -1,38 +1,48 @@
 // app/components/notifications/types.ts
 
 export interface Notification {
-  /** ====== TU SHAPE UI (tal cual lo tenías) ====== */
+  /** ====== SHAPE UI ====== */
   id: string;
-  category: "all" | "agent" | "reviews" | "billing" | "system" | "integrations";
+
+  category:
+    | "all"
+    | "agent"
+    | "reviews"
+    | "billing"
+    | "system"
+    | "integrations"
+    | "general";   // 🔹 NUEVA CATEGORÍA
+
   type: string;
-  title: string;          // título visible en UI
-  description: string;    // descripción visible en UI
-  timestamp: string;      // ISO string (o humanizado) preferido por la UI
+  title: string;         // título visible en UI
+  description: string;   // descripción visible en UI
+  timestamp: string;     // ISO string o formateado
   read: boolean;
   priority?: "low" | "medium" | "high";
   created_at: string;
 
-  /** Datos enriquecidos opcionales para UI */
+  /** —— Datos enriquecidos opcionales ——— */
   data?: {
-    comment?: string;        // texto de la review u otro detalle
-    rating?: number;         // puntuación (ej. 4.5)
-    reviewerName?: string;   // nombre del autor de la review
-    reviewId?: string;       // para posibles acciones (ver más, etc.)
+    comment?: string;
+    rating?: number;
+    reviewerName?: string;
+    reviewId?: string;
     [key: string]: any;
   };
 
-  /** ====== CAMPOS “PRISMA-LIKE” OPCIONALES (para tolerar lectura directa de BBDD) ====== */
+  /** —— Campos compatibles con BBDD (opcional) ——— */
   object_id?: string | null;
-  subject?: string | null;     // alternativa a title
-  comment?: string | null;     // alternativa a description
-  body?: string | null;        // alternativa a description
-  status?: string | null;      // "unread" | "read" (texto)
-  notified_at?: string | Date | null; // alternativa a timestamp
+  subject?: string | null; 
+  comment?: string | null;
+  body?: string | null;
+  status?: string | null; // "unread" | "read"
+  notified_at?: string | Date | null;
   locationId?: string | null;
   accountId?: string | null;
   userId?: string | null;
   reviewId?: string | null;
   metadata?: any;
-  // banderas de BBDD
-  read_db?: boolean | null;    // si alguna vez usas otro flag
+
+  // banderas extra, si existieran
+  read_db?: boolean | null;
 }

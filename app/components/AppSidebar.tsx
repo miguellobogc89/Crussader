@@ -1,3 +1,4 @@
+// app/components/sidebar/AppSidebar.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -52,7 +53,7 @@ const MYBUSINESS: NavItem = {
 
 const INTEGRATIONS: NavItem = {
   title: "Conexiones",
-  href: "/dashboard/integrations-test-2",
+  href: "/dashboard/integrations",
   icon: "🔌",
   description: "Conecta tus plataformas sociales",
 };
@@ -174,6 +175,33 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState<boolean>(isMobile);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
+  // 🔹 NUEVO: contador de notificaciones sin leer
+  const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchUnread() {
+      try {
+        const res = await fetch("/api/notifications/unread-count", {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) {
+          const value = Number(data?.unreadCount ?? 0);
+          setUnreadNotifications(Number.isNaN(value) ? 0 : value);
+        }
+      } catch (err) {
+        console.error("[AppSidebar] error fetching unread notifications", err);
+      }
+    }
+
+    fetchUnread();
+  }, []);
+
   // ===== admin flag
   const user = session?.user;
   const roleRaw = (user as any)?.role ?? (user as any)?.companyRole ?? "";
@@ -212,7 +240,6 @@ export function AppSidebar() {
   };
   const isAdmin = Object.values(adminFlags).some(Boolean);
 
-  // ===== grupos (inyecta admin si aplica)
   const ADMIN_GROUP: NavGroup | null = isAdmin
     ? {
         id: "admin",
@@ -285,19 +312,16 @@ export function AppSidebar() {
             icon: "🤖",
             description: "Constructor de Agentes",
           },
-
-          // 👉 mete PRICING dentro de Admin
           PRICING,
-
-          // 👉 mete los items de los 3 grupos (dashboard, business, products)
           ...GROUPS.flatMap((g) => g.items),
         ],
       }
     : null;
 
-  const ALL_GROUPS: NavGroup[] = ADMIN_GROUP ? [ADMIN_GROUP, ...GROUPS] : GROUPS;
+  const ALL_GROUPS: NavGroup[] = ADMIN_GROUP
+    ? [ADMIN_GROUP, ...GROUPS]
+    : GROUPS;
 
-  // cuál abrir por defecto
   const defaultOpenId = useActiveGroupId(ALL_GROUPS);
   const [openGroupId, setOpenGroupId] = useState<string | null>(defaultOpenId);
 
@@ -312,7 +336,6 @@ export function AppSidebar() {
   };
   const width = isOverlay ? "100vw" : collapsed ? "4rem" : "18rem";
 
-  // Bloquea el scroll del body cuando el overlay está abierto
   useEffect(() => {
     if (isOverlay) {
       const prev = document.body.style.overflow;
@@ -323,7 +346,6 @@ export function AppSidebar() {
     }
   }, [isOverlay]);
 
-  // Cerrar overlay con Escape
   useEffect(() => {
     if (!isOverlay) return;
     const onKey = (e: KeyboardEvent) => {
@@ -338,9 +360,6 @@ export function AppSidebar() {
     setOpenGroupId((prev) => (prev === id ? null : id));
   }
 
-  /* ─────────────────────────────────────────────
-     AUTO-HIDE TOP BAR (solo móvil + colapsado)
-     ───────────────────────────────────────────── */
   const [showTopBar, setShowTopBar] = useState(true);
 
   useEffect(() => {
@@ -355,12 +374,10 @@ export function AppSidebar() {
     };
 
     window.addEventListener("pointerdown", onPointerDown, { passive: true });
-    return () => window.removeEventListener("pointerdown", onPointerDown);
+    return () =>
+      window.removeEventListener("pointerdown", onPointerDown);
   }, [isMobile, collapsed]);
 
-  /* ─────────────────────────────────────────────
-     MODO MÓVIL COLAPSADO → SOLO TOP BAR
-     ───────────────────────────────────────────── */
   if (isMobile && collapsed) {
     return (
       <>
@@ -389,9 +406,6 @@ export function AppSidebar() {
     );
   }
 
-  /* ─────────────────────────────────────────────
-     SIDEBAR
-     ───────────────────────────────────────────── */
   return (
     <aside
       style={{ width }}
@@ -419,7 +433,6 @@ export function AppSidebar() {
           </div>
         )}
 
-        {/* HOME siempre visible */}
         <SidebarItem
           item={HOME}
           active={isActivePath(pathname, HOME.href)}
@@ -427,7 +440,6 @@ export function AppSidebar() {
           onNavigate={onItemNavigate}
         />
 
-        {/* PRICING solo fuera de admin; si es admin ya está dentro del grupo Admin */}
         {!isAdmin && (
           <SidebarItem
             item={PRICING}
@@ -462,7 +474,6 @@ export function AppSidebar() {
           onNavigate={onItemNavigate}
         />
 
-        {/* Grupos solo para NO admins; para admin ya están dentro del grupo Admin */}
         {!isAdmin && (
           <div className="mt-2 space-y-1">
             {GROUPS.map((g) => (
