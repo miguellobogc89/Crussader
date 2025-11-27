@@ -141,6 +141,7 @@ export function CompanyEstablishments({ companyId }: Props) {
             <EstablishmentCard
               key={loc.id}
               location={loc}
+              companyId={companyId} 
               typeName={loc.__businessTypeName ?? null}
               typeIcon={loc.__businessTypeIcon}
               onSync={() => handleSync(loc.id)}

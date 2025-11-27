@@ -4,14 +4,27 @@
 import * as React from "react";
 import Image from "next/image";
 import { Card, CardContent } from "@/app/components/ui/card";
+import { Button } from "@/app/components/ui/button";
+import { Badge } from "@/app/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/app/components/ui/dropdown-menu";
+
 import {
   MapPin,
   Star,
-  Calendar,
-  Settings,
-  Plug,
-  RotateCcw,
+  MoreVertical,
+  RefreshCw,
+  Power,
+  Settings2,
+  Image as ImageIcon,
 } from "lucide-react";
+
+
 import type { LocationRow } from "@/hooks/useCompanyLocations";
 import { useBillingStatus } from "@/hooks/useBillingStatus";
 import LocationSettingsModal, {
@@ -19,6 +32,7 @@ import LocationSettingsModal, {
 } from "@/app/components/company/LocationSettingsModal";
 
 type Props = {
+  companyId: string; 
   location: LocationRow;
   onSync?: () => void | Promise<void>;
   onConnect?: () => void;
@@ -29,6 +43,7 @@ type Props = {
 };
 
 export function EstablishmentCard({
+  companyId, 
   location,
   onSync,
   onConnect,
@@ -38,6 +53,8 @@ export function EstablishmentCard({
   typeIcon,
 }: Props) {
   const { loading } = useBillingStatus();
+
+  const locationId = (location as any).id as string | undefined;
 
   const title =
     (location as any).title ??
@@ -64,6 +81,21 @@ export function EstablishmentCard({
   const avgText = Number.isFinite(avg) ? avg.toFixed(1) : "—";
 
   const countText = Number((location as any).reviewsCount ?? 0).toString();
+
+  const featuredImageUrl = (location as any).featuredImageUrl as
+    | string
+    | null
+    | undefined;
+
+  const [localImageUrl, setLocalImageUrl] = React.useState<string | null>(
+    featuredImageUrl ?? null,
+  );
+
+  React.useEffect(() => {
+    setLocalImageUrl(featuredImageUrl ?? null);
+  }, [featuredImageUrl]);
+
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const canRefresh = !!onSync;
   const [syncing, setSyncing] = React.useState(false);
@@ -112,137 +144,220 @@ export function EstablishmentCard({
     }
   }
 
+  function handleClickImage() {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
+    }
+  }
+
+async function handleFileChange(
+  e: React.ChangeEvent<HTMLInputElement>,
+) {
+  const file = e.target.files?.[0];
+  const locationId = (location as any).id as string | undefined;
+  if (!file || !locationId || !companyId) return;
+
+  const reader = new FileReader();
+  reader.onloadend = async () => {
+    const dataUrl = reader.result as string;
+
+    // Preview inmediata en la card
+    setLocalImageUrl(dataUrl);
+
+    try {
+      const res = await fetch(
+        `/api/companies/${companyId}/locations`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            locationId,
+            featuredImageUrl: dataUrl,
+          }),
+        },
+      );
+
+      const j = await res.json().catch(() => null);
+      if (!res.ok || !j?.ok) {
+        console.error(j?.error || "Error al guardar imagen");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  reader.readAsDataURL(file);
+}
+
+
   return (
     <>
-      <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg">
+      <Card className="group relative overflow-hidden border-border/40 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-border hover:shadow-md">
         <CardContent className="p-6">
-          <div className="flex gap-4 md:gap-6">
-            {/* COLUMNA IZQUIERDA */}
-            <div className="flex min-w-0 flex-[2.2] flex-col gap-3">
-              <div className="flex items-start gap-3 border">
-                {/* Icono principal */}
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-200">
-                  <Image
-                    src="/icon/location.png"
-                    alt="Local"
-                    width={24}
-                    height={24}
-                  />
-                </div>
+          {/* input de fichero oculto */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
 
-                <div className="min-w-0">
-                  <h3 className="truncate text-lg font-semibold">{title}</h3>
+          <div className="flex items-start justify-between gap-6">
+            {/* LEFT SECTION - MAIN INFO */}
+            <div className="flex flex-1 gap-4">
+              {/* Avatar / Imagen clickable */}
+              <button
+                type="button"
+                onClick={handleClickImage}
+                className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/20 via-fuchsia-500/20 to-sky-500/20 ring-1 ring-primary/20 shadow-sm overflow-hidden transition hover:opacity-90"
+                title={localImageUrl ? "Cambiar imagen" : "Añadir foto"}
+              >
+                {localImageUrl ? (
+                  <Image
+                    src={localImageUrl}
+                    alt={title}
+                    width={64}
+                    height={64}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-background/70 backdrop-blur-sm">
+                      <ImageIcon className="h-5 w-5 text-primary/80" />
+                    </div>
+                  </div>
+                )}
+              </button>
+
+              {/* Columna de info */}
+              <div className="min-w-0 flex-1 space-y-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="truncate text-lg font-semibold text-foreground">
+                      {title}
+                    </h3>
+
+                    {/* Punto de estado al final del nombre */}
+                    <span
+                      className={[
+                        "h-2.5 w-2.5 rounded-full shrink-0",
+                        isLinked ? "bg-emerald-500" : "bg-slate-300",
+                      ].join(" ")}
+                    />
+                  </div>
+
 
                   {/* CHIP DE TIPO */}
                   {typeName && (
-                    <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-sm text-orange-600 shadow-sm">
+                    <Badge
+                      variant="secondary"
+                      className="mt-1.5 h-6 gap-1 border-0 bg-accent/50 text-xs font-medium text-accent-foreground"
+                    >
                       <span>{typeIcon ?? "🏠"}</span>
                       <span className="truncate max-w-[200px] md:max-w-xs">
                         {typeName}
                       </span>
-                    </div>
+                    </Badge>
                   )}
+                </div>
 
-                  <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin size={14} />
-                    <span className="truncate">{addr || "—"}</span>
+                {/* Dirección */}
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{addr || "—"}</span>
+                </div>
+
+                {/* Rating + nº reseñas */}
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 dark:bg-amber-950/30">
+                      <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                      <span className="text-sm font-semibold text-foreground">
+                        {avgText}
+                      </span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {countText} reseñas
+                    </span>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex flex-wrap items-center gap-4 text-sm">
-                <div className="flex items-center gap-1">
-                  <Star size={16} className="text-warning" />
-                  <span className="font-semibold">{avgText}</span>
-                  <span className="text-muted-foreground">
-                    ({countText} reseñas)
-                  </span>
-                </div>
+                {loading && !connected && (
+                  <p className="text-xs text-muted-foreground">
+                    Comprobando suscripción…
+                  </p>
+                )}
               </div>
-
-              {loading && !connected && (
-                <p className="text-xs text-muted-foreground">
-                  Comprobando suscripción…
-                </p>
-              )}
             </div>
 
-            {/* COLUMNA DERECHA — 4 FILAS IGUALES */}
-            <div className="flex flex-[1.2] items-stretch">
-              <div className="grid h-full min-h-[112px] flex-1 grid-rows-4 gap-1">
-                {/* Fila 1: engranaje */}
-                <div className="flex items-center justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setSettingsOpen(true)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm hover:bg-gray-50"
-                    title="Configurar ubicación"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {/* Fila 2: vacía */}
-                <div className="flex items-center justify-end">{/* vacío */}</div>
-
-                {/* Fila 3: botón conectar / desconectar */}
-                <div className="flex items-center justify-end">
-                  <button
-                    type="button"
-                    disabled={!canToggleCable}
-                    onClick={handleToggleCable}
-                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-colors ${
-                      !canToggleCable
-                        ? "cursor-not-allowed bg-slate-100 text-slate-300"
-                        : isLinked
-                        ? "bg-emerald-500 text-white hover:bg-emerald-600"
-                        : "bg-rose-500 text-white hover:bg-rose-600"
+            {/* RIGHT SECTION - ACTIONS & STATUS */}
+            <div className="flex shrink-0 items-start gap-3">
+              {/* Sync + fecha */}
+              <div className="flex flex-col items-end gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSyncClick}
+                  disabled={refreshDisabled}
+                  className="h-8 gap-2 px-3 text-xs hover:bg-accent"
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${
+                      effectiveSyncing ? "animate-spin" : ""
                     }`}
-                    title={
-                      !canToggleCable
-                        ? isLinked
-                          ? "No se puede desvincular (sin acción configurada)"
-                          : "No se puede vincular (sin acción configurada)"
-                        : isLinked
-                        ? "Desvincular reseñas"
-                        : "Vincular reseñas"
-                    }
-                  >
-                    <Plug className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {/* Fila 4: texto + botón actualizar */}
-                <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
-                  <span className="whitespace-nowrap">
-                    Actualizado {lastSyncAgo}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={refreshDisabled}
-                    onClick={handleSyncClick}
-                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-xs shadow-sm transition
-                      ${
-                        refreshDisabled
-                          ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300"
-                          : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                      }`}
-                    title={
-                      isLinked
-                        ? "Actualizar reseñas"
-                        : "Vincula la ubicación para refrescar reseñas"
-                    }
-                  >
-                    <RotateCcw
-                      className={`h-4 w-4 ${
-                        effectiveSyncing ? "animate-spin" : ""
-                      }`}
-                    />
-                  </button>
-                </div>
+                  />
+                  <span className="hidden md:inline">Actualizar</span>
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {isLinked ? `Actualizado ${lastSyncAgo}` : "No conectado"}
+                </span>
               </div>
+
+              {/* Menú de acciones */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+                    <Settings2 className="mr-2 h-4 w-4" />
+                    Configuración
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleToggleCable}
+                    disabled={!canToggleCable}
+                    className={
+                      isLinked
+                        ? "text-destructive data-[disabled=true]:text-slate-300"
+                        : "text-emerald-600 data-[disabled=true]:text-slate-300"
+                    }
+                  >
+                    <Power className="mr-2 h-4 w-4" />
+                    {isLinked ? "Desconectar" : "Conectar"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
+
+          {/* Banner de estado si no está conectada */}
+          {!isLinked && (
+            <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+              <Power className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Esta ubicación no está conectada. Conéctala para sincronizar reseñas.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

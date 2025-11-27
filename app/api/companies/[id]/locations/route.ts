@@ -156,3 +156,62 @@ export async function POST(
 
   return NextResponse.json({ ok: true, created, count: created.length }, { status: 201 });
 }
+
+
+/** PATCH - actualiza campos de una ubicación concreta (ej: featuredImageUrl) */
+export async function PATCH(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  const { id: companyId } = await ctx.params;
+
+  const session = await getServerSession(authOptions);
+  const guard = await ensureMember(session?.user?.email ?? null, companyId);
+  if (!guard.ok) {
+    return NextResponse.json(
+      { ok: false, error: guard.error },
+      { status: guard.status },
+    );
+  }
+  if (!canEdit(guard.role)) {
+    return NextResponse.json(
+      { ok: false, error: "forbidden" },
+      { status: 403 },
+    );
+  }
+
+  const body = await req.json().catch(() => ({} as any));
+  const locationId = String(body.locationId ?? "").trim();
+  const featuredImageUrlRaw = body.featuredImageUrl;
+
+  if (!locationId || typeof featuredImageUrlRaw !== "string") {
+    return NextResponse.json(
+      { ok: false, error: "missing_location_or_image" },
+      { status: 400 },
+    );
+  }
+
+  // opcional: si quieres tratar "" como "quitar imagen"
+  const featuredImageUrl =
+    featuredImageUrlRaw.trim().length > 0 ? featuredImageUrlRaw.trim() : null;
+
+  const existing = await prisma.location.findFirst({
+    where: { id: locationId, companyId },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    return NextResponse.json(
+      { ok: false, error: "location_not_found" },
+      { status: 404 },
+    );
+  }
+
+  const updated = await prisma.location.update({
+    where: { id: locationId },
+    data: { featuredImageUrl },
+    select: { id: true, featuredImageUrl: true },
+  });
+
+  return NextResponse.json({ ok: true, location: updated });
+}
