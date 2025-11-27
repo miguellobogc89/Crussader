@@ -1,6 +1,8 @@
+// app/components/sidebar/SidebarItem.tsx
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { SidebarIcon } from "./SidebarIcon";
 import type { NavItem } from "./types";
 
@@ -15,16 +17,52 @@ export function SidebarItem({
   collapsed: boolean;
   onNavigate?: () => void;
 }) {
+  // 🔹 Estado local para marcar el item justo al hacer click
+  const [pressed, setPressed] = useState(false);
+  const timeoutRef = useRef<number | null>(null);
+
+  function handleClick() {
+    if (onNavigate) {
+      onNavigate();
+    }
+
+    // feedback inmediato al click
+    setPressed(true);
+
+    // limpiamos cualquier timeout anterior
+    if (timeoutRef.current !== null) {
+      window.clearTimeout(timeoutRef.current);
+    }
+
+    // el estado "pressed" dura un poco (por si la navegación tarda)
+    timeoutRef.current = window.setTimeout(() => {
+      setPressed(false);
+      timeoutRef.current = null;
+    }, 400); // ajusta la duración si quieres
+  }
+
+  // limpieza al desmontar
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) {
+        window.clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  const isActiveOrPressed = active || pressed;
+
   return (
     <Link
       href={item.href}
-      onClick={onNavigate}
-      aria-current={active ? "page" : undefined}
+      onClick={handleClick}
+      aria-current={isActiveOrPressed ? "page" : undefined}
       className={[
         "group relative flex rounded-lg transition-colors",
-        collapsed ? "items-center min-h-11 px-2 justify-center"
-                  : "items-start min-h-11 px-3 py-2 justify-start gap-3",
-        active
+        collapsed
+          ? "items-center min-h-11 px-2 justify-center"
+          : "items-start min-h-11 px-3 py-2 justify-start gap-3",
+        isActiveOrPressed
           ? "bg-slate-800/70 text-white border-r-2 border-primary/60"
           : "text-slate-300 hover:text-white hover:bg-slate-800/60",
       ].join(" ")}

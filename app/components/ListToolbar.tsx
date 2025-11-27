@@ -75,7 +75,7 @@ export default function ReviewsToolbar({ className }: ReviewsToolbarProps) {
         <div className="flex items-center gap-2 relative">
           <input
             type="text"
-            placeholder="Buscar por texto, autor…"
+            placeholder="Buscar por nombre, tipo..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-64 rounded-md border bg-white px-3 py-2 text-sm outline-none"

@@ -43,6 +43,7 @@ export async function GET(
       country: true,
       postalCode: true,
       phone: true,
+      type: true,
       website: true,
       googleName: true,
       googlePlaceId: true,

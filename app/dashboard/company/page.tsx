@@ -4,11 +4,11 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/app/components/ui/button";
-import { Plus, Building2 } from "lucide-react";
+import { Plus, Building2, Pencil } from "lucide-react";
 
 import PageShell from "@/app/components/layouts/PageShell";
-import ListToolbar from "@/app/components/ListToolbar";
 import PreloadCompanyBuffer from "@/app/components/buffer/PreloadCompanyBuffer";
+import GoogleBusinessConnectBanner from "@/app/components/mybusiness/GoogleBusinessConnectBanner";
 
 import {
   CompanyModal,
@@ -16,9 +16,8 @@ import {
 } from "@/app/components/company/CompanyModal";
 
 import CompanyKpiRow from "@/app/components/company/cards/CompanyKpiRow";
-import { EstablishmentCard } from "@/app/components/company/EstablishmentCard";
-import type { LocationRow } from "@/hooks/useCompanyLocations";
 import { useCompanySummary } from "@/hooks/useCompanySummary";
+import { CompanyEstablishments } from "@/app/components/company/CompanyEstablishments";
 
 /* ----------------------- helpers (fetchers) ----------------------- */
 
@@ -40,7 +39,9 @@ type CompanyDetails = {
   employeesBand?: string | null;
 };
 
-async function fetchCompanyDetails(companyId: string): Promise<CompanyDetails | null> {
+async function fetchCompanyDetails(
+  companyId: string,
+): Promise<CompanyDetails | null> {
   try {
     const r = await fetch(`/api/companies/${companyId}`, { cache: "no-store" });
     if (!r.ok) return null;
@@ -65,7 +66,7 @@ export default function CompanyPage() {
   const hasCompany = !!companyId;
 
   // métricas (buffer / react query)
-  useCompanySummary(companyId); // ya precalienta datos para CompanyKpiRow, etc.
+  useCompanySummary(companyId); // precalienta datos para CompanyKpiRow, etc.
 
   // modal empresa (crear/editar)
   const [companyModalOpen, setCompanyModalOpen] = React.useState(false);
@@ -80,11 +81,6 @@ export default function CompanyPage() {
   function modalChange(patch: Partial<CompanyForm>) {
     setForm((prev) => ({ ...prev, ...patch }));
   }
-
-  // locations
-  const [locs, setLocs] = React.useState<LocationRow[]>([]);
-  const [locsLoading, setLocsLoading] = React.useState(false);
-  const [locsError, setLocsError] = React.useState<string | null>(null);
 
   // Nudge modal (solo si no hay empresa)
   const [showNudge, setShowNudge] = React.useState(false);
@@ -128,29 +124,6 @@ export default function CompanyPage() {
     }
   }, [loading, hasCompany]);
 
-  // cargar locations
-  const loadLocations = React.useCallback(async () => {
-    if (!companyId) return;
-    setLocsLoading(true);
-    setLocsError(null);
-    try {
-      const r = await fetch(`/api/companies/${companyId}/locations`, { cache: "no-store" });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
-      setLocs(Array.isArray(j?.locations) ? j.locations : []);
-    } catch (e: any) {
-      setLocsError(e?.message || String(e));
-    } finally {
-      setLocsLoading(false);
-    }
-  }, [companyId]);
-
-  React.useEffect(() => {
-    if (hasCompany && companyId) {
-      loadLocations();
-    }
-  }, [hasCompany, companyId, loadLocations]);
-
   /* --------- acciones empresa --------- */
 
   function openCreate() {
@@ -180,7 +153,8 @@ export default function CompanyPage() {
         body: JSON.stringify({ name: form.name.trim() }),
       });
       const j = await res.json();
-      if (!res.ok || !j?.company?.id) throw new Error(j?.error || `HTTP ${res.status}`);
+      if (!res.ok || !j?.company?.id)
+        throw new Error(j?.error || `HTTP ${res.status}`);
 
       setCompanyModalOpen(false);
       // tras crear, navegamos a la vista detallada de la empresa
@@ -222,39 +196,14 @@ export default function CompanyPage() {
     }
   }
 
-  /* --------- acciones locations --------- */
-
-  function handleConnect(locationId: string) {
-    const returnTo = encodeURIComponent("/dashboard/company");
-    window.location.href = `/api/connect/google-business/start?locationId=${encodeURIComponent(
-      locationId
-    )}&returnTo=${returnTo}`;
-  }
-
-  async function handleSync(locationId: string) {
-    try {
-      const res = await fetch(`/api/locations/${locationId}/sync`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: "manual" }),
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        alert(j?.error || `Sync falló (${res.status})`);
-        return;
-      }
-      await loadLocations();
-    } catch (e: any) {
-      alert(e?.message || String(e));
-    }
-  }
-
   /* --------- formatos para cards --------- */
 
   const infoEmail = details?.email ?? "—";
   const infoPhone = details?.phone ?? "—";
   const infoAddress = details?.address ?? "—";
-  const infoEmployees = details?.employeesBand ? `${details.employeesBand} empleados` : "—";
+  const infoEmployees = details?.employeesBand
+    ? `${details.employeesBand} empleados`
+    : "—";
 
   /* ----------------------- render ----------------------- */
 
@@ -264,9 +213,28 @@ export default function CompanyPage() {
 
       <PageShell
         title={companyName}
+        titleIconName="Building2"
         description="Gestiona los datos de tu empresa y las ubicaciones conectadas."
-
+        toolbar={
+          hasCompany ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openEdit}
+              className="inline-flex items-center gap-2"
+            >
+              <Pencil className="h-4 w-4" />
+              <span>Editar empresa</span>
+            </Button>
+          ) : undefined
+        }
+        isLoading={loading}
       >
+        {/* Banner GBP arriba del body */}
+        <div className="mb-4">
+          <GoogleBusinessConnectBanner companyId={companyId} />
+        </div>
+
         {/* Estado sin empresa */}
         {!hasCompany ? (
           <div className="py-14">
@@ -274,9 +242,12 @@ export default function CompanyPage() {
               <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-500 to-sky-500 text-white shadow-lg">
                 <Building2 className="h-8 w-8" />
               </div>
-              <h2 className="text-xl font-semibold">Aún no tienes ninguna empresa</h2>
+              <h2 className="text-xl font-semibold">
+                Aún no tienes ninguna empresa
+              </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Crea tu empresa o solicita unirte a una existente para empezar a trabajar con Crussader.
+                Crea tu empresa o solicita unirte a una existente para empezar a
+                trabajar con Crussader.
               </p>
               <div className="mt-5 flex items-center justify-center gap-2">
                 <Button onClick={openCreate}>
@@ -307,47 +278,8 @@ export default function CompanyPage() {
               />
             </div>
 
-            {/* Listado de ubicaciones */}
-            <section className="space-y-3">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div className="text-sm font-medium text-muted-foreground">
-                  Ubicaciones vinculadas a tu empresa
-                </div>
-                <ListToolbar />
-              </div>
-
-              {locsError && (
-                <div className="text-sm text-red-600">
-                  {locsError}
-                </div>
-              )}
-
-              {locsLoading ? (
-                <div className="grid gap-3">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-20 rounded-xl border bg-muted/40 animate-pulse"
-                    />
-                  ))}
-                </div>
-              ) : locs.length === 0 ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">
-                  No hay ubicaciones todavía. Crea tu primera ubicación desde el flujo guiado.
-                </div>
-              ) : (
-                <div className="grid gap-4">
-                  {locs.map((loc) => (
-                    <EstablishmentCard
-                      key={loc.id}
-                      location={loc}
-                      onSync={() => handleSync(loc.id)}
-                      onConnect={() => handleConnect(loc.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
+            {/* Listado de ubicaciones (autónomo) */}
+            <CompanyEstablishments companyId={companyId} />
           </>
         )}
 

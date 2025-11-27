@@ -175,7 +175,17 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState<boolean>(isMobile);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  // 🔹 NUEVO: contador de notificaciones sin leer
+  // 🔹 NUEVO: estado de navegación pendiente (para feedback inmediato)
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  // Cuando cambia la ruta real, limpiamos el pending
+  useEffect(() => {
+    if (pendingHref) {
+      setPendingHref(null);
+    }
+  }, [pathname, pendingHref]);
+
+  // 🔹 Contador de notificaciones sin leer
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
 
   useEffect(() => {
@@ -200,6 +210,9 @@ export function AppSidebar() {
     }
 
     fetchUnread();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ===== admin flag
@@ -331,9 +344,21 @@ export function AppSidebar() {
 
   const isOverlay = isMobile && !collapsed;
   const requestExpand = () => setCollapsed(false);
+
+  // 🔹 Handler genérico para items de grupos (sin feedback específico por href)
   const onItemNavigate = () => {
     if (isMobile) setCollapsed(true);
   };
+
+  // 🔹 NUEVO: handler que sabe qué href se ha clicado (top-level items)
+  function makeItemNavigate(href: string) {
+    return () => {
+      setUserMenuOpen(false);
+      setPendingHref(href);
+      if (isMobile) setCollapsed(true);
+    };
+  }
+
   const width = isOverlay ? "100vw" : collapsed ? "4rem" : "18rem";
 
   useEffect(() => {
@@ -406,6 +431,21 @@ export function AppSidebar() {
     );
   }
 
+  // Helpers de active con pending para top-level
+  const homeActive =
+    isActivePath(pathname, HOME.href) || pendingHref === HOME.href;
+  const pricingActive =
+    isActivePath(pathname, PRICING.href) || pendingHref === PRICING.href;
+  const reviewsActive =
+    isActivePath(pathname, REVIEWS.href) || pendingHref === REVIEWS.href;
+  const myBusinessActive =
+    isActivePath(pathname, MYBUSINESS.href) || pendingHref === MYBUSINESS.href;
+  const settingsActive =
+    isActivePath(pathname, SETTINGS.href) || pendingHref === SETTINGS.href;
+  const integrationsActive =
+    isActivePath(pathname, INTEGRATIONS.href) ||
+    pendingHref === INTEGRATIONS.href;
+
   return (
     <aside
       style={{ width }}
@@ -435,43 +475,43 @@ export function AppSidebar() {
 
         <SidebarItem
           item={HOME}
-          active={isActivePath(pathname, HOME.href)}
+          active={homeActive}
           collapsed={collapsed}
-          onNavigate={onItemNavigate}
+          onNavigate={makeItemNavigate(HOME.href)}
         />
 
         {!isAdmin && (
           <SidebarItem
             item={PRICING}
-            active={isActivePath(pathname, PRICING.href)}
+            active={pricingActive}
             collapsed={collapsed}
-            onNavigate={onItemNavigate}
+            onNavigate={makeItemNavigate(PRICING.href)}
           />
         )}
 
         <SidebarItem
           item={REVIEWS}
-          active={isActivePath(pathname, REVIEWS.href)}
+          active={reviewsActive}
           collapsed={collapsed}
-          onNavigate={onItemNavigate}
+          onNavigate={makeItemNavigate(REVIEWS.href)}
         />
         <SidebarItem
           item={MYBUSINESS}
-          active={isActivePath(pathname, MYBUSINESS.href)}
+          active={myBusinessActive}
           collapsed={collapsed}
-          onNavigate={onItemNavigate}
+          onNavigate={makeItemNavigate(MYBUSINESS.href)}
         />
         <SidebarItem
           item={SETTINGS}
-          active={isActivePath(pathname, SETTINGS.href)}
+          active={settingsActive}
           collapsed={collapsed}
-          onNavigate={onItemNavigate}
+          onNavigate={makeItemNavigate(SETTINGS.href)}
         />
         <SidebarItem
           item={INTEGRATIONS}
-          active={isActivePath(pathname, INTEGRATIONS.href)}
+          active={integrationsActive}
           collapsed={collapsed}
-          onNavigate={onItemNavigate}
+          onNavigate={makeItemNavigate(INTEGRATIONS.href)}
         />
 
         {!isAdmin && (

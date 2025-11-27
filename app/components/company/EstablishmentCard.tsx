@@ -2,34 +2,43 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { Card, CardContent } from "@/app/components/ui/card";
 import {
   MapPin,
   Star,
   Calendar,
-  Wifi,
-  WifiOff,
-  RefreshCw,
   Settings,
+  Plug,
+  RotateCcw,
 } from "lucide-react";
 import type { LocationRow } from "@/hooks/useCompanyLocations";
 import { useBillingStatus } from "@/hooks/useBillingStatus";
-import { getBusinessIcon } from "@/lib/businessTypeIcons";
 import LocationSettingsModal, {
   type LocationForm,
 } from "@/app/components/company/LocationSettingsModal";
-import { Button } from "@/app/components/ui/button";
 
 type Props = {
   location: LocationRow;
-  onSync: () => void | Promise<void>;
+  onSync?: () => void | Promise<void>;
   onConnect?: () => void;
+  onDisconnect?: () => void;
+  isSyncing?: boolean;
+  typeName?: string | null;
+  typeIcon?: string;
 };
 
-export function EstablishmentCard({ location, onSync, onConnect }: Props) {
-  const { data, loading, canConnect } = useBillingStatus();
+export function EstablishmentCard({
+  location,
+  onSync,
+  onConnect,
+  onDisconnect,
+  isSyncing = false,
+  typeName,
+  typeIcon,
+}: Props) {
+  const { loading } = useBillingStatus();
 
-  // ---------- Derivados actuales (sin romper nada) ----------
   const title =
     (location as any).title ??
     (location as any).name ??
@@ -39,55 +48,33 @@ export function EstablishmentCard({ location, onSync, onConnect }: Props) {
     .filter(Boolean)
     .join(", ");
 
+  const googlePlaceId = (location as any).googlePlaceId ?? null;
+  const isLinked = !!googlePlaceId;
+
   const connected = Boolean(
     (location as any).externalConnectionId ||
       (location as any).ExternalConnection?.id ||
-      (location as any).googlePlaceId
+      (location as any).googlePlaceId,
   );
 
-  const accountEmail =
-    (location as any).ExternalConnection?.accountEmail ??
-    (location as any).googleAccountEmail ??
-    (location as any).accountEmail ??
-    null;
+  const lastSyncAt = (location as any).lastSyncAt as string | Date | undefined;
+  const lastSyncAgo = timeAgo(lastSyncAt);
 
-  const lastSyncAt = (location as any).lastSyncAt as
-    | string
-    | Date
-    | undefined;
-  const lastSyncText = lastSyncAt
-    ? new Date(String(lastSyncAt)).toLocaleString()
-    : "—";
-
-  const avg =
-    typeof (location as any).reviewsAvg === "number"
-      ? (location as any).reviewsAvg
-      : Number((location as any).reviewsAvg ?? NaN);
-
+  const avg = Number((location as any).reviewsAvg ?? NaN);
   const avgText = Number.isFinite(avg) ? avg.toFixed(1) : "—";
-  const countText =
-    typeof (location as any).reviewsCount === "number"
-      ? String((location as any).reviewsCount)
-      : "0";
 
-  const rawTypeName =
-    (location as any).type?.name ??
-    (location as any).Type?.name ??
-    (location as any).businessType?.name ??
-    (location as any).BusinessType?.name ??
-    (location as any).typeName ??
-    (location as any).type ??
-    null;
+  const countText = Number((location as any).reviewsCount ?? 0).toString();
 
-  const icon = getBusinessIcon(rawTypeName || title);
+  const canRefresh = !!onSync;
+  const [syncing, setSyncing] = React.useState(false);
+  const effectiveSyncing = isSyncing || syncing;
+  const refreshDisabled = !isLinked || !canRefresh || effectiveSyncing;
 
-  // ---------- Estado para modal de configuración ----------
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [form, setForm] = React.useState<LocationForm>(() =>
-    mapLocationToForm(location, title)
+    mapLocationToForm(location, title),
   );
 
-  // Si la location cambia desde fuera (sync, etc.), actualizamos el formulario
   React.useEffect(() => {
     if (!settingsOpen) {
       setForm(mapLocationToForm(location, title));
@@ -100,36 +87,70 @@ export function EstablishmentCard({ location, onSync, onConnect }: Props) {
 
   function handleSettingsSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    // Próximo paso: aquí haremos PATCH /api/locations/[id] con "form"
     setSettingsOpen(false);
   }
 
-  // ---------- Render ----------
+  const canToggleCable =
+    (isLinked && !!onDisconnect) || (!isLinked && !!onConnect);
+
+  function handleToggleCable() {
+    if (!canToggleCable) return;
+    if (isLinked) {
+      onDisconnect?.();
+    } else {
+      onConnect?.();
+    }
+  }
+
+  async function handleSyncClick() {
+    if (!onSync || refreshDisabled) return;
+    try {
+      setSyncing(true);
+      await Promise.resolve(onSync());
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <>
-      <Card className="relative overflow-hidden hover:shadow-lg transition-all duration-300">
+      <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg">
         <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between">
-            {/* IZQUIERDA */}
-            <div className="flex-1 space-y-3">
-              <div className="flex items-start gap-3">
-                {/* Icono dinámico */}
-                <span className="text-2xl" aria-hidden>
-                  {icon}
-                </span>
-                <div>
-                  <h3 className="font-semibold text-lg">{title}</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Cuenta Google: {accountEmail ?? "—"}
-                  </p>
+          <div className="flex gap-4 md:gap-6">
+            {/* COLUMNA IZQUIERDA */}
+            <div className="flex min-w-0 flex-[2.2] flex-col gap-3">
+              <div className="flex items-start gap-3 border">
+                {/* Icono principal */}
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-200">
+                  <Image
+                    src="/icon/location.png"
+                    alt="Local"
+                    width={24}
+                    height={24}
+                  />
+                </div>
+
+                <div className="min-w-0">
+                  <h3 className="truncate text-lg font-semibold">{title}</h3>
+
+                  {/* CHIP DE TIPO */}
+                  {typeName && (
+                    <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-sm text-orange-600 shadow-sm">
+                      <span>{typeIcon ?? "🏠"}</span>
+                      <span className="truncate max-w-[200px] md:max-w-xs">
+                        {typeName}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
                     <MapPin size={14} />
-                    <span>{addr || "—"}</span>
+                    <span className="truncate">{addr || "—"}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4 text-sm">
                 <div className="flex items-center gap-1">
                   <Star size={16} className="text-warning" />
                   <span className="font-semibold">{avgText}</span>
@@ -137,88 +158,94 @@ export function EstablishmentCard({ location, onSync, onConnect }: Props) {
                     ({countText} reseñas)
                   </span>
                 </div>
-
-                <div className="flex items-center gap-1 text-sm">
-                  <Calendar
-                    size={14}
-                    className="text-muted-foreground"
-                  />
-                  <span className="text-muted-foreground">
-                    Última sync: {lastSyncText}
-                  </span>
-                </div>
               </div>
 
-              {/* BOTÓN CONECTAR → abre modal (lo gestionará el padre vía onConnect) */}
-              {!connected && onConnect && (
-                <button
-                  onClick={onConnect}
-                  className="px-2 py-1 rounded border text-sm hover:bg-gray-50 inline-flex items-center gap-1"
-                >
-                  Conectar
-                </button>
-              )}
-
-              {!connected && loading && (
+              {loading && !connected && (
                 <p className="text-xs text-muted-foreground">
                   Comprobando suscripción…
                 </p>
               )}
-              {!connected && !loading && !canConnect && (
-                <p className="text-[10px] text-muted-foreground">
-                  Tu plan actual no permite conectar más ubicaciones.
-                </p>
-              )}
             </div>
 
-            {/* DERECHA */}
-            <div className="flex flex-col items-end gap-3">
-              {/* Estado conexión */}
-              <span
-                className={`px-2 py-0.5 rounded text-xs ${
-                  connected
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-100 text-gray-600"
-                } flex items-center gap-1`}
-                title={
-                  connected
-                    ? "Conectado a Google Business"
-                    : "No conectado"
-                }
-              >
-                {connected ? (
-                  <Wifi size={12} />
-                ) : (
-                  <WifiOff size={12} />
-                )}
-                {connected ? "Conectado" : "No conectado"}
-              </span>
+            {/* COLUMNA DERECHA — 4 FILAS IGUALES */}
+            <div className="flex flex-[1.2] items-stretch">
+              <div className="grid h-full min-h-[112px] flex-1 grid-rows-4 gap-1">
+                {/* Fila 1: engranaje */}
+                <div className="flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setSettingsOpen(true)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-muted-foreground shadow-sm hover:bg-gray-50"
+                    title="Configurar ubicación"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </button>
+                </div>
 
-              {/* Botón sincronizar (igual que antes) */}
-              <button
-                onClick={() => void onSync()}
-                className="px-2 py-1 rounded border text-sm hover:bg-gray-50 inline-flex items-center gap-1"
-                title="Sincronizar ahora"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Sincronizar
-              </button>
+                {/* Fila 2: vacía */}
+                <div className="flex items-center justify-end">{/* vacío */}</div>
 
-              {/* Botón configuración */}
-              <button
-                onClick={() => setSettingsOpen(true)}
-                className="mt-1 px-2 py-1 rounded text-xs text-muted-foreground hover:bg-gray-50 inline-flex items-center gap-1"
-                title="Configurar ubicación"
-              >
-                <Settings className="w-4 h-4" />
-                Configurar
-              </button>
+                {/* Fila 3: botón conectar / desconectar */}
+                <div className="flex items-center justify-end">
+                  <button
+                    type="button"
+                    disabled={!canToggleCable}
+                    onClick={handleToggleCable}
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-colors ${
+                      !canToggleCable
+                        ? "cursor-not-allowed bg-slate-100 text-slate-300"
+                        : isLinked
+                        ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                        : "bg-rose-500 text-white hover:bg-rose-600"
+                    }`}
+                    title={
+                      !canToggleCable
+                        ? isLinked
+                          ? "No se puede desvincular (sin acción configurada)"
+                          : "No se puede vincular (sin acción configurada)"
+                        : isLinked
+                        ? "Desvincular reseñas"
+                        : "Vincular reseñas"
+                    }
+                  >
+                    <Plug className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Fila 4: texto + botón actualizar */}
+                <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+                  <span className="whitespace-nowrap">
+                    Actualizado {lastSyncAgo}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={refreshDisabled}
+                    onClick={handleSyncClick}
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-xs shadow-sm transition
+                      ${
+                        refreshDisabled
+                          ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300"
+                          : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
+                    title={
+                      isLinked
+                        ? "Actualizar reseñas"
+                        : "Vincula la ubicación para refrescar reseñas"
+                    }
+                  >
+                    <RotateCcw
+                      className={`h-4 w-4 ${
+                        effectiveSyncing ? "animate-spin" : ""
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Modal configuración ubicación */}
       <LocationSettingsModal
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
@@ -233,7 +260,10 @@ export function EstablishmentCard({ location, onSync, onConnect }: Props) {
 
 /* ---------- Helpers ---------- */
 
-function mapLocationToForm(loc: LocationRow, fallbackTitle: string): LocationForm {
+function mapLocationToForm(
+  loc: LocationRow,
+  fallbackTitle: string,
+): LocationForm {
   return {
     title:
       (loc as any).title ??
@@ -251,4 +281,23 @@ function mapLocationToForm(loc: LocationRow, fallbackTitle: string): LocationFor
       "",
     website: (loc as any).website ?? "",
   };
+}
+
+function timeAgo(date: Date | string | undefined): string {
+  if (!date) return "—";
+  const now = new Date();
+  const d = new Date(date);
+  const diffMs = now.getTime() - d.getTime();
+
+  const sec = Math.floor(diffMs / 1000);
+  const min = Math.floor(sec / 60);
+  const hr = Math.floor(min / 60);
+  const day = Math.floor(hr / 24);
+  const week = Math.floor(day / 7);
+
+  if (sec < 60) return `hace ${sec}s`;
+  if (min < 60) return `hace ${min} min`;
+  if (hr < 24) return `hace ${hr} horas`;
+  if (day < 7) return `hace ${day} días`;
+  return `hace ${week} semanas`;
 }

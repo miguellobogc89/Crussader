@@ -16,6 +16,25 @@ Roadmap:
 - Pulir la sidbar
 - Renderizar la web para portatil, tablet y móvil
 
+============ NUEVO =====================
+
+- Arreglar visual de notificaciones
+- Montar tabla de plataformas disponibles para conectar y próximas - OK
+- Mostrar los usuarios de las empresa y poder invitar - 
+- Bloquear informes y sentimiento en la pagina de reseñas
+- Quitar el chatbot
+- Gráfico de ratio de reseñas contestadas por mes
+- Gráfico de tiempo medio de respuesta por mes
+- Arreglar saludo bienvenida y panel general
+- Arreglar enlaces de correos de invitación
+- que al pulsar en la sidebar haya feedback visual
+- arrglear las configuracion general: quitar tema oscuro y claro, etc..
+- Añadir cosas al panel de empresas mybusiness
+- arreglar el selector de empresas y el activecompany
+
+- Notificaciones por WhatsApp
+- Volver a verificar google
+
 
 -------- Una vez tengamos la API de Google --------------
 - Automatizar la autocontestación y que ponga, respuesta contestada automaticamente
