@@ -228,6 +228,23 @@ export async function createAIResponseForReview(reviewId: string) {
 
   if (!review) throw new Error("Review not found");
 
+  // 🆕 CORTE DE 30 DÍAS: no generamos IA si la reseña es demasiado antigua
+  if (review.createdAtG instanceof Date) {
+    const now = new Date();
+    const diffMs = now.getTime() - review.createdAtG.getTime();
+    const days = diffMs / (1000 * 60 * 60 * 24);
+    if (days > 30) {
+      // No crear respuesta automática para reseñas > 30 días.
+      // Devolvemos cualquier respuesta existente si la hubiera, o null.
+      const existing = await prisma.response.findFirst({
+        where: { reviewId: review.id },
+        orderBy: { createdAt: "desc" },
+      });
+      // Cast a any para no romper firmas; los sitios que no usan el retorno no se ven afectados.
+      return existing as any;
+    }
+  }
+
   const rs = await prisma.responseSettings.findUnique({
     where: { companyId: review.companyId },
     select: { config: true },
@@ -265,6 +282,7 @@ export async function createAIResponseForReview(reviewId: string) {
       tone: String(cfg.tone),
       businessType: cfg.sector,
       promptVersion: "settings-v1",
+      auto_publish_status: "pending",
     },
   });
 

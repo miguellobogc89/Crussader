@@ -225,7 +225,7 @@ export default function ReviewCard({
       )
     );
     try {
-      const res = await fetch(`/api/responses/${current.id}/publish`, {
+      const res = await fetch(`/api/reviews/response/${current.id}/publish`, {
         method: "POST",
         cache: "no-store",
       });

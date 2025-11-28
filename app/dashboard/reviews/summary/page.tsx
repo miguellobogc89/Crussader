@@ -8,8 +8,9 @@ import LocationSelector, {
   type LocationLite,
 } from "@/app/components/crussader/LocationSelector";
 import { useBootstrapData } from "@/app/providers/bootstrap-store";
-
+import AutoPublishSettingsPanel from "@/app/components/reviews/summary/AutoPublishSettingsPanel";
 import dynamic from "next/dynamic";
+
 
 const ReviewsFilterPanel = dynamic(
   () =>
@@ -207,6 +208,11 @@ export default function ReviewsSummaryPage() {
 
   return (
     <div className="py-6 sm:py-8 overflow-x-hidden mx-6">
+      {/* NUEVO PANEL DE AUTOPUBLICACIÓN */}
+      <div className="mb-4 sm:mb-6">
+        <AutoPublishSettingsPanel />
+      </div>
+
       <div className="mb-6">
         <ReviewsFilterPanel
           locationSelectorSlot={

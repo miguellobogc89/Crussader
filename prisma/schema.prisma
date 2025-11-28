@@ -1823,38 +1823,40 @@ model Review {
 }
 
 model Response {
-  id              String               @id @default(cuid())
-  reviewId        String
-  content         String
-  status          ResponseStatus       @default(PENDING)
-  active          Boolean              @default(true)
-  published       Boolean              @default(false)
-  edited          Boolean              @default(false)
-  generationCount Int                  @default(1)
-  lastGeneratedAt DateTime?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  publishedAt     DateTime?
-  createdById     String?
-  editedById      String?
-  source          ResponseSource       @default(AI)
-  model           String?
-  temperature     Float?
-  promptVersion   String?
-  language        String?
-  tone            String?
-  businessType    String?
-  moderationFlag  Boolean              @default(false)
-  moderationNotes String?
-  lastError       String?
-  jobs            Job[]
-  createdBy       User?                @relation("ResponseCreatedBy", fields: [createdById], references: [id])
-  editedBy        User?                @relation("ResponseEditedBy", fields: [editedById], references: [id])
-  review          Review               @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  publishLogs     ResponsePublishLog[]
+  id                  String                    @id @default(cuid())
+  reviewId            String
+  content             String
+  status              ResponseStatus            @default(PENDING)
+  active              Boolean                   @default(true)
+  published           Boolean                   @default(false)
+  edited              Boolean                   @default(false)
+  generationCount     Int                       @default(1)
+  lastGeneratedAt     DateTime?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  publishedAt         DateTime?
+  createdById         String?
+  editedById          String?
+  source              ResponseSource            @default(AI)
+  model               String?
+  temperature         Float?
+  promptVersion       String?
+  language            String?
+  tone                String?
+  businessType        String?
+  moderationFlag      Boolean                   @default(false)
+  moderationNotes     String?
+  lastError           String?
+  auto_publish_status ResponseAutoPublishStatus @default(pending)
+  jobs                Job[]
+  createdBy           User?                     @relation("ResponseCreatedBy", fields: [createdById], references: [id])
+  editedBy            User?                     @relation("ResponseEditedBy", fields: [editedById], references: [id])
+  review              Review                    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  publishLogs         ResponsePublishLog[]
 
   @@index([reviewId])
   @@index([status, published, active])
+  @@index([auto_publish_status])
 }
 
 model Notification {
@@ -1883,6 +1885,26 @@ model Notification {
   @@index([notified_at(sort: Desc)], map: "idx_notification_notified")
   @@index([object_id], map: "idx_notification_object_id")
   @@index([status], map: "idx_notification_status")
+}
+
+model integration_platforms {
+  id                BigInt               @id @default(autoincrement())
+  name              String
+  slug              String               @unique
+  provider          integration_provider
+  status            integration_status   @default(in_development)
+  go_live_at        DateTime?            @db.Timestamptz(6)
+  is_public         Boolean              @default(true)
+  is_free           Boolean              @default(true)
+  base_monthly_cost Decimal?             @db.Decimal(10, 2)
+  currency          String               @default("EUR")
+  logo_url          String?
+  brand_color       String?
+  docs_url          String?
+  description_short String?
+  description_long  String?
+  created_at        DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime             @default(now()) @db.Timestamptz(6)
 }
 
 /// *
@@ -2205,4 +2227,32 @@ enum shift_event_kind {
   SICK
   HOLIDAY
   OTHER
+}
+
+enum ResponseAutoPublishStatus {
+  pending
+  done
+  skipped
+}
+
+enum integration_provider {
+  google
+  meta
+  whatsapp
+  facebook
+  instagram
+  tripadvisor
+  yelp
+  booking
+  internal
+  other
+}
+
+enum integration_status {
+  active
+  beta
+  in_development
+  coming_soon
+  inactive
+  deprecated
 }
