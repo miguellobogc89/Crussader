@@ -249,126 +249,128 @@ export default function ReportsAndAnalyticsPage() {
       // showShellBadge // (true por defecto)
     >
       {/* Contenido de los paneles con transición suave */}
-      <SectionWrapper topPadding="pt-6" minH="min-h-[60vh]">
-        {/* FAVORITOS */}
-        {activeTab === "favorites" && (
-          <div className="py-16 text-center text-muted-foreground">
-            (Vacío) Aquí podrás fijar tus paneles favoritos.
-          </div>
-        )}
+      <SectionWrapper topPadding="pt-6">
+        <div className="min-h-[60vh]">
+            {/* FAVORITOS */}
+            {activeTab === "favorites" && (
+              <div className="py-16 text-center text-muted-foreground">
+                (Vacío) Aquí podrás fijar tus paneles favoritos.
+              </div>
+            )}
 
-        {/* TENDENCIAS */}
-        {activeTab === "trends" && (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader><CardTitle>Evolución del Rating</CardTitle></CardHeader>
-              <CardContent className="h-80">
-                <RatingLineChart {...({ data: monthlySeries, xKey: "month", yKey: "rating" } as any)} />
-              </CardContent>
-            </Card>
+            {/* TENDENCIAS */}
+            {activeTab === "trends" && (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <Card>
+                  <CardHeader><CardTitle>Evolución del Rating</CardTitle></CardHeader>
+                  <CardContent className="h-80">
+                    <RatingLineChart {...({ data: monthlySeries, xKey: "month", yKey: "rating" } as any)} />
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader><CardTitle>Distribución de Estrellas</CardTitle></CardHeader>
-              <CardContent className="h-80">
-                <StarDistribution {...({ data: starsData } as any)} />
-              </CardContent>
-            </Card>
+                <Card>
+                  <CardHeader><CardTitle>Distribución de Estrellas</CardTitle></CardHeader>
+                  <CardContent className="h-80">
+                    <StarDistribution {...({ data: starsData } as any)} />
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader><CardTitle>Tendencia de Reseñas</CardTitle></CardHeader>
-              <CardContent className="h-80">
-                <ReviewsAreaChart {...({ data: monthlySeries, xKey: "month", yKey: "reviews" } as any)} />
-              </CardContent>
-            </Card>
+                <Card>
+                  <CardHeader><CardTitle>Tendencia de Reseñas</CardTitle></CardHeader>
+                  <CardContent className="h-80">
+                    <ReviewsAreaChart {...({ data: monthlySeries, xKey: "month", yKey: "reviews" } as any)} />
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader><CardTitle>Fuentes de Reseñas</CardTitle></CardHeader>
-              <CardContent className="h-80">
-                <ReviewSourcesPie {...({ data: sourcesData } as any)} />
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                <Card>
+                  <CardHeader><CardTitle>Fuentes de Reseñas</CardTitle></CardHeader>
+                  <CardContent className="h-80">
+                    <ReviewSourcesPie {...({ data: sourcesData } as any)} />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-        {/* ANÁLISIS */}
-        {activeTab === "analysis" && (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader><CardTitle>Análisis de Sentimientos</CardTitle></CardHeader>
-              <CardContent className="h-80">
-                <SentimentDonut {...({ data: sentimentData } as any)} />
-              </CardContent>
-            </Card>
+            {/* ANÁLISIS */}
+            {activeTab === "analysis" && (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <Card>
+                  <CardHeader><CardTitle>Análisis de Sentimientos</CardTitle></CardHeader>
+                  <CardContent className="h-80">
+                    <SentimentDonut {...({ data: sentimentData } as any)} />
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader><CardTitle>Palabras Más Repetidas</CardTitle></CardHeader>
-              <CardContent className="h-80">
-                <TopKeywordsBars {...({ data: keywordsData } as any)} />
-              </CardContent>
-            </Card>
+                <Card>
+                  <CardHeader><CardTitle>Palabras Más Repetidas</CardTitle></CardHeader>
+                  <CardContent className="h-80">
+                    <TopKeywordsBars {...({ data: keywordsData } as any)} />
+                  </CardContent>
+                </Card>
 
-            <Card className="lg:col-span-2">
-              <CardHeader><CardTitle>Volumen de Reseñas por Mes</CardTitle></CardHeader>
-              <CardContent className="h-80">
-                <ReviewsAreaChart {...({ data: monthlySeries, xKey: "month", yKey: "reviews" } as any)} />
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                <Card className="lg:col-span-2">
+                  <CardHeader><CardTitle>Volumen de Reseñas por Mes</CardTitle></CardHeader>
+                  <CardContent className="h-80">
+                    <ReviewsAreaChart {...({ data: monthlySeries, xKey: "month", yKey: "reviews" } as any)} />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-        {/* UBICACIONES */}
-        {activeTab === "locations" && (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader><CardTitle>Tiempo de Respuesta por Ubicación</CardTitle></CardHeader>
-              <CardContent className="h-80">
-                <ResponseTimeCompare
-                  {...({ data: responseCompareData, xKey: "label", avgKey: "avg", targetKey: "target" } as any)}
-                />
-              </CardContent>
-            </Card>
+            {/* UBICACIONES */}
+            {activeTab === "locations" && (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <Card>
+                  <CardHeader><CardTitle>Tiempo de Respuesta por Ubicación</CardTitle></CardHeader>
+                  <CardContent className="h-80">
+                    <ResponseTimeCompare
+                      {...({ data: responseCompareData, xKey: "label", avgKey: "avg", targetKey: "target" } as any)}
+                    />
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader><CardTitle>Dispositivos de Origen</CardTitle></CardHeader>
-              <CardContent className="h-80">
-                <DeviceOriginList {...({ data: deviceData } as any)} />
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                <Card>
+                  <CardHeader><CardTitle>Dispositivos de Origen</CardTitle></CardHeader>
+                  <CardContent className="h-80">
+                    <DeviceOriginList {...({ data: deviceData } as any)} />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
-        {/* RENDIMIENTO */}
-        {activeTab === "performance" && (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <Card className="lg:col-span-1">
-              <CardHeader><CardTitle>KPIs Objetivo</CardTitle></CardHeader>
-              <CardContent className="h-80">
-                <KpiTargetsProgress items={kpiTargets as any} />
-              </CardContent>
-            </Card>
+            {/* RENDIMIENTO */}
+            {activeTab === "performance" && (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <Card className="lg:col-span-1">
+                  <CardHeader><CardTitle>KPIs Objetivo</CardTitle></CardHeader>
+                  <CardContent className="h-80">
+                    <KpiTargetsProgress items={kpiTargets as any} />
+                  </CardContent>
+                </Card>
 
-            <Card className="lg:col-span-1">
-              <CardHeader><CardTitle>Alertas Activas</CardTitle></CardHeader>
-              <CardContent className="h-80 overflow-auto">
-                <AlertsList items={alertItems} />
-              </CardContent>
-            </Card>
+                <Card className="lg:col-span-1">
+                  <CardHeader><CardTitle>Alertas Activas</CardTitle></CardHeader>
+                  <CardContent className="h-80 overflow-auto">
+                    <AlertsList items={alertItems} />
+                  </CardContent>
+                </Card>
 
-            <Card className="lg:col-span-1">
-              <CardHeader><CardTitle>Resumen del Mes</CardTitle></CardHeader>
-              <CardContent className="h-80">
-                <MonthlyHighlights items={monthlyHighlightsItems} />
-              </CardContent>
-            </Card>
+                <Card className="lg:col-span-1">
+                  <CardHeader><CardTitle>Resumen del Mes</CardTitle></CardHeader>
+                  <CardContent className="h-80">
+                    <MonthlyHighlights items={monthlyHighlightsItems} />
+                  </CardContent>
+                </Card>
 
-            <Card className="lg:col-span-3">
-              <CardHeader><CardTitle>Análisis Competitivo</CardTitle></CardHeader>
-              <CardContent className="h-96">
-                <CompetitiveRadar {...({ data: competitiveData } as any)} />
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                <Card className="lg:col-span-3">
+                  <CardHeader><CardTitle>Análisis Competitivo</CardTitle></CardHeader>
+                  <CardContent className="h-96">
+                    <CompetitiveRadar {...({ data: competitiveData } as any)} />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+        </div>
       </SectionWrapper>
     </PageShell>
   );

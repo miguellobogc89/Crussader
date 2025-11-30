@@ -16,7 +16,6 @@ import { BrandIdentitySection } from "@/app/components/reviews/settings/sections
 import { StarRulesSection } from "@/app/components/reviews/settings/sections/StarRulesSection";
 import { ChannelsCtaSection } from "@/app/components/reviews/settings/sections/ChannelsCtaSection";
 import { PublishingSection } from "@/app/components/reviews/settings/sections/PublishingSection";
-import { ResponsePreviewPanel } from "@/app/components/reviews/settings/sections/ResponsePreviewPanel";
 
 import { ConfigBadgesBar } from "@/app/components/reviews/settings/ConfigBadgesBar";
 import type { BadgesComputed } from "@/app/components/reviews/settings/ConfigBadgesBar";
@@ -145,12 +144,6 @@ const computedBadges: BadgesComputed = useMemo(() => {
           </div>
 
           <div className="lg:col-span-5 space-y-6">
-            <ResponsePreviewPanel
-              settings={settings}
-              selectedStar={selectedStar}
-              onStarChange={(s) => setSelectedStar(s)}
-              showConfigBadges={false}
-            />
 
             {showPromptDebug && (
               <Card className="border-none shadow-none bg-white/60 backdrop-blur-sm">
