@@ -4,7 +4,6 @@
 import * as React from "react";
 import Image from "next/image";
 import { EstablishmentCard } from "@/app/components/company/EstablishmentCard";
-import ListToolbar from "@/app/components/ListToolbar";
 import type { LocationRow } from "@/hooks/useCompanyLocations";
 import { getBusinessIcon } from "@/lib/businessTypeIcons";
 
@@ -36,7 +35,6 @@ export function CompanyEstablishments({ companyId }: Props) {
         ? j.locations
         : [];
 
-      // 🔹 Cruce: Type.id → Type.name → icono
       const withTypeAndIcon = rawLocs.map((loc: any) => {
         const typeName: string | null =
           loc.type?.name ??
@@ -97,8 +95,7 @@ export function CompanyEstablishments({ companyId }: Props) {
 
   return (
     <section className="space-y-3 rounded border bg-white p-4">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        {/* Título + icono, con buen peso visual */}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center">
         <div className="flex items-center gap-2">
           <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100">
             <Image
@@ -112,8 +109,6 @@ export function CompanyEstablishments({ companyId }: Props) {
             Ubicaciones vinculadas a tu empresa
           </span>
         </div>
-
-        <ListToolbar />
       </div>
 
       {locsError && (
@@ -141,7 +136,7 @@ export function CompanyEstablishments({ companyId }: Props) {
             <EstablishmentCard
               key={loc.id}
               location={loc}
-              companyId={companyId} 
+              companyId={companyId}
               typeName={loc.__businessTypeName ?? null}
               typeIcon={loc.__businessTypeIcon}
               onSync={() => handleSync(loc.id)}

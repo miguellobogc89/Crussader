@@ -24,7 +24,6 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 
-
 import type { LocationRow } from "@/hooks/useCompanyLocations";
 import { useBillingStatus } from "@/hooks/useBillingStatus";
 import LocationSettingsModal, {
@@ -32,18 +31,21 @@ import LocationSettingsModal, {
 } from "@/app/components/company/LocationSettingsModal";
 
 type Props = {
-  companyId: string; 
+  companyId: string;
   location: LocationRow;
+
+  // mismas callbacks que ya usaba el padre
   onSync?: () => void | Promise<void>;
   onConnect?: () => void;
   onDisconnect?: () => void;
   isSyncing?: boolean;
+
   typeName?: string | null;
   typeIcon?: string;
 };
 
 export function EstablishmentCard({
-  companyId, 
+  companyId,
   location,
   onSync,
   onConnect,
@@ -53,8 +55,6 @@ export function EstablishmentCard({
   typeIcon,
 }: Props) {
   const { loading } = useBillingStatus();
-
-  const locationId = (location as any).id as string | undefined;
 
   const title =
     (location as any).title ??
@@ -97,11 +97,13 @@ export function EstablishmentCard({
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
+  // ---- sync / refresh (usa onSync del padre) ----
   const canRefresh = !!onSync;
   const [syncing, setSyncing] = React.useState(false);
   const effectiveSyncing = isSyncing || syncing;
   const refreshDisabled = !isLinked || !canRefresh || effectiveSyncing;
 
+  // ---- modal ajustes ----
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [form, setForm] = React.useState<LocationForm>(() =>
     mapLocationToForm(location, title),
@@ -122,6 +124,7 @@ export function EstablishmentCard({
     setSettingsOpen(false);
   }
 
+  // ---- conectar / desconectar ----
   const canToggleCable =
     (isLinked && !!onDisconnect) || (!isLinked && !!onConnect);
 
@@ -134,6 +137,7 @@ export function EstablishmentCard({
     }
   }
 
+  // ---- refrescar reseñas ----
   async function handleSyncClick() {
     if (!onSync || refreshDisabled) return;
     try {
@@ -144,6 +148,7 @@ export function EstablishmentCard({
     }
   }
 
+  // ---- imagen destacada ----
   function handleClickImage() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -151,45 +156,44 @@ export function EstablishmentCard({
     }
   }
 
-async function handleFileChange(
-  e: React.ChangeEvent<HTMLInputElement>,
-) {
-  const file = e.target.files?.[0];
-  const locationId = (location as any).id as string | undefined;
-  if (!file || !locationId || !companyId) return;
+  async function handleFileChange(
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = e.target.files?.[0];
+    const locationId = (location as any).id as string | undefined;
+    if (!file || !locationId || !companyId) return;
 
-  const reader = new FileReader();
-  reader.onloadend = async () => {
-    const dataUrl = reader.result as string;
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const dataUrl = reader.result as string;
 
-    // Preview inmediata en la card
-    setLocalImageUrl(dataUrl);
+      // Preview inmediata en la card
+      setLocalImageUrl(dataUrl);
 
-    try {
-      const res = await fetch(
-        `/api/companies/${companyId}/locations`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            locationId,
-            featuredImageUrl: dataUrl,
-          }),
-        },
-      );
+      try {
+        const res = await fetch(
+          `/api/companies/${companyId}/locations`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              locationId,
+              featuredImageUrl: dataUrl,
+            }),
+          },
+        );
 
-      const j = await res.json().catch(() => null);
-      if (!res.ok || !j?.ok) {
-        console.error(j?.error || "Error al guardar imagen");
+        const j = await res.json().catch(() => null);
+        if (!res.ok || !j?.ok) {
+          console.error(j?.error || "Error al guardar imagen");
+        }
+      } catch (err) {
+        console.error(err);
       }
-    } catch (err) {
-      console.error(err);
-    }
-  };
+    };
 
-  reader.readAsDataURL(file);
-}
-
+    reader.readAsDataURL(file);
+  }
 
   return (
     <>
@@ -204,7 +208,7 @@ async function handleFileChange(
             onChange={handleFileChange}
           />
 
-          <div className="flex items-start justify-between gap-6">
+          <div className="flex items-stretch justify-between gap-6">
             {/* LEFT SECTION - MAIN INFO */}
             <div className="flex flex-1 gap-4">
               {/* Avatar / Imagen clickable */}
@@ -247,7 +251,6 @@ async function handleFileChange(
                       ].join(" ")}
                     />
                   </div>
-
 
                   {/* CHIP DE TIPO */}
                   {typeName && (
@@ -293,39 +296,19 @@ async function handleFileChange(
             </div>
 
             {/* RIGHT SECTION - ACTIONS & STATUS */}
-            <div className="flex shrink-0 items-start gap-3">
-              {/* Sync + fecha */}
-              <div className="flex flex-col items-end gap-1.5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSyncClick}
-                  disabled={refreshDisabled}
-                  className="h-8 gap-2 px-3 text-xs hover:bg-accent"
-                >
-                  <RefreshCw
-                    className={`h-3.5 w-3.5 ${
-                      effectiveSyncing ? "animate-spin" : ""
-                    }`}
-                  />
-                  <span className="hidden md:inline">Actualizar</span>
-                </Button>
-                <span className="text-xs text-muted-foreground">
-                  {isLinked ? `Actualizado ${lastSyncAgo}` : "No conectado"}
-                </span>
-              </div>
-
+            <div className="shrink-0 flex flex-col items-end gap-3 h-full">
               {/* Menú de acciones */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
                   >
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
+
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
                     <Settings2 className="mr-2 h-4 w-4" />
@@ -346,6 +329,40 @@ async function handleFileChange(
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              {/* Bloque inferior: Sync o botón Conectar */}
+              <div className="mt-auto flex flex-col items-end gap-1.5">
+                {isLinked ? (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSyncClick}
+                      disabled={refreshDisabled}
+                      className="h-8 gap-2 px-3 text-xs hover:bg-accent"
+                    >
+                      <RefreshCw
+                        className={`h-3.5 w-3.5 ${
+                          effectiveSyncing ? "animate-spin" : ""
+                        }`}
+                      />
+                      <span className="hidden md:inline">Actualizar</span>
+                    </Button>
+
+                    <span className="text-xs text-muted-foreground">
+                      Actualizado {lastSyncAgo}
+                    </span>
+                  </>
+                ) : (
+                  <Button
+                    onClick={handleToggleCable}
+                    size="sm"
+                    className="h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                  >
+                    Conectar
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 

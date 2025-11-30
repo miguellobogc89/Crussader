@@ -12,7 +12,7 @@ import {
 } from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
-import { MapPin, Star, Loader2, Building2 } from "lucide-react";
+import { MapPin, Star, Loader2, Building2, Store } from "lucide-react";
 
 type Location = {
   id: string;
@@ -89,7 +89,6 @@ export default function HomeLocationsCard() {
           {loading && (
             <Badge className="flex items-center gap-1 bg-muted text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Cargando
             </Badge>
           )}
 
@@ -192,17 +191,14 @@ export default function HomeLocationsCard() {
               </div>
             );
           })}
-
-        <Button
-          variant="ghost"
-          className="w-full mt-4"
-          asChild
-          disabled={loading || error}
-        >
-          <Link href="/dashboard/company">
-            Gestionar ubicaciones
+        <div className="flex justify-end">
+          <Link href="/dashboard/mybusiness">
+            <Button className="bg-gradient-to-r from-violet-400 to-violet-500 hover:from-violet-700 hover:to-violet-800 shadow-md">
+              <Store className="h-4 w-4 mr-2" /> Gestionar ubicaciones
+            </Button>
           </Link>
-        </Button>
+        </div>
+
       </CardContent>
     </Card>
   );

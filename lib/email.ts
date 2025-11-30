@@ -4,8 +4,37 @@ import { Resend } from "resend";
 const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
 const EMAIL_FROM =
   process.env.EMAIL_FROM ?? "Crussader <no-reply@crussader.com>";
-const REPLY_TO =
-  process.env.EMAIL_REPLY_TO ?? "soporte@tu-dominio.com";
+const REPLY_TO = process.env.EMAIL_REPLY_TO ?? "soporte@tu-dominio.com";
+
+/**
+ * Dominio base para los enlaces que van en los emails.
+ *
+ * Configura en producción, por ejemplo:
+ *  - NEXT_PUBLIC_APP_URL=https://app.crussader.com
+ *
+ * Fallback final: https://app.crussader.com
+ */
+const APP_BASE_URL =
+  process.env.NEXT_PUBLIC_APP_URL ??
+  process.env.APP_URL ??
+  process.env.NEXTAUTH_URL ??
+  "https://app.crussader.com";
+
+function toAbsoluteUrl(url: string): string {
+  if (!url) return APP_BASE_URL;
+
+  // Si ya es absoluta, la dejamos tal cual
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+
+  // Aseguramos que empiece por "/"
+  const normalizedPath = url.startsWith("/") ? url : `/${url}`;
+
+  // Unimos dominio + path sin duplicar barras
+  const base = APP_BASE_URL.replace(/\/+$/, "");
+  return `${base}${normalizedPath}`;
+}
 
 let resendSingleton: Resend | null = null;
 function getResend(): Resend | null {
@@ -211,11 +240,13 @@ async function sendEmail({
 /** ============ Public API ============ */
 
 export async function sendVerificationEmail(to: string, verifyUrl: string) {
-  const html = VERIFY_EMAIL_HTML.replace(/{{verifyUrl}}/g, verifyUrl);
+  const absoluteVerifyUrl = toAbsoluteUrl(verifyUrl);
+
+  const html = VERIFY_EMAIL_HTML.replace(/{{verifyUrl}}/g, absoluteVerifyUrl);
   const text = `Crussader
 
 Verifica tu cuenta para activarla:
-${verifyUrl}
+${absoluteVerifyUrl}
 
 Si no has solicitado esta cuenta, ignora este mensaje.`;
   return sendEmail({
@@ -230,12 +261,14 @@ export async function sendPasswordResetEmail(
   to: string,
   resetUrl: string
 ) {
-  const html = RESET_EMAIL_HTML.replace(/{{resetUrl}}/g, resetUrl);
+  const absoluteResetUrl = toAbsoluteUrl(resetUrl);
+
+  const html = RESET_EMAIL_HTML.replace(/{{resetUrl}}/g, absoluteResetUrl);
   const text = `Crussader
 
 Recibimos una solicitud para restablecer tu contraseña.
 Abre este enlace (válido 1 hora) para crear una nueva:
-${resetUrl}
+${absoluteResetUrl}
 
 Si no solicitaste este cambio, ignora este mensaje.`;
   return sendEmail({
@@ -255,17 +288,19 @@ export async function sendBetaInviteEmail(params: {
   url: string;
 }) {
   const safeName = params.name || params.to;
+  const absoluteUrl = toAbsoluteUrl(params.url);
+
   const html = BETA_INVITE_HTML
     .replace(/{{name}}/g, safeName)
     .replace(/{{code}}/g, params.code)
-    .replace(/{{url}}/g, params.url);
+    .replace(/{{url}}/g, absoluteUrl);
 
   const text = `Hola ${safeName},
 
 Te hemos invitado a la beta privada de Crussader.
 
 Accede desde este enlace:
-${params.url}
+${absoluteUrl}
 
 Código de invitación: ${params.code}
 
@@ -299,17 +334,19 @@ export async function sendAccessRequestEmail(params: {
       ? requesterEmail.trim()
       : "desconocido@correo.com";
 
+  const absoluteApproveUrl = toAbsoluteUrl(approveUrl);
+
   const html = ACCESS_REQUEST_HTML
     .replace(/{{requesterName}}/g, safeName)
     .replace(/{{requesterEmail}}/g, safeEmail)
-    .replace(/{{approveUrl}}/g, approveUrl);
+    .replace(/{{approveUrl}}/g, absoluteApproveUrl);
 
   const text = `Nueva solicitud de acceso en Crussader.
 
 ${safeName} (${safeEmail}) ha solicitado unirse a vuestra empresa.
 
 Si quieres aprobar el acceso, abre este enlace:
-${approveUrl}
+${absoluteApproveUrl}
 
 Si no reconoces a esta persona, puedes ignorar este mensaje.`;
 
@@ -320,4 +357,3 @@ Si no reconoces a esta persona, puedes ignorar este mensaje.`;
     text,
   });
 }
-

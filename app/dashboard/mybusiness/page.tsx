@@ -317,9 +317,6 @@ export default function MyBusinessPage() {
               <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-fuchsia-500 to-sky-500 text-white shadow-lg">
                 <Building2 className="h-8 w-8" />
               </div>
-              <h2 className="text-xl font-semibold">
-                Aún no tienes ninguna empresa
-              </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Crea tu empresa o solicita unirte a una existente para empezar a
                 trabajar con Crussader.

@@ -1,5 +1,4 @@
 // app/components/home/HomeWelcomeHeader.tsx
-
 import { Crown } from "lucide-react";
 
 type HomeWelcomeHeaderProps = {
@@ -23,3 +22,4 @@ export default function HomeWelcomeHeader({ name }: HomeWelcomeHeaderProps) {
     </div>
   );
 }
+
