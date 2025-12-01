@@ -31,13 +31,10 @@ export function OnboardingModal({
   currentStepId,
   isBusy = false,
 }: OnboardingModalProps) {
-  // 👉 Detectar si estamos en el paso FINAL
+  // 👉 Paso final (success)
   const isFinished = currentStepId === "finished";
 
-  // 👉 Botón anterior solo si NO estamos en el final
   const effectiveCanPrev = canGoPrev && !isBusy && !isFinished;
-
-  // 👉 Botón siguiente siempre visible, pero renombrado a "Finalizar" en el último paso
   const effectiveCanNext = canGoNext && !isBusy;
 
   return (
@@ -56,10 +53,10 @@ export function OnboardingModal({
         {/* BODY */}
         <div className="px-6 py-6">{children}</div>
 
-        {/* FOOTER */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/80 flex items-center justify-between">
-          {/* ===== BOTÓN ANTERIOR ===== */}
-          {!isFinished ? (
+        {/* FOOTER: solo se muestra si NO es el paso finished */}
+        {!isFinished && (
+          <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/80 flex items-center justify-between">
+            {/* Botón Anterior */}
             <button
               type="button"
               disabled={!effectiveCanPrev}
@@ -68,41 +65,37 @@ export function OnboardingModal({
                 "px-4 py-2 rounded-md text-sm font-medium transition",
                 !effectiveCanPrev
                   ? "text-slate-400 cursor-not-allowed"
-                  : "text-indigo-600 hover:text-indigo-700"
+                  : "text-indigo-600 hover:text-indigo-700",
               )}
             >
               Anterior
             </button>
-          ) : (
-            <div /> // placeholder para mantener espaciado
-          )}
 
-          {/* ===== BOTÓN SIGUIENTE / FINALIZAR ===== */}
-          <button
-            type="button"
-            disabled={!effectiveCanNext}
-            onClick={effectiveCanNext ? onNext : undefined}
-            className={cn(
-              "px-6 py-2 rounded-lg text-sm font-semibold text-white shadow-md transition",
-              "bg-gradient-to-r from-indigo-600 to-fuchsia-600",
-              "hover:opacity-90 hover:shadow-lg",
-              (!effectiveCanNext || isBusy) &&
-                "opacity-40 cursor-not-allowed hover:opacity-40 hover:shadow-none"
-            )}
-          >
-            {isBusy
-              ? "Procesando…"
-              : currentStepId === "join_email"
-              ? "Solicitar acceso"
-              : currentStepId === "create_company"
-              ? "Crear"
-              : isFinished
-              ? "Finalizar"
-              : "Siguiente"}
-          </button>
-        </div>
+            {/* Botón Siguiente / Finalizar (según step) */}
+            <button
+              type="button"
+              disabled={!effectiveCanNext}
+              onClick={effectiveCanNext ? onNext : undefined}
+              className={cn(
+                "px-6 py-2 rounded-lg text-sm font-semibold text-white shadow-md transition",
+                "bg-gradient-to-r from-indigo-600 to-fuchsia-600",
+                "hover:opacity-90 hover:shadow-lg",
+                (!effectiveCanNext || isBusy) &&
+                  "opacity-40 cursor-not-allowed hover:opacity-40 hover:shadow-none",
+              )}
+            >
+              {isBusy
+                ? "Procesando…"
+                : currentStepId === "join_email"
+                ? "Solicitar acceso"
+                : currentStepId === "create_company"
+                ? "Crear"
+                : "Siguiente"}
+            </button>
+          </div>
+        )}
 
-        {/* ===== INDICADOR DE PROGRESO ===== */}
+        {/* Indicador de progreso (también oculto en finished) */}
         {!isFinished && (
           <div className="py-3 text-center text-xs text-slate-500 bg-white/60 border-t border-slate-100">
             Paso {stepIndex} de {totalSteps}
