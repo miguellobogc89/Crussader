@@ -152,7 +152,7 @@ const BETA_INVITE_HTML = `<!DOCTYPE html>
   </body>
 </html>`;
 
-/** Template solicitud de acceso (onboarding) */
+
 const ACCESS_REQUEST_HTML = `<!DOCTYPE html>
 <html lang="es">
   <head><meta charset="UTF-8" /><title>Solicitud de acceso a tu empresa - Crussader</title></head>
