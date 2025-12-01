@@ -247,130 +247,124 @@ export default function OnboardingPage() {
       return;
     }
 
-    // ---- Paso "create_company": crear empresa + establecimiento y saltar a finished
-    if (currentStep.id === "create_company") {
-      setIsSending(true);
-      try {
-        // 1) Crear empresa si aún no tenemos companyId
-        let companyId = flowState.companyId;
-        const c = flowState.companyForm;
+// ---- Paso "create_company": crear empresa + establecimiento y saltar a finished
+if (currentStep.id === "create_company") {
+  setIsSending(true);
+  try {
+    // 1) Crear empresa si aún no tenemos companyId
+    let companyId = flowState.companyId;
+    const c = flowState.companyForm;
 
-        if (!companyId) {
-          const name = c.name.trim();
+    if (!companyId) {
+      const name = c.name.trim();
 
-          const res = await fetch("/api/mybusiness/company/create", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name,
-              email: c.email,
-              phone: c.phone,
-              address: c.address,
-              employeesBand: c.employeesBand,
-            }),
-          });
+      const res = await fetch("/api/mybusiness/company/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          email: c.email,
+          phone: c.phone,
+          address: c.address,
+          employeesBand: c.employeesBand,
+        }),
+      });
 
-          const data = await res.json().catch(() => null);
+      const data = await res.json().catch(() => null);
 
-          if (!res.ok || !data?.ok) {
-            console.error("❌ Error creando empresa:", res.status, data);
-            setIsSending(false);
-            return;
-          }
-
-          const companyFromApi = data.company;
-          const companyIdFromApi =
-            data.companyId ?? data.company?.id ?? null;
-
-          if (!companyIdFromApi) {
-            console.error(
-              "❌ Respuesta sin companyId al crear empresa:",
-              data,
-            );
-            setIsSending(false);
-            return;
-          }
-
-          const finalName = companyFromApi?.name ?? name;
-
-          companyId = companyIdFromApi;
-
-          setFlowState((prev) => ({
-            ...prev,
-            companyId: companyIdFromApi,
-            companyForm: {
-              ...prev.companyForm,
-              name: finalName,
-            },
-          }));
-        }
-
-        // 2) Crear Location (establecimiento)
-        const {
-          title,
-          address,
-          city,
-          postalCode,
-          phone,
-          website,
-          activityId,
-          typeId,
-        } = flowState.locationForm;
-
-        const locRes = await fetch("/api/mybusiness/locations/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title,
-            address,
-            city,
-            postalCode,
-            phone,
-            website,
-            activityId,
-            typeId,
-          }),
-        });
-
-        const locData = await locRes.json().catch(() => null);
-
-        console.log(
-          "[Onboarding] locations/create response",
-          locRes.status,
-          locData,
-        );
-
-        if (!locRes.ok || !locData?.ok) {
-          console.error(
-            "❌ Error creando Location:",
-            locRes.status,
-            locData,
-          );
-          setIsSending(false);
-          return;
-        }
-
-        setFlowState((prev) => ({
-          ...prev,
-          locationCreated: true,
-        }));
-
-        // 3) Ir al paso final "finished"
-        const nextId = "finished" as StepId;
-        const idx = onboardingSteps.findIndex((s) => s.id === nextId);
-        if (idx !== -1) {
-          setCurrentStepIndex(idx);
-          updateStepInUrl(nextId);
-        } else if (typeof window !== "undefined") {
-          window.location.href = "/dashboard/mybusiness";
-        }
-      } catch (err) {
-        console.error("❌ Error creando empresa + location:", err);
-      } finally {
+      if (!res.ok || !data?.ok) {
+        console.error("❌ Error creando empresa:", res.status, data);
         setIsSending(false);
+        return;
       }
+
+      const companyFromApi = data.company;
+      const companyIdFromApi = data.companyId ?? data.company?.id ?? null;
+
+      if (!companyIdFromApi) {
+        console.error("❌ Respuesta sin companyId al crear empresa:", data);
+        setIsSending(false);
+        return;
+      }
+
+      const finalName = companyFromApi?.name ?? name;
+
+      companyId = companyIdFromApi;
+
+      setFlowState((prev) => ({
+        ...prev,
+        companyId: companyIdFromApi,
+        companyForm: {
+          ...prev.companyForm,
+          name: finalName,
+        },
+      }));
+    }
+
+    // 2) Crear Location (establecimiento) **ligada a esa company**
+    const {
+      title,
+      address,
+      city,
+      postalCode,
+      phone,
+      website,
+      activityId,
+      typeId,
+    } = flowState.locationForm;
+
+    const locRes = await fetch("/api/mybusiness/locations/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyId,     // 👈 IMPORTANTE: ligar la location a la empresa creada
+        title,
+        address,
+        city,
+        postalCode,
+        phone,
+        website,
+        activityId,
+        typeId,
+      }),
+    });
+
+    const locData = await locRes.json().catch(() => null);
+
+    console.log(
+      "[Onboarding] locations/create response",
+      locRes.status,
+      locData,
+    );
+
+    if (!locRes.ok || !locData?.ok) {
+      console.error("❌ Error creando Location:", locRes.status, locData);
+      setIsSending(false);
       return;
     }
+
+    setFlowState((prev) => ({
+      ...prev,
+      locationCreated: true,
+    }));
+
+    // 3) Ir al paso final "finished"
+    const nextId = "finished" as StepId;
+    const idx = onboardingSteps.findIndex((s) => s.id === nextId);
+    if (idx !== -1) {
+      setCurrentStepIndex(idx);
+      updateStepInUrl(nextId);
+    } else if (typeof window !== "undefined") {
+      window.location.href = "/dashboard/mybusiness";
+    }
+  } catch (err) {
+    console.error("❌ Error creando empresa + location:", err);
+  } finally {
+    setIsSending(false);
+  }
+  return;
+}
+
 
     // ---- Paso "finished": ir al dashboard (fallback si el propio step no lo hace)
     if (currentStep.id === "finished") {
@@ -392,46 +386,6 @@ export default function OnboardingPage() {
   function patchState(patch: Partial<OnboardingFlowState>) {
     setFlowState((prev) => ({ ...prev, ...patch }));
   }
-
-  // ==========================
-  // Polling cuando estás en "access_request_sent"
-  // ==========================
-  useEffect(() => {
-    if (currentStep.id !== "access_request_sent") return;
-
-    let cancelled = false;
-
-    async function checkAccess() {
-      try {
-        const res = await fetch("/api/bootstrap", { method: "GET" });
-        if (!res.ok) return;
-        const json = await res.json();
-
-        // 👇 Ajusta este check a tu estructura real de bootstrap
-        const hasCompany =
-          Boolean(json?.currentCompanyId) ||
-          Boolean(json?.me?.companyId) ||
-          (Array.isArray(json?.me?.memberships) &&
-            json.me.memberships.length > 0);
-
-        if (hasCompany && !cancelled) {
-          window.location.href = "/dashboard/mybusiness";
-        }
-      } catch (err) {
-        console.error("Error comprobando acceso aprobado:", err);
-      }
-    }
-
-    // Primera comprobación inmediata
-    checkAccess();
-    // Luego polling cada 5s
-    const id = setInterval(checkAccess, 5000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [currentStep.id]);
 
   return (
     <PageShell title=" " description="">
