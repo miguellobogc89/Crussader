@@ -32,6 +32,8 @@ export default function LoginClient() {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [verifyUrl, setVerifyUrl] = useState<string | null>(null);
 
   const verifiedBanner = params.get("verified") === "1";
 
@@ -79,9 +81,102 @@ export default function LoginClient() {
     window.location.href = res.url ?? "/dashboard";
   }
 
-  function onRegisterSubmit(e: React.FormEvent) {
+  async function onRegisterSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // Mockup: aquí conectaremos el registro real (API /auth/register) más adelante.
+    setError(null);
+    setSuccess(false);
+    setVerifyUrl(null);
+
+    // Validaciones básicas
+    if (!firstName.trim()) {
+      setError("El nombre es obligatorio.");
+      return;
+    }
+    if (!lastName.trim()) {
+      setError("Los apellidos son obligatorios.");
+      return;
+    }
+    if (!email.trim()) {
+      setError("El email es obligatorio.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
+    if (!acceptedTerms) {
+      setError("Debes aceptar los términos y condiciones.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          email,
+          password,
+          acceptTerms: true,
+          next: nextUrl,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data?.ok === false) {
+        const err = data?.error as string | undefined;
+
+        const msg =
+          data?.message ||
+          (err === "EMAIL_ALREADY_EXISTS"
+            ? "Ya existe una cuenta con este email."
+            : err === "INVITE_CODE_REQUIRED"
+            ? "Este entorno requiere código de invitación."
+            : "No se pudo crear la cuenta.");
+        setError(msg);
+        return;
+      }
+
+      // Modo invitación: login automático
+      if (data?.mode === "invite") {
+        const loginRes = await signIn("credentials", {
+          email,
+          password,
+          callbackUrl: nextUrl,
+          redirect: false,
+        });
+
+        if (loginRes && !loginRes.error) {
+          window.location.href = loginRes.url ?? nextUrl;
+          return;
+        }
+
+        // Si falla el login automático, caemos al flujo de ir al login
+        window.location.href = `/auth/login?email=${encodeURIComponent(email)}`;
+        return;
+      }
+
+      // Modo verificación por email: mostramos banner y NO redirigimos
+      if (data?.verifyUrl) {
+        setSuccess(true);
+        setVerifyUrl(data.verifyUrl as string);
+        return;
+      }
+
+      // Fallback: redirigir al login con email pre-rellenado
+      window.location.href = `/auth/login?email=${encodeURIComponent(email)}`;
+    } catch (err: any) {
+      setError(err?.message ?? "Error de red.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function onGoogleClick() {
@@ -90,7 +185,6 @@ export default function LoginClient() {
       await signIn("google", {
         callbackUrl: nextUrl,
       });
-      // Si hay redirect correcto, no vuelve a este punto.
     } catch (err) {
       console.error(err);
       setGoogleLoading(false);
@@ -136,7 +230,10 @@ export default function LoginClient() {
             <div className="inline-flex rounded-full bg-muted p-1 text-sm">
               <button
                 type="button"
-                onClick={() => setMode("login")}
+                onClick={() => {
+                  setMode("login");
+                  setError(null);
+                }}
                 className={[
                   "px-4 py-1 rounded-full transition-all",
                   isLogin
@@ -148,7 +245,10 @@ export default function LoginClient() {
               </button>
               <button
                 type="button"
-                onClick={() => setMode("register")}
+                onClick={() => {
+                  setMode("register");
+                  setError(null);
+                }}
                 className={[
                   "px-4 py-1 rounded-full transition-all",
                   !isLogin
@@ -255,132 +355,154 @@ export default function LoginClient() {
             </form>
           ) : (
             /* FORM REGISTRO */
-            <form className="space-y-4" onSubmit={onRegisterSubmit}>
-              {/* FILA 1 - Nombre / Apellidos */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="register-firstname"
-                    className="text-foreground"
-                  >
-                    Nombre
-                  </Label>
-                  <Input
-                    id="register-firstname"
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="Tu nombre"
-                    required
-                    className="bg-background border-border focus:border-primary transition-colors"
-                  />
+            <>
+              {success && verifyUrl && (
+                <div className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                  Te hemos enviado un correo para{" "}
+                  <strong>verificar</strong> tu cuenta.
                 </div>
+              )}
 
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="register-lastname"
-                    className="text-foreground"
+              {!success && (
+                <form className="space-y-4" onSubmit={onRegisterSubmit}>
+                  {/* FILA 1 - Nombre / Apellidos */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="register-firstname"
+                        className="text-foreground"
+                      >
+                        Nombre
+                      </Label>
+                      <Input
+                        id="register-firstname"
+                        type="text"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="Tu nombre"
+                        required
+                        className="bg-background border-border focus:border-primary transition-colors"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="register-lastname"
+                        className="text-foreground"
+                      >
+                        Apellidos
+                      </Label>
+                      <Input
+                        id="register-lastname"
+                        type="text"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder="Tus apellidos"
+                        required
+                        className="bg-background border-border focus:border-primary transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* FILA 2 - Email */}
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="register-email"
+                      className="text-foreground"
+                    >
+                      Correo electrónico
+                    </Label>
+                    <Input
+                      id="register-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="tu@email.com"
+                      required
+                      className="bg-background border-border focus:border-primary transition-colors"
+                    />
+                  </div>
+
+                  {/* FILA 3 - Contraseña / Confirmar */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="register-password"
+                        className="text-foreground"
+                      >
+                        Contraseña
+                      </Label>
+                      <Input
+                        id="register-password"
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        required
+                        className="bg-background border-border focus:border-primary transition-colors"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="register-confirm"
+                        className="text-foreground"
+                      >
+                        Confirmar contraseña
+                      </Label>
+                      <Input
+                        id="register-confirm"
+                        type={showPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••"
+                        required
+                        className="bg-background border-border focus:border-primary transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Términos y condiciones */}
+                  <div className="mt-2 flex items-start gap-2 text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      id="terms"
+                      className="mt-[3px] accent-primary"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      required
+                    />
+                    <label htmlFor="terms" className="leading-tight">
+                      Acepto los{" "}
+                      <a
+                        href="https://crussader.com/terms.html"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        términos y condiciones
+                      </a>
+                      .
+                    </label>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={loading || !isRegisterFormValid}
+                    className="w-full bg-gradient-to-r from-primary via-accent to-[hsl(280,100%,70%)] hover:opacity-90 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Apellidos
-                  </Label>
-                  <Input
-                    id="register-lastname"
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Tus apellidos"
-                    required
-                    className="bg-background border-border focus:border-primary transition-colors"
-                  />
-                </div>
-              </div>
-
-              {/* FILA 2 - Email */}
-              <div className="space-y-2">
-                <Label htmlFor="register-email" className="text-foreground">
-                  Correo electrónico
-                </Label>
-                <Input
-                  id="register-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="tu@email.com"
-                  required
-                  className="bg-background border-border focus:border-primary transition-colors"
-                />
-              </div>
-
-              {/* FILA 3 - Contraseña / Confirmar */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="register-password"
-                    className="text-foreground"
-                  >
-                    Contraseña
-                  </Label>
-                  <Input
-                    id="register-password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    className="bg-background border-border focus:border-primary transition-colors"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="register-confirm"
-                    className="text-foreground"
-                  >
-                    Confirmar contraseña
-                  </Label>
-                  <Input
-                    id="register-confirm"
-                    type={showPassword ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    className="bg-background border-border focus:border-primary transition-colors"
-                  />
-                </div>
-              </div>
-
-              {/* Términos y condiciones */}
-              <div className="mt-2 flex items-start gap-2 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  id="terms"
-                  className="mt-[3px] accent-primary"
-                  checked={acceptedTerms}
-                  onChange={(e) => setAcceptedTerms(e.target.checked)}
-                  required
-                />
-                <label htmlFor="terms" className="leading-tight">
-                  Acepto los{" "}
-                  <a
-                    href="https://crussader.com/terms.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    términos y condiciones
-                  </a>
-                </label>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={!isRegisterFormValid}
-                className="w-full bg-gradient-to-r from-primary via-accent to-[hsl(280,100%,70%)] hover:opacity-90 text-white font-medium shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Crear cuenta
-              </Button>
-            </form>
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Creando cuenta…</span>
+                      </>
+                    ) : (
+                      "Crear cuenta"
+                    )}
+                  </Button>
+                </form>
+              )}
+            </>
           )}
 
           {/* Divider + Google button */}
@@ -417,13 +539,6 @@ export default function LoginClient() {
               )}
             </Button>
           </div>
-
-          <p className="mt-6 text-center text-[11px] text-muted-foreground">
-            ¿Problemas para entrar?{" "}
-            <a href="/support" className="text-primary hover:underline">
-              Soporte
-            </a>
-          </p>
         </CardContent>
       </Card>
     </div>
