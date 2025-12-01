@@ -393,6 +393,46 @@ export default function OnboardingPage() {
     setFlowState((prev) => ({ ...prev, ...patch }));
   }
 
+  // ==========================
+  // Polling cuando estás en "access_request_sent"
+  // ==========================
+  useEffect(() => {
+    if (currentStep.id !== "access_request_sent") return;
+
+    let cancelled = false;
+
+    async function checkAccess() {
+      try {
+        const res = await fetch("/api/bootstrap", { method: "GET" });
+        if (!res.ok) return;
+        const json = await res.json();
+
+        // 👇 Ajusta este check a tu estructura real de bootstrap
+        const hasCompany =
+          Boolean(json?.currentCompanyId) ||
+          Boolean(json?.me?.companyId) ||
+          (Array.isArray(json?.me?.memberships) &&
+            json.me.memberships.length > 0);
+
+        if (hasCompany && !cancelled) {
+          window.location.href = "/dashboard/mybusiness";
+        }
+      } catch (err) {
+        console.error("Error comprobando acceso aprobado:", err);
+      }
+    }
+
+    // Primera comprobación inmediata
+    checkAccess();
+    // Luego polling cada 5s
+    const id = setInterval(checkAccess, 5000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [currentStep.id]);
+
   return (
     <PageShell title=" " description="">
       <OnboardingModal
