@@ -144,8 +144,10 @@ export default function LoginClient() {
         return;
       }
 
+      const modeFromApi = data?.mode as "invite" | "email_verify" | undefined;
+
       // Modo invitación: login automático
-      if (data?.mode === "invite") {
+      if (modeFromApi === "invite") {
         const loginRes = await signIn("credentials", {
           email,
           password,
@@ -158,20 +160,16 @@ export default function LoginClient() {
           return;
         }
 
-        // Si falla el login automático, caemos al flujo de ir al login
         window.location.href = `/auth/login?email=${encodeURIComponent(email)}`;
         return;
       }
 
-      // Modo verificación por email: mostramos banner y NO redirigimos
-      if (data?.verifyUrl) {
-        setSuccess(true);
+      // Modo verificación por email (producción y local)
+      setSuccess(true);
+      if (data?.verifyUrl && process.env.NODE_ENV !== "production") {
         setVerifyUrl(data.verifyUrl as string);
-        return;
       }
-
-      // Fallback: redirigir al login con email pre-rellenado
-      window.location.href = `/auth/login?email=${encodeURIComponent(email)}`;
+      // NO redirigimos: nos quedamos en la pestaña "Crear cuenta" mostrando el banner
     } catch (err: any) {
       setError(err?.message ?? "Error de red.");
     } finally {
@@ -197,12 +195,10 @@ export default function LoginClient() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 p-4 relative overflow-hidden">
-      {/* Gradient mesh background */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(262,83%,58%,0.15)_0%,transparent_50%),radial-gradient(ellipse_at_bottom_right,hsl(217,91%,60%,0.15)_0%,transparent_50%)]" />
 
       <Card className="w-full max-w-md relative backdrop-blur-sm bg-card/95 border-border shadow-elegant">
         <CardHeader className="space-y-6 pb-4">
-          {/* Logo + título con el mismo gradiente */}
           <div className="flex flex-col items-center space-y-3">
             <div className="flex items-center gap-3">
               <div
@@ -225,7 +221,6 @@ export default function LoginClient() {
             </div>
           </div>
 
-          {/* Toggle Login / Registro */}
           <div className="flex flex-col items-center space-y-3">
             <div className="inline-flex rounded-full bg-muted p-1 text-sm">
               <button
@@ -272,6 +267,27 @@ export default function LoginClient() {
           {isLogin && verifiedBanner && (
             <div className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
               ¡Correo verificado! Ahora introduce tu contraseña para entrar.
+            </div>
+          )}
+
+          {/* Banner de "correo enviado" ahora solo depende de success */}
+          {!isLogin && success && (
+            <div className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              Te hemos enviado un correo para <strong>verificar</strong> tu cuenta.
+              {verifyUrl && process.env.NODE_ENV !== "production" && (
+                <>
+                  {" "}
+                  (dev){" "}
+                  <a
+                    href={verifyUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline text-emerald-700"
+                  >
+                    Abrir enlace de verificación
+                  </a>
+                </>
+              )}
             </div>
           )}
 
