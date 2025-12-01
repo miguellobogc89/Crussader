@@ -1,4 +1,4 @@
-// app/api/onboarding/access-approve/route.ts
+// app/api/onboarding/access-approved/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/server/db";
 import { OnboardingStatus, CompanyRole } from "@prisma/client";
@@ -56,10 +56,11 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Aquí puedes redirigir a una página bonita si quieres
-    return NextResponse.json({ ok: true });
+    // ✅ Redirigir a una página bonita
+    const redirectUrl = new URL("/dashboard/onboarding/access-approved", url.origin);
+    return NextResponse.redirect(redirectUrl);
   } catch (err) {
-    console.error("[access-approve] Error:", err);
+    console.error("[access-approved] Error:", err);
     return NextResponse.json(
       { ok: false, error: "INTERNAL_ERROR" },
       { status: 500 }

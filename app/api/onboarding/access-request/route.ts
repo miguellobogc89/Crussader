@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
         const companyId = approver.UserCompany[0].companyId;
 
-        const approveUrl = `${origin}/api/onboarding/access-approve?userId=${encodeURIComponent(
+        const approveUrl = `${origin}/api/onboarding/access-approved?userId=${encodeURIComponent(
           requesterUser.id
         )}&companyId=${encodeURIComponent(companyId)}`;
 

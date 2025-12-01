@@ -3,6 +3,8 @@
 import { cn } from "@/lib/utils";
 import type { OnboardingStepProps } from "./index";
 
+const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 export function JoinEmailStep({ state, setState }: OnboardingStepProps) {
   const { joinEmailInput, joinEmails } = state;
 
@@ -13,23 +15,31 @@ export function JoinEmailStep({ state, setState }: OnboardingStepProps) {
     // Quitar comas/puntos sueltos al final
     value = value.replace(/[;,]+$/, "").trim();
 
-    // Validación muy básica de email
-    const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // Validación básica de email
     if (!basicEmailRegex.test(value)) {
-      // Si quieres, más adelante podemos mostrar un error visual.
+      // Más adelante se puede añadir feedback visual
       return;
     }
 
     // Evitar duplicados (case-insensitive)
     const exists = joinEmails.some(
-      (e) => e.toLowerCase() === value.toLowerCase()
+      (e) => e.toLowerCase() === value.toLowerCase(),
     );
-    if (exists) return;
+    if (exists) {
+      setState({ joinEmailInput: "" });
+      return;
+    }
 
     setState({
       joinEmails: [...joinEmails, value],
       joinEmailInput: "",
     });
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    // Solo actualizamos el texto; la detección de email completo
+    // la usa el canGoNext y el blur/Enter/espacio.
+    setState({ joinEmailInput: e.target.value });
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -77,13 +87,13 @@ export function JoinEmailStep({ state, setState }: OnboardingStepProps) {
           id="join-email-input"
           type="email"
           value={joinEmailInput}
-          onChange={(e) => setState({ joinEmailInput: e.target.value })}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          placeholder="Escribe un correo y pulsa espacio o Enter…"
+          placeholder="Escribe un correo y pulsa espacio, Enter o sigue escribiendo…"
           className={cn(
             "w-full rounded-lg border px-3 py-2 text-sm outline-none transition",
-            "border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+            "border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200",
           )}
         />
 

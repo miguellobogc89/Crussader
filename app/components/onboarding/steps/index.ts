@@ -6,6 +6,8 @@ import { AccessRequestSentStep } from "./AccessRequestSentStep";
 import { CreateCompanyAndLocation } from "./CreateCompanyAndLocation";
 import { OnboardingSuccessfulStep } from "./OnboardingSuccessfulStep";
 
+const basicEmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 export type StepId =
   | "choice"
   | "join_email"
@@ -69,7 +71,9 @@ export const onboardingSteps: OnboardingStepDefinition[] = [
   {
     id: "join_email",
     render: (props) => React.createElement(JoinEmailStep, props),
-    canGoNext: (state) => state.joinEmails.length > 0,
+    canGoNext: (state) =>
+      state.joinEmails.length > 0 ||
+      basicEmailRegex.test(state.joinEmailInput.trim()),
     getTitle: () => "Ayúdanos a localizar tu empresa",
     getSubtitle: () =>
       "Añade correos de personas de tu empresa para solicitar acceso.",
