@@ -7,15 +7,16 @@ import { Plus, Building2, Pencil } from "lucide-react";
 import GoogleBusinessConnectBanner from "@/app/components/mybusiness/GoogleBusinessConnectBanner";
 import PageShell from "@/app/components/layouts/PageShell";
 import PreloadCompanyBuffer from "@/app/components/buffer/PreloadCompanyBuffer";
-import { AverageRatingCard } from "@/app/components/mybusiness/cards/AverageRatingCard";
+
 import {
   CompanyModal,
   type CompanyForm,
 } from "@/app/components/company/CompanyModal";
 
-import { LocationCard } from "@/app/components/mybusiness/locations/LocationCard";
-import type { LocationRow } from "@/hooks/useCompanyLocations";
-import LinkGbpLocationModal from "@/app/components/mybusiness/locations/LinkGbpLocationModal";
+// Cards de cabecera de Company
+import CompanyKpiRow from "@/app/components/company/cards/CompanyKpiRow";
+import { useCompanySummary } from "@/hooks/useCompanySummary";
+import { CompanyEstablishments } from "@/app/components/company/CompanyEstablishments";
 
 /* ----------------------- helpers (fetchers) ----------------------- */
 
@@ -62,6 +63,9 @@ export default function MyBusinessPage() {
   const [details, setDetails] = React.useState<CompanyDetails | null>(null);
   const hasCompany = !!companyId;
 
+  // precalienta métricas para CompanyKpiRow
+  useCompanySummary(companyId);
+
   // modal empresa
   const [companyModalOpen, setCompanyModalOpen] = React.useState(false);
   const [submittingCompany, setSubmittingCompany] = React.useState(false);
@@ -75,17 +79,6 @@ export default function MyBusinessPage() {
   function modalChange(patch: Partial<CompanyForm>) {
     setForm((prev) => ({ ...prev, ...patch }));
   }
-
-  // locations
-  const [locs, setLocs] = React.useState<LocationRow[]>([]);
-  const [locsLoading, setLocsLoading] = React.useState(false);
-  const [locsError, setLocsError] = React.useState<string | null>(null);
-
-  // location que abre el modal de vincular
-  const [linkLocationId, setLinkLocationId] = React.useState<string | null>(null);
-
-  // location que se está refrescando (para el spinner)
-  const [refreshingLocationId, setRefreshingLocationId] = React.useState<string | null>(null);
 
   // auto-open modal create una sola vez si no hay empresa
   const openedOnceRef = React.useRef(false);
@@ -119,31 +112,6 @@ export default function MyBusinessPage() {
       abort = true;
     };
   }, []);
-
-  // Cargar locations cuando ya sabemos la company
-  const loadLocations = React.useCallback(async () => {
-    if (!companyId) return;
-    setLocsLoading(true);
-    setLocsError(null);
-    try {
-      const r = await fetch(`/api/companies/${companyId}/locations`, {
-        cache: "no-store",
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
-      setLocs(Array.isArray(j?.locations) ? j.locations : []);
-    } catch (e: any) {
-      setLocsError(e?.message || String(e));
-    } finally {
-      setLocsLoading(false);
-    }
-  }, [companyId]);
-
-  React.useEffect(() => {
-    if (hasCompany && companyId) {
-      loadLocations();
-    }
-  }, [hasCompany, companyId, loadLocations]);
 
   // Auto-abrir modal de crear empresa una vez cuando no hay company
   React.useEffect(() => {
@@ -224,59 +192,14 @@ export default function MyBusinessPage() {
     }
   }
 
-  /* --------- acciones locations --------- */
+  /* --------- formatos para las cards de cabecera --------- */
 
-  function handleConnect(location: LocationRow) {
-    const id = (location as any).id ?? null;
-    if (!id) return;
-    setLinkLocationId(id);
-  }
-
-  async function handleDisconnect(location: LocationRow) {
-    const id = (location as any).id;
-    if (!id) return;
-
-    try {
-      const res = await fetch(
-        `/api/mybusiness/locations/${id}/unlink-google`,
-        { method: "POST" },
-      );
-
-      const json = await res.json().catch(() => null);
-
-      if (!res.ok || !json?.ok) {
-        alert(json?.error || `Error al desvincular (${res.status})`);
-      } else {
-        await loadLocations();
-      }
-    } catch (e: any) {
-      alert(e?.message || String(e));
-    }
-  }
-
-  async function refreshReviews(locationId: string) {
-    try {
-      setRefreshingLocationId(locationId);
-
-      const res = await fetch(
-        `/api/mybusiness/locations/${locationId}/refresh-reviews`,
-        { method: "POST" },
-      );
-
-      const j = await res.json().catch(() => ({}));
-
-      if (!res.ok || !j?.ok) {
-        alert(j?.error || `Error al refrescar reviews (${res.status})`);
-        return;
-      }
-
-      await loadLocations();
-    } catch (e: any) {
-      alert(e?.message || String(e));
-    } finally {
-      setRefreshingLocationId(null);
-    }
-  }
+  const infoEmail = details?.email ?? "—";
+  const infoPhone = details?.phone ?? "—";
+  const infoAddress = details?.address ?? "—";
+  const infoEmployees = details?.employeesBand
+    ? `${details.employeesBand} empleados`
+    : "—";
 
   /* ----------------------- render ----------------------- */
 
@@ -338,58 +261,27 @@ export default function MyBusinessPage() {
         )}
 
         {/* ── CON EMPRESA ─────────────────────────────── */}
-{hasCompany && (
-  <section className="mt-6 space-y-6">
-    {/* KPIs generales */}
-    <div className="grid gap-4 md:grid-cols-3">
-      <AverageRatingCard average={4.8} totalReviews={128} />
-      {/* aquí luego podremos añadir más cards de KPIs */}
-    </div>
+        {hasCompany && (
+          <section className="mt-6 space-y-6">
+            {/* Cards de cabecera (datos de empresa) */}
+            <div>
+              <CompanyKpiRow
+                key={companyId ?? "none"}
+                companyId={companyId}
+                name={companyName}
+                email={infoEmail}
+                phone={infoPhone}
+                address={infoAddress}
+                employeesText={infoEmployees}
+              />
+            </div>
 
-    {/* listado de ubicaciones */}
-    <div className="space-y-3">
-      <div className="text-sm font-medium text-muted-foreground">
-        Ubicaciones vinculadas a tu empresa
-      </div>
+            {/* Listado de establecimientos / ubicaciones */}
+            <CompanyEstablishments companyId={companyId} />
+          </section>
+        )}
 
-      {locsError && (
-        <div className="text-sm text-red-600">{locsError}</div>
-      )}
-
-      {locsLoading ? (
-        <div className="grid gap-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-20 rounded-xl border bg-muted/40 animate-pulse"
-            />
-          ))}
-        </div>
-      ) : locs.length === 0 ? (
-        <div className="py-8 text-center text-sm text-muted-foreground">
-          No hay ubicaciones todavía. Crea tu primera ubicación desde el
-          flujo guiado.
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {locs.map((loc) => (
-            <LocationCard
-              key={(loc as any).id}
-              location={loc}
-              onConnect={() => handleConnect(loc)}
-              onDisconnect={() => handleDisconnect(loc)}
-              onRefresh={() => refreshReviews((loc as any).id)}
-              isRefreshing={refreshingLocationId === (loc as any).id}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  </section>
-)}
-
-
-        {/* ── MODALES ─────────────────────────────────── */}
+        {/* ── MODAL EMPRESA ───────────────────────────── */}
         <CompanyModal
           open={companyModalOpen}
           onOpenChange={setCompanyModalOpen}
@@ -398,18 +290,6 @@ export default function MyBusinessPage() {
           onChange={modalChange}
           onSubmit={hasCompany ? onSubmitEdit : onSubmitCreate}
           submitting={submittingCompany}
-        />
-
-        <LinkGbpLocationModal
-          open={!!linkLocationId}
-          locationId={linkLocationId ?? ""}
-          onClose={() => setLinkLocationId(null)}
-          onCompanyResolved={(cid) => {
-            console.log("CompanyId resuelto en modal:", cid);
-          }}
-          onLinked={async () => {
-            await loadLocations();
-          }}
         />
       </PageShell>
     </>

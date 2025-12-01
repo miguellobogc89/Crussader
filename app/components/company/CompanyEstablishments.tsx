@@ -6,6 +6,8 @@ import Image from "next/image";
 import { EstablishmentCard } from "@/app/components/company/EstablishmentCard";
 import type { LocationRow } from "@/hooks/useCompanyLocations";
 import { getBusinessIcon } from "@/lib/businessTypeIcons";
+import { Button } from "@/app/components/ui/button";
+import { RotateCcw } from "lucide-react";
 
 type Props = {
   companyId: string | null;
@@ -15,6 +17,7 @@ export function CompanyEstablishments({ companyId }: Props) {
   const [locs, setLocs] = React.useState<LocationRow[]>([]);
   const [locsLoading, setLocsLoading] = React.useState(false);
   const [locsError, setLocsError] = React.useState<string | null>(null);
+  const [bulkSyncing, setBulkSyncing] = React.useState(false);
 
   const hasCompany = !!companyId;
 
@@ -65,27 +68,54 @@ export function CompanyEstablishments({ companyId }: Props) {
   }, [hasCompany, companyId, loadLocations]);
 
   function handleConnect(locationId: string) {
-    const returnTo = encodeURIComponent("/dashboard/company");
+    const returnTo = encodeURIComponent("/dashboard/mybusiness");
     window.location.href = `/api/connect/google-business/start?locationId=${encodeURIComponent(
       locationId,
     )}&returnTo=${returnTo}`;
   }
 
-  async function handleSync(locationId: string) {
+  function isLocationLinked(loc: any): boolean {
+    return Boolean(
+      loc.googlePlaceId ||
+        loc.externalConnectionId ||
+        loc.ExternalConnection?.id,
+    );
+  }
+
+  async function handleBulkSync() {
+    if (bulkSyncing || locsLoading) return;
+
+    const linkedLocs = locs.filter((loc) => isLocationLinked(loc as any));
+    if (linkedLocs.length === 0) {
+      return;
+    }
+
+    setBulkSyncing(true);
     try {
-      const res = await fetch(`/api/locations/${locationId}/sync`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source: "manual" }),
-      });
-      if (!res.ok) {
+      for (const loc of linkedLocs) {
+        const id = (loc as any).id as string | undefined;
+        if (!id) continue;
+
+        const res = await fetch(
+          `/api/mybusiness/locations/${id}/refresh-reviews`,
+          { method: "POST" },
+        );
+
         const j = await res.json().catch(() => ({}));
-        alert(j?.error || `Sync falló (${res.status})`);
-        return;
+
+        if (!res.ok || !j?.ok) {
+          console.error(
+            `Error al refrescar reviews de la ubicación ${id}:`,
+            j?.error || `HTTP ${res.status}`,
+          );
+        }
       }
+
       await loadLocations();
     } catch (e: any) {
       alert(e?.message || String(e));
+    } finally {
+      setBulkSyncing(false);
     }
   }
 
@@ -93,9 +123,14 @@ export function CompanyEstablishments({ companyId }: Props) {
     return null;
   }
 
+  const anyLinked = locs.some((loc) => isLocationLinked(loc as any));
+  const disableBulk =
+    locsLoading || bulkSyncing || !anyLinked;
+
   return (
     <section className="space-y-3 rounded border bg-white p-4">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        {/* Título + icono */}
         <div className="flex items-center gap-2">
           <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100">
             <Image
@@ -109,6 +144,26 @@ export function CompanyEstablishments({ companyId }: Props) {
             Ubicaciones vinculadas a tu empresa
           </span>
         </div>
+
+        {/* Botón global de actualizar reseñas */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleBulkSync}
+          disabled={disableBulk}
+          className="inline-flex items-center gap-2 text-xs md:text-sm"
+        >
+          <RotateCcw
+            className={`h-4 w-4 ${
+              bulkSyncing ? "animate-spin" : ""
+            }`}
+          />
+          <span>
+            {bulkSyncing
+              ? "Actualizando reseñas..."
+              : "Actualizar reseñas"}
+          </span>
+        </Button>
       </div>
 
       {locsError && (
@@ -139,7 +194,6 @@ export function CompanyEstablishments({ companyId }: Props) {
               companyId={companyId}
               typeName={loc.__businessTypeName ?? null}
               typeIcon={loc.__businessTypeIcon}
-              onSync={() => handleSync(loc.id)}
               onConnect={() => handleConnect(loc.id)}
             />
           ))}

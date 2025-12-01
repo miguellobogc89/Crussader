@@ -18,7 +18,6 @@ import {
   MapPin,
   Star,
   MoreVertical,
-  RefreshCw,
   Power,
   Settings2,
   Image as ImageIcon,
@@ -33,13 +32,8 @@ import LocationSettingsModal, {
 type Props = {
   companyId: string;
   location: LocationRow;
-
-  // mismas callbacks que ya usaba el padre
-  onSync?: () => void | Promise<void>;
   onConnect?: () => void;
   onDisconnect?: () => void;
-  isSyncing?: boolean;
-
   typeName?: string | null;
   typeIcon?: string;
 };
@@ -47,10 +41,8 @@ type Props = {
 export function EstablishmentCard({
   companyId,
   location,
-  onSync,
   onConnect,
   onDisconnect,
-  isSyncing = false,
   typeName,
   typeIcon,
 }: Props) {
@@ -97,13 +89,6 @@ export function EstablishmentCard({
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  // ---- sync / refresh (usa onSync del padre) ----
-  const canRefresh = !!onSync;
-  const [syncing, setSyncing] = React.useState(false);
-  const effectiveSyncing = isSyncing || syncing;
-  const refreshDisabled = !isLinked || !canRefresh || effectiveSyncing;
-
-  // ---- modal ajustes ----
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [form, setForm] = React.useState<LocationForm>(() =>
     mapLocationToForm(location, title),
@@ -124,7 +109,6 @@ export function EstablishmentCard({
     setSettingsOpen(false);
   }
 
-  // ---- conectar / desconectar ----
   const canToggleCable =
     (isLinked && !!onDisconnect) || (!isLinked && !!onConnect);
 
@@ -137,18 +121,6 @@ export function EstablishmentCard({
     }
   }
 
-  // ---- refrescar reseñas ----
-  async function handleSyncClick() {
-    if (!onSync || refreshDisabled) return;
-    try {
-      setSyncing(true);
-      await Promise.resolve(onSync());
-    } finally {
-      setSyncing(false);
-    }
-  }
-
-  // ---- imagen destacada ----
   function handleClickImage() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -167,7 +139,6 @@ export function EstablishmentCard({
     reader.onloadend = async () => {
       const dataUrl = reader.result as string;
 
-      // Preview inmediata en la card
       setLocalImageUrl(dataUrl);
 
       try {
@@ -330,29 +301,12 @@ export function EstablishmentCard({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Bloque inferior: Sync o botón Conectar */}
+              {/* Bloque inferior: Conectar o texto de última actualización */}
               <div className="mt-auto flex flex-col items-end gap-1.5">
                 {isLinked ? (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleSyncClick}
-                      disabled={refreshDisabled}
-                      className="h-8 gap-2 px-3 text-xs hover:bg-accent"
-                    >
-                      <RefreshCw
-                        className={`h-3.5 w-3.5 ${
-                          effectiveSyncing ? "animate-spin" : ""
-                        }`}
-                      />
-                      <span className="hidden md:inline">Actualizar</span>
-                    </Button>
-
-                    <span className="text-xs text-muted-foreground">
-                      Actualizado {lastSyncAgo}
-                    </span>
-                  </>
+                  <span className="text-xs text-muted-foreground">
+                    Actualizado {lastSyncAgo}
+                  </span>
                 ) : (
                   <Button
                     onClick={handleToggleCable}
