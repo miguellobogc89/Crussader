@@ -20,39 +20,21 @@ export function CompanyEstablishments({ companyId }: Props) {
   const [locsError, setLocsError] = React.useState<string | null>(null);
   const [bulkSyncing, setBulkSyncing] = React.useState(false);
 
-  const hasCompany = !!companyId;
-
-  // 🔹 Estado para el modal morado
+  // 🔹 estado para el modal de vinculación
   const [linkModalOpen, setLinkModalOpen] = React.useState(false);
   const [linkLocationId, setLinkLocationId] = React.useState<string | null>(null);
+
+  const hasCompany = !!companyId;
 
   const loadLocations = React.useCallback(async () => {
     if (!companyId) return;
     setLocsLoading(true);
     setLocsError(null);
-
     try {
       const r = await fetch(`/api/companies/${companyId}/locations`, {
         cache: "no-store",
       });
-
-      // ✅ Leer como texto y parsear a mano para evitar el error
-      const rawText = await r.text();
-      let j: any = null;
-
-      if (rawText) {
-        try {
-          j = JSON.parse(rawText);
-        } catch (err) {
-          console.error(
-            "[CompanyEstablishments] Error parseando JSON de /locations:",
-            err,
-            rawText,
-          );
-          j = null;
-        }
-      }
-
+      const j = await r.json();
       if (!r.ok) {
         throw new Error(j?.error || `HTTP ${r.status}`);
       }
@@ -90,12 +72,53 @@ export function CompanyEstablishments({ companyId }: Props) {
     }
   }, [hasCompany, companyId, loadLocations]);
 
+  // 🔹 helper: saber si una location está vinculada
   function isLocationLinked(loc: any): boolean {
     return Boolean(
-      loc.googlePlaceId ||
+      loc.googleLocationId ||
+        loc.googlePlaceId ||
         loc.externalConnectionId ||
         loc.ExternalConnection?.id,
     );
+  }
+
+  // 🔹 abrir modal de vinculación para una location
+  function openLinkModal(locationId: string) {
+    setLinkLocationId(locationId);
+    setLinkModalOpen(true);
+  }
+
+  // 🔹 handler de desconexión (unlink-google)
+  async function handleDisconnect(locationId: string) {
+    if (!locationId) return;
+
+    try {
+      const res = await fetch(
+        `/api/mybusiness/locations/${encodeURIComponent(
+          locationId,
+        )}/unlink-google`,
+        {
+          method: "POST",
+        },
+      );
+
+      const j = await res.json().catch(() => null);
+
+      if (!res.ok || !j?.ok) {
+        console.error(
+          "[CompanyEstablishments] Error al desvincular ubicación:",
+          j?.error || `HTTP ${res.status}`,
+        );
+        return;
+      }
+
+      await loadLocations();
+    } catch (e: any) {
+      console.error(
+        "[CompanyEstablishments] Error de red al desvincular ubicación:",
+        e?.message || String(e),
+      );
+    }
   }
 
   async function handleBulkSync() {
@@ -135,12 +158,6 @@ export function CompanyEstablishments({ companyId }: Props) {
     }
   }
 
-  // 🔹 Abrir el modal morado desde la card
-  function handleOpenLinkModal(locationId: string) {
-    setLinkLocationId(locationId);
-    setLinkModalOpen(true);
-  }
-
   if (!hasCompany || !companyId) {
     return null;
   }
@@ -155,15 +172,16 @@ export function CompanyEstablishments({ companyId }: Props) {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           {/* Título + icono */}
           <div className="flex items-center gap-2">
-            <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100">
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 sm:h-12 sm:w-12">
               <Image
                 src="/icon/location.png"
                 alt="Ubicaciones"
-                width={28}
-                height={28}
+                width={24}
+                height={24}
+                className="sm:h-7 sm:w-7 h-5 w-5"
               />
             </span>
-            <span className="text-base font-semibold text-slate-900 md:text-lg">
+            <span className="text-sm font-semibold text-slate-900 sm:text-base md:text-lg">
               Ubicaciones vinculadas a tu empresa
             </span>
           </div>
@@ -217,25 +235,29 @@ export function CompanyEstablishments({ companyId }: Props) {
                 companyId={companyId}
                 typeName={loc.__businessTypeName ?? null}
                 typeIcon={loc.__businessTypeIcon}
-                onConnect={() => handleOpenLinkModal(loc.id)}
+                // 🔹 Conectar → abre modal
+                onConnect={() => openLinkModal(loc.id)}
+                // 🔹 Desconectar → unlink-google
+                onDisconnect={() => handleDisconnect(loc.id)}
               />
             ))}
           </div>
         )}
       </section>
 
-      {/* Modal morado de vinculación con GBP */}
-      {linkLocationId && (
-        <LinkGbpLocationModal
-          open={linkModalOpen}
-          locationId={linkLocationId}
-          onClose={() => setLinkModalOpen(false)}
-          onLinked={async () => {
-            await loadLocations();
-            setLinkModalOpen(false);
-          }}
-        />
-      )}
+      {/* Modal de vinculación con Google Business */}
+      <LinkGbpLocationModal
+        open={linkModalOpen}
+        locationId={linkLocationId ?? ""}
+        onClose={() => setLinkModalOpen(false)}
+        onCompanyResolved={() => {
+          // opcional, ahora mismo no necesitamos nada aquí
+        }}
+        onLinked={async () => {
+          await loadLocations();
+          setLinkModalOpen(false);
+        }}
+      />
     </>
   );
 }
