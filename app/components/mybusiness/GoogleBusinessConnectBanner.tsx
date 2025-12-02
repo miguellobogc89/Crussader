@@ -31,7 +31,8 @@ export default function GoogleBusinessConnectBanner({
 
         if (!cancelled) {
           const exists = json?.data ?? null;
-          setShowBanner(!exists); // si NO hay conexión → mostrar banner
+          // si NO hay conexión → mostrar banner
+          setShowBanner(!exists);
         }
       } catch (err) {
         if (!cancelled) setShowBanner(true);
@@ -52,20 +53,30 @@ export default function GoogleBusinessConnectBanner({
       className="
         w-full border border-amber-300 
         bg-gradient-to-r from-amber-50 via-amber-100 to-orange-50 
-        px-5 py-3 rounded-xl shadow-sm
-        flex items-center justify-between
+        px-3 py-3 sm:px-5 sm:py-3
+        rounded-xl shadow-sm
+        flex flex-col gap-3
+        sm:flex-row sm:items-center sm:justify-between
       "
     >
       {/* Texto del aviso */}
-      <div className="text-sm text-amber-900 font-medium">
-        Aún no has conectado tu cuenta de Google Business.  
-        Conéctala para sincronizar tus reseñas y ubicaciones automáticamente.
+      <div
+        className="
+          text-xs sm:text-sm md:text-base
+          text-amber-900 font-medium
+          leading-snug sm:leading-normal
+        "
+      >
+        Aún no has conectado tu cuenta de Google Business. Conéctala para
+        sincronizar tus reseñas y ubicaciones automáticamente.
       </div>
 
       {/* Botón (autónomo) */}
-      <GoogleBusinessConnectButton>
-        Conectar
-      </GoogleBusinessConnectButton>
+      <div className="flex-shrink-0 w-full sm:w-auto flex sm:justify-end">
+        <GoogleBusinessConnectButton>
+          Conectar
+        </GoogleBusinessConnectButton>
+      </div>
     </div>
   );
 }

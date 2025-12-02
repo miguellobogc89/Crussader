@@ -21,6 +21,8 @@ import {
   Power,
   Settings2,
   Image as ImageIcon,
+  Link2,
+  Unlink,
 } from "lucide-react";
 
 import type { LocationRow } from "@/hooks/useCompanyLocations";
@@ -66,26 +68,30 @@ export function EstablishmentCard({
       (location as any).googlePlaceId,
   );
 
-  const lastSyncAt = (location as any).lastSyncAt as string | Date | undefined;
-  const lastSyncAgo = timeAgo(lastSyncAt);
-
   const avg = Number((location as any).reviewsAvg ?? NaN);
   const avgText = Number.isFinite(avg) ? avg.toFixed(1) : "—";
 
   const countText = Number((location as any).reviewsCount ?? 0).toString();
 
-  const featuredImageUrl = (location as any).featuredImageUrl as
-    | string
-    | null
-    | undefined;
+// 1) Imagen inicial desde BD (featuredImageUrl o imageUrl)
+const initialImageUrl =
+  ((location as any).featuredImageUrl ??
+    (location as any).imageUrl ??
+    null) as string | null;
 
-  const [localImageUrl, setLocalImageUrl] = React.useState<string | null>(
-    featuredImageUrl ?? null,
+const [localImageUrl, setLocalImageUrl] = React.useState<string | null>(
+  initialImageUrl,
+);
+
+// 2) Si cambia la location (refetch), refrescamos la imagen local
+React.useEffect(() => {
+  setLocalImageUrl(
+    ((location as any).featuredImageUrl ??
+      (location as any).imageUrl ??
+      null) as string | null,
   );
+}, [location]);
 
-  React.useEffect(() => {
-    setLocalImageUrl(featuredImageUrl ?? null);
-  }, [featuredImageUrl]);
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
@@ -169,7 +175,8 @@ export function EstablishmentCard({
   return (
     <>
       <Card className="group relative overflow-hidden border-border/40 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-border hover:shadow-md">
-        <CardContent className="p-6">
+        {/* CardContent ahora es relative para poder posicionar los 3 puntos */}
+        <CardContent className="relative p-4 sm:p-6">
           {/* input de fichero oculto */}
           <input
             ref={fileInputRef}
@@ -179,156 +186,172 @@ export function EstablishmentCard({
             onChange={handleFileChange}
           />
 
-          <div className="flex items-stretch justify-between gap-6">
-            {/* LEFT SECTION - MAIN INFO */}
-            <div className="flex flex-1 gap-4">
-              {/* Avatar / Imagen clickable */}
-              <button
-                type="button"
-                onClick={handleClickImage}
-                className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/20 via-fuchsia-500/20 to-sky-500/20 ring-1 ring-primary/20 shadow-sm overflow-hidden transition hover:opacity-90"
-                title={localImageUrl ? "Cambiar imagen" : "Añadir foto"}
+          {/* BOTÓN DE 3 PUNTOS SIEMPRE EN LA ESQUINA SUPERIOR DERECHA */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-2 h-8 w-8 text-muted-foreground hover:text-foreground"
               >
-                {localImageUrl ? (
-                  <Image
-                    src={localImageUrl}
-                    alt={title}
-                    width={64}
-                    height={64}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-background/70 backdrop-blur-sm">
-                      <ImageIcon className="h-5 w-5 text-primary/80" />
-                    </div>
-                  </div>
-                )}
-              </button>
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+                <Settings2 className="mr-2 h-4 w-4" />
+                Configuración
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleToggleCable}
+                disabled={!canToggleCable}
+                className={
+                  isLinked
+                    ? "text-destructive data-[disabled=true]:text-slate-300"
+                    : "text-emerald-600 data-[disabled=true]:text-slate-300"
+                }
+              >
+                <Power className="mr-2 h-4 w-4" />
+                {isLinked ? "Desconectar" : "Conectar"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* FILA PRINCIPAL: info */}
+          <div className="flex items-stretch justify-between gap-4 sm:gap-6">
+            {/* LEFT SECTION - MAIN INFO */}
+            <div className="flex flex-1 gap-3 sm:gap-4">
+              {/* Avatar / Imagen clickable */}
+<button
+  type="button"
+  onClick={handleClickImage}
+  className="relative flex h-11 w-11 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/20 via-fuchsia-500/20 to-sky-500/20 ring-1 ring-primary/20 shadow-sm overflow-hidden transition hover:opacity-90"
+  title={localImageUrl ? "Cambiar imagen" : "Añadir foto"}
+>
+  {localImageUrl ? (
+    <Image
+      src={localImageUrl}
+      alt={title}
+      width={64}
+      height={64}
+      className="h-full w-full object-cover"
+    />
+  ) : (
+    <div className="flex h-full w-full items-center justify-center">
+      <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-background/70 backdrop-blur-sm">
+        <ImageIcon className="h-4 w-4 sm:h-5 sm:w-5 text-primary/80" />
+      </div>
+    </div>
+  )}
+</button>
+
 
               {/* Columna de info */}
               <div className="min-w-0 flex-1 space-y-2">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="truncate text-lg font-semibold text-foreground">
-                      {title}
-                    </h3>
+<div className="flex items-center gap-2">
+  {/* Título recortado para dejar hueco a los 3 puntos */}
+  <h3
+    className="
+      truncate
+      max-w-[85%]        /* en móvil: recortamos el ancho del título */
+      sm:max-w-full      /* en sm+ puede ocupar todo el ancho */
+      text-sm sm:text-lg
+      font-semibold text-foreground
+    "
+  >
+    {title}
+  </h3>
 
-                    {/* Punto de estado al final del nombre */}
-                    <span
-                      className={[
-                        "h-2.5 w-2.5 rounded-full shrink-0",
-                        isLinked ? "bg-emerald-500" : "bg-slate-300",
-                      ].join(" ")}
-                    />
-                  </div>
+  {/* Punto de estado SOLO en desktop/tablet */}
+  <span
+    className={[
+      "hidden sm:inline-block rounded-full shrink-0",
+      "h-2 w-2 sm:h-2.5 sm:w-2.5",
+      isLinked ? "bg-emerald-500" : "bg-slate-300",
+    ].join(" ")}
+  />
+</div>
+
 
                   {/* CHIP DE TIPO */}
                   {typeName && (
                     <Badge
                       variant="secondary"
-                      className="mt-1.5 h-6 gap-1 border-0 bg-accent/50 text-xs font-medium text-accent-foreground"
+                      className="mt-1.5 h-5 sm:h-6 gap-1 border-0 bg-accent/50 text-[10px] sm:text-xs font-medium text-accent-foreground"
                     >
-                      <span>{typeIcon ?? "🏠"}</span>
-                      <span className="truncate max-w-[200px] md:max-w-xs">
+                      <span className="text-xs sm:text-sm">
+                        {typeIcon ?? "🏠"}
+                      </span>
+                      <span className="truncate max-w-[140px] sm:max-w-[200px] md:max-w-xs">
                         {typeName}
                       </span>
                     </Badge>
                   )}
                 </div>
 
-                {/* Dirección */}
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                {/* Dirección (solo desktop/tablet aquí) */}
+                <div className="hidden sm:flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground">
+                  <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
                   <span className="truncate">{addr || "—"}</span>
                 </div>
 
-                {/* Rating + nº reseñas */}
-                <div className="flex flex-wrap items-center gap-3 text-sm">
+                {/* Rating + nº reseñas (solo desktop/tablet aquí) */}
+                <div className="hidden sm:flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
                   <div className="flex items-center gap-1.5">
-                    <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 dark:bg-amber-950/30">
-                      <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                      <span className="text-sm font-semibold text-foreground">
+                    <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 sm:py-1 dark:bg-amber-950/30">
+                      <Star className="h-3 w-3 sm:h-4 sm:w-4 fill-amber-400 text-amber-400" />
+                      <span className="text-xs sm:text-sm font-semibold text-foreground">
                         {avgText}
                       </span>
                     </div>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-xs sm:text-sm text-muted-foreground">
                       {countText} reseñas
                     </span>
                   </div>
                 </div>
 
                 {loading && !connected && (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[11px] sm:text-xs text-muted-foreground">
                     Comprobando suscripción…
                   </p>
                 )}
               </div>
             </div>
+          </div>
 
-            {/* RIGHT SECTION - ACTIONS & STATUS */}
-            <div className="shrink-0 flex flex-col items-end gap-3 h-full">
-              {/* Menú de acciones */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
+          {/* BLOQUE MOBILE: dirección + rating alineados a la izquierda, debajo de la imagen */}
+          <div className="mt-3 flex flex-col gap-1 sm:hidden">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3 shrink-0" />
+              <span className="truncate">{addr || "—"}</span>
+            </div>
 
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
-                    <Settings2 className="mr-2 h-4 w-4" />
-                    Configuración
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={handleToggleCable}
-                    disabled={!canToggleCable}
-                    className={
-                      isLinked
-                        ? "text-destructive data-[disabled=true]:text-slate-300"
-                        : "text-emerald-600 data-[disabled=true]:text-slate-300"
-                    }
-                  >
-                    <Power className="mr-2 h-4 w-4" />
-                    {isLinked ? "Desconectar" : "Conectar"}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Bloque inferior: Conectar o texto de última actualización */}
-              <div className="mt-auto flex flex-col items-end gap-1.5">
-                {isLinked ? (
-                  <span className="text-xs text-muted-foreground">
-                    Actualizado {lastSyncAgo}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 dark:bg-amber-950/30">
+                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                  <span className="text-xs font-semibold text-foreground">
+                    {avgText}
                   </span>
-                ) : (
-                  <Button
-                    onClick={handleToggleCable}
-                    size="sm"
-                    className="h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-                  >
-                    Conectar
-                  </Button>
-                )}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {countText} reseñas
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Banner de estado si no está conectada */}
-          {!isLinked && (
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
-              <Power className="h-4 w-4 text-amber-600 dark:text-amber-500" />
-              <p className="text-xs text-amber-700 dark:text-amber-400">
-                Esta ubicación no está conectada. Conéctala para sincronizar reseñas.
-              </p>
-            </div>
-          )}
+          {/* Icono de estado link/unlink SOLO en móvil, abajo a la derecha */}
+          <span className="absolute right-3 bottom-3 sm:hidden">
+            {isLinked ? (
+              <Link2 className="h-4 w-4 text-emerald-500" />
+            ) : (
+              <Unlink className="h-4 w-4 text-slate-300" />
+            )}
+          </span>
         </CardContent>
       </Card>
 
@@ -367,23 +390,4 @@ function mapLocationToForm(
       "",
     website: (loc as any).website ?? "",
   };
-}
-
-function timeAgo(date: Date | string | undefined): string {
-  if (!date) return "—";
-  const now = new Date();
-  const d = new Date(date);
-  const diffMs = now.getTime() - d.getTime();
-
-  const sec = Math.floor(diffMs / 1000);
-  const min = Math.floor(sec / 60);
-  const hr = Math.floor(min / 60);
-  const day = Math.floor(hr / 24);
-  const week = Math.floor(day / 7);
-
-  if (sec < 60) return `hace ${sec}s`;
-  if (min < 60) return `hace ${min} min`;
-  if (hr < 24) return `hace ${hr} horas`;
-  if (day < 7) return `hace ${day} días`;
-  return `hace ${week} semanas`;
 }

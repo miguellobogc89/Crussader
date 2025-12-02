@@ -46,6 +46,8 @@ model User {
   phoneVerifiedAt                     DateTime?            @db.Timestamptz(6)
   uiTheme                             String               @default("system")
   invited_via_id                      String?
+  first_name                          String?
+  last_name                           String?
   AuthAccount                         AuthAccount[]
   ExternalConnection                  ExternalConnection[]
   Invite_Invite_invited_by_idToUser   Invite[]             @relation("Invite_invited_by_idToUser")

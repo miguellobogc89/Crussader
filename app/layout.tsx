@@ -4,22 +4,20 @@ import { Inter } from "next/font/google";
 import Providers from "./providers";
 import QueryProvider from "./providers/QueryProvider";
 
-
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
 });
 
-
 export const metadata = {
-  metadataBase: new URL("https://www.crussader.com"), // ← cambia al dominio real
+  metadataBase: new URL("https://www.crussader.com"),
   title: {
     default: "Crussader — Respuestas de IA para reseñas",
     template: "%s · Crussader",
   },
   description:
-    "Gestiona reseñas con IA: voz de marca, notificaciones y reportes. Webchat próximamente.",
+    "Gestiona reseñas con IA: voz de marca, notificaciones y reportes.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Crussader — Respuestas de IA para reseñas",
@@ -33,8 +31,7 @@ export const metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Crussader - Respuestas de IA para reseñas",
-    description:
-      "Voz de marca, notificaciones y reportes. Webchat próximamente.",
+    description: "Voz de marca, notificaciones y reportes.",
     images: ["/og.jpg"],
   },
   icons: {
@@ -65,23 +62,6 @@ export default function RootLayout({
         <QueryProvider>
           <Providers>{children}</Providers>
         </QueryProvider>
-        <script
-          src="/webchat/wc.js"
-          async
-          data-key="demo-public-key-123"
-          data-color="#10b981"
-          data-position="left"
-          data-greeting="Hola 👋 soy tu asistente Crussader"
-          data-auto-open="false"
-          data-greet-on="open"
-        />
-        <script dangerouslySetInnerHTML={{
-          __html: `
-            window.crussaderChat && window.crussaderChat('identify', { email: 'demo@cliente.com', name: 'Cliente Demo' });
-            console.log('[landing] webchat script insertado');
-          `
-        }} />
-
       </body>
     </html>
   );

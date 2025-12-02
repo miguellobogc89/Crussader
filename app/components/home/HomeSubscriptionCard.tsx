@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -11,7 +10,6 @@ import {
   CardTitle,
 } from "@/app/components/ui/card";
 import { Badge } from "@/app/components/ui/badge";
-import { Button } from "@/app/components/ui/button";
 import { Progress } from "@/app/components/ui/progress";
 import { Crown, Loader2 } from "lucide-react";
 
@@ -105,21 +103,9 @@ export default function HomeSubscriptionCard() {
   }, []);
 
   const account = data?.account ?? null;
-  const limits = data?.limits ?? {};
-  const billing = data?.billing ?? null;
-
-  const rawStatus =
-    account?.subscriptionStatus?.toLowerCase() ?? "none";
+  const rawStatus = account?.subscriptionStatus?.toLowerCase() ?? "none";
   const isTrial = rawStatus === "trial";
-  const isActive = rawStatus === "active";
-  const isNone =
-    rawStatus === "none" ||
-    rawStatus === "trial_ended" ||
-    rawStatus === "canceled" ||
-    rawStatus === "expired";
-
-  const trial = isTrial ? account?.trial ?? null : null;
-  const plan = account?.plan ?? null;
+  const trial = account?.trial ?? null;
 
   function formatDate(value: string | null | undefined): string {
     if (!value) return "-";
@@ -132,16 +118,16 @@ export default function HomeSubscriptionCard() {
     });
   }
 
-  const hasUsersLimit = !!limits.users;
-  const hasLocationsLimit = !!limits.locations;
-
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Crown className="h-5 w-5 text-primary" />
-            <CardTitle>Suscripción y límites</CardTitle>
+            {/* Título responsive para armonía en pantallas pequeñas */}
+            <CardTitle className="text-base sm:text-xl lg:text-2xl xl:text-3xl">
+              Free trial
+            </CardTitle>
           </div>
 
           {loading && (
@@ -151,32 +137,9 @@ export default function HomeSubscriptionCard() {
             </Badge>
           )}
 
-          {!loading && !loadError && account && (
-            <>
-              {isTrial && trial && (
-                <Badge className="bg-amber-500/10 text-amber-600">
-                  Prueba · {trial.daysLeft} día
-                  {trial.daysLeft === 1 ? "" : "s"} restantes
-                </Badge>
-              )}
-
-              {isActive && (
-                <Badge className="bg-emerald-500/10 text-emerald-600">
-                  Plan activo
-                </Badge>
-              )}
-
-              {isNone && (
-                <Badge className="bg-slate-200 text-slate-700">
-                  Sin plan activo
-                </Badge>
-              )}
-            </>
-          )}
-
-          {!loading && !loadError && !account && (
-            <Badge className="bg-slate-200 text-slate-700">
-              Sin cuenta configurada
+          {!loading && !loadError && (
+            <Badge className="bg-emerald-500/10 text-emerald-600">
+              Versión gratuita sin límites
             </Badge>
           )}
 
@@ -187,22 +150,11 @@ export default function HomeSubscriptionCard() {
           )}
         </div>
 
-        {!loading && !loadError && account && (
-          <CardDescription>
-            {isTrial &&
-              "Estás en periodo de prueba. Aquí ves cuánto te queda y qué capacidades tienes activas."}
-            {isActive &&
-              "Tu suscripción está activa. Revisa límites, módulos contratados y próxima renovación."}
-            {isNone &&
-              "Aún no tienes un plan activo asociado a esta cuenta. Puedes activar tu prueba o contratar un plan."}
+        {!loading && !loadError && (
+          <CardDescription className="text-sm sm:text-base lg:text-lg">
+            Estás usando la versión Free trial de Crussader, sin límites de usuarios ni de ubicaciones durante este periodo.
           </CardDescription>
-        )}
 
-        {!loading && !loadError && !account && (
-          <CardDescription>
-            Crea una cuenta de facturación para empezar a usar todas las
-            funciones.
-          </CardDescription>
         )}
 
         {!loading && loadError && (
@@ -214,7 +166,7 @@ export default function HomeSubscriptionCard() {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Trial */}
+        {/* Bloque de trial opcional: solo si hay datos de trial */}
         {!loading && !loadError && isTrial && trial && (
           <div className="space-y-2">
             <div className="flex justify-between text-xs text-muted-foreground">
@@ -239,133 +191,20 @@ export default function HomeSubscriptionCard() {
                 {trial.daysLeft} día
                 {trial.daysLeft === 1 ? "" : "s"}
               </span>{" "}
-              de acceso completo.
+              de acceso completo sin límites.
             </p>
           </div>
         )}
 
-        {/* Activo */}
-        {!loading && !loadError && isActive && account && (
-          <div className="space-y-3">
-            <div className="flex items-baseline justify-between gap-4">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">
-                  Plan actual
-                </p>
-                <p className="text-sm font-semibold uppercase tracking-wide">
-                  {plan?.slug || "Plan activo"}
-                </p>
-              </div>
-              <div className="space-y-1 text-right">
-                <p className="text-xs text-muted-foreground">
-                  Próxima renovación
-                </p>
-                <p className="text-sm font-semibold">
-                  {formatDate(plan?.renewsAt || billing?.renewsAt)}
-                </p>
-              </div>
-            </div>
-
-            {(hasUsersLimit || hasLocationsLimit) && (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {hasUsersLimit && limits.users && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">
-                      Usuarios incluidos
-                    </p>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-sm font-semibold">
-                        {limits.users.used} /{" "}
-                        {limits.users.limit ?? "∞"}
-                      </span>
-                    </div>
-                    <Progress
-                      value={
-                        limits.users.limit
-                          ? (limits.users.used /
-                              limits.users.limit) *
-                            100
-                          : 0
-                      }
-                      className="h-1.5"
-                    />
-                  </div>
-                )}
-
-                {hasLocationsLimit && limits.locations && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">
-                      Ubicaciones incluidas
-                    </p>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-sm font-semibold">
-                        {limits.locations.used} /{" "}
-                        {limits.locations.limit ?? "∞"}
-                      </span>
-                    </div>
-                    <Progress
-                      value={
-                        limits.locations.limit
-                          ? (limits.locations.used /
-                              limits.locations.limit) *
-                            100
-                          : 0
-                      }
-                      className="h-1.5"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {data?.products && data.products.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Módulos activos:{" "}
-                {data.products
-                  .filter((p) => p.active)
-                  .map((p) => p.label)
-                  .join(", ")}
-              </p>
-            )}
-          </div>
+        {/* Estado genérico cuando no hay trial estructurado */}
+        {!loading && !loadError && (!isTrial || !trial) && (
+          <p className="text-sm text-muted-foreground">
+            Disfruta de todas las funciones de Crussader sin límites de
+            usuarios ni de ubicaciones durante tu Free trial.
+          </p>
         )}
 
-        {/* Sin plan */}
-        {!loading &&
-          !loadError &&
-          (isNone || !account) && (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Configura tu plan para desbloquear límites más altos,
-                múltiples ubicaciones y automatizaciones avanzadas.
-              </p>
-            </div>
-          )}
-
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-3 border-t pt-4">
-          <div className="text-xs text-muted-foreground">
-            {loading && "Comprobando el estado de tu cuenta..."}
-            {!loading && !loadError && isTrial && trial && (
-              <>La prueba finaliza el {formatDate(trial.endAt)}.</>
-            )}
-            {!loading && !loadError && isActive && (
-              <>Gestiona la facturación o cambios de plan cuando quieras.</>
-            )}
-            {!loading && !loadError && (isNone || !account) && (
-              <>Activa tu prueba o suscripción en la sección de billing.</>
-            )}
-            {!loading && loadError && (
-              <>Error al cargar la información de cuenta.</>
-            )}
-          </div>
-
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/pricing">
-              Gestionar suscripción
-            </Link>
-          </Button>
-        </div>
+        {/* Footer eliminado: sin botón ni mensajes de contratación */}
       </CardContent>
     </Card>
   );

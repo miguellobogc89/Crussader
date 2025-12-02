@@ -11,7 +11,6 @@ import { Group, useActiveGroupId } from "@/app/components/sidebar/NavGroups";
 import type { NavItem, NavGroup } from "@/app/components/sidebar/types";
 
 import { Brand } from "@/app/components/sidebar/Brand";
-import { CompanyChip } from "@/app/components/sidebar/CompanyChip";
 import { UserFooter } from "@/app/components/sidebar/UserFooter";
 import TrialBanner from "@/app/components/sidebar/TrialBanner";
 import { Menu } from "lucide-react";
@@ -175,45 +174,20 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState<boolean>(isMobile);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  // 🔹 NUEVO: estado de navegación pendiente (para feedback inmediato)
+  // navegación pendiente (para feedback inmediato)
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-
-  // Cuando cambia la ruta real, limpiamos el pending
-  useEffect(() => {
-    if (pendingHref) {
-      setPendingHref(null);
-    }
-  }, [pathname, pendingHref]);
-
-  // 🔹 Contador de notificaciones sin leer
-  const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
+    // Evitar hydration mismatch en bloques sólo de cliente (mock items, etc.)
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function fetchUnread() {
-      try {
-        const res = await fetch("/api/notifications/unread-count", {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        });
-
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled) {
-          const value = Number(data?.unreadCount ?? 0);
-          setUnreadNotifications(Number.isNaN(value) ? 0 : value);
-        }
-      } catch (err) {
-        console.error("[AppSidebar] error fetching unread notifications", err);
-      }
-    }
-
-    fetchUnread();
-    return () => {
-      cancelled = true;
-    };
+    setIsClient(true);
   }, []);
+
+
+  // reset de pending al cambiar ruta
+  useEffect(() => {
+    if (pendingHref) setPendingHref(null);
+  }, [pathname, pendingHref]);
 
   // ===== admin flag
   const user = session?.user;
@@ -228,6 +202,7 @@ export function AppSidebar() {
   const permsArr = Array.isArray(permsArrRaw)
     ? permsArrRaw.map((p: any) => String(p).toLowerCase())
     : [];
+
   const ADMIN_ALIASES = new Set([
     "admin",
     "administrator",
@@ -238,6 +213,7 @@ export function AppSidebar() {
     "sysadmin",
     "root",
   ]);
+
   const adminFlags = {
     a_isAdminField: (user as any)?.isAdmin === true,
     b_roleEqAdmin: ADMIN_ALIASES.has(role) || /admin/.test(role),
@@ -251,8 +227,10 @@ export function AppSidebar() {
       typeof window !== "undefined" &&
       localStorage.getItem("forceAdmin") === "1",
   };
+
   const isAdmin = Object.values(adminFlags).some(Boolean);
 
+  // 👇 Admin conserva Pricing + TODOS los items de los 3 grupos
   const ADMIN_GROUP: NavGroup | null = isAdmin
     ? {
         id: "admin",
@@ -331,9 +309,7 @@ export function AppSidebar() {
       }
     : null;
 
-  const ALL_GROUPS: NavGroup[] = ADMIN_GROUP
-    ? [ADMIN_GROUP, ...GROUPS]
-    : GROUPS;
+  const ALL_GROUPS: NavGroup[] = ADMIN_GROUP ? [ADMIN_GROUP] : [];
 
   const defaultOpenId = useActiveGroupId(ALL_GROUPS);
   const [openGroupId, setOpenGroupId] = useState<string | null>(defaultOpenId);
@@ -345,12 +321,10 @@ export function AppSidebar() {
   const isOverlay = isMobile && !collapsed;
   const requestExpand = () => setCollapsed(false);
 
-  // 🔹 Handler genérico para items de grupos (sin feedback específico por href)
   const onItemNavigate = () => {
     if (isMobile) setCollapsed(true);
   };
 
-  // 🔹 NUEVO: handler que sabe qué href se ha clicado (top-level items)
   function makeItemNavigate(href: string) {
     return () => {
       setUserMenuOpen(false);
@@ -431,11 +405,9 @@ export function AppSidebar() {
     );
   }
 
-  // Helpers de active con pending para top-level
+  // Helpers active + pending
   const homeActive =
     isActivePath(pathname, HOME.href) || pendingHref === HOME.href;
-  const pricingActive =
-    isActivePath(pathname, PRICING.href) || pendingHref === PRICING.href;
   const reviewsActive =
     isActivePath(pathname, REVIEWS.href) || pendingHref === REVIEWS.href;
   const myBusinessActive =
@@ -456,7 +428,7 @@ export function AppSidebar() {
     >
       <Brand collapsed={collapsed} setCollapsed={setCollapsed} />
 
-      <CompanyChip collapsed={collapsed} />
+      {/* 👇 Selector de empresas eliminado */}
 
       <nav className="flex-1 overflow-y-auto px-2 py-2">
         {ADMIN_GROUP && (
@@ -480,14 +452,8 @@ export function AppSidebar() {
           onNavigate={makeItemNavigate(HOME.href)}
         />
 
-        {!isAdmin && (
-          <SidebarItem
-            item={PRICING}
-            active={pricingActive}
-            collapsed={collapsed}
-            onNavigate={makeItemNavigate(PRICING.href)}
-          />
-        )}
+        {/* Pricing NO se muestra a usuarios normales, solo desde Admin */}
+        {/* <SidebarItem ... PRICING ... /> */}
 
         <SidebarItem
           item={REVIEWS}
@@ -514,25 +480,15 @@ export function AppSidebar() {
           onNavigate={makeItemNavigate(INTEGRATIONS.href)}
         />
 
-        {!isAdmin && (
-          <div className="mt-2 space-y-1">
-            {GROUPS.map((g) => (
-              <Group
-                key={g.id}
-                group={g}
-                pathname={pathname}
-                collapsed={collapsed}
-                open={openGroupId === g.id}
-                onHeaderClick={() => handleGroupHeaderClick(g.id)}
-                onRequestExpand={requestExpand}
-                onItemNavigate={onItemNavigate}
-              />
-            ))}
-          </div>
-        )}
+        {/* 👇 3 grupos grandes ocultos de la sidebar general,
+            pero sus items siguen dentro de ADMIN_GROUP */}
       </nav>
 
       <TrialBanner collapsed={collapsed} />
+
+
+
+
 
       <UserFooter
         collapsed={collapsed}

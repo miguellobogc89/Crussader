@@ -41,8 +41,7 @@ export function Brand({
           </div>
           {!collapsed && (
             <div className="leading-tight">
-              <div className="text-sm font-semibold text-white">Crussader</div>
-              <div className="text-[11px] text-slate-400">Panel de usuario</div>
+              <div className="text-md font-semibold text-white">Crussader</div>
             </div>
           )}
         </div>

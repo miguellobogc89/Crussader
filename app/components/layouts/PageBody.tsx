@@ -1,3 +1,4 @@
+// app/components/layouts/PageBody.tsx
 "use client";
 
 import { ReactNode } from "react";
@@ -11,7 +12,7 @@ export default function PageBody({
   children: ReactNode;
   variant?: "default" | "full" | "narrow";
 }) {
-  const width =
+  const widthClasses =
     variant === "full"
       ? "max-w-none w-full"
       : variant === "narrow"
@@ -21,7 +22,12 @@ export default function PageBody({
   return (
     <main
       role="main"
-      className={`w-full bg-dark ${width} mx-auto px-4 py-6 sm:px-6 lg:px-8`}
+      className={[
+        "w-full mx-auto",
+        widthClasses,
+        // padding horizontal + vertical responsivo
+        "px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8",
+      ].join(" ")}
     >
       {toolbar && <div className="mb-4">{toolbar}</div>}
       {children}
