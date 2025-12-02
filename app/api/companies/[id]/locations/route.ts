@@ -42,6 +42,7 @@ export async function GET(
       region: true,
       country: true,
       postalCode: true,
+      featuredImageUrl: true,
       phone: true,
       type: true,
       website: true,

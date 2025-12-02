@@ -21,6 +21,7 @@ import {
   Power,
   Settings2,
   Image as ImageIcon,
+  Link as LinkIcon,
   Link2,
   Unlink,
 } from "lucide-react";
@@ -62,36 +63,22 @@ export function EstablishmentCard({
   const googlePlaceId = (location as any).googlePlaceId ?? null;
   const isLinked = !!googlePlaceId;
 
-  const connected = Boolean(
-    (location as any).externalConnectionId ||
-      (location as any).ExternalConnection?.id ||
-      (location as any).googlePlaceId,
-  );
-
   const avg = Number((location as any).reviewsAvg ?? NaN);
   const avgText = Number.isFinite(avg) ? avg.toFixed(1) : "—";
 
   const countText = Number((location as any).reviewsCount ?? 0).toString();
 
-// 1) Imagen inicial desde BD (featuredImageUrl o imageUrl)
-const initialImageUrl =
-  ((location as any).featuredImageUrl ??
-    (location as any).imageUrl ??
-    null) as string | null;
+  // Imagen inicial desde BD (featuredImageUrl o imageUrl) ignorando strings vacíos
+  const initialImageUrl = getLocationImageUrl(location);
 
-const [localImageUrl, setLocalImageUrl] = React.useState<string | null>(
-  initialImageUrl,
-);
-
-// 2) Si cambia la location (refetch), refrescamos la imagen local
-React.useEffect(() => {
-  setLocalImageUrl(
-    ((location as any).featuredImageUrl ??
-      (location as any).imageUrl ??
-      null) as string | null,
+  const [localImageUrl, setLocalImageUrl] = React.useState<string | null>(
+    initialImageUrl,
   );
-}, [location]);
 
+  // Si cambia la location (refetch), refrescamos la imagen local
+  React.useEffect(() => {
+    setLocalImageUrl(getLocationImageUrl(location));
+  }, [location]);
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
@@ -175,7 +162,7 @@ React.useEffect(() => {
   return (
     <>
       <Card className="group relative overflow-hidden border-border/40 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-border hover:shadow-md">
-        {/* CardContent ahora es relative para poder posicionar los 3 puntos */}
+        {/* CardContent ahora es relative para poder posicionar los elementos absolutos */}
         <CardContent className="relative p-4 sm:p-6">
           {/* input de fichero oculto */}
           <input
@@ -214,7 +201,7 @@ React.useEffect(() => {
                 }
               >
                 <Power className="mr-2 h-4 w-4" />
-                {isLinked ? "Desconectar" : "Conectar"}
+                {isLinked ? "Desconectar" : "Conectar ubicación"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -224,57 +211,62 @@ React.useEffect(() => {
             {/* LEFT SECTION - MAIN INFO */}
             <div className="flex flex-1 gap-3 sm:gap-4">
               {/* Avatar / Imagen clickable */}
-<button
-  type="button"
-  onClick={handleClickImage}
-  className="relative flex h-11 w-11 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/20 via-fuchsia-500/20 to-sky-500/20 ring-1 ring-primary/20 shadow-sm overflow-hidden transition hover:opacity-90"
-  title={localImageUrl ? "Cambiar imagen" : "Añadir foto"}
->
-  {localImageUrl ? (
-    <Image
-      src={localImageUrl}
-      alt={title}
-      width={64}
-      height={64}
-      className="h-full w-full object-cover"
-    />
-  ) : (
-    <div className="flex h-full w-full items-center justify-center">
-      <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-background/70 backdrop-blur-sm">
-        <ImageIcon className="h-4 w-4 sm:h-5 sm:w-5 text-primary/80" />
-      </div>
-    </div>
-  )}
-</button>
-
+              <button
+                type="button"
+                onClick={handleClickImage}
+                className="relative flex h-11 w-11 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/20 via-fuchsia-500/20 to-sky-500/20 ring-1 ring-primary/20 shadow-sm overflow-hidden transition hover:opacity-90"
+                title={localImageUrl ? "Cambiar imagen" : "Añadir foto"}
+              >
+                {localImageUrl ? (
+                  <Image
+                    src={localImageUrl}
+                    alt={title}
+                    width={64}
+                    height={64}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-background/70 backdrop-blur-sm">
+                      <ImageIcon className="h-4 w-4 sm:h-5 sm:w-5 text-primary/80" />
+                    </div>
+                  </div>
+                )}
+              </button>
 
               {/* Columna de info */}
               <div className="min-w-0 flex-1 space-y-2">
                 <div>
-<div className="flex items-center gap-2">
-  {/* Título recortado para dejar hueco a los 3 puntos */}
-  <h3
-    className="
-      truncate
-      max-w-[85%]        /* en móvil: recortamos el ancho del título */
-      sm:max-w-full      /* en sm+ puede ocupar todo el ancho */
-      text-sm sm:text-lg
-      font-semibold text-foreground
-    "
-  >
-    {title}
-  </h3>
+                  <div className="flex items-center gap-2">
+                    {/* Título recortado para dejar hueco a los 3 puntos */}
+                    <h3
+                      className="
+                        truncate
+                        max-w-[85%]
+                        sm:max-w-full
+                        text-sm sm:text-lg
+                        font-semibold text-foreground
+                      "
+                    >
+                      {title}
+                    </h3>
 
-  {/* Punto de estado SOLO en desktop/tablet */}
-  <span
-    className={[
-      "hidden sm:inline-block rounded-full shrink-0",
-      "h-2 w-2 sm:h-2.5 sm:w-2.5",
-      isLinked ? "bg-emerald-500" : "bg-slate-300",
-    ].join(" ")}
-  />
-</div>
-
+                    {/* Icono de estado (solo desktop) con tooltip nativo */}
+                    <div
+                      className="hidden sm:block shrink-0"
+                      title={
+                        isLinked
+                          ? "Conectado a Google Business"
+                          : "No conectado a Google Business"
+                      }
+                    >
+                      {isLinked ? (
+                        <LinkIcon className="h-4 w-4 text-emerald-500" />
+                      ) : (
+                        <Unlink className="h-4 w-4 text-slate-400" />
+                      )}
+                    </div>
+                  </div>
 
                   {/* CHIP DE TIPO */}
                   {typeName && (
@@ -313,8 +305,8 @@ React.useEffect(() => {
                   </div>
                 </div>
 
-                {loading && !connected && (
-                  <p className="text-[11px] sm:text-xs text-muted-foreground">
+                {loading && !isLinked && (
+                  <p className="hidden sm:block text-xs text-muted-foreground">
                     Comprobando suscripción…
                   </p>
                 )}
@@ -322,7 +314,7 @@ React.useEffect(() => {
             </div>
           </div>
 
-          {/* BLOQUE MOBILE: dirección + rating alineados a la izquierda, debajo de la imagen */}
+          {/* BLOQUE MOBILE: dirección + rating */}
           <div className="mt-3 flex flex-col gap-1 sm:hidden">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <MapPin className="h-3 w-3 shrink-0" />
@@ -352,6 +344,22 @@ React.useEffect(() => {
               <Unlink className="h-4 w-4 text-slate-300" />
             )}
           </span>
+
+          {/* Botón CONECTAR solo en desktop/tablet, abajo a la derecha, y solo si se puede conectar */}
+          {!isLinked && !!onConnect && (
+            <div className="hidden sm:flex absolute right-4 bottom-4">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!canToggleCable}
+                onClick={handleToggleCable}
+                className="h-8 px-3 text-xs gap-1"
+              >
+                <Link2 className="h-4 w-4" />
+                Conectar ubicación
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -390,4 +398,23 @@ function mapLocationToForm(
       "",
     website: (loc as any).website ?? "",
   };
+}
+
+// Devuelve la primera URL de imagen no vacía
+function getLocationImageUrl(loc: LocationRow): string | null {
+  const candidates = [
+    (loc as any).featuredImageUrl,
+    (loc as any).imageUrl,
+  ];
+
+  for (const raw of candidates) {
+    if (typeof raw === "string") {
+      const trimmed = raw.trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+  }
+
+  return null;
 }

@@ -17,9 +17,6 @@ export default async function DashboardLayout({
 }) {
   const initialData = await getBootstrapData();
 
-  // Si el usuario tiene compañías pero aún no hay compañía activa en bootstrap,
-  // inyectamos un script muy pequeño que hace POST a /api/me/active-company
-  // para fijar la cookie `active_company_id` en el navegador del usuario.
   const needsEnsureActiveCompany =
     !initialData.activeCompany && (initialData.companies?.length ?? 0) > 0;
 
@@ -55,11 +52,11 @@ export default async function DashboardLayout({
           <AppSidebar />
 
           {/* Contenido (derecha): ahora es el "scope" del overlay */}
-          <div className="relative flex h-svh min-w-0 flex-1 overflow-y-auto">
+          <div className="relative flex h-svh min-w-0 flex-1 overflow-y-auto overflow-x-hidden pt-12 md:pt-0">
             {/* 👇 Overlay limitado al área de página, NO tapa la sidebar */}
             <RouteTransitionOverlay scope="container" />
 
-            <main className="flex-1 bg-background">
+            <main className="flex-1 bg-background min-w-0">
               <PageContainer>{children}</PageContainer>
             </main>
           </div>
@@ -70,7 +67,6 @@ export default async function DashboardLayout({
         {/* ====== Asegurar compañía activa (sin componentes nuevos) ====== */}
         {needsEnsureActiveCompany ? (
           <script
-            // Se ejecuta en el cliente; fija la cookie con la primera compañía del usuario.
             dangerouslySetInnerHTML={{
               __html: `
               (function() {

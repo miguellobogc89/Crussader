@@ -209,25 +209,30 @@ export default function MyBusinessPage() {
     <>
       <PreloadCompanyBuffer companyId={companyId} />
 
-      <PageShell
-        title={companyName}
-        titleIconName="Building2"
-        description="Gestiona los datos de tu empresa y las ubicaciones conectadas."
-        toolbar={
-          hasCompany ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={openEdit}
-              className="inline-flex items-center gap-2"
-            >
-              <Pencil className="h-4 w-4" />
-              <span>Editar empresa</span>
-            </Button>
-          ) : undefined
-        }
-        isLoading={loading}
+<PageShell
+  title={companyName}
+  titleIconName="Building2"
+  description="Gestiona los datos de tu empresa y las ubicaciones conectadas."
+  toolbar={
+    hasCompany ? (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={openEdit}
+        className="inline-flex items-center gap-2"
       >
+        <Pencil className="h-4 w-4" />
+
+        {/* Ocultar texto en móviles → visible solo desde sm: */}
+        <span className="hidden sm:inline">
+          Editar empresa
+        </span>
+      </Button>
+    ) : undefined
+  }
+  isLoading={loading}
+>
+
         {/* banner en el BODY, arriba del todo */}
         <div className="mb-4">
           <GoogleBusinessConnectBanner companyId={companyId} />

@@ -1,4 +1,4 @@
-// app/dashboard/reviews/sentiment/page.tsx
+// app/dashboard/informes/page.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -10,9 +10,8 @@ import { type Establishment } from "@/app/components/establishments/Establishmen
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/app/components/ui/card";
 import TopicsUpdater from "@/app/components/insights/TopicsUpdater";
 import TopicsList from "@/app/components/insights/TopicsList";
-import ConceptsUpdater from "@/app/components/insights/ConceptsUpdater";TopicPlanetaryView
+import ConceptsUpdater from "@/app/components/insights/ConceptsUpdater";
 import BubbleInsightsChart from "@/app/components/charts/BubbleInsightsChart";
-import TopicPlanetaryView from "@/app/components/charts/TopicPlanetaryView";
 
 
 /* ===== Helper: LocationLite -> Establishment ===== */
@@ -336,13 +335,6 @@ export default function InformesPage() {
               to={to}
             />
 
-            {/* ===== Gráfico planetario ===== */}
-            <TopicPlanetaryView
-              companyId={currentCompanyId}
-              locationId={currentLocationId}
-              from={from}
-              to={to}
-            />
 
             {/* ===== Lista de Topics (ya existente) ===== */}
             <Card>

@@ -9,6 +9,7 @@ export type LocationRow = {
   address?: string | null;
   city?: string | null;
   postalCode?: string | null;
+  featuredImageUrl: string | null;
   reviewsAvg?: number | null;
   reviewsCount: number;
   googlePlaceId?: string | null;

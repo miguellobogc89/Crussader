@@ -27,14 +27,18 @@ async function callLLM(messages: ChatMsg[]): Promise<string> {
 function buildMessagesForClustering(items: ConceptLite[], minTopicSize: number) {
   const system = [
     "Eres un analista que agrupa conceptos {id,label} en TOPICS claros y cualitativos.",
-    "Reglas del nombre del topic:",
-    "- Lenguaje natural, informativo y específico (3–8 palabras).",
-    "- Evita 'Valoración de…/Opinión sobre…'.",
-    "- Prefiere formulaciones como: 'Calidad de las instalaciones', 'Problemas con la centralita telefónica', 'Confirmaciones por WhatsApp bien valoradas', 'Dificultad para reprogramar citas', 'Esperas prolongadas en recepción'.",
-    "- Varía el inicio (Calidad…, Problemas…, Dificultad…, Atención…, Seguimiento…).",
-    "- Indica implícitamente si la señal es positiva, negativa o neutra.",
-    "",
-    `Política de agrupación: tamaño mínimo = ${minTopicSize} (no grupos de 1), sin inventar ni duplicar IDs.`,
+"Reglas del nombre del topic:",
+"- Lenguaje natural, informativo y específico (3–8 palabras).",
+"- Usa términos completamente neutros (servicio, atención, experiencia, comunicación, equipo).",
+"- No asumas un sector concreto (no uses términos como tratamiento, paciente, clínica, restaurante, etc.) salvo que aparezcan explícitamente en los datos.",
+"- Evita inventar detalles no presentes en los labels.",
+"- No utilices tecnicismos médicos, procesos clínicos o productos específicos si no aparecen literal en los conceptos.",
+"- Prefiere formulaciones generales como: 'Claridad en la comunicación', 'Rapidez del servicio', 'Cortesía del personal', 'Gestión de citas y tiempos'.",
+"",
+`Política de agrupación: tamaño mínimo = ${minTopicSize}. Prefiere AGRUPAR más que dividir: menos topics y más amplios. Evita crear topics muy pequeños.`,
+"Está prohibido crear grupos de tamaño 1.",
+"Prohíbe duplicar IDs en varios topics.",
+
   ].join("\n");
 
   const user = [

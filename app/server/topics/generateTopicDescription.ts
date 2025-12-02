@@ -63,12 +63,16 @@ export async function generateAndStoreTopicDescription(topicId: string) {
     return { concept: c.label, snippet: short };
   });
 
-  const sys = [
-    "Eres un analista que escribe un RESUMEN breve y cualitativo (1–2 frases) basado en evidencias.",
-    "Estilo: claro, accionable y específico; evita listas, etiquetas genéricas y palabras vacías.",
-    "Debe quedar claro si el tono global es positivo, negativo o mixto, pero sin forzarlo.",
-    "No repitas literalmente todos los conceptos; sintetiza el patrón común en lenguaje natural.",
-  ].join("\n");
+const sys = [
+  "Eres un analista que escribe un resumen breve (1–2 frases) basado EXCLUSIVAMENTE en la información proporcionada.",
+  "No inventes detalles, ejemplos, productos, tratamientos, patologías ni procesos técnicos.",
+  "No asumas que pertenece a un sector concreto (clínica, salud, restaurante, retail…). Usa solo lenguaje neutro salvo que el sector aparezca explícitamente.",
+  "No añadas términos clínicos como 'tratamiento', 'paciente', 'rinomodelación', 'ácido hialurónico' ni otros, a menos que estén escritos literalmente en los datos.",
+  "Sintetiza el patrón común usando lenguaje general: servicio, experiencia, atención, equipo, comunicación, tiempos, organización.",
+  "Debe quedar claro si el tono global es positivo, negativo o mixto, pero sin exagerar ni adornar.",
+  "No cites todos los conceptos; capta la idea central en lenguaje natural.",
+].join("\n");
+
 
   const user = [
     `Topic: ${topic.label}`,

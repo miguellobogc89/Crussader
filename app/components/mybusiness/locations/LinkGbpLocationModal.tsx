@@ -231,44 +231,103 @@ export default function LinkGbpLocationModal({
 
   const title = "Vincular ubicación con Google";
 
-  async function handleLink() {
-    if (!selectedGbpLocationId || !locationId) return;
-    setLinking(true);
-    setGbpError(null);
+async function handleLink() {
+  if (!selectedGbpLocationId || !locationId) return;
+  setLinking(true);
+  setGbpError(null);
 
-    try {
-      const res = await fetch(
+  try {
+    // 1) Mirar si la GBP seleccionada ya está vinculada a OTRA location
+    const selectedRow = gbpLocations.find(
+      (loc) => loc.id === selectedGbpLocationId,
+    );
+
+    const otherLocationId =
+      selectedRow?.linkedLocationId &&
+      selectedRow.linkedLocationId !== locationId
+        ? selectedRow.linkedLocationId
+        : null;
+
+    // 2) Si está vinculada a otra → desvincular primero
+    if (otherLocationId) {
+      const unlinkRes = await fetch(
         `/api/mybusiness/locations/${encodeURIComponent(
-          locationId,
-        )}/link-google`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ gbpLocationId: selectedGbpLocationId }),
-        },
+          otherLocationId,
+        )}/unlink-google`,
+        { method: "POST" },
       );
 
-      const data = await res.json().catch(() => null);
+      const unlinkData = await unlinkRes.json().catch(() => null);
 
-      if (!res.ok || !data?.ok) {
+      if (!unlinkRes.ok || !unlinkData?.ok) {
         setGbpError(
-          data?.error ||
-            `Error al vincular la ubicación (${res.status})`,
+          unlinkData?.error ||
+            `No se ha podido desvincular la ubicación anterior (status ${unlinkRes.status}).`,
         );
         return;
       }
-
-      if (onLinked) {
-        await onLinked();
-      }
-
-      onClose();
-    } catch (err) {
-      setGbpError("Error de red al vincular la ubicación.");
-    } finally {
-      setLinking(false);
     }
+
+    // 3) Vincular con la location actual
+    const res = await fetch(
+      `/api/mybusiness/locations/${encodeURIComponent(
+        locationId,
+      )}/link-google`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gbpLocationId: selectedGbpLocationId }),
+      },
+    );
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || !data?.ok) {
+      setGbpError(
+        data?.error ||
+          `Error al vincular la ubicación (${res.status})`,
+      );
+      return;
+    }
+
+    // 4) Lanzar sync de reseñas para ESTA ubicación
+    try {
+      await fetch(
+        `/api/mybusiness/locations/${encodeURIComponent(
+          locationId,
+        )}/refresh-reviews`,
+        { method: "POST" },
+      );
+    } catch (err) {
+      console.error(
+        "[mybusiness][link-google-modal] Error al refrescar reseñas después de vincular",
+        err,
+      );
+      // No rompemos el flujo si falla el refresh puntual
+    }
+
+    // 5) Avisar al padre y cerrar
+    if (onLinked) {
+      await onLinked();
+    }
+
+    onClose();
+  } catch (err) {
+    setGbpError("Error de red al vincular la ubicación.");
+  } finally {
+    setLinking(false);
   }
+}
+
+
+  // Row seleccionada (para el banner amarillo)
+  const selectedRow = selectedGbpLocationId
+    ? gbpLocations.find((loc) => loc.id === selectedGbpLocationId)
+    : null;
+
+  const selectedIsLinkedOther =
+    selectedRow?.linkedLocationId &&
+    selectedRow.linkedLocationId !== locationId;
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -311,6 +370,15 @@ export default function LinkGbpLocationModal({
                   </div>
                 )}
 
+                {/* Banner: selección ya vinculada a otra ubicación */}
+                {selectedIsLinkedOther && !gbpError && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    Esta ubicación de Google ya está vinculada a otra
+                    ubicación interna. Si la vinculas aquí, se desvinculará de
+                    la anterior automáticamente.
+                  </div>
+                )}
+
                 {!gbpError && !gbpAccount && (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                     No se ha encontrado ninguna cuenta de Google Business
@@ -329,9 +397,8 @@ export default function LinkGbpLocationModal({
                       <div className="flex-1 overflow-y-auto rounded-lg border border-slate-200 bg-white/60">
                         {gbpLocations.map((loc) => {
                           const isLinked = Boolean(loc.linkedLocationId);
-                          const isSelected =
-                            selectedGbpLocationId === loc.id;
-
+                          const isLinkedHere =
+                            loc.linkedLocationId === locationId;
                           const hasRating =
                             typeof loc.avgRating === "number" &&
                             Number.isFinite(loc.avgRating);
@@ -342,6 +409,8 @@ export default function LinkGbpLocationModal({
                             typeof loc.reviewCount === "number"
                               ? loc.reviewCount
                               : null;
+                          const isSelected =
+                            selectedGbpLocationId === loc.id;
 
                           return (
                             <button
@@ -367,12 +436,18 @@ export default function LinkGbpLocationModal({
                                   <span
                                     className={cn(
                                       "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold border",
-                                      isLinked
+                                      isLinkedHere
                                         ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                        : "border-slate-200 bg-slate-50 text-slate-600",
+                                        : isLinked
+                                          ? "border-amber-200 bg-amber-50 text-amber-800"
+                                          : "border-slate-200 bg-slate-50 text-slate-600",
                                     )}
                                   >
-                                    {isLinked ? "Ya vinculada" : "No vinculada"}
+                                    {isLinkedHere
+                                      ? "Vinculada a esta ubicación"
+                                      : isLinked
+                                        ? "Vinculada a otra ubicación"
+                                        : "No vinculada"}
                                   </span>
                                 </div>
 
@@ -386,9 +461,6 @@ export default function LinkGbpLocationModal({
                                           {ratingText}
                                         </span>
                                         <Star className="h-4 w-4 text-amber-400 fill-current" />
-                                        <span className="text-[13px]">
-                                          Estrella
-                                        </span>
                                       </span>
                                       <span className="text-slate-400">·</span>
                                       <span className="text-[13px]">

@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -12,8 +13,7 @@ import type { NavItem, NavGroup } from "@/app/components/sidebar/types";
 
 import { Brand } from "@/app/components/sidebar/Brand";
 import { UserFooter } from "@/app/components/sidebar/UserFooter";
-import TrialBanner from "@/app/components/sidebar/TrialBanner";
-import { Menu } from "lucide-react";
+import { Menu, ChevronUp } from "lucide-react";
 
 /* ======== util ======== */
 function isActivePath(pathname: string, href: string) {
@@ -57,11 +57,11 @@ const INTEGRATIONS: NavItem = {
   description: "Conecta tus plataformas sociales",
 };
 
-const SETTINGS: NavItem = {
-  title: "Configuración",
-  href: "/dashboard/settings",
-  icon: "⚙️",
-  description: "Ajustes de usuario",
+const LABS: NavItem = {
+  title: "Laboratorio",
+  href: "/dashboard/labs",
+  icon: "🧪",
+  description: "Próximas funcionalidades",
 };
 
 const GROUPS: NavGroup[] = [
@@ -171,18 +171,28 @@ export function AppSidebar() {
   const isMobile = useIsMobile();
   const { data: session } = useSession();
 
-  const [collapsed, setCollapsed] = useState<boolean>(isMobile);
+  // 👉 En móvil queremos que SIEMPRE arranque colapsado
+  const [collapsed, setCollapsed] = useState<boolean>(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   // navegación pendiente (para feedback inmediato)
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-    // Evitar hydration mismatch en bloques sólo de cliente (mock items, etc.)
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
+  // Cuando cambie isMobile, forzamos estado por defecto:
+  // - Mobile: colapsado (true)
+  // - Desktop: expandido (false)
+  useEffect(() => {
+    if (isMobile) {
+      setCollapsed(true);
+    } else {
+      setCollapsed(false);
+    }
+  }, [isMobile]);
 
   // reset de pending al cambiar ruta
   useEffect(() => {
@@ -230,7 +240,6 @@ export function AppSidebar() {
 
   const isAdmin = Object.values(adminFlags).some(Boolean);
 
-  // 👇 Admin conserva Pricing + TODOS los items de los 3 grupos
   const ADMIN_GROUP: NavGroup | null = isAdmin
     ? {
         id: "admin",
@@ -292,8 +301,8 @@ export function AppSidebar() {
             description: "Logs y cumplimiento",
           },
           {
-            title: "Estado del sistema",
-            href: "/dashboard/admin/system",
+            title: "Configuración",
+            href: "/dashboard/settings",
             icon: "⚙️",
             description: "Salud y configuración",
           },
@@ -335,6 +344,7 @@ export function AppSidebar() {
 
   const width = isOverlay ? "100vw" : collapsed ? "4rem" : "18rem";
 
+  // Bloquear scroll del body cuando el overlay móvil está abierto
   useEffect(() => {
     if (isOverlay) {
       const prev = document.body.style.overflow;
@@ -377,6 +387,7 @@ export function AppSidebar() {
       window.removeEventListener("pointerdown", onPointerDown);
   }, [isMobile, collapsed]);
 
+  // ---------- HEADER MÓVIL COLAPSADO ----------
   if (isMobile && collapsed) {
     return (
       <>
@@ -388,6 +399,26 @@ export function AppSidebar() {
             showTopBar ? "translate-y-0" : "-translate-y-full",
           ].join(" ")}
         >
+          {/* IZQUIERDA: LOGO */}
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center overflow-hidden">
+              <Image
+                src="/logo/logo.svg"
+                alt="Crussader logo"
+                width={32}
+                height={32}
+                className="h-7 w-7"
+                priority
+              />
+            </div>
+          </div>
+
+          {/* CENTRO: TEXTO */}
+          <span className="text-slate-200 text-sm font-semibold tracking-wide">
+            Crussader
+          </span>
+
+          {/* DERECHA: HAMBURGUESA */}
           <button
             onClick={() => setCollapsed(false)}
             aria-label="Abrir menú"
@@ -395,11 +426,6 @@ export function AppSidebar() {
           >
             <Menu className="h-5 w-5 text-slate-200" />
           </button>
-
-          <span className="text-slate-200 text-sm font-semibold tracking-wide">
-            Crussader
-          </span>
-          <span className="h-9 w-9" />
         </div>
       </>
     );
@@ -413,7 +439,7 @@ export function AppSidebar() {
   const myBusinessActive =
     isActivePath(pathname, MYBUSINESS.href) || pendingHref === MYBUSINESS.href;
   const settingsActive =
-    isActivePath(pathname, SETTINGS.href) || pendingHref === SETTINGS.href;
+    isActivePath(pathname, LABS.href) || pendingHref === LABS.href;
   const integrationsActive =
     isActivePath(pathname, INTEGRATIONS.href) ||
     pendingHref === INTEGRATIONS.href;
@@ -423,12 +449,26 @@ export function AppSidebar() {
       style={{ width }}
       className={[
         "h-svh shrink-0 border-r border-slate-800 bg-slate-900 text-slate-200 shadow-lg flex flex-col transition-[width] duration-300 ease-in-out",
-        isOverlay ? "fixed inset-0 z-50" : "",
+        // 👇 En móvil overlay: panel fijo que "cae" desde debajo del topbar
+        isOverlay
+          ? "fixed inset-x-0 top-12 bottom-0 z-50 transform transition-transform duration-300"
+          : "",
       ].join(" ")}
     >
-      <Brand collapsed={collapsed} setCollapsed={setCollapsed} />
+      {/* Botón cerrar (chevron arriba) SOLO en móvil overlay */}
+      {isOverlay && isMobile && (
+        <div className="flex items-center justify-end px-3 pt-2 md:hidden">
+          <button
+            onClick={() => setCollapsed(true)}
+            aria-label="Cerrar menú"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-lg hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-700"
+          >
+            <ChevronUp className="h-5 w-5 text-slate-200" />
+          </button>
+        </div>
+      )}
 
-      {/* 👇 Selector de empresas eliminado */}
+      <Brand collapsed={collapsed} setCollapsed={setCollapsed} />
 
       <nav className="flex-1 overflow-y-auto px-2 py-2">
         {ADMIN_GROUP && (
@@ -452,9 +492,6 @@ export function AppSidebar() {
           onNavigate={makeItemNavigate(HOME.href)}
         />
 
-        {/* Pricing NO se muestra a usuarios normales, solo desde Admin */}
-        {/* <SidebarItem ... PRICING ... /> */}
-
         <SidebarItem
           item={REVIEWS}
           active={reviewsActive}
@@ -468,10 +505,10 @@ export function AppSidebar() {
           onNavigate={makeItemNavigate(MYBUSINESS.href)}
         />
         <SidebarItem
-          item={SETTINGS}
+          item={LABS}
           active={settingsActive}
           collapsed={collapsed}
-          onNavigate={makeItemNavigate(SETTINGS.href)}
+          onNavigate={makeItemNavigate(LABS.href)}
         />
         <SidebarItem
           item={INTEGRATIONS}
@@ -479,19 +516,12 @@ export function AppSidebar() {
           collapsed={collapsed}
           onNavigate={makeItemNavigate(INTEGRATIONS.href)}
         />
-
-        {/* 👇 3 grupos grandes ocultos de la sidebar general,
-            pero sus items siguen dentro de ADMIN_GROUP */}
       </nav>
-
-      <TrialBanner collapsed={collapsed} />
-
-
 
 
 
       <UserFooter
-        collapsed={collapsed}
+        collapsed={collapsed} 
         userMenuOpen={userMenuOpen}
         setUserMenuOpen={setUserMenuOpen}
         onItemNavigate={onItemNavigate}
