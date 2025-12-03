@@ -6,6 +6,10 @@ import { SidebarCollapse } from "@/app/components/sidebar/SidebarCollapse";
 import { useSession, signOut } from "next-auth/react";
 import * as React from "react";
 
+// Flags para ocultar secciones manteniendo el código
+const SHOW_NOTIFICATIONS = false;
+const SHOW_SUPPORT = false;
+
 export function UserFooter({
   collapsed,
   userMenuOpen,
@@ -67,52 +71,56 @@ export function UserFooter({
   return (
     <div className="sticky bottom-0 z-10 bg-slate-900">
       <div className="border-t border-slate-800">
-        {/* NOTIFICACIONES */}
-        <Link
-          href="/dashboard/notifications"
-          onClick={onItemNavigate}
-          className={[
-            "relative flex items-center min-h-11 transition-colors",
-            "text-slate-300 hover:text-white hover:bg-slate-800/60",
-            collapsed ? "justify-center px-2" : "justify-start gap-3 px-3",
-          ].join(" ")}
-        >
-          <div className="relative">
-            <Bell className="h-5 w-5" />
+        {/* NOTIFICACIONES (oculto mediante flag) */}
+        {SHOW_NOTIFICATIONS && (
+          <Link
+            href="/dashboard/notifications"
+            onClick={onItemNavigate}
+            className={[
+              "relative flex items-center min-h-11 transition-colors",
+              "text-slate-300 hover:text-white hover:bg-slate-800/60",
+              collapsed ? "justify-center px-2" : "justify-start gap-3 px-3",
+            ].join(" ")}
+          >
+            <div className="relative">
+              <Bell className="h-5 w-5" />
 
-            {/* Bolita con contador dinámico (solo en cliente) */}
-            {isClient && unread > 0 && (
-              <div className="absolute -top-1 -right-1 flex items-center justify-center">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-primary blur-sm animate-pulse" />
-                  <div className="relative bg-gradient-to-br from-primary via-primary to-primary/80 text-white text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center border border-white/20 shadow-lg">
-                    {unread > 9 ? "9+" : unread}
+              {/* Bolita con contador dinámico (solo en cliente) */}
+              {isClient && unread > 0 && (
+                <div className="absolute -top-1 -right-1 flex items-center justify-center">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-primary blur-sm animate-pulse" />
+                    <div className="relative bg-gradient-to-br from-primary via-primary to-primary/80 text-white text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center border border-white/20 shadow-lg">
+                      {unread > 9 ? "9+" : unread}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+            </div>
+            {!collapsed && (
+              <span className="text-sm font-medium">Notificaciones</span>
             )}
-          </div>
-          {!collapsed && (
-            <span className="text-sm font-medium">Notificaciones</span>
-          )}
-        </Link>
+          </Link>
+        )}
 
-        {/* SOPORTE */}
-        <Link
-          href="/dashboard/support"
-          onClick={onItemNavigate}
-          className={[
-            "flex items-center min-h-11 transition-colors",
-            "text-slate-300 hover:text-white hover:bg-slate-800/60",
-            collapsed ? "justify-center px-2" : "justify-start gap-3 px-3",
-          ].join(" ")}
-          title={collapsed ? "Soporte" : undefined}
-        >
-          <span className="text-base">💡</span>
-          {!collapsed && (
-            <span className="text-sm font-medium">Soporte</span>
-          )}
-        </Link>
+        {/* SOPORTE (oculto mediante flag) */}
+        {SHOW_SUPPORT && (
+          <Link
+            href="/dashboard/support"
+            onClick={onItemNavigate}
+            className={[
+              "flex items-center min-h-11 transition-colors",
+              "text-slate-300 hover:text-white hover:bg-slate-800/60",
+              collapsed ? "justify-center px-2" : "justify-start gap-3 px-3",
+            ].join(" ")}
+            title={collapsed ? "Soporte" : undefined}
+          >
+            <span className="text-base">💡</span>
+            {!collapsed && (
+              <span className="text-sm font-medium">Soporte</span>
+            )}
+          </Link>
+        )}
       </div>
 
       <div className="border-t border-slate-800" />

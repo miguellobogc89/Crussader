@@ -71,12 +71,6 @@ const GROUPS: NavGroup[] = [
     icon: "📊",
     items: [
       {
-        title: "Reseñas",
-        href: "/dashboard/reviews",
-        icon: "💬",
-        description: "Métricas y estadísticas",
-      },
-      {
         title: "Reportes",
         href: "/dashboard/reports",
         icon: "📋",
@@ -99,68 +93,6 @@ const GROUPS: NavGroup[] = [
         href: "/dashboard/reports-test",
         icon: "🧪",
         description: "Sandbox",
-      },
-    ],
-  },
-  {
-    id: "business",
-    title: "Mi Negocio",
-    icon: "🏢",
-    items: [
-      {
-        title: "Empresa",
-        href: "/dashboard/company",
-        icon: "🏛️",
-        description: "Información de la empresa",
-      },
-      {
-        title: "Empleados",
-        href: "/dashboard/myusers",
-        icon: "👥",
-        description: "Empleados y roles",
-      },
-      {
-        title: "Turnos del personal",
-        href: "/dashboard/shifts",
-        icon: "🗓️",
-        description: "Horarios, vacaciones y festivos",
-      },
-      {
-        title: "Calendario de reservas",
-        href: "/dashboard/calendar",
-        icon: "📅",
-        description: "Gestión de citas y agenda",
-      },
-    ],
-  },
-  {
-    id: "products",
-    title: "Productos y Servicios",
-    icon: "📦",
-    items: [
-      {
-        title: "Conocimientos",
-        href: "/dashboard/knowledge",
-        icon: "📚",
-        description: "Base de conocimiento",
-      },
-      {
-        title: "Agentes de voz IA",
-        href: "/dashboard/integrations-test",
-        icon: "🎙️",
-        description: "Conecta servicios",
-      },
-      {
-        title: "Todos los productos",
-        href: "/dashboard/products",
-        icon: "📦",
-        description: "Productos y servicios",
-      },
-      {
-        title: "WebChat IA",
-        href: "/dashboard/database",
-        icon: "🗄️",
-        description: "Conexiones y datos",
       },
     ],
   },
@@ -263,12 +195,54 @@ export function AppSidebar() {
             href: "/dashboard/crm/leads",
             icon: "🏪",
             description: "Invitaciones a nuevos usuarios",
+          },      
+          {
+            title: "Empleados",
+            href: "/dashboard/myusers",
+            icon: "👥",
+            description: "Empleados y roles",
+          },
+          {
+            title: "Turnos del personal",
+            href: "/dashboard/shifts",
+            icon: "🗓️",
+            description: "Horarios, vacaciones y festivos",
+          },
+          {
+            title: "Calendario de reservas",
+            href: "/dashboard/calendar",
+            icon: "📅",
+            description: "Gestión de citas y agenda",
           },
           {
             title: "Empresas y establecimientos",
             href: "/dashboard/admin/companies",
             icon: "🏪",
             description: "Estructura, sedes y negocios",
+          },
+          {
+            title: "Conocimientos",
+            href: "/dashboard/knowledge",
+            icon: "📚",
+            description: "Base de conocimiento",
+          },
+          {
+            title: "Agentes de voz IA",
+            href: "/dashboard/integrations-test",
+            icon: "🎙️",
+            description: "Conecta servicios",
+          },
+          {
+            title: "Todos los productos",
+            href: "/dashboard/products",
+            icon: "📦",
+            description: "Productos y servicios",
+          },
+          {
+            title: "WebChat IA",
+            href: "/dashboard/database",
+            icon: "🗄️",
+            description: "Conexiones y datos",
           },
           {
             title: "Integraciones",
