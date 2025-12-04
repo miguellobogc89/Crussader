@@ -60,82 +60,6 @@ type Props = {
   previewN?: number;
 };
 
-/* ================== Mock (fallback) ================== */
-const mockData: TopicData[] = [
-  {
-    id: "m1",
-    topic: "Calidad atención médica",
-    score: 4.5,
-    weight: 25,
-    avgAge: 15,
-    description: null,
-    reviews: 120,
-  },
-  {
-    id: "m2",
-    topic: "Atención al cliente",
-    score: 4.2,
-    weight: 18,
-    avgAge: 12,
-    description: null,
-    reviews: 96,
-  },
-  {
-    id: "m3",
-    topic: "Dificultad contacto telefónico",
-    score: 2.1,
-    weight: 15,
-    avgAge: 8,
-    description: null,
-    reviews: 88,
-  },
-  {
-    id: "m4",
-    topic: "Puntualidad en la atención",
-    score: 3.8,
-    weight: 12,
-    avgAge: 20,
-    description: null,
-    reviews: 77,
-  },
-  {
-    id: "m5",
-    topic: "Problemas con el pago",
-    score: 2.4,
-    weight: 10,
-    avgAge: 25,
-    description: null,
-    reviews: 66,
-  },
-  {
-    id: "m6",
-    topic: "Dificultad aparcamiento",
-    score: 2.8,
-    weight: 8,
-    avgAge: 30,
-    description: null,
-    reviews: 44,
-  },
-  {
-    id: "m7",
-    topic: "Reprogramar citas",
-    score: 3.2,
-    weight: 7,
-    avgAge: 18,
-    description: null,
-    reviews: 33,
-  },
-  {
-    id: "m8",
-    topic: "Calidad instalaciones",
-    score: 4.7,
-    weight: 5,
-    avgAge: 45,
-    description: null,
-    reviews: 22,
-  },
-];
-
 /* ================== Utils ================== */
 const getColorByScore = (score: number, alpha: number = 0.75): string => {
   let r: number, g: number, b: number;
@@ -299,10 +223,7 @@ const SafePointLabel = (props: any) => {
 /* ================== Placeholder ================== */
 function ChartPlaceholder() {
   return (
-    <div
-      className="w-full flex items-center justify-center"
-      style={{ aspectRatio: "4 / 3" }}
-    >
+    <div className="w-full h-[260px] sm:h-[320px] lg:h-[360px] xl:h-[380px] flex items-center justify-center">
       <Spinner />
     </div>
   );
@@ -365,20 +286,16 @@ export default function BubbleInsightsChart({
 
   useEffect(() => {
     let cancelled = false;
+
     async function load() {
       try {
         setIsLoading(true);
 
         if (!hasFilters) {
-          // modo demo
-          setData(mockData);
+          setData([]);
+          setTotalReviews(0);
           setErr(null);
-          setTotalReviews(
-            mockData.reduce((a, b) => a + (b.reviews || 0), 0),
-          );
-          if (!cancelled) {
-            setIsLoading(false);
-          }
+          if (!cancelled) setIsLoading(false);
           return;
         }
 
@@ -433,6 +350,7 @@ export default function BubbleInsightsChart({
         if (!cancelled) setIsLoading(false);
       }
     }
+
     load();
     return () => {
       cancelled = true;
@@ -471,19 +389,7 @@ export default function BubbleInsightsChart({
     <Card className="w-full bg-card border-border shadow-sm">
       <CardHeader className="pb-4">
         <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1.5 flex-1 min-w-0">
-            <CardTitle className="text-lg font-semibold text-foreground">
-              Performance por Topic
-            </CardTitle>
-            <CardDescription className="text-xs text-muted-foreground leading-relaxed">
-              X = Puntuación (1–5) · Y = Antigüedad (días) · Tamaño = Peso %
-              {hasFilters && totalReviews
-                ? ` · ${totalReviews} reviews totales`
-                : ""}
-              {err ? ` · Error: ${err}` : ""}
-              {!hasFilters ? " · Modo demo (sin filtros)" : ""}
-            </CardDescription>
-          </div>
+
           <Button
             variant="ghost"
             size="sm"
@@ -507,8 +413,7 @@ export default function BubbleInsightsChart({
         ) : (
           <div
             ref={containerRef}
-            className="w-full"
-            style={{ aspectRatio: "4 / 3" }}
+            className="w-full h-[260px] sm:h-[320px] lg:h-[360px] xl:h-[380px]"
           >
             <ResponsiveContainer
               width="100%"
@@ -532,7 +437,6 @@ export default function BubbleInsightsChart({
                 <XAxis
                   type="number"
                   dataKey="x"
-                  // aire lateral para que las bolas grandes no se corten
                   domain={[0.9, 5.1]}
                   ticks={[1, 2, 3, 4, 5]}
                   allowDataOverflow={false}

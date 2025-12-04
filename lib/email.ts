@@ -54,7 +54,7 @@ const VERIFY_EMAIL_HTML = `<!DOCTYPE html>
       <tr><td align="center">
         <table width="600" cellspacing="0" cellpadding="0" style="background:white; border-radius:16px; box-shadow:0 4px 12px rgba(0,0,0,0.05); overflow:hidden;">
           <tr><td style="background:linear-gradient(135deg, #7c3aed, #2563eb); padding:24px; text-align:center;">
-            <h1 style="margin:0; font-size:28px; color:white; font-weight:700;">¡Bienvenido!</h1>
+            <h1 style="margin:0; font-size:28px; color:white; font-weight:700;">¡Bienvenido a Crussader!</h1>
           </td></tr>
           <tr><td style="padding:40px 32px; color:#111827; text-align:left;">
             <h2 style="margin-top:0; font-size:22px; font-weight:600; color:#111827;">Verifica tu correo electrónico</h2>
