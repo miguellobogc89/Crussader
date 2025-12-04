@@ -51,14 +51,16 @@ function shouldAutoPublishRating(mode: AutoPublishMode, rating: number | null): 
 
 // Mínimo 10 min desde la creación de la Response
 const MIN_DELAY_MS = 10 * 60 * 1000; // 10 minutos
-// Máximo 6h desde la creación de la Response/review para autopublicar
+// 🆕 Máximo 6h desde la creación de la Response/review para autopublicar
 const MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 horas
 
-async function runAutoPublish(companyIdFilter?: string, rawMaxPerRun?: number) {
+export async function POST(req: NextRequest) {
   try {
+    const body = await req.json().catch(() => null);
+    const companyIdFilter = (body?.companyId as string | undefined)?.trim() || undefined;
     const maxPerRun =
-      typeof rawMaxPerRun === "number" && rawMaxPerRun > 0 && rawMaxPerRun <= 200
-        ? rawMaxPerRun
+      typeof body?.maxPerRun === "number" && body.maxPerRun > 0 && body.maxPerRun <= 200
+        ? body.maxPerRun
         : 50;
 
     const now = new Date();
@@ -231,7 +233,7 @@ async function runAutoPublish(companyIdFilter?: string, rawMaxPerRun?: number) {
           continue;
         }
 
-        // Más de 6h desde la creación → no autopublicamos nunca esta respuesta
+        // 🆕 Más de 6h desde la creación → no autopublicamos nunca esta respuesta
         if (ageMs > MAX_AGE_MS) {
           await prisma.response.update({
             where: { id: resp.id },
@@ -365,32 +367,4 @@ async function runAutoPublish(companyIdFilter?: string, rawMaxPerRun?: number) {
       { status: 500 },
     );
   }
-}
-
-// → Cron de Vercel (GET) y llamadas internas (POST) comparten la misma lógica
-
-export async function GET(req: NextRequest) {
-  const url = req.nextUrl;
-  const companyIdFilter = url.searchParams.get("companyId")?.trim() || undefined;
-
-  const maxPerRunParam = url.searchParams.get("maxPerRun");
-  let maxPerRun: number | undefined = undefined;
-  if (maxPerRunParam) {
-    const n = Number(maxPerRunParam);
-    if (!Number.isNaN(n)) {
-      maxPerRun = n;
-    }
-  }
-
-  return runAutoPublish(companyIdFilter, maxPerRun);
-}
-
-export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => null);
-  const companyIdFilter = (body?.companyId as string | undefined)?.trim() || undefined;
-
-  const rawMaxPerRun =
-    typeof body?.maxPerRun === "number" ? body.maxPerRun : undefined;
-
-  return runAutoPublish(companyIdFilter, rawMaxPerRun);
 }
