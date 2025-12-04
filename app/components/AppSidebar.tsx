@@ -57,12 +57,7 @@ const INTEGRATIONS: NavItem = {
   description: "Conecta tus plataformas sociales",
 };
 
-const LABS: NavItem = {
-  title: "Laboratorio",
-  href: "/dashboard/labs",
-  icon: "🧪",
-  description: "Próximas funcionalidades",
-};
+
 
 const GROUPS: NavGroup[] = [
   {
@@ -207,6 +202,12 @@ export function AppSidebar() {
             href: "/dashboard/shifts",
             icon: "🗓️",
             description: "Horarios, vacaciones y festivos",
+          },
+          {
+            title: "Laboratorio",
+            href: "/dashboard/labs",
+            icon: "🧪",
+            description: "Próximas funcionalidades",
           },
           {
             title: "Calendario de reservas",
@@ -412,8 +413,6 @@ export function AppSidebar() {
     isActivePath(pathname, REVIEWS.href) || pendingHref === REVIEWS.href;
   const myBusinessActive =
     isActivePath(pathname, MYBUSINESS.href) || pendingHref === MYBUSINESS.href;
-  const settingsActive =
-    isActivePath(pathname, LABS.href) || pendingHref === LABS.href;
   const integrationsActive =
     isActivePath(pathname, INTEGRATIONS.href) ||
     pendingHref === INTEGRATIONS.href;
@@ -477,12 +476,6 @@ export function AppSidebar() {
           active={myBusinessActive}
           collapsed={collapsed}
           onNavigate={makeItemNavigate(MYBUSINESS.href)}
-        />
-        <SidebarItem
-          item={LABS}
-          active={settingsActive}
-          collapsed={collapsed}
-          onNavigate={makeItemNavigate(LABS.href)}
         />
         <SidebarItem
           item={INTEGRATIONS}
