@@ -4,12 +4,8 @@ import { prisma } from "@/app/server/db";
 
 export const runtime = "nodejs";
 
-export async function POST(req: NextRequest) {
+async function runRefreshAll(baseUrl: string, companyId?: string | null) {
   try {
-    const body = await req.json().catch(() => null);
-    const companyId = (body?.companyId as string | undefined)?.trim();
-
-    // 1) Locations con GBP linkado (y opcionalmente filtradas por companyId)
     const locations = await prisma.location.findMany({
       where: {
         ...(companyId ? { companyId } : {}),
@@ -33,10 +29,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2) Base URL para llamar al endpoint existente de refresh por location
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin || "http://localhost:3000";
-
     let successCount = 0;
     let errorCount = 0;
     const results: Array<{
@@ -47,7 +39,6 @@ export async function POST(req: NextRequest) {
       synced?: unknown;
     }> = [];
 
-    // 3) Recorrer locations y llamar a tu endpoint actual de refresh
     for (const loc of locations) {
       const url = `${baseUrl}/api/mybusiness/locations/${loc.id}/refresh-reviews`;
 
@@ -57,7 +48,6 @@ export async function POST(req: NextRequest) {
           headers: {
             "Content-Type": "application/json",
           },
-          // Puedes usar este body para diferenciar en logs que viene de cron
           body: JSON.stringify({ reason: "cron_refresh_all" }),
         });
 
@@ -97,6 +87,38 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("[gbp][cron][refresh-reviews-all] error", err);
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "internal_error",
+        details: err?.message ?? String(err),
+      },
+      { status: 500 },
+    );
+  }
+}
+
+// Cron de Vercel puede entrar por GET (con ?companyId=...) o por POST (con JSON)
+export async function GET(req: NextRequest) {
+  const url = req.nextUrl;
+  const companyId = url.searchParams.get("companyId");
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL || url.origin || "http://localhost:3000";
+
+  return runRefreshAll(baseUrl, companyId);
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => null);
+    const companyId = (body?.companyId as string | undefined)?.trim() || null;
+
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin || "http://localhost:3000";
+
+    return runRefreshAll(baseUrl, companyId);
+  } catch (err: any) {
+    console.error("[gbp][cron][refresh-reviews-all][POST] error", err);
     return NextResponse.json(
       {
         ok: false,
