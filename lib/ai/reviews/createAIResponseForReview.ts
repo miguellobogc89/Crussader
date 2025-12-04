@@ -226,22 +226,28 @@ export async function createAIResponseForReview(reviewId: string) {
     },
   });
 
-  if (!review) throw new Error("Review not found");
+  // 🔧 Alineamos con el route (catch que mira "review_not_found")
+  if (!review) throw new Error("review_not_found");
 
-  // 🆕 CORTE DE 30 DÍAS: no generamos IA si la reseña es demasiado antigua
+  // 🆕 CORTE DE 30 DÍAS (SUAVIZADO):
+  // - Si la reseña es muy antigua y YA hay respuesta → usamos la existente.
+  // - Si no hay respuesta existente → generamos igualmente (no bloqueamos el botón "Responder").
   if (review.createdAtG instanceof Date) {
     const now = new Date();
     const diffMs = now.getTime() - review.createdAtG.getTime();
     const days = diffMs / (1000 * 60 * 60 * 24);
+
     if (days > 30) {
-      // No crear respuesta automática para reseñas > 30 días.
-      // Devolvemos cualquier respuesta existente si la hubiera, o null.
       const existing = await prisma.response.findFirst({
         where: { reviewId: review.id },
         orderBy: { createdAt: "desc" },
       });
-      // Cast a any para no romper firmas; los sitios que no usan el retorno no se ven afectados.
-      return existing as any;
+
+      if (existing) {
+        // Review vieja + ya respondida → devolvemos la existente
+        return existing;
+      }
+      // Si no hay existing, seguimos abajo y GENERAMOS igualmente.
     }
   }
 
@@ -288,6 +294,7 @@ export async function createAIResponseForReview(reviewId: string) {
 
   return saved;
 }
+
 
 /**
  * NUEVO: modo PREVIEW

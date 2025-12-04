@@ -353,30 +353,31 @@ export default function NewReviewCard({
           className="mt-3"
         >
           {/* Si no hay ninguna respuesta aún: botón "Responder" en gradiente */}
-          {!hasResponse && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={regenerate}
-                disabled={busy}
-                className="
-                  inline-flex items-center justify-center gap-2
-                  rounded-full
-                  bg-gradient-to-r from-fuchsia-500 to-sky-500
-                  text-white
-                  h-9 px-4 text-xs font-medium
-                  shadow
-                  hover:brightness-110
-                  disabled:opacity-50
-                  transition
-                "
-                title="Responder"
-                aria-label="Responder"
-              >
-                Responder
-              </button>
-            </div>
-          )}
+{!hasResponse && (
+  <div className="flex justify-end">
+    <button
+      type="button"
+      onClick={() => regenerate()}   // 🔥 explícito y garantizado
+      disabled={busy}
+      className="
+        inline-flex items-center justify-center gap-2
+        rounded-full
+        bg-gradient-to-r from-fuchsia-500 to-sky-500
+        text-white
+        h-9 px-4 text-xs font-medium
+        shadow
+        hover:brightness-110
+        disabled:opacity-50
+        transition
+      "
+      title="Responder"
+      aria-label="Responder"
+    >
+      Responder
+    </button>
+  </div>
+)}
+
 
           {/* Con respuesta: separador + Response (sin chips antiguos abajo) */}
           {hasResponse && (

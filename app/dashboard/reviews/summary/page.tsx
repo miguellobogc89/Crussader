@@ -282,18 +282,6 @@ export default function ReviewsSummaryPage() {
                 <NewReviewCard review={r} />
               </motion.div>
             ))}
-
-            {!loading && pagedReviews.length === 0 && (
-              <motion.div
-                key="empty"
-                className="col-span-full text-muted-foreground"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                No hay reseñas.
-              </motion.div>
-            )}
           </AnimatePresence>
         </motion.div>
 
