@@ -30,6 +30,10 @@ type Props = {
   edited?: boolean;
   title?: string;
 
+  // 🔥 NUEVO: origen real de la respuesta
+  // valores típicos en BD: "AI", "HUMAN", "GOOGLE", "GOOGLE_SYNC", etc.
+  source?: string;
+
   allowRegenerate?: boolean;
   allowPublish?: boolean;
   allowEdit?: boolean;
@@ -56,6 +60,8 @@ export default function Response({
   edited, // mantenido por compat aunque no se pinte
   title = "Respuesta generada con IA",
 
+  source,
+
   allowRegenerate = true,
   allowPublish = true,
   allowEdit = true,
@@ -75,8 +81,29 @@ export default function Response({
     return status === "published";
   }, [published, status]);
 
-  const isGoogle = isPublished;
-  const [isEditing, setIsEditing] = useState<boolean>(defaultEditing && !isPublished);
+  // 🔥 Determinamos el origen REAL en base a `source`
+  // y, si no está definido, hacemos un fallback:
+  // - si está publicada → asumimos Google
+  // - si no → asumimos IA (como hasta ahora)
+  const origin = useMemo<"ai" | "google" | "human">(() => {
+    const s = (source || "").toUpperCase();
+
+    if (s === "AI") return "ai";
+    if (s === "GOOGLE" || s === "GOOGLE_SYNC") return "google";
+    if (s === "HUMAN") return "human";
+
+    // Fallback para registros antiguos:
+    if (isPublished) return "google";
+    return "ai";
+  }, [source, isPublished]);
+
+  const isGoogleOrigin = origin === "google";
+  const isAIOrigin = origin === "ai";
+  const isHumanOrigin = origin === "human";
+
+  const [isEditing, setIsEditing] = useState<boolean>(
+    defaultEditing && !isPublished,
+  );
   const [draft, setDraft] = useState<string>(content);
 
   function startEdit() {
@@ -102,6 +129,14 @@ export default function Response({
   const canRegenerate = !!onRegenerate && allowRegenerate && !isPublished;
   const canPublish = !!onPublish && allowPublish && !isPublished;
 
+  // Texto de cabecera según origen
+  const headerTitle = useMemo(() => {
+    if (isGoogleOrigin) return "Respuesta escrita en Google";
+    if (isHumanOrigin) return "Respuesta escrita a mano";
+    // IA (o fallback) → usamos el título por defecto
+    return title;
+  }, [isGoogleOrigin, isHumanOrigin, title]);
+
   return (
     <section
       className="relative p-3 sm:p-4 max-w-full space-y-3 sm:space-y-4 rounded-xl"
@@ -116,7 +151,7 @@ export default function Response({
 
       {/* Header: icono + título */}
       <div className="flex items-center gap-2">
-        {isGoogle ? (
+        {isGoogleOrigin ? (
           <img
             src="/platform-icons/google-business.png"
             alt="Google Business Profile"
@@ -129,10 +164,9 @@ export default function Response({
           className="font-medium text-foreground"
           style={{ fontSize: "clamp(13px,1.2vw,14px)" }}
         >
-          {isGoogle ? "Respuesta generada desde Google" : title}
+          {headerTitle}
         </h5>
       </div>
-
 
       {/* Contenido */}
       {!isEditing ? (
@@ -280,9 +314,11 @@ function IconButton({
       className={`
         inline-flex items-center justify-center h-8 w-8 rounded-md text-neutral-600
         transition-colors disabled:opacity-50
-        ${solid
-          ? "bg-foreground text-white hover:brightness-95"
-          : "hover:text-foreground"}
+        ${
+          solid
+            ? "bg-foreground text-white hover:brightness-95"
+            : "hover:text-foreground"
+        }
       `}
     >
       {icon}
