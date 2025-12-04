@@ -1,16 +1,19 @@
 {
   "crons": [
     {
-      "path": "/api/tasks/sync-reviews",
-      "schedule": "0 10 * * *"
+      "path": "/api/reviews/response/auto-publish/cron",
+      "schedule": "*/1 * * * *",
+      "method": "POST"
     },
     {
       "path": "/api/integrations/google/business-profile/cron/refresh-reviews-all",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/15 * * * *",
+      "method": "POST"
     },
     {
-      "path": "/api/reviews/response/auto-publish/cron",
-      "schedule": "*/1 * * * *"
+      "path": "/api/tasks/sync-reviews",
+      "schedule": "0 10 * * *",
+      "method": "POST"
     }
   ]
 }
