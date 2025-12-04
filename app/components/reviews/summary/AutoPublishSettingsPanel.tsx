@@ -224,7 +224,7 @@ export default function AutoPublishSettingsPanel() {
             >
               <CardContent className="space-y-4 pt-0 pb-4 sm:space-y-5">
                 {/* Opciones de estrategia */}
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 grid-cols-1 lg:grid-cols-3">
                   {/* Solo positivas */}
                   <button
                     type="button"

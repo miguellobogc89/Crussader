@@ -42,7 +42,11 @@ type ReviewForCard = {
   content: string;
   rating: number;
   date: string;
-  businessResponse?: { content: string; status: "published" | "draft" } | null;
+  avatar?: string;
+  businessResponse: {
+    content: string;
+    status: "published" | "draft";
+  } | null;
 };
 
 type ActiveEst = { id: string; name: string; location: string };
@@ -97,7 +101,19 @@ export default function ReviewsSummaryPage() {
         );
         const json = await res.json();
         if (cancelled) return;
-        setReviews(Array.isArray(json?.reviews) ? json.reviews : []);
+        setReviews(
+          Array.isArray(json?.reviews)
+            ? json.reviews.map((r: any) => ({
+                id: r.id,
+                author: r.author,
+                content: r.content,
+                rating: r.rating,
+                date: r.date,
+                avatar: r.avatar,
+                businessResponse: r.businessResponse ?? null, // 👈 viene precargado
+              }))
+            : []
+        );
       } catch {
         setReviews([]);
       } finally {
@@ -258,7 +274,7 @@ export default function ReviewsSummaryPage() {
       <SectionWrapper topPadding="pt-6 sm:pt-10">
         <motion.div
           ref={gridTopRef}
-          className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 justify-items-center"
+          className="grid gap-4 sm:gap-6 grid-cols-1 xl:grid-cols-2 justify-items-center"
           layout
         >
           <AnimatePresence mode="popLayout">

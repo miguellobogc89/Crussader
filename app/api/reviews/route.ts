@@ -2,15 +2,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const locationId = url.searchParams.get("locationId");
-    const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
+    const page = Math.max(
+      1,
+      parseInt(url.searchParams.get("page") ?? "1", 10) || 1
+    );
     const size = Math.min(
       50,
       Math.max(1, parseInt(url.searchParams.get("size") ?? "9", 10) || 9)
-    ); // tu grid 3x3
+    ); // grid 3x3 por defecto
 
     if (!locationId) {
       return NextResponse.json(
@@ -29,24 +35,51 @@ export async function GET(req: NextRequest) {
       orderBy: [{ createdAtG: "desc" }, { ingestedAt: "desc" }],
       skip,
       take: size,
-      select: {
-        id: true,
-        rating: true,
-        reviewerName: true,
-        reviewerPhoto: true,   // 👈 AÑADIDO
-        comment: true,
-        createdAtG: true,
+      include: {
+        responses: {
+          where: { active: true },
+          orderBy: [
+            { published: "desc" },
+            { status: "asc" },
+            { createdAt: "desc" },
+          ],
+          take: 1, // 👈 solo la versión “principal”
+        },
       },
     });
 
-    const rows = reviews.map((r) => ({
-      id: r.id,
-      author: r.reviewerName ?? "Anónimo",
-      content: r.comment ?? "",
-      rating: r.rating ?? 0,
-      date: r.createdAtG ? new Date(r.createdAtG).toISOString() : "",
-      avatar: r.reviewerPhoto ?? undefined, // 👈 AÑADIDO: encaja con ReviewCard.avatar
-    }));
+    const rows = reviews.map((r) => {
+      const resp = r.responses[0];
+
+      // status UI simplificado para la card
+      let uiStatus: "published" | "draft" = "draft";
+      if (resp && (resp.published || resp.status === "PUBLISHED")) {
+        uiStatus = "published";
+      }
+
+      return {
+        id: r.id,
+        author: r.reviewerName ?? "Anónimo",
+        content: r.comment ?? "",
+        rating: r.rating ?? 0,
+        date: r.createdAtG
+          ? new Date(r.createdAtG).toISOString()
+          : "",
+        avatar: r.reviewerPhoto ?? undefined,
+
+        // 👇 ya traemos la última respuesta “lista para la UI”
+        businessResponse: resp
+          ? {
+              id: resp.id,
+              content: resp.content,
+              status: uiStatus,
+              published: resp.published,
+              edited: resp.edited,
+              createdAt: resp.createdAt,
+            }
+          : null,
+      };
+    });
 
     return NextResponse.json({
       ok: true,
@@ -56,7 +89,7 @@ export async function GET(req: NextRequest) {
       totalPages,
       reviews: rows,
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("[GET /api/reviews]", e);
     return NextResponse.json(
       { ok: false, error: "internal_error" },

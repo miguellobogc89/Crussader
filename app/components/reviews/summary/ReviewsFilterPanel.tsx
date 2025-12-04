@@ -2,7 +2,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import {
   Select,
@@ -23,29 +22,24 @@ import {
   Search,
   SlidersHorizontal,
   ArrowUpDown,
-  RotateCcw, // ⬅️ Calendar eliminado del import
+  RotateCcw,
 } from "lucide-react";
 
 export type SortOption = "date-desc" | "date-asc" | "rating-desc" | "rating-asc";
 export type DateRange = "1m" | "3m" | "6m" | "1y" | "all";
 
 type Props = {
-  /** ⬅️ Pásame aquí tu <LocationSelector .../> */
   locationSelectorSlot?: React.ReactNode;
 
-  // Fecha
   dateRange: DateRange;
   onChangeDateRange: (v: DateRange) => void;
 
-  // Búsqueda
   searchQuery: string;
   onChangeSearchQuery: (v: string) => void;
 
-  // Orden
   sortBy: SortOption;
   onChangeSortBy: (v: SortOption) => void;
 
-  // Filtros extra
   showUnresponded: boolean;
   onToggleUnresponded: (v: boolean) => void;
 
@@ -57,7 +51,6 @@ type Props = {
 
   onClearAllFilters: () => void;
 
-  // Refresco
   onRefresh?: () => void;
   refreshDisabled?: boolean;
 };
@@ -95,19 +88,22 @@ export default function ReviewsFilterPanel({
 
   return (
     <div className="bg-card border border-border rounded-lg p-3 sm:p-4 md:p-6 bg-dark">
-      {/* En móvil: columnas (3 filas). En >=sm: fila con wrap. */}
+      {/* móvil: columnas; sm: fila con wrap; md+: fila sin wrap */}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-        {/* ⬅️ Location selector (slot) — ocupa todo el ancho en móvil */}
+        {/* Location selector:
+            - móvil: full width
+            - sm+: flex-1 con min/max para equilibrar con resto
+        */}
         {locationSelectorSlot && (
-          <div className="h-9 flex w-full items-center sm:shrink-0 sm:min-w-[360px] md:min-w-[420px]">
+          <div className="h-9 flex w-full items-center sm:flex-1 sm:min-w-[180px] sm:max-w-[320px] md:max-w-[360px]">
             {locationSelectorSlot}
           </div>
         )}
 
-        {/* 👉 Fila 2 en móvil: fecha + botones; el select se expande */}
+        {/* Fecha + filtros + ordenar + refrescar */}
         <div className="flex w-full items-center gap-2 sm:w-auto sm:gap-3 sm:ml-auto">
-          {/* 📅 Fecha (sin icono de calendario) */}
-          <div className="flex-1 min-w-[140px] sm:flex-none sm:w-[160px]">
+          {/* Fecha: flex-1 con min/max */}
+          <div className="flex-1 min-w-[140px] max-w-[200px]">
             <Select
               value={dateRange}
               onValueChange={(v) => onChangeDateRange(v as DateRange)}
@@ -125,7 +121,7 @@ export default function ReviewsFilterPanel({
             </Select>
           </div>
 
-          {/* 🧰 Filtros */}
+          {/* Filtros */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -181,7 +177,7 @@ export default function ReviewsFilterPanel({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* ↕️ Ordenar */}
+          {/* Ordenar */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -223,7 +219,7 @@ export default function ReviewsFilterPanel({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* ⟳ Actualizar */}
+          {/* Actualizar */}
           <button
             type="button"
             onClick={onRefresh}
@@ -236,14 +232,17 @@ export default function ReviewsFilterPanel({
           </button>
         </div>
 
-        {/* 🔍 Fila 3 en móvil: buscador a todo el ancho */}
-        <div className="relative w-full sm:w-auto">
+        {/* Buscador:
+            - móvil: full width
+            - sm+: flex-1 con min/max (para equilibrarlo con fecha y location)
+        */}
+        <div className="relative w-full sm:flex-1 sm:min-w-[200px] sm:max-w-[360px] md:max-w-[420px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Autor o contenido…"
             value={searchQuery}
             onChange={(e) => onChangeSearchQuery(e.target.value)}
-            className="h-9 w-full max-w-full bg-background pl-10 sm:w-[260px] md:w-[320px] sm:max-w-[320px]"
+            className="h-9 w-full bg-background pl-10"
           />
           {searchQuery && (
             <button

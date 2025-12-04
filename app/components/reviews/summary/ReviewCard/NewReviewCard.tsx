@@ -1,21 +1,13 @@
 // app/components/reviews/summary/ReviewCard/NewReviewCard.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/app/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import Review from "@/app/components/reviews/summary/ReviewCard/Review";
 import Response, { type UIStatus } from "@/app/components/reviews/summary/ReviewCard/Response";
 
 /* ------------------------- Tipos ------------------------- */
-interface ReviewT {
-  id: string;
-  author: string;
-  rating: number;
-  content: string;
-  date: string; // ISO
-  avatar?: string;
-}
 interface BusinessResponse {
   id?: string;
   content: string;
@@ -24,10 +16,22 @@ interface BusinessResponse {
   edited?: boolean;
   createdAt?: string | Date;
 }
+
+interface ReviewT {
+  id: string;
+  author: string;
+  rating: number;
+  content: string;
+  date: string; // ISO
+  avatar?: string;
+
+  // 👇 añadidos: ya vienen desde /api/reviews
+  businessResponse?: BusinessResponse | null;
+  responses?: BusinessResponse[];
+}
+
 interface ReviewCardProps {
   review: ReviewT;
-  businessResponse?: BusinessResponse;
-  responses?: BusinessResponse[];
 }
 
 /* Normalizador de estados backend → UI */
@@ -69,21 +73,18 @@ function StatusChip({
 }
 
 /* ======================================================= */
-export default function NewReviewCard({
-  review,
-  businessResponse,
-  responses,
-}: ReviewCardProps) {
+export default function NewReviewCard({ review }: ReviewCardProps) {
   // Lista y versión activa (index 0 = la más reciente)
   const initialList = useMemo<BusinessResponse[]>(
     () =>
-      responses?.length
-        ? responses
-        : businessResponse
-        ? [businessResponse]
+      review.responses?.length
+        ? review.responses
+        : review.businessResponse
+        ? [review.businessResponse]
         : [],
-    [responses, businessResponse]
+    [review]
   );
+
   const [list, setList] = useState<BusinessResponse[]>(initialList);
   const [idx, setIdx] = useState<number>(initialList.length ? 0 : -1);
   const current = idx >= 0 ? list[idx] : undefined;
@@ -95,45 +96,6 @@ export default function NewReviewCard({
   const isPublished = Boolean(
     current?.published || current?.status === "published"
   );
-
-  // Cargar última respuesta si no vino
-  useEffect(() => {
-    let cancelled = false;
-    if (responses?.length || businessResponse) return;
-
-    (async () => {
-      try {
-        const res = await fetch(
-          `/api/reviews/${review.id}/responses?latest=1`,
-          { cache: "no-store" }
-        );
-        if (!res.ok) return;
-        const json = await res.json();
-        const latest = json?.responses?.[0] ?? json?.response ?? null;
-        if (!cancelled && latest) {
-          const normalized: BusinessResponse = {
-            id: latest.id,
-            content: latest.content,
-            status: normalizeStatus(latest.status),
-            published: Boolean(latest.published),
-            edited: Boolean(latest.edited),
-            createdAt: latest.createdAt,
-          };
-          setList([normalized]);
-          setIdx(0);
-        }
-      } catch {
-        toast({
-          variant: "error",
-          title: "Error cargando respuestas",
-        });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [review.id, businessResponse, responses]);
 
   async function regenerate() {
     setBusy(true);
@@ -178,37 +140,77 @@ export default function NewReviewCard({
 
   async function publish() {
     if (!current?.id) return;
+
     setBusy(true);
     const prev = { ...current };
+
+    // Optimistic UI
     setList((prevList) =>
       prevList.map((r, i) =>
-        i === idx
-          ? { ...r, published: true, status: "published" }
-          : r
+        i === idx ? { ...r, published: true, status: "published" } : r
       )
     );
+
     try {
-      const res = await fetch(`/api/reviews/response/${current.id}/publish`, {
-        method: "POST",
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error("No se pudo publicar");
+      const res = await fetch(
+        `/api/reviews/response/${current.id}/publish`,
+        {
+          method: "POST",
+          cache: "no-store",
+        }
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.ok) {
+        const rawError = data?.error || "";
+        const rawDetail = data?.detail || "";
+
+        let userMessage =
+          "No se pudo publicar la respuesta. Inténtalo de nuevo en unos minutos.";
+
+        if (
+          typeof rawError === "string" &&
+          rawError.includes("reply_failed_403")
+        ) {
+          userMessage =
+            "No se puede publicar en Google porque la ficha de Google Business Profile está suspendida o no tiene permisos para responder reseñas. Revisa el estado de tu perfil en Google.";
+        }
+
+        if (
+          typeof rawError === "string" &&
+          rawError.includes("reply_failed_404")
+        ) {
+          userMessage =
+            "No se puede publicar en Google porque la reseña ya no existe o el enlace asociado en Google Business Profile está desactualizado. Te recomendamos actualizar las reseñas en Crussader y revisar el estado en Google.";
+        }
+
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[publish] error", {
+            status: res.status,
+            rawError,
+            rawDetail,
+          });
+        }
+
+        throw new Error(userMessage);
+      }
+
       toast({
         title: "Publicado",
-        description: "La respuesta se ha publicado correctamente.",
+        description:
+          "La respuesta se ha publicado correctamente en Google.",
       });
     } catch (e: any) {
+      // revertir optimistic UI
       setList((prevList) =>
         prevList.map((r, i) =>
           i === idx
-            ? {
-                ...r,
-                published: prev.published,
-                status: prev.status,
-              }
+            ? { ...r, published: prev.published, status: prev.status }
             : r
         )
       );
+
       toast({
         variant: "error",
         title: "Error publicando",
@@ -270,9 +272,7 @@ export default function NewReviewCard({
 
   async function removeCurrent() {
     if (!current?.id) return;
-    const ok = confirm(
-      "¿Seguro que deseas borrar esta respuesta?"
-    );
+    const ok = confirm("¿Seguro que deseas borrar esta respuesta?");
     if (!ok) return;
 
     setBusy(true);
@@ -353,31 +353,30 @@ export default function NewReviewCard({
           className="mt-3"
         >
           {/* Si no hay ninguna respuesta aún: botón "Responder" en gradiente */}
-{!hasResponse && (
-  <div className="flex justify-end">
-    <button
-      type="button"
-      onClick={() => regenerate()}   // 🔥 explícito y garantizado
-      disabled={busy}
-      className="
-        inline-flex items-center justify-center gap-2
-        rounded-full
-        bg-gradient-to-r from-fuchsia-500 to-sky-500
-        text-white
-        h-9 px-4 text-xs font-medium
-        shadow
-        hover:brightness-110
-        disabled:opacity-50
-        transition
-      "
-      title="Responder"
-      aria-label="Responder"
-    >
-      Responder
-    </button>
-  </div>
-)}
-
+          {!hasResponse && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={regenerate}
+                disabled={busy}
+                className="
+                  inline-flex items-center justify-center gap-2
+                  rounded-full
+                  bg-gradient-to-r from-fuchsia-500 to-sky-500
+                  text-white
+                  h-9 px-4 text-xs font-medium
+                  shadow
+                  hover:brightness-110
+                  disabled:opacity-50
+                  transition
+                "
+                title="Responder"
+                aria-label="Responder"
+              >
+                Responder
+              </button>
+            </div>
+          )}
 
           {/* Con respuesta: separador + Response (sin chips antiguos abajo) */}
           {hasResponse && (
