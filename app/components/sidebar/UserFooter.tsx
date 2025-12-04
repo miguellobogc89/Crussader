@@ -175,36 +175,6 @@ export function UserFooter({
           <SidebarCollapse open={userMenuOpen}>
             <div className="px-2 pb-2 pt-1">
               <div className="space-y-1">
-                <Link
-                  href="/dashboard/settings"
-                  onClick={() => {
-                    setUserMenuOpen(false);
-                    onItemNavigate();
-                  }}
-                  className="flex items-center justify-start gap-3 rounded-lg px-3 min-h-11 text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors"
-                >
-                  <svg
-                    className="h-5 w-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 1v2" />
-                    <path d="M12 21v2" />
-                    <path d="M4.22 4.22l1.42 1.42" />
-                    <path d="M18.36 18.36l1.42 1.42" />
-                    <path d="M1 12h2" />
-                    <path d="M21 12h2" />
-                    <path d="M4.22 19.78l1.42-1.42" />
-                    <path d="M18.36 5.64l1.42-1.42" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                  <span className="text-sm font-medium">Configuración</span>
-                </Link>
-
                 <button
                   type="button"
                   onClick={() => {

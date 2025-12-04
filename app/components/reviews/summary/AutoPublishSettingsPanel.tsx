@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  Sparkles,
   ShieldCheck,
   Clock,
   MessageCircleMore,
@@ -54,6 +53,9 @@ export default function AutoPublishSettingsPanel() {
 
   const hasChanges = mode !== savedMode;
 
+  const canSave =
+    !!companyId && !initialLoading && !saving && hasChanges;
+
   // Cargar configuración inicial desde BD
   useEffect(() => {
     if (!companyId) {
@@ -98,7 +100,7 @@ export default function AutoPublishSettingsPanel() {
   }, [companyId]);
 
   async function handleSave() {
-    if (!companyId || !hasChanges || saving) return;
+    if (!canSave) return;
 
     try {
       setSaving(true);
@@ -137,15 +139,10 @@ export default function AutoPublishSettingsPanel() {
               }
             >
               <div className="flex items-center gap-2">
-                <CardTitle className="text-base sm:text-lg font-semibold text-slate-900">
-                  Autopublicación en Google
+                <CardTitle className="text-base font-semibold tracking-tight sm:text-lg md:text-xl">
+                  Respuestas automáticas
                 </CardTitle>
-                <Badge
-                  variant="outline"
-                  className="border-violet-200 bg-violet-50 text-[11px] font-medium text-violet-700"
-                >
-                  Beta
-                </Badge>
+                {/* Chip / banner eliminado */}
               </div>
 
               {collapsed ? (
@@ -164,55 +161,27 @@ export default function AutoPublishSettingsPanel() {
                       {modeLabel}
                     </span>
                   </div>
-
-                  <span className="h-1 w-1 rounded-full bg-slate-300" />
-
-                  <div className="inline-flex items-center gap-1.5">
-                    <div
-                      className={[
-                        "flex h-6 w-6 items-center justify-center rounded-full border",
-                        whatsappEnabled
-                          ? "border-emerald-300 bg-emerald-50"
-                          : "border-slate-200 bg-slate-50 opacity-70",
-                      ].join(" ")}
-                    >
-                      <Image
-                        src="/platform-icons/whatsapp.png"
-                        alt="WhatsApp"
-                        width={14}
-                        height={14}
-                      />
-                    </div>
-                    <span className="text-[11px] text-slate-600">
-                      WhatsApp {whatsappEnabled ? "activo" : "desactivado"}
-                    </span>
-                  </div>
                 </div>
               ) : (
                 <>
-                  <CardDescription className="mt-1 text-xs sm:text-sm text-slate-500 max-w-xl">
+                  <CardDescription className="mt-1 max-w-xl text-xs text-slate-500 sm:text-sm">
                     Elige qué reseñas se publican automáticamente. Todas las
                     respuestas se generan con IA.
                   </CardDescription>
 
-                  {/* Píldora IA + botón guardar/sin cambios */}
-                  <div className="mt-2 border inline-flex items-center justify-between gap-2 rounded-full bg-slate-50 px-3 py-1 text-[11px] text-slate-500">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-3.5 w-3.5 text-violet-500" />
-                      <span>
-                        IA activa para todas las reseñas
-                        {initialLoading ? " (cargando…)" : ""}
-                      </span>
-                    </div>
-
+                  {/* Solo botón Guardar, sin banner extra */}
+                  <div className="mt-2 flex justify-end">
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={
-                        !companyId || initialLoading || saving || !hasChanges
-                      }
+                      disabled={!canSave}
                       onClick={handleSave}
-                      className="h-6 px-2 py-0 text-[11px] border-slate-300 bg-white"
+                      className={[
+                        "h-7 px-3 py-0 text-[11px] font-medium rounded-full border transition-colors disabled:opacity-60 disabled:cursor-not-allowed",
+                        canSave
+                          ? "border-0 bg-gradient-to-r from-sky-500 to-violet-500 text-white shadow-sm hover:from-sky-500/90 hover:to-violet-500/90"
+                          : "border-slate-300 bg-white text-slate-500",
+                      ].join(" ")}
                     >
                       {saving ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -230,7 +199,7 @@ export default function AutoPublishSettingsPanel() {
             <button
               type="button"
               onClick={() => setCollapsed((v) => !v)}
-              className="m-auto inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700 transition"
+              className="m-auto inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
             >
               {collapsed ? (
                 <ChevronDown className="h-3.5 w-3.5" />
@@ -253,7 +222,7 @@ export default function AutoPublishSettingsPanel() {
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
             >
-              <CardContent className="space-y-4 sm:space-y-5 pt-0 pb-4">
+              <CardContent className="space-y-4 pt-0 pb-4 sm:space-y-5">
                 {/* Opciones de estrategia */}
                 <div className="grid gap-3 sm:grid-cols-3">
                   {/* Solo positivas */}
@@ -262,11 +231,13 @@ export default function AutoPublishSettingsPanel() {
                     onClick={() => setMode("positives")}
                     disabled={saving || initialLoading}
                     className={[
-                      "flex bg-white items-center gap-3 sm:gap-4 rounded-xl border p-3 sm:p-4 text-left transition",
+                      "flex items-center gap-3 rounded-xl border bg-white p-3 text-left transition sm:gap-4 sm:p-4",
                       mode === "positives"
                         ? "border-violet-300 bg-violet-50/80 shadow-[0_0_0_1px_rgba(139,92,246,0.20)]"
                         : "border-slate-200 hover:border-violet-200 hover:bg-violet-50/40",
-                      saving || initialLoading ? "opacity-80 cursor-not-allowed" : "",
+                      saving || initialLoading
+                        ? "cursor-not-allowed opacity-80"
+                        : "",
                     ].join(" ")}
                   >
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
@@ -289,11 +260,13 @@ export default function AutoPublishSettingsPanel() {
                     onClick={() => setMode("mixed")}
                     disabled={saving || initialLoading}
                     className={[
-                      "flex bg-white items-center gap-3 sm:gap-4 rounded-xl border p-3 sm:p-4 text-left transition",
+                      "flex items-center gap-3 rounded-xl border bg-white p-3 text-left transition sm:gap-4 sm:p-4",
                       mode === "mixed"
                         ? "border-violet-300 bg-violet-50/80 shadow-[0_0_0_1px_rgba(139,92,246,0.20)]"
                         : "border-slate-200 hover:border-violet-200 hover:bg-violet-50/40",
-                      saving || initialLoading ? "opacity-80 cursor-not-allowed" : "",
+                      saving || initialLoading
+                        ? "cursor-not-allowed opacity-80"
+                        : "",
                     ].join(" ")}
                   >
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50">
@@ -316,11 +289,13 @@ export default function AutoPublishSettingsPanel() {
                     onClick={() => setMode("manual")}
                     disabled={saving || initialLoading}
                     className={[
-                      "flex bg-white items-center gap-3 sm:gap-4 rounded-xl border p-3 sm:p-4 text-left transition",
+                      "flex items-center gap-3 rounded-xl border bg-white p-3 text-left transition sm:gap-4 sm:p-4",
                       mode === "manual"
                         ? "border-violet-300 bg-violet-50/80 shadow-[0_0_0_1px_rgba(139,92,246,0.20)]"
                         : "border-slate-200 hover:border-violet-200 hover:bg-violet-50/40",
-                      saving || initialLoading ? "opacity-80 cursor-not-allowed" : "",
+                      saving || initialLoading
+                        ? "cursor-not-allowed opacity-80"
+                        : "",
                     ].join(" ")}
                   >
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-50">
@@ -372,7 +347,7 @@ export default function AutoPublishSettingsPanel() {
                       variant="outline"
                       size="sm"
                       disabled
-                      className="text-xs text-slate-500 border-slate-300 bg-white"
+                      className="border-slate-300 bg-white text-xs text-slate-500"
                     >
                       Configurar WhatsApp
                     </Button>

@@ -1,5 +1,4 @@
 // app/components/crussader/navigation/TabMenu.tsx
-
 "use client";
 
 import Link from "next/link";
@@ -21,19 +20,27 @@ export default function TabMenu({
   const tabRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const [indicator, setIndicator] = useState<{ left: number; width: number }>({
-    left: 0,
-    width: 0,
-  });
+  const [indicator, setIndicator] = useState<{ left: number; width: number }>(
+    {
+      left: 0,
+      width: 0,
+    }
+  );
 
-  const [hover, setHover] = useState<{ left: number; width: number; visible: boolean }>({
+  const [hover, setHover] = useState<{
+    left: number;
+    width: number;
+    visible: boolean;
+  }>({
     left: 0,
     width: 0,
     visible: false,
   });
 
   const isActive = (href: string, exact?: boolean) =>
-    exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
+    exact
+      ? pathname === href
+      : pathname === href || pathname.startsWith(href + "/");
 
   const moveIndicatorTo = (index: number) => {
     const el = tabRefs.current[index];
@@ -90,7 +97,7 @@ export default function TabMenu({
       aria-label="Secciones"
       onMouseLeave={hideHover}
     >
-      {/* Fondo de sombra animado */}
+      {/* Fondo de sombra animado (hover) */}
       {hover.visible && (
         <div
           className="absolute top-0 bottom-0 my-auto h-8 rounded-md bg-primary/10 transition-all duration-300 ease-out"
@@ -118,8 +125,15 @@ export default function TabMenu({
               }}
               onMouseEnter={() => moveHoverTo(index)}
               className={[
-                "inline-flex items-center gap-2 whitespace-nowrap px-3 py-2 text-sm rounded-md transition-colors",
-                active ? "text-primary font-medium" : "text-muted-foreground hover:text-foreground",
+                // 👇 más compacto en móvil, igual que antes en sm+
+                "inline-flex items-center whitespace-nowrap rounded-md transition-colors",
+                "gap-1 sm:gap-2",
+                "px-3 sm:px-4",
+                "py-2",
+                "text-xs sm:text-sm",
+                active
+                  ? "text-primary font-medium"
+                  : "text-muted-foreground hover:text-foreground",
               ].join(" ")}
               onFocus={() => {
                 const i = items.findIndex((x) => x.href === it.href);

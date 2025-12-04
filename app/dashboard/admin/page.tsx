@@ -1,140 +1,215 @@
 // app/dashboard/admin/page.tsx
+"use client";
+
 import Link from "next/link";
-import PageShell from "@/app/components/layouts/PageShell";
-import { Card, CardContent } from "@/app/components/ui/card";
 import {
-  Users,
-  Wallet,
-  Bot,
-  Palette,
-  Package,
-  ShoppingCart,
-  Activity,
-  Plug,
-  ChevronRight,
-} from "lucide-react";
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/app/components/ui/card";
+import PageShell from "@/app/components/layouts/PageShell";
+import { useBootstrapStatus } from "@/app/providers/bootstrap-store";
 
-type Option = {
-  id: string;
-  title: string;
-  description: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string; // tailwind text-*
-};
-
-const settingsOptions: Option[] = [
+const modules = [
   {
-    id: "usuarios",
-    title: "Usuarios",
-    description: "Gestiona usuarios y permisos",
+    title: "Usuarios y roles",
     href: "/dashboard/admin/users",
-    icon: Users,
-    color: "text-blue-500",
+    icon: "👥",
+    description: "Altas, permisos y equipos",
   },
   {
-    id: "finanzas",
-    title: "Finanzas y Contabilidad",
-    description: "Control de gastos e ingresos",
-    href: "/dashboard/admin/finance",
-    icon: Wallet,
-    color: "text-green-500",
-  },
-  {
-    id: "agentes-ia",
-    title: "Agentes IA",
-    description: "Configura asistentes inteligentes",
-    href: "/dashboard/admin/voiceagents",
-    icon: Bot,
-    color: "text-purple-500",
-  },
-  {
-    id: "ui-design",
     title: "UI & Design",
-    description: "Personaliza la apariencia",
     href: "/dashboard/admin/UI_and_Dessign",
-    icon: Palette,
-    color: "text-pink-500",
+    icon: "🎨",
+    description: "Diseño de la interfaz",
   },
   {
-    id: "productos",
-    title: "Productos",
-    description: "Catálogo y gestión de productos",
-    href: "/dashboard/admin/products",
-    icon: Package,
-    color: "text-orange-500",
+    title: "Leads",
+    href: "/dashboard/crm/leads",
+    icon: "🏪",
+    description: "Invitaciones a nuevos usuarios",
   },
   {
-    id: "ventas",
-    title: "Ventas",
-    description: "Monitorea tus ventas",
-    href: "/dashboard/admin/sales",
-    icon: ShoppingCart,
-    color: "text-emerald-500",
+    title: "Empleados",
+    href: "/dashboard/myusers",
+    icon: "👥",
+    description: "Empleados y roles",
   },
   {
-    id: "sistema",
-    title: "Estado del Sistema",
-    description: "Salud y rendimiento",
-    href: "/dashboard/admin/system",
-    icon: Activity,
-    color: "text-red-500",
+    title: "Turnos del personal",
+    href: "/dashboard/shifts",
+    icon: "🗓️",
+    description: "Horarios, vacaciones y festivos",
   },
   {
-    id: "integraciones",
+    title: "Laboratorio",
+    href: "/dashboard/labs",
+    icon: "🧪",
+    description: "Próximas funcionalidades",
+  },
+  {
+    title: "Calendario de reservas",
+    href: "/dashboard/calendar",
+    icon: "📅",
+    description: "Gestión de citas y agenda",
+  },
+  {
+    title: "Empresas y establecimientos",
+    href: "/dashboard/admin/companies",
+    icon: "🏬",
+    description: "Estructura, sedes y negocios",
+  },
+  {
+    title: "Conocimientos",
+    href: "/dashboard/knowledge",
+    icon: "📚",
+    description: "Base de conocimiento",
+  },
+  {
+    title: "Agentes de voz IA",
+    href: "/dashboard/integrations-test",
+    icon: "🎙️",
+    description: "Conecta servicios",
+  },
+  {
+    title: "Todos los productos",
+    href: "/dashboard/products",
+    icon: "📦",
+    description: "Productos y servicios",
+  },
+  {
+    title: "WebChat IA",
+    href: "/dashboard/database",
+    icon: "🗄️",
+    description: "Conexiones y datos",
+  },
+  {
     title: "Integraciones",
-    description: "Conecta servicios externos",
     href: "/dashboard/admin/integrations",
-    icon: Plug,
-    color: "text-indigo-500",
+    icon: "🔌",
+    description: "Conexiones externas",
+  },
+  {
+    title: "Finanzas",
+    href: "/dashboard/admin/finance",
+    icon: "💰",
+    description: "Pagos, costes y facturas",
+  },
+  {
+    title: "Productos (Admin)",
+    href: "/dashboard/admin/products",
+    icon: "📦",
+    description: "Configurador de productos",
+  },
+  {
+    title: "Ventas",
+    href: "/dashboard/admin/sales",
+    icon: "🛒",
+    description: "Canales y conversión",
+  },
+  {
+    title: "Permisos y auditoría",
+    href: "/dashboard/admin/audit",
+    icon: "🧾",
+    description: "Logs y cumplimiento",
+  },
+  {
+    title: "Configuración",
+    href: "/dashboard/settings",
+    icon: "⚙️",
+    description: "Salud y configuración",
+  },
+  {
+    title: "Agentes IA",
+    href: "/dashboard/admin/voiceagents",
+    icon: "🤖",
+    description: "Constructor de agentes",
+  },
+  {
+    title: "Pricing",
+    href: "/dashboard/pricing",
+    icon: "💎",
+    description: "Planes y precios",
+  },
+  {
+    title: "Reportes",
+    href: "/dashboard/reports",
+    icon: "📋",
+    description: "Generación de informes",
+  },
+  {
+    title: "Informes",
+    href: "/dashboard/informes",
+    icon: "📈",
+    description: "Informes real",
+  },
+  {
+    title: "Gráficos",
+    href: "/dashboard/charts-test",
+    icon: "📊",
+    description: "Visualizaciones",
+  },
+  {
+    title: "Reportes de prueba",
+    href: "/dashboard/reports-test",
+    icon: "🧪",
+    description: "Sandbox",
   },
 ];
 
-export default function AdminIndexPage() {
+export const dynamic = "force-dynamic";
+
+export default function AdminHubPage() {
+  const bootStatus = useBootstrapStatus();
+  const isLoading = bootStatus !== "ready";
+
   return (
     <PageShell
-      title="Ajustes de Administrador"
-      description="Centro de configuración y herramientas avanzadas"
-      // Si tu PageShell acepta icono por nombre: titleIconName="Shield"
-      // o si acepta componente: titleIcon={Shield}
+      title="Panel de administración"
+      description="Acceso rápido a todos los módulos avanzados de Crussader."
+      titleIconName="Shield"
+      isLoading={isLoading}
+      loadingLabel="Cargando panel de administración..."
     >
-      <div className="w-full max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {settingsOptions.map((option) => {
-            const Icon = option.icon;
-            return (
-              <Link key={option.id} href={option.href} className="block">
-                <Card className="hover:shadow-md transition-all duration-200 cursor-pointer group border">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      {/* Icono */}
-                      <div className="flex-shrink-0">
-                        <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Icon className={`h-6 w-6 ${option.color}`} />
+      <div className="space-y-6">
+        <Card className="bg-white border border-slate-200 shadow-md hover:shadow-lg transition-shadow">
+          <CardHeader>
+            <CardTitle className="text-slate-700">
+              Centro de control
+            </CardTitle>
+            <CardDescription className="text-slate-600">
+              Elige un módulo para gestionar usuarios, integraciones, finanzas y
+              configuración avanzada.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {modules.map((m) => (
+                <Link key={m.href} href={m.href}>
+                  <Card className="h-full cursor-pointer border-slate-100 bg-white hover:border-slate-200 transition-colors group">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-lg border-slate-100">
+                          <span>{m.icon}</span>
                         </div>
+                        <CardTitle className="text-sm text-slate-700">
+                          {m.title}
+                        </CardTitle>
                       </div>
-
-                      {/* Contenido */}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground text-lg mb-1">
-                          {option.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {option.description}
-                        </p>
-                      </div>
-
-                      {/* Flecha */}
-                      <div className="flex-shrink-0">
-                        <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <p className="text-xs text-slate-600">
+                        {m.description}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </PageShell>
   );

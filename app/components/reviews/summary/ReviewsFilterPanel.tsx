@@ -95,41 +95,46 @@ export default function ReviewsFilterPanel({
 
   return (
     <div className="bg-card border border-border rounded-lg p-3 sm:p-4 md:p-6 bg-dark">
-      {/* ÚNICA LÍNEA; wrap en pantallas pequeñas */}
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-        {/* ⬅️ Location selector (slot) — más ancho y sin encoger */}
+      {/* En móvil: columnas (3 filas). En >=sm: fila con wrap. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+        {/* ⬅️ Location selector (slot) — ocupa todo el ancho en móvil */}
         {locationSelectorSlot && (
-          <div className="h-9 flex items-center shrink-0 min-w-[280px] sm:min-w-[360px] md:min-w-[420px]">
+          <div className="h-9 flex w-full items-center sm:shrink-0 sm:min-w-[360px] md:min-w-[420px]">
             {locationSelectorSlot}
           </div>
         )}
 
-        {/* 👉 Grupo “derecha”: fecha + botones (pegados al buscador) */}
-        <div className="ml-auto flex items-center gap-2 sm:gap-3">
+        {/* 👉 Fila 2 en móvil: fecha + botones; el select se expande */}
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:gap-3 sm:ml-auto">
           {/* 📅 Fecha (sin icono de calendario) */}
-          <Select value={dateRange} onValueChange={(v) => onChangeDateRange(v as DateRange)}>
-            <SelectTrigger className="h-9 w-[140px] sm:w-[160px] bg-background">
-              <SelectValue placeholder="Fecha" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1m">Último mes</SelectItem>
-              <SelectItem value="3m">Últimos 3 meses</SelectItem>
-              <SelectItem value="6m">Últimos 6 meses</SelectItem>
-              <SelectItem value="1y">Último año</SelectItem>
-              <SelectItem value="all">Siempre</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex-1 min-w-[140px] sm:flex-none sm:w-[160px]">
+            <Select
+              value={dateRange}
+              onValueChange={(v) => onChangeDateRange(v as DateRange)}
+            >
+              <SelectTrigger className="h-9 w-full bg-background">
+                <SelectValue placeholder="Fecha" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1m">Último mes</SelectItem>
+                <SelectItem value="3m">Últimos 3 meses</SelectItem>
+                <SelectItem value="6m">Últimos 6 meses</SelectItem>
+                <SelectItem value="1y">Último año</SelectItem>
+                <SelectItem value="all">Siempre</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* 🧰 Filtros */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="inline-flex items-center justify-center rounded-md h-9 w-9 border border-border/70 bg-background hover:bg-muted transition-colors"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border/70 bg-background transition-colors hover:bg-muted"
                 title="Filtros"
                 aria-label="Filtros"
               >
-                <SlidersHorizontal className="w-4 h-4" />
+                <SlidersHorizontal className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
@@ -166,7 +171,7 @@ export default function ReviewsFilterPanel({
                 <>
                   <DropdownMenuSeparator />
                   <button
-                    className="w-full text-left px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground"
+                    className="w-full px-2 py-1.5 text-left text-sm text-muted-foreground hover:text-foreground"
                     onClick={onClearAllFilters}
                   >
                     Limpiar todo
@@ -181,11 +186,11 @@ export default function ReviewsFilterPanel({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="inline-flex items-center justify-center rounded-md h-9 w-9 border border-border/70 bg-background hover:bg-muted transition-colors"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border/70 bg-background transition-colors hover:bg-muted"
                 title="Ordenar"
                 aria-label="Ordenar"
               >
-                <ArrowUpDown className="w-4 h-4" />
+                <ArrowUpDown className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
@@ -223,28 +228,28 @@ export default function ReviewsFilterPanel({
             type="button"
             onClick={onRefresh}
             disabled={refreshDisabled}
-            className="inline-flex items-center justify-center rounded-md h-9 w-9 border border-border/70 bg-background hover:bg-muted transition-colors disabled:opacity-50"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border/70 bg-background transition-colors hover:bg-muted disabled:opacity-50"
             title="Actualizar"
             aria-label="Actualizar"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="h-4 w-4" />
           </button>
         </div>
 
-        {/* 🔍 Buscar (derecha del todo) */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        {/* 🔍 Fila 3 en móvil: buscador a todo el ancho */}
+        <div className="relative w-full sm:w-auto">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Autor o contenido…"
             value={searchQuery}
             onChange={(e) => onChangeSearchQuery(e.target.value)}
-            className="pl-10 h-9 bg-background w-[220px] sm:w-[260px] md:w-[320px] max-w-[320px]"
+            className="h-9 w-full max-w-full bg-background pl-10 sm:w-[260px] md:w-[320px] sm:max-w-[320px]"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => onChangeSearchQuery("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
               aria-label="Borrar búsqueda"
             >
               ×

@@ -2,7 +2,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import ReviewCard from "@/app/components/reviews/summary/ReviewCard/ReviewCard";
+// 🔁 ANTES: import ReviewCard from "@/app/components/reviews/summary/ReviewCard/ReviewCard";
+import NewReviewCard from "@/app/components/reviews/summary/ReviewCard/NewReviewCard";
 import { useSectionLoading } from "@/hooks/useSectionLoading";
 import LocationSelector, {
   type LocationLite,
@@ -10,7 +11,6 @@ import LocationSelector, {
 import { useBootstrapData } from "@/app/providers/bootstrap-store";
 import AutoPublishSettingsPanel from "@/app/components/reviews/summary/AutoPublishSettingsPanel";
 import dynamic from "next/dynamic";
-
 
 const ReviewsFilterPanel = dynamic(
   () =>
@@ -20,8 +20,10 @@ const ReviewsFilterPanel = dynamic(
   { ssr: false }
 );
 
-type SortOption = import("@/app/components/reviews/summary/ReviewsFilterPanel").SortOption;
-type DateRange = import("@/app/components/reviews/summary/ReviewsFilterPanel").DateRange;
+type SortOption =
+  import("@/app/components/reviews/summary/ReviewsFilterPanel").SortOption;
+type DateRange =
+  import("@/app/components/reviews/summary/ReviewsFilterPanel").DateRange;
 
 const NavPagination = dynamic(
   () =>
@@ -30,7 +32,6 @@ const NavPagination = dynamic(
     ).then((m) => m.default),
   { ssr: false }
 );
-
 
 // Animaciones
 import { AnimatePresence, motion } from "framer-motion";
@@ -272,12 +273,13 @@ export default function ReviewsSummaryPage() {
                 transition={{ duration: 0.18, ease: "easeOut" }}
                 className="
                   w-[80vw]
-                  sm:w-[85%]
+                  sm:w-[95%] px-1
                   md:w-full
                   max-w-[720px]
                 "
               >
-                <ReviewCard review={r} />
+                {/* 🔁 Usamos el nuevo componente */}
+                <NewReviewCard review={r} />
               </motion.div>
             ))}
 

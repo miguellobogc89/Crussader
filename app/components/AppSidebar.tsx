@@ -8,12 +8,11 @@ import { useSession } from "next-auth/react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 import { SidebarItem } from "@/app/components/sidebar/SidebarItem";
-import { Group, useActiveGroupId } from "@/app/components/sidebar/NavGroups";
-import type { NavItem, NavGroup } from "@/app/components/sidebar/types";
+import type { NavItem } from "@/app/components/sidebar/types";
 
 import { Brand } from "@/app/components/sidebar/Brand";
 import { UserFooter } from "@/app/components/sidebar/UserFooter";
-import { Menu, ChevronUp } from "lucide-react";
+import { Menu } from "lucide-react";
 
 /* ======== util ======== */
 function isActivePath(pathname: string, href: string) {
@@ -57,52 +56,15 @@ const INTEGRATIONS: NavItem = {
   description: "Conecta tus plataformas sociales",
 };
 
-
-
-const GROUPS: NavGroup[] = [
-  {
-    id: "dashboard",
-    title: "Dashboard",
-    icon: "📊",
-    items: [
-      {
-        title: "Reportes",
-        href: "/dashboard/reports",
-        icon: "📋",
-        description: "Generación de informes",
-      },
-      {
-        title: "Informes",
-        href: "/dashboard/informes",
-        icon: "📈",
-        description: "Informes real",
-      },
-      {
-        title: "Gráficos",
-        href: "/dashboard/charts-test",
-        icon: "📈",
-        description: "Visualizaciones",
-      },
-      {
-        title: "Reportes de prueba",
-        href: "/dashboard/reports-test",
-        icon: "🧪",
-        description: "Sandbox",
-      },
-    ],
-  },
-];
-
 export function AppSidebar() {
   const pathname = usePathname() ?? "";
   const isMobile = useIsMobile();
   const { data: session } = useSession();
 
-  // 👉 En móvil queremos que SIEMPRE arranque colapsado
+  // En móvil: colapsado; en desktop: expandido (se corrige en el effect según isMobile)
   const [collapsed, setCollapsed] = useState<boolean>(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
-  // navegación pendiente (para feedback inmediato)
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
 
@@ -110,9 +72,7 @@ export function AppSidebar() {
     setIsClient(true);
   }, []);
 
-  // Cuando cambie isMobile, forzamos estado por defecto:
-  // - Mobile: colapsado (true)
-  // - Desktop: expandido (false)
+  // Sincroniza estado por defecto según tamaño
   useEffect(() => {
     if (isMobile) {
       setCollapsed(true);
@@ -121,7 +81,6 @@ export function AppSidebar() {
     }
   }, [isMobile]);
 
-  // reset de pending al cambiar ruta
   useEffect(() => {
     if (pendingHref) setPendingHref(null);
   }, [pathname, pendingHref]);
@@ -167,140 +126,14 @@ export function AppSidebar() {
 
   const isAdmin = Object.values(adminFlags).some(Boolean);
 
-  const ADMIN_GROUP: NavGroup | null = isAdmin
+  const ADMIN: NavItem | null = isAdmin
     ? {
-        id: "admin",
         title: "Admin",
+        href: "/dashboard/admin",
         icon: "🛡️",
-        items: [
-          {
-            title: "Usuarios y roles",
-            href: "/dashboard/admin/users",
-            icon: "👥",
-            description: "Altas, permisos y equipos",
-          },
-          {
-            title: "UI & Dessign",
-            href: "/dashboard/admin/UI_and_Dessign",
-            icon: "🤖",
-            description: "Diseño de la interfaz",
-          },
-          {
-            title: "Leads",
-            href: "/dashboard/crm/leads",
-            icon: "🏪",
-            description: "Invitaciones a nuevos usuarios",
-          },      
-          {
-            title: "Empleados",
-            href: "/dashboard/myusers",
-            icon: "👥",
-            description: "Empleados y roles",
-          },
-          {
-            title: "Turnos del personal",
-            href: "/dashboard/shifts",
-            icon: "🗓️",
-            description: "Horarios, vacaciones y festivos",
-          },
-          {
-            title: "Laboratorio",
-            href: "/dashboard/labs",
-            icon: "🧪",
-            description: "Próximas funcionalidades",
-          },
-          {
-            title: "Calendario de reservas",
-            href: "/dashboard/calendar",
-            icon: "📅",
-            description: "Gestión de citas y agenda",
-          },
-          {
-            title: "Empresas y establecimientos",
-            href: "/dashboard/admin/companies",
-            icon: "🏪",
-            description: "Estructura, sedes y negocios",
-          },
-          {
-            title: "Conocimientos",
-            href: "/dashboard/knowledge",
-            icon: "📚",
-            description: "Base de conocimiento",
-          },
-          {
-            title: "Agentes de voz IA",
-            href: "/dashboard/integrations-test",
-            icon: "🎙️",
-            description: "Conecta servicios",
-          },
-          {
-            title: "Todos los productos",
-            href: "/dashboard/products",
-            icon: "📦",
-            description: "Productos y servicios",
-          },
-          {
-            title: "WebChat IA",
-            href: "/dashboard/database",
-            icon: "🗄️",
-            description: "Conexiones y datos",
-          },
-          {
-            title: "Integraciones",
-            href: "/dashboard/admin/integrations",
-            icon: "🔌",
-            description: "Conexiones externas",
-          },
-          {
-            title: "Finanzas",
-            href: "/dashboard/admin/finance",
-            icon: "💰",
-            description: "Pagos, costes y facturas",
-          },
-          {
-            title: "Productos",
-            href: "/dashboard/admin/products",
-            icon: "📦",
-            description: "Configurador de productos",
-          },
-          {
-            title: "Ventas",
-            href: "/dashboard/admin/sales",
-            icon: "🛒",
-            description: "Canales y conversión",
-          },
-          {
-            title: "Permisos y auditoría",
-            href: "/dashboard/admin/audit",
-            icon: "🧾",
-            description: "Logs y cumplimiento",
-          },
-          {
-            title: "Configuración",
-            href: "/dashboard/settings",
-            icon: "⚙️",
-            description: "Salud y configuración",
-          },
-          {
-            title: "Agentes IA",
-            href: "/dashboard/admin/voiceagents",
-            icon: "🤖",
-            description: "Constructor de Agentes",
-          },
-          PRICING,
-          ...GROUPS.flatMap((g) => g.items),
-        ],
+        description: "Panel de administración",
       }
     : null;
-
-  const ALL_GROUPS: NavGroup[] = ADMIN_GROUP ? [ADMIN_GROUP] : [];
-
-  const defaultOpenId = useActiveGroupId(ALL_GROUPS);
-  const [openGroupId, setOpenGroupId] = useState<string | null>(defaultOpenId);
-
-  useEffect(() => {
-    setOpenGroupId(defaultOpenId);
-  }, [defaultOpenId]);
 
   const isOverlay = isMobile && !collapsed;
   const requestExpand = () => setCollapsed(false);
@@ -319,7 +152,7 @@ export function AppSidebar() {
 
   const width = isOverlay ? "100vw" : collapsed ? "4rem" : "18rem";
 
-  // Bloquear scroll del body cuando el overlay móvil está abierto
+  // Bloquear scroll cuando overlay móvil está abierto
   useEffect(() => {
     if (isOverlay) {
       const prev = document.body.style.overflow;
@@ -339,70 +172,41 @@ export function AppSidebar() {
     return () => window.removeEventListener("keydown", onKey);
   }, [isOverlay]);
 
-  function handleGroupHeaderClick(id: string) {
-    setUserMenuOpen(false);
-    setOpenGroupId((prev) => (prev === id ? null : id));
-  }
-
-  const [showTopBar, setShowTopBar] = useState(true);
-
-  useEffect(() => {
-    if (!(isMobile && collapsed)) return;
-
-    const onPointerDown = (ev: PointerEvent) => {
-      const target = ev.target as HTMLElement | null;
-      const hitBar = target?.closest?.('[data-topbar="true"]');
-      if (hitBar) return;
-
-      setShowTopBar((prev) => !prev);
-    };
-
-    window.addEventListener("pointerdown", onPointerDown, { passive: true });
-    return () =>
-      window.removeEventListener("pointerdown", onPointerDown);
-  }, [isMobile, collapsed]);
-
   // ---------- HEADER MÓVIL COLAPSADO ----------
   if (isMobile && collapsed) {
     return (
-      <>
-        <div
-          data-topbar="true"
-          className={[
-            "fixed top-0 inset-x-0 h-12 bg-slate-900 border-b border-slate-800 z-40 flex items-center justify-between px-3",
-            "transition-transform duration-300 will-change-transform",
-            showTopBar ? "translate-y-0" : "-translate-y-full",
-          ].join(" ")}
-        >
-          {/* IZQUIERDA: LOGO */}
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center overflow-hidden">
-              <Image
-                src="/logo/logo.svg"
-                alt="Crussader logo"
-                width={32}
-                height={32}
-                className="h-7 w-7"
-                priority
-              />
-            </div>
+      <div
+        data-topbar="true"
+        className="fixed top-0 inset-x-0 h-12 bg-slate-900 border-b border-slate-800 z-40 flex items-center justify-between px-3"
+      >
+        {/* IZQUIERDA: LOGO */}
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center overflow-hidden">
+            <Image
+              src="/logo/logo.svg"
+              alt="Crussader logo"
+              width={32}
+              height={32}
+              className="h-7 w-7"
+              priority
+            />
           </div>
-
-          {/* CENTRO: TEXTO */}
-          <span className="text-slate-200 text-sm font-semibold tracking-wide">
-            Crussader
-          </span>
-
-          {/* DERECHA: HAMBURGUESA */}
-          <button
-            onClick={() => setCollapsed(false)}
-            aria-label="Abrir menú"
-            className="inline-flex items-center justify-center h-9 w-9 rounded-lg hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-700"
-          >
-            <Menu className="h-5 w-5 text-slate-200" />
-          </button>
         </div>
-      </>
+
+        {/* CENTRO: TEXTO */}
+        <span className="text-slate-200 text-sm font-semibold tracking-wide">
+          Crussader
+        </span>
+
+        {/* DERECHA: HAMBURGUESA */}
+        <button
+          onClick={() => setCollapsed(false)}
+          aria-label="Abrir menú"
+          className="inline-flex items-center justify-center h-9 w-9 rounded-lg hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-700"
+        >
+          <Menu className="h-5 w-5 text-slate-200" />
+        </button>
+      </div>
     );
   }
 
@@ -416,48 +220,22 @@ export function AppSidebar() {
   const integrationsActive =
     isActivePath(pathname, INTEGRATIONS.href) ||
     pendingHref === INTEGRATIONS.href;
+  const adminActive =
+    ADMIN &&
+    (isActivePath(pathname, ADMIN.href) || pendingHref === ADMIN.href);
 
   return (
     <aside
       style={{ width }}
       className={[
         "h-svh shrink-0 border-r border-slate-800 bg-slate-900 text-slate-200 shadow-lg flex flex-col transition-[width] duration-300 ease-in-out",
-        // 👇 En móvil overlay: panel fijo que "cae" desde debajo del topbar
-        isOverlay
-          ? "fixed inset-x-0 top-12 bottom-0 z-50 transform transition-transform duration-300"
-          : "",
+        // En móvil overlay: panel fijo que cubre desde arriba, sin hueco
+        isOverlay ? "fixed inset-0 z-50" : "",
       ].join(" ")}
     >
-      {/* Botón cerrar (chevron arriba) SOLO en móvil overlay */}
-      {isOverlay && isMobile && (
-        <div className="flex items-center justify-end px-3 pt-2 md:hidden">
-          <button
-            onClick={() => setCollapsed(true)}
-            aria-label="Cerrar menú"
-            className="inline-flex items-center justify-center h-8 w-8 rounded-lg hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-700"
-          >
-            <ChevronUp className="h-5 w-5 text-slate-200" />
-          </button>
-        </div>
-      )}
-
       <Brand collapsed={collapsed} setCollapsed={setCollapsed} />
 
       <nav className="flex-1 overflow-y-auto px-2 py-2">
-        {ADMIN_GROUP && (
-          <div className="mb-2">
-            <Group
-              group={ADMIN_GROUP}
-              pathname={pathname}
-              collapsed={collapsed}
-              open={openGroupId === ADMIN_GROUP.id}
-              onHeaderClick={() => handleGroupHeaderClick(ADMIN_GROUP.id)}
-              onRequestExpand={requestExpand}
-              onItemNavigate={onItemNavigate}
-            />
-          </div>
-        )}
-
         <SidebarItem
           item={HOME}
           active={homeActive}
@@ -471,24 +249,33 @@ export function AppSidebar() {
           collapsed={collapsed}
           onNavigate={makeItemNavigate(REVIEWS.href)}
         />
+
         <SidebarItem
           item={MYBUSINESS}
           active={myBusinessActive}
           collapsed={collapsed}
           onNavigate={makeItemNavigate(MYBUSINESS.href)}
         />
+
         <SidebarItem
           item={INTEGRATIONS}
           active={integrationsActive}
           collapsed={collapsed}
           onNavigate={makeItemNavigate(INTEGRATIONS.href)}
         />
+
+        {ADMIN && (
+          <SidebarItem
+            item={ADMIN}
+            active={!!adminActive}
+            collapsed={collapsed}
+            onNavigate={makeItemNavigate(ADMIN.href)}
+          />
+        )}
       </nav>
 
-
-
       <UserFooter
-        collapsed={collapsed} 
+        collapsed={collapsed}
         userMenuOpen={userMenuOpen}
         setUserMenuOpen={setUserMenuOpen}
         onItemNavigate={onItemNavigate}

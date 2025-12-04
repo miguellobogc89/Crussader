@@ -34,7 +34,6 @@ export async function GET(
   return NextResponse.json({ ok: true, responses });
 }
 
-
 /** ---------------- POST ----------------
  * Crear una respuesta:
  * - Si viene content + source:HUMAN → se guarda tal cual.
@@ -43,9 +42,10 @@ export async function GET(
  */
 export async function POST(
   req: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = context.params;
+  const { id } = await params;
+
   if (!id) {
     return NextResponse.json(
       { ok: false, error: "id requerido" },
@@ -81,14 +81,20 @@ export async function POST(
           status: "PENDING",
         },
       });
-      return NextResponse.json({ ok: true, response: created }, { status: 201 });
+      return NextResponse.json(
+        { ok: true, response: created },
+        { status: 201 }
+      );
     }
 
     // 2) Generar IA
     if (action === "generate" || !content) {
       const created = await createAIResponseForReview({ reviewId: id });
 
-      return NextResponse.json({ ok: true, response: created }, { status: 201 });
+      return NextResponse.json(
+        { ok: true, response: created },
+        { status: 201 }
+      );
     }
 
     // 3) Guardar content con source AI
@@ -101,7 +107,10 @@ export async function POST(
           status: "PENDING",
         },
       });
-      return NextResponse.json({ ok: true, response: created }, { status: 201 });
+      return NextResponse.json(
+        { ok: true, response: created },
+        { status: 201 }
+      );
     }
 
     return NextResponse.json(
