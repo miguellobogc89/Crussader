@@ -87,7 +87,6 @@ export default function LoginClient() {
     setSuccess(false);
     setVerifyUrl(null);
 
-    // Validaciones básicas
     if (!firstName.trim()) {
       setError("El nombre es obligatorio.");
       return;
@@ -146,7 +145,6 @@ export default function LoginClient() {
 
       const modeFromApi = data?.mode as "invite" | "email_verify" | undefined;
 
-      // Modo invitación: login automático
       if (modeFromApi === "invite") {
         const loginRes = await signIn("credentials", {
           email,
@@ -164,12 +162,10 @@ export default function LoginClient() {
         return;
       }
 
-      // Modo verificación por email (producción y local)
       setSuccess(true);
       if (data?.verifyUrl && process.env.NODE_ENV !== "production") {
         setVerifyUrl(data.verifyUrl as string);
       }
-      // NO redirigimos: nos quedamos en la pestaña "Crear cuenta" mostrando el banner
     } catch (err: any) {
       setError(err?.message ?? "Error de red.");
     } finally {
@@ -194,11 +190,21 @@ export default function LoginClient() {
   }, [remember]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(262,83%,58%,0.15)_0%,transparent_50%),radial-gradient(ellipse_at_bottom_right,hsl(217,91%,60%,0.15)_0%,transparent_50%)]" />
+    <div
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden text-slate-50"
+      style={{
+        // mismo fondo que la landing
+        background: "radial-gradient(circle at top, #1f2937 0, #020617 55%)",
+      }}
+    >
+      {/* glow rosa/azul suave por detrás, como en la landing */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(262,83%,58%,0.16)_0%,transparent_55%),radial-gradient(ellipse_at_bottom_right,hsl(217,91%,60%,0.18)_0%,transparent_55%)]" />
 
-      <Card className="w-full max-w-md relative backdrop-blur-sm bg-card/95 border-border shadow-elegant">
-        <CardHeader className="space-y-6 pb-4">
+      <Card className="w-full max-w-md relative overflow-hidden border border-slate-700/70 bg-slate-950/75 backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.85)]">
+        {/* halo suave de color en el panel */}
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,#a855f71f,transparent_55%),radial-gradient(circle_at_bottom,#38bdf81a,transparent_55%)]" />
+
+        <CardHeader className="space-y-6 pb-4 relative z-10">
           <div className="flex flex-col items-center space-y-3">
             <div className="flex items-center gap-3">
               <div
@@ -222,7 +228,7 @@ export default function LoginClient() {
           </div>
 
           <div className="flex flex-col items-center space-y-3">
-            <div className="inline-flex rounded-full bg-muted p-1 text-sm">
+            <div className="inline-flex rounded-full bg-slate-900/80 p-1 text-sm border border-slate-700/70">
               <button
                 type="button"
                 onClick={() => {
@@ -232,8 +238,8 @@ export default function LoginClient() {
                 className={[
                   "px-4 py-1 rounded-full transition-all",
                   isLogin
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-slate-950 text-slate-50 shadow-sm"
+                    : "text-slate-400 hover:text-slate-50",
                 ].join(" ")}
               >
                 Iniciar sesión
@@ -247,8 +253,8 @@ export default function LoginClient() {
                 className={[
                   "px-4 py-1 rounded-full transition-all",
                   !isLogin
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-slate-950 text-slate-50 shadow-sm"
+                    : "text-slate-400 hover:text-slate-50",
                 ].join(" ")}
               >
                 Crear cuenta
@@ -256,23 +262,22 @@ export default function LoginClient() {
             </div>
 
             <div className="text-center space-y-1">
-              <h2 className="text-xl font-semibold text-foreground">
+              <h2 className="text-xl font-semibold text-slate-50">
                 {isLogin ? "Iniciar sesión" : "Crea tu cuenta"}
               </h2>
             </div>
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="relative z-10">
           {isLogin && verifiedBanner && (
-            <div className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            <div className="mb-4 rounded-md border border-emerald-400/70 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
               ¡Correo verificado! Ahora introduce tu contraseña para entrar.
             </div>
           )}
 
-          {/* Banner de "correo enviado" ahora solo depende de success */}
           {!isLogin && success && (
-            <div className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            <div className="mb-4 rounded-md border border-emerald-400/70 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
               Te hemos enviado un correo para <strong>verificar</strong> tu cuenta.
               {verifyUrl && process.env.NODE_ENV !== "production" && (
                 <>
@@ -282,7 +287,7 @@ export default function LoginClient() {
                     href={verifyUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="underline text-emerald-700"
+                    className="underline text-emerald-200"
                   >
                     Abrir enlace de verificación
                   </a>
@@ -292,16 +297,15 @@ export default function LoginClient() {
           )}
 
           {error && (
-            <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="mb-4 rounded-md border border-red-400/70 bg-red-500/10 px-3 py-2 text-sm text-red-200">
               {error}
             </div>
           )}
 
           {isLogin ? (
-            /* FORM LOGIN */
             <form className="space-y-4" onSubmit={onLoginSubmit}>
               <div className="space-y-2">
-                <Label htmlFor="login-email" className="text-foreground">
+                <Label htmlFor="login-email" className="text-slate-50">
                   Email
                 </Label>
                 <Input
@@ -311,12 +315,12 @@ export default function LoginClient() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="tu@email.com"
                   required
-                  className="bg-background border-border focus:border-primary transition-colors"
+                  className="bg-slate-950/70 border-slate-700 focus:border-primary transition-colors text-slate-50 placeholder:text-slate-500"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="login-password" className="text-foreground">
+                <Label htmlFor="login-password" className="text-slate-50">
                   Contraseña
                 </Label>
                 <div className="relative">
@@ -327,12 +331,12 @@ export default function LoginClient() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    className="bg-background border-border focus:border-primary transition-colors pr-10"
+                    className="bg-slate-950/70 border-slate-700 focus:border-primary transition-colors pr-10 text-slate-50 placeholder:text-slate-500"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-50 transition-colors"
                   >
                     {showPassword ? (
                       <EyeOff className="w-4 h-4" />
@@ -343,7 +347,7 @@ export default function LoginClient() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <div className="flex items-center justify-between text-xs text-slate-400">
                 <label className="inline-flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -370,10 +374,9 @@ export default function LoginClient() {
               </Button>
             </form>
           ) : (
-            /* FORM REGISTRO */
             <>
               {success && verifyUrl && (
-                <div className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                <div className="mb-4 rounded-md border border-emerald-400/70 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
                   Te hemos enviado un correo para{" "}
                   <strong>verificar</strong> tu cuenta.
                 </div>
@@ -381,12 +384,11 @@ export default function LoginClient() {
 
               {!success && (
                 <form className="space-y-4" onSubmit={onRegisterSubmit}>
-                  {/* FILA 1 - Nombre / Apellidos */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label
                         htmlFor="register-firstname"
-                        className="text-foreground"
+                        className="text-slate-50"
                       >
                         Nombre
                       </Label>
@@ -397,14 +399,14 @@ export default function LoginClient() {
                         onChange={(e) => setFirstName(e.target.value)}
                         placeholder="Tu nombre"
                         required
-                        className="bg-background border-border focus:border-primary transition-colors"
+                        className="bg-slate-950/70 border-slate-700 focus:border-primary transition-colors text-slate-50 placeholder:text-slate-500"
                       />
                     </div>
 
                     <div className="space-y-2">
                       <Label
                         htmlFor="register-lastname"
-                        className="text-foreground"
+                        className="text-slate-50"
                       >
                         Apellidos
                       </Label>
@@ -415,16 +417,15 @@ export default function LoginClient() {
                         onChange={(e) => setLastName(e.target.value)}
                         placeholder="Tus apellidos"
                         required
-                        className="bg-background border-border focus:border-primary transition-colors"
+                        className="bg-slate-950/70 border-slate-700 focus:border-primary transition-colors text-slate-50 placeholder:text-slate-500"
                       />
                     </div>
                   </div>
 
-                  {/* FILA 2 - Email */}
                   <div className="space-y-2">
                     <Label
                       htmlFor="register-email"
-                      className="text-foreground"
+                      className="text-slate-50"
                     >
                       Correo electrónico
                     </Label>
@@ -435,16 +436,15 @@ export default function LoginClient() {
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="tu@email.com"
                       required
-                      className="bg-background border-border focus:border-primary transition-colors"
+                      className="bg-slate-950/70 border-slate-700 focus:border-primary transition-colors text-slate-50 placeholder:text-slate-500"
                     />
                   </div>
 
-                  {/* FILA 3 - Contraseña / Confirmar */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label
                         htmlFor="register-password"
-                        className="text-foreground"
+                        className="text-slate-50"
                       >
                         Contraseña
                       </Label>
@@ -455,14 +455,14 @@ export default function LoginClient() {
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
                         required
-                        className="bg-background border-border focus:border-primary transition-colors"
+                        className="bg-slate-950/70 border-slate-700 focus:border-primary transition-colors text-slate-50 placeholder:text-slate-500"
                       />
                     </div>
 
                     <div className="space-y-2">
                       <Label
                         htmlFor="register-confirm"
-                        className="text-foreground"
+                        className="text-slate-50"
                       >
                         Confirmar contraseña
                       </Label>
@@ -473,13 +473,12 @@ export default function LoginClient() {
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="••••••••"
                         required
-                        className="bg-background border-border focus:border-primary transition-colors"
+                        className="bg-slate-950/70 border-slate-700 focus:border-primary transition-colors text-slate-50 placeholder:text-slate-500"
                       />
                     </div>
                   </div>
 
-                  {/* Términos y condiciones */}
-                  <div className="mt-2 flex items-start gap-2 text-xs text-muted-foreground">
+                  <div className="mt-2 flex items-start gap-2 text-xs text-slate-400">
                     <input
                       type="checkbox"
                       id="terms"
@@ -521,12 +520,11 @@ export default function LoginClient() {
             </>
           )}
 
-          {/* Divider + Google button */}
           <div className="mt-6">
-            <div className="relative flex items-center gap-3 text-[11px] text-muted-foreground uppercase tracking-wide">
-              <div className="flex-1 h-px bg-border" />
+            <div className="relative flex items-center gap-3 text-[11px] text-slate-500 uppercase tracking-wide">
+              <div className="flex-1 h-px bg-slate-700" />
               <span>o continúa con</span>
-              <div className="flex-1 h-px bg-border" />
+              <div className="flex-1 h-px bg-slate-700" />
             </div>
 
             <Button
@@ -534,7 +532,7 @@ export default function LoginClient() {
               variant="outline"
               onClick={onGoogleClick}
               disabled={googleLoading}
-              className="mt-3 w-full bg-background/60 hover:bg-muted border-border text-foreground hover:text-foreground flex items-center justify-center gap-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              className="mt-3 w-full bg-slate-950/60 hover:bg-slate-900 border-slate-700 text-slate-50 hover:text-slate-50 flex items-center justify-center gap-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {googleLoading ? (
                 <>
