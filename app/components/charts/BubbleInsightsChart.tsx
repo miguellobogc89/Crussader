@@ -144,7 +144,7 @@ const FadingTooltip = ({ active, payload }: any) => {
       <p className="font-semibold text-sm text-foreground mb-2">
         {data.topic}
       </p>
-      <div className="space-y-1 text-xs">
+      <div className="space-y-1 text-sm">
         <div className="flex justify-between gap-4">
           <span className="text-muted-foreground">Puntuación:</span>
           <span className="font-medium text-foreground">
