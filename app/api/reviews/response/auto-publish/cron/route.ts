@@ -368,3 +368,8 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// 👇 Añadido para que el cron de Vercel (GET) reutilice la misma lógica
+export async function GET(req: NextRequest) {
+  return POST(req);
+}
