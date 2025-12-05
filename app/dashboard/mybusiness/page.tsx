@@ -60,7 +60,8 @@ export default function MyBusinessPage() {
   // ----- estado empresa -----
   const [loading, setLoading] = React.useState(true);
   const [companyId, setCompanyId] = React.useState<string | null>(null);
-  const [companyName, setCompanyName] = React.useState("Mi empresa");
+  const [companyName, setCompanyName] = React.useState("");
+
   const [details, setDetails] = React.useState<CompanyDetails | null>(null);
   const hasCompany = !!companyId;
 
@@ -96,7 +97,7 @@ export default function MyBusinessPage() {
       if (list.length > 0) {
         const c = list[0];
         setCompanyId(c.id);
-        setCompanyName(c.name ?? "Mi empresa");
+        setCompanyName(c.name ?? "");
 
         const d = await fetchCompanyDetails(c.id);
         if (abort) return;

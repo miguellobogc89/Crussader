@@ -1,15 +1,14 @@
 // app/components/layouts/RouteTransitionOverlay.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 /**
  * Muestra una barra de progreso arriba + un overlay con blur
- * cuando cambia la ruta del App Router.
+ * cuando se dispara el evento global "crs:navigation-start".
  *
  * Usa una animación “optimista”: avanza hasta ~85% y termina
- * al montar la nueva ruta, con una duración mínima para evitar flicker.
+ * al completar la nueva vista, con una duración mínima para evitar flicker.
  */
 export default function RouteTransitionOverlay({
   scope = "container", // "container" (por defecto) = dentro del área de página; "full" = cubre toda la app
@@ -20,24 +19,55 @@ export default function RouteTransitionOverlay({
   className?: string;
   minDurationMs?: number;
 }) {
-  const pathname = usePathname();
-  const lastPathRef = useRef<string | null>(null);
-
   const [active, setActive] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  // Detecta cambios de ruta
+  // Inicia y finaliza con duración mínima
+  const start = () => {
+    // Si ya está activo, no reiniciamos para evitar parpadeos múltiples
+    setProgress((prev) => {
+      if (!active && prev === 0) return 0.06;
+      return prev;
+    });
+    if (active) return;
+    setActive(true);
+
+    const started = performance.now();
+    const finish = () => {
+      const elapsed = performance.now() - started;
+      const wait = Math.max(0, minDurationMs - elapsed);
+      window.setTimeout(() => {
+        // completa barra y oculta overlay
+        setProgress(1);
+        // pequeño delay para permitir la transición CSS
+        window.setTimeout(() => {
+          setActive(false);
+          setProgress(0);
+        }, 220);
+      }, wait);
+    };
+
+    // Finaliza cuando el frame actual haya “pintado” la nueva ruta
+    requestAnimationFrame(() => {
+      requestAnimationFrame(finish);
+    });
+  };
+
+  // 🔹 Escucha eventos globales de inicio de navegación
   useEffect(() => {
-    if (lastPathRef.current === null) {
-      lastPathRef.current = pathname;
-      return;
-    }
-    if (lastPathRef.current !== pathname) {
-      lastPathRef.current = pathname;
+    const handler = () => {
       start();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("crs:navigation-start", handler);
     }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("crs:navigation-start", handler);
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, []);
 
   // Simulación de progreso tipo NProgress (optimista)
   useEffect(() => {
@@ -63,36 +93,9 @@ export default function RouteTransitionOverlay({
     };
   }, [active]);
 
-  // Inicia y finaliza con duración mínima
-  const start = () => {
-    setProgress(0.06);
-    setActive(true);
-
-    const started = performance.now();
-    const finish = () => {
-      const elapsed = performance.now() - started;
-      const wait = Math.max(0, minDurationMs - elapsed);
-      window.setTimeout(() => {
-        // completa barra y oculta overlay
-        setProgress(1);
-        // pequeño delay para permitir la transición CSS
-        window.setTimeout(() => {
-          setActive(false);
-          setProgress(0);
-        }, 220);
-      }, wait);
-    };
-
-    // Finaliza cuando el frame actual haya “pintado” la nueva ruta
-    // (suficiente en la mayoría de casos con Suspense en App Router)
-    requestAnimationFrame(() => {
-      requestAnimationFrame(finish);
-    });
-  };
-
   const scopeClass = useMemo(
     () => (scope === "full" ? "fixed inset-0 z-[999]" : "absolute inset-0 z-50"),
-    [scope]
+    [scope],
   );
 
   // No renderizamos nada si está inactivo

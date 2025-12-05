@@ -61,28 +61,26 @@ export function AppSidebar() {
   const isMobile = useIsMobile();
   const { data: session } = useSession();
 
-  // En móvil: colapsado; en desktop: expandido (se corrige en el effect según isMobile)
-  const [collapsed, setCollapsed] = useState<boolean>(true);
+  // Desktop: expandida por defecto. En móvil se colapsa en el effect.
+  const [collapsed, setCollapsed] = useState<boolean>(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
+  // Para marcar optimistamente el item clicado
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-  const [isClient, setIsClient] = useState(false);
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  // Sincroniza estado por defecto según tamaño
+  // Sincroniza estado por defecto en móvil sin tocar desktop
   useEffect(() => {
     if (isMobile) {
       setCollapsed(true);
-    } else {
-      setCollapsed(false);
     }
   }, [isMobile]);
 
+  // Limpia el pendingHref SOLO cuando la ruta ya coincide (navegación completada)
   useEffect(() => {
-    if (pendingHref) setPendingHref(null);
+    if (!pendingHref) return;
+    if (isActivePath(pathname, pendingHref)) {
+      setPendingHref(null);
+    }
   }, [pathname, pendingHref]);
 
   // ===== admin flag
@@ -136,7 +134,6 @@ export function AppSidebar() {
     : null;
 
   const isOverlay = isMobile && !collapsed;
-  const requestExpand = () => setCollapsed(false);
 
   const onItemNavigate = () => {
     if (isMobile) setCollapsed(true);
@@ -145,7 +142,15 @@ export function AppSidebar() {
   function makeItemNavigate(href: string) {
     return () => {
       setUserMenuOpen(false);
+
+      // 🔹 Dispara el evento global de inicio de navegación
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("crs:navigation-start"));
+      }
+
+      // 🔹 Marca este href como "pendiente" → se resalta inmediatamente
       setPendingHref(href);
+
       if (isMobile) setCollapsed(true);
     };
   }
@@ -210,19 +215,30 @@ export function AppSidebar() {
     );
   }
 
-  // Helpers active + pending
-  const homeActive =
-    isActivePath(pathname, HOME.href) || pendingHref === HOME.href;
-  const reviewsActive =
-    isActivePath(pathname, REVIEWS.href) || pendingHref === REVIEWS.href;
-  const myBusinessActive =
-    isActivePath(pathname, MYBUSINESS.href) || pendingHref === MYBUSINESS.href;
-  const integrationsActive =
-    isActivePath(pathname, INTEGRATIONS.href) ||
-    pendingHref === INTEGRATIONS.href;
+  // ===== Helpers active: solo uno activo cuando hay pendingHref =====
+  const hasPending = !!pendingHref;
+
+  const homeActive = hasPending
+    ? pendingHref === HOME.href
+    : isActivePath(pathname, HOME.href);
+
+  const reviewsActive = hasPending
+    ? pendingHref === REVIEWS.href
+    : isActivePath(pathname, REVIEWS.href);
+
+  const myBusinessActive = hasPending
+    ? pendingHref === MYBUSINESS.href
+    : isActivePath(pathname, MYBUSINESS.href);
+
+  const integrationsActive = hasPending
+    ? pendingHref === INTEGRATIONS.href
+    : isActivePath(pathname, INTEGRATIONS.href);
+
   const adminActive =
     ADMIN &&
-    (isActivePath(pathname, ADMIN.href) || pendingHref === ADMIN.href);
+    (hasPending
+      ? pendingHref === ADMIN.href
+      : isActivePath(pathname, ADMIN.href));
 
   return (
     <aside
