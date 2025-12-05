@@ -216,3 +216,55 @@ export async function PATCH(
 
   return NextResponse.json({ ok: true, location: updated });
 }
+
+
+/** DELETE - elimina una ubicación concreta de la compañía */
+export async function DELETE(
+  req: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  const { id: companyId } = await ctx.params;
+
+  const session = await getServerSession(authOptions);
+  const guard = await ensureMember(session?.user?.email ?? null, companyId);
+  if (!guard.ok) {
+    return NextResponse.json(
+      { ok: false, error: guard.error },
+      { status: guard.status },
+    );
+  }
+  if (!canEdit(guard.role)) {
+    return NextResponse.json(
+      { ok: false, error: "forbidden" },
+      { status: 403 },
+    );
+  }
+
+  const body = await req.json().catch(() => ({} as any));
+  const locationId = String(body.locationId ?? "").trim();
+
+  if (!locationId) {
+    return NextResponse.json(
+      { ok: false, error: "missing_location" },
+      { status: 400 },
+    );
+  }
+
+  const existing = await prisma.location.findFirst({
+    where: { id: locationId, companyId },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    return NextResponse.json(
+      { ok: false, error: "location_not_found" },
+      { status: 404 },
+    );
+  }
+
+  await prisma.location.delete({
+    where: { id: locationId },
+  });
+
+  return NextResponse.json({ ok: true }, { status: 200 });
+}

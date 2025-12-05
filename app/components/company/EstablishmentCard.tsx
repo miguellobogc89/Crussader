@@ -1,4 +1,3 @@
-// app/components/company/EstablishmentCard.tsx
 "use client";
 
 import * as React from "react";
@@ -24,6 +23,7 @@ import {
   Link as LinkIcon,
   Link2,
   Unlink,
+  Trash2,
 } from "lucide-react";
 
 import type { LocationRow } from "@/hooks/useCompanyLocations";
@@ -37,6 +37,7 @@ type Props = {
   location: LocationRow;
   onConnect?: () => void;
   onDisconnect?: () => void;
+  onDelete?: () => void;
   typeName?: string | null;
   typeIcon?: string;
 };
@@ -46,6 +47,7 @@ export function EstablishmentCard({
   location,
   onConnect,
   onDisconnect,
+  onDelete,
   typeName,
   typeIcon,
 }: Props) {
@@ -126,7 +128,7 @@ export function EstablishmentCard({
   ) {
     const file = e.target.files?.[0];
     const locationId = (location as any).id as string | undefined;
-    if (!file || !locationId || !companyId) return;
+       if (!file || !locationId || !companyId) return;
 
     const reader = new FileReader();
     reader.onloadend = async () => {
@@ -202,6 +204,14 @@ export function EstablishmentCard({
               >
                 <Power className="mr-2 h-4 w-4" />
                 {isLinked ? "Desconectar" : "Conectar ubicación"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => onDelete?.()}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Eliminar local
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

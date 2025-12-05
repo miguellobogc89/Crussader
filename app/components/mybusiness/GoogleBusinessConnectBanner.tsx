@@ -52,7 +52,7 @@ export default function GoogleBusinessConnectBanner({
           setAccountEmail(null);
         }
 
-        // 2) Si hay conexión, miramos ubicaciones
+        // 2) Si hay conexión, miramos ubicaciones (locations de la compañía)
         try {
           const locRes = await fetch(
             `/api/companies/${companyId}/locations`,
@@ -91,148 +91,132 @@ export default function GoogleBusinessConnectBanner({
 
   if (checking || !status) return null;
 
-  /* ---------- Config visual según estado ---------- */
+  /* ========= ESTADO CONECTADO: diseño ultra minimal (bolita a la izquierda) ========= */
 
-  const isCompact = status === "connected_ok"; // banner informativo, poco protagonista
+  if (status === "connected_ok") {
+    return (
+      <div
+        className={[
+          "w-full rounded-2xl border border-slate-200",
+          "bg-white/90 dark:bg-slate-900/80",
+          "shadow-sm px-3 py-2 sm:px-4 sm:py-2",
+          "flex items-center justify-between gap-3",
+        ].join(" ")}
+      >
+        {/* IZQUIERDA → bolita + texto */}
+        <div className="flex items-center gap-2 flex-1">
+          {/* Bolita al extremo izquierdo */}
+          <span
+            className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0"
+            aria-hidden="true"
+          />
 
-  let bgClass = "";
-  let borderClass = "";
-  let labelTextClass = "";
-  let dotClass = "";
-  let mainTextClass = "";
-  let line1 = "";
-  let line2: string | null = null;
-  let buttonLabel = "";
+          {/* Texto */}
+          <div className="flex flex-col leading-tight">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-100">
+              Conectado
+            </span>
 
-  if (status === "disconnected") {
-    // 🟡 Desconectado → CTA visible pero sin gritar
-    bgClass = "bg-amber-50/90 dark:bg-amber-950/20";
-    borderClass = "border border-amber-200/80 dark:border-amber-500/40";
-    labelTextClass = "text-amber-800 dark:text-amber-200";
-    dotClass = "bg-amber-500";
-    mainTextClass = "text-amber-900 dark:text-amber-50";
-    line1 = "Conecta tu cuenta de Google Business";
-    line2 = "Sincroniza tus reseñas y ubicaciones para gestionarlas desde Crussader.";
-    buttonLabel = "Conectar Google";
-  } else if (status === "connected_ok") {
-    // 🟢 Conectado → muy discreto, casi un chip de estado
-    bgClass = "bg-emerald-50/70 dark:bg-emerald-950/15";
-    borderClass = "border border-emerald-100 dark:border-emerald-500/30";
-    labelTextClass = "text-emerald-700 dark:text-emerald-200";
-    dotClass = "bg-emerald-500";
-    mainTextClass = "text-emerald-900 dark:text-emerald-50";
+            {accountEmail && (
+              <span className="text-[11px] text-slate-500 dark:text-slate-300">
+                {accountEmail}
+              </span>
+            )}
+          </div>
+        </div>
 
-    // Línea 1: súper concisa
-    line1 = "Conectado";
-
-    // Línea 2: email + ubicaciones, en una sola frase
-    const parts: string[] = [];
-    if (accountEmail) parts.push(accountEmail);
-    if (typeof locationsCount === "number" && locationsCount > 0) {
-      const label =
-        locationsCount === 1 ? "1 ubicación sincronizada" : `${locationsCount} ubicaciones sincronizadas`;
-      parts.push(label);
-    }
-    line2 = parts.length ? parts.join(" · ") : null;
-
-    // Botón corto, no repito “Google Business”
-    buttonLabel = "Gestionar";
-  } else {
-    // 🟠 Conectado pero sin ubicaciones → aviso, pero sin dramatismo
-    bgClass = "bg-orange-50/90 dark:bg-orange-950/20";
-    borderClass = "border border-orange-200/80 dark:border-orange-500/40";
-    labelTextClass = "text-orange-800 dark:text-orange-200";
-    dotClass = "bg-orange-500";
-    mainTextClass = "text-orange-900 dark:text-orange-50";
-    line1 = "Cuenta conectada, pero sin ubicaciones";
-
-    if (accountEmail) {
-      line2 =
-        `No hemos encontrado ninguna ubicación en esta cuenta (${accountEmail}). ` +
-        "Prueba a conectar con el correo que gestiona tu ficha de negocio en Google.";
-    } else {
-      line2 =
-        "No hemos encontrado ninguna ubicación. Prueba a conectar con el correo que gestiona tu ficha de negocio en Google.";
-    }
-
-    buttonLabel = "Revisar conexión";
-  }
-
-  const paddingClasses = isCompact
-    ? "px-3 py-2 sm:px-4 sm:py-2"
-    : "px-3 py-3 sm:px-5 sm:py-3.5";
-
-  const line1Size = isCompact
-    ? "text-xs sm:text-sm"
-    : "text-sm md:text-base";
-
-  const line2Size = isCompact
-    ? "text-[11px] sm:text-xs md:text-sm"
-    : "text-xs md:text-sm";
-
-  return (
-    <div
-      className={[
-        "w-full rounded-2xl shadow-sm",
-        "flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between",
-        paddingClasses,
-        bgClass,
-        borderClass,
-      ].join(" ")}
-    >
-      {/* Bloque de texto */}
-      <div className="flex items-start gap-3">
-        {/* Punto de estado: círculo fijo, no se deforma */}
-        <div
-          className={[
-            "mt-1.5 h-2.5 w-2.5 rounded-full",
-            "shrink-0 flex-none aspect-square",
-            dotClass,
-          ].join(" ")}
-        />
-
-        <div className="space-y-0.5">
-          {/* Label muy pequeño y discreto */}
-          <p
-            className={[
-              "text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide",
-              labelTextClass,
-            ].join(" ")}
-          >
-            Google Business
-          </p>
-
-          {/* Línea principal */}
-          <p
-            className={[
-              "font-medium",
-              line1Size,
-              mainTextClass,
-            ].join(" ")}
-          >
-            {line1}
-          </p>
-
-          {/* Línea secundaria opcional */}
-          {line2 && (
-            <p
-              className={[
-                "text-slate-600 dark:text-slate-300",
-                line2Size,
-              ].join(" ")}
-            >
-              {line2}
-            </p>
-          )}
+        {/* DERECHA → botón compacto */}
+        <div className="flex-shrink-0">
+          <GoogleBusinessConnectButton compact>
+            Gestionar
+          </GoogleBusinessConnectButton>
         </div>
       </div>
+    );
+  }
 
-      {/* Botón de acción */}
-      <div className="flex-shrink-0 w-full sm:w-auto flex sm:justify-end mt-1 sm:mt-0">
-        <GoogleBusinessConnectButton>
-          {buttonLabel}
-        </GoogleBusinessConnectButton>
+  /* ========= ESTADO DESCONECTADO: amarillo, minimal ========= */
+
+  if (status === "disconnected") {
+    return (
+      <div
+        className={[
+          "w-full rounded-2xl border border-amber-200/80 dark:border-amber-500/40",
+          "bg-amber-50/90 dark:bg-amber-950/20",
+          "shadow-sm px-3 py-2 sm:px-4 sm:py-2",
+          "flex items-center justify-between gap-3",
+        ].join(" ")}
+      >
+        {/* IZQUIERDA → bolita + texto */}
+        <div className="flex items-center gap-2 flex-1">
+          <span
+            className="h-2.5 w-2.5 rounded-full bg-amber-500 shrink-0"
+            aria-hidden="true"
+          />
+
+          <div className="flex flex-col leading-tight">
+            <span className="text-xs font-medium text-amber-900">
+              No conectado
+            </span>
+            <span className="text-[11px] text-amber-800/80">
+              Conecta tu cuenta para sincronizar tus reseñas.
+            </span>
+          </div>
+        </div>
+
+        {/* DERECHA → botón compacto */}
+        <div className="flex-shrink-0">
+          <GoogleBusinessConnectButton compact>
+            Conectar
+          </GoogleBusinessConnectButton>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  /* ========= ESTADO CONECTADO PERO SIN UBICACIONES (tono rosado suave) ========= */
+
+  if (status === "connected_no_locations") {
+    const line2 = accountEmail
+      ? `No hemos encontrado ubicaciones en esta cuenta (${accountEmail}). Prueba introduciendo el correo de tu negocio de Google.`
+      : "No hemos encontrado ubicaciones. Prueba introduciendo el correo de tu negocio de Google.";
+
+    return (
+      <div
+        className={[
+          "w-full rounded-2xl border border-rose-200/80 dark:border-rose-500/40",
+          "bg-rose-50/90 dark:bg-rose-950/20",
+          "shadow-sm px-3 py-2 sm:px-4 sm:py-2",
+          "flex items-center justify-between gap-3",
+        ].join(" ")}
+      >
+        {/* IZQUIERDA → bolita + texto */}
+        <div className="flex items-center gap-2 flex-1">
+          <span
+            className="h-2.5 w-2.5 rounded-full bg-rose-500 shrink-0"
+            aria-hidden="true"
+          />
+
+          <div className="flex flex-col leading-tight">
+            <span className="text-xs font-medium text-rose-900">
+              Conectado, sin ubicaciones
+            </span>
+            <span className="text-[11px] text-rose-800/80">
+              {line2}
+            </span>
+          </div>
+        </div>
+
+        {/* DERECHA → botón compacto */}
+        <div className="flex-shrink-0">
+          <GoogleBusinessConnectButton compact>
+            Revisar conexión
+          </GoogleBusinessConnectButton>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback (no debería llegar aquí)
+  return null;
 }

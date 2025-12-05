@@ -1,4 +1,3 @@
-// app/components/company/CompanyEstablishments.tsx
 "use client";
 
 import * as React from "react";
@@ -7,8 +6,13 @@ import { EstablishmentCard } from "@/app/components/company/EstablishmentCard";
 import type { LocationRow } from "@/hooks/useCompanyLocations";
 import { getBusinessIcon } from "@/lib/businessTypeIcons";
 import { Button } from "@/app/components/ui/button";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Store } from "lucide-react";
 import LinkGbpLocationModal from "@/app/components/mybusiness/locations/LinkGbpLocationModal";
+// ⬇️ ajusta la ruta si tu modal está en otro sitio
+import {
+  AddLocationsModal,
+  type NewLocation,
+} from "@/app/components/company/AddLocationsModal";
 
 type Props = {
   companyId: string | null;
@@ -22,7 +26,13 @@ export function CompanyEstablishments({ companyId }: Props) {
 
   // 🔹 estado para el modal de vinculación
   const [linkModalOpen, setLinkModalOpen] = React.useState(false);
-  const [linkLocationId, setLinkLocationId] = React.useState<string | null>(null);
+  const [linkLocationId, setLinkLocationId] = React.useState<string | null>(
+    null,
+  );
+
+  // 🔹 estado para modal "Añadir local"
+  const [addModalOpen, setAddModalOpen] = React.useState(false);
+  const [addingLocations, setAddingLocations] = React.useState(false);
 
   const hasCompany = !!companyId;
 
@@ -45,9 +55,7 @@ export function CompanyEstablishments({ companyId }: Props) {
 
       const withTypeAndIcon = rawLocs.map((loc: any) => {
         const typeName: string | null =
-          loc.type?.name ??
-          loc.Type?.name ??
-          null;
+          loc.type?.name ?? loc.Type?.name ?? null;
 
         const typeIcon = getBusinessIcon(typeName ?? "");
 
@@ -158,13 +166,107 @@ export function CompanyEstablishments({ companyId }: Props) {
     }
   }
 
+  // 🔹 crear ubicaciones (single / bulk) desde el modal
+  async function handleAddSingle(loc: NewLocation) {
+    if (!companyId) return;
+    setAddingLocations(true);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/locations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locations: [loc] }),
+      });
+
+      const j = await res.json().catch(() => null);
+
+      if (!res.ok || !j?.ok) {
+        console.error(
+          "[CompanyEstablishments] Error al crear ubicación:",
+          j?.error || `HTTP ${res.status}`,
+        );
+        return;
+      }
+
+      await loadLocations();
+      setAddModalOpen(false);
+    } catch (e: any) {
+      console.error(
+        "[CompanyEstablishments] Error de red al crear ubicación:",
+        e?.message || String(e),
+      );
+    } finally {
+      setAddingLocations(false);
+    }
+  }
+
+  async function handleAddBulk(locsToAdd: NewLocation[]) {
+    if (!companyId) return;
+    setAddingLocations(true);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/locations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locations: locsToAdd }),
+      });
+
+      const j = await res.json().catch(() => null);
+
+      if (!res.ok || !j?.ok) {
+        console.error(
+          "[CompanyEstablishments] Error al crear ubicaciones:",
+          j?.error || `HTTP ${res.status}`,
+        );
+        return;
+      }
+
+      await loadLocations();
+      setAddModalOpen(false);
+    } catch (e: any) {
+      console.error(
+        "[CompanyEstablishments] Error de red al crear ubicaciones:",
+        e?.message || String(e),
+      );
+    } finally {
+      setAddingLocations(false);
+    }
+  }
+
+  // 🔹 eliminar ubicación
+  async function handleDeleteLocation(locationId: string) {
+    if (!companyId || !locationId) return;
+
+    try {
+      const res = await fetch(`/api/companies/${companyId}/locations`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locationId }),
+      });
+
+      const j = await res.json().catch(() => null);
+
+      if (!res.ok || !j?.ok) {
+        console.error(
+          "[CompanyEstablishments] Error al eliminar ubicación:",
+          j?.error || `HTTP ${res.status}`,
+        );
+        return;
+      }
+
+      await loadLocations();
+    } catch (e: any) {
+      console.error(
+        "[CompanyEstablishments] Error de red al eliminar ubicación:",
+        e?.message || String(e),
+      );
+    }
+  }
+
   if (!hasCompany || !companyId) {
     return null;
   }
 
   const anyLinked = locs.some((loc) => isLocationLinked(loc as any));
-  const disableBulk =
-    locsLoading || bulkSyncing || !anyLinked;
+  const disableBulk = locsLoading || bulkSyncing || !anyLinked;
 
   return (
     <>
@@ -178,7 +280,7 @@ export function CompanyEstablishments({ companyId }: Props) {
                 alt="Ubicaciones"
                 width={24}
                 height={24}
-                className="sm:h-7 sm:w-7 h-5 w-5"
+                className="h-5 w-5 sm:h-7 sm:w-7"
               />
             </span>
             <span className="text-sm font-semibold text-slate-900 sm:text-base md:text-lg">
@@ -186,25 +288,30 @@ export function CompanyEstablishments({ companyId }: Props) {
             </span>
           </div>
 
-          {/* Botón global de actualizar reseñas */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleBulkSync}
-            disabled={disableBulk}
-            className="inline-flex items-center gap-2 text-xs md:text-sm"
-          >
-            <RotateCcw
-              className={`h-4 w-4 ${
-                bulkSyncing ? "animate-spin" : ""
-              }`}
-            />
-            <span>
-              {bulkSyncing
-                ? "Actualizando reseñas..."
-                : "Actualizar reseñas"}
-            </span>
-          </Button>
+          {/* Botones: refrescar (solo icono) + Añadir local */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleBulkSync}
+              disabled={disableBulk}
+              className="shrink-0"
+              aria-label="Actualizar reseñas"
+            >
+              <RotateCcw
+                className={`h-4 w-4 ${bulkSyncing ? "animate-spin" : ""}`}
+              />
+            </Button>
+
+            <Button
+              type="button"
+              onClick={() => setAddModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-25 bg-gradient-to-r from-amber-400 to-orange-500 px-4 py-2 text-xs font-semibold text-white shadow-md hover:from-amber-500 hover:to-orange-600 focus-visible:ring-2 focus-visible:ring-amber-400 md:text-sm"
+            >
+              <Store className="h-4 w-4" />
+              <span>Añadir local</span>
+            </Button>
+          </div>
         </div>
 
         {locsError && (
@@ -224,7 +331,8 @@ export function CompanyEstablishments({ companyId }: Props) {
           </div>
         ) : locs.length === 0 ? (
           <div className="py-8 text-center text-sm text-muted-foreground">
-            No hay ubicaciones todavía. Crea tu primera ubicación desde el flujo guiado.
+            No hay ubicaciones todavía. Crea tu primera ubicación desde el
+            flujo guiado.
           </div>
         ) : (
           <div className="grid gap-4">
@@ -239,6 +347,8 @@ export function CompanyEstablishments({ companyId }: Props) {
                 onConnect={() => openLinkModal(loc.id)}
                 // 🔹 Desconectar → unlink-google
                 onDisconnect={() => handleDisconnect(loc.id)}
+                // 🔹 Eliminar
+                onDelete={() => handleDeleteLocation(loc.id)}
               />
             ))}
           </div>
@@ -257,6 +367,15 @@ export function CompanyEstablishments({ companyId }: Props) {
           await loadLocations();
           setLinkModalOpen(false);
         }}
+      />
+
+      {/* Modal para añadir nuevos locales */}
+      <AddLocationsModal
+        open={addModalOpen}
+        onOpenChange={setAddModalOpen}
+        onSubmitSingle={handleAddSingle}
+        onSubmitBulk={handleAddBulk}
+        submitting={addingLocations}
       />
     </>
   );
