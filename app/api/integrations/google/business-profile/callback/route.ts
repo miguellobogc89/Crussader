@@ -99,6 +99,58 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // 1.ter) Comprobar que esta cuenta de Google ve al menos un Perfil de Empresa
+    try {
+      const myBusiness = google.mybusinessaccountmanagement("v1");
+      const accResp = await myBusiness.accounts.list({ auth: client });
+      const accounts = accResp.data.accounts || [];
+
+      if (!accounts || accounts.length === 0) {
+        console.warn(
+          "[Google Business Callback] User has no GBP accounts or insufficient permissions for API",
+        );
+
+        // Añadimos un error específico a la URL de vuelta para poder mostrar mensaje claro
+        try {
+          const redirectUrl = new URL(redirectAfter);
+          redirectUrl.searchParams.set("error", "no_gbp_accounts");
+          redirectAfter = redirectUrl.toString();
+        } catch (e) {
+          console.error(
+            "[Google Business Callback] invalid redirectAfter URL on no_gbp_accounts:",
+            redirectAfter,
+            e,
+          );
+        }
+
+        // No creamos externalConnection si la cuenta no ve ningún negocio en la API
+        return NextResponse.redirect(redirectAfter);
+      }
+    } catch (apiErr) {
+      console.error(
+        "[Google Business Callback] Error calling My Business accounts.list",
+        apiErr,
+      );
+
+      // Si falla la llamada a accounts, devolvemos un error genérico de integración
+      try {
+        const redirectUrl = new URL(redirectAfter);
+        redirectUrl.searchParams.set(
+          "error",
+          "google_business_accounts_failed",
+        );
+        redirectAfter = redirectUrl.toString();
+      } catch (e) {
+        console.error(
+          "[Google Business Callback] invalid redirectAfter URL on accounts_failed:",
+          redirectAfter,
+          e,
+        );
+      }
+
+      return NextResponse.redirect(redirectAfter);
+    }
+
     // 2) Crear o actualizar ExternalConnection
     const existing = await prisma.externalConnection.findUnique({
       where: { userId_provider: { userId, provider } },

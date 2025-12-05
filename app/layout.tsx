@@ -1,8 +1,8 @@
-// app/layout.tsx
 import "./globals.css";
 import { Inter } from "next/font/google";
 import Providers from "./providers";
 import QueryProvider from "./providers/QueryProvider";
+import { ToastProvider } from "@/app/components/crussader/UX/Toast";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -60,7 +60,9 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning className={inter.variable}>
       <body className="min-h-screen bg-background text-foreground font-sans">
         <QueryProvider>
-          <Providers>{children}</Providers>
+          <Providers>
+            <ToastProvider>{children}</ToastProvider>
+          </Providers>
         </QueryProvider>
       </body>
     </html>

@@ -7,7 +7,7 @@ import { Plus, Building2, Pencil } from "lucide-react";
 import GoogleBusinessConnectBanner from "@/app/components/mybusiness/GoogleBusinessConnectBanner";
 import PageShell from "@/app/components/layouts/PageShell";
 import PreloadCompanyBuffer from "@/app/components/buffer/PreloadCompanyBuffer";
-
+import { useToast } from "@/app/components/crussader/UX/Toast";
 import {
   CompanyModal,
   type CompanyForm,
@@ -55,6 +55,7 @@ async function fetchCompanyDetails(
 
 export default function MyBusinessPage() {
   const router = useRouter();
+  const { showToast } = useToast();
 
   // ----- estado empresa -----
   const [loading, setLoading] = React.useState(true);
@@ -121,6 +122,54 @@ export default function MyBusinessPage() {
     }
   }, [loading, hasCompany]);
 
+  // 🔹 Leer parámetros de la URL (éxito / error Google) y disparar toasts
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const url = new URL(window.location.href);
+    const connected = url.searchParams.get("google_connected");
+    const error = url.searchParams.get("error");
+
+    if (connected === "1") {
+      showToast({
+        variant: "success",
+        title: "Google Business conectado",
+        message: "Hemos sincronizado tu cuenta de Google Business correctamente.",
+      });
+
+      url.searchParams.delete("google_connected");
+      window.history.replaceState(null, "", url.toString());
+    } else if (error) {
+      let message = "Ha ocurrido un error al conectar con Google Business.";
+
+      if (error === "missing_user") {
+        message =
+          "No hemos podido identificar tu usuario interno. Vuelve a iniciar sesión e inténtalo de nuevo.";
+      } else if (error === "missing_access_token") {
+        message =
+          "Google no ha devuelto un token de acceso válido. Repite la conexión.";
+      } else if (error === "no_gbp_accounts") {
+        message =
+          "Esta cuenta de Google no tiene ningún perfil de empresa asociado o no tiene permisos suficientes.";
+      } else if (error === "google_business_accounts_failed") {
+        message =
+          "No hemos podido leer tus perfiles de empresa desde la API de Google. Inténtalo de nuevo más tarde.";
+      } else if (error === "google_business_callback") {
+        message =
+          "Ha fallado la integración con Google Business durante el proceso de conexión.";
+      }
+
+      showToast({
+        variant: "error",
+        title: "Error al conectar con Google",
+        message,
+      });
+
+      url.searchParams.delete("error");
+      window.history.replaceState(null, "", url.toString());
+    }
+  }, [showToast]);
+
   /* --------- acciones empresa --------- */
 
   function openCreate() {
@@ -156,7 +205,11 @@ export default function MyBusinessPage() {
       setCompanyModalOpen(false);
       router.push(`/dashboard/company/${j.company.id}`);
     } catch (err: any) {
-      alert(err?.message || String(err));
+      showToast({
+        variant: "error",
+        title: "Error al crear empresa",
+        message: err?.message || "No se ha podido crear la empresa.",
+      });
     } finally {
       setSubmittingCompany(false);
     }
@@ -185,8 +238,18 @@ export default function MyBusinessPage() {
       setCompanyModalOpen(false);
       setDetails(j.company);
       if (j.company?.name) setCompanyName(j.company.name);
+
+      showToast({
+        variant: "success",
+        title: "Empresa actualizada",
+        message: "Los datos de tu empresa se han guardado correctamente.",
+      });
     } catch (err: any) {
-      alert(err?.message || String(err));
+      showToast({
+        variant: "error",
+        title: "Error al actualizar empresa",
+        message: err?.message || "No se han podido guardar los cambios.",
+      });
     } finally {
       setSubmittingCompany(false);
     }
@@ -209,30 +272,25 @@ export default function MyBusinessPage() {
     <>
       <PreloadCompanyBuffer companyId={companyId} />
 
-<PageShell
-  title={companyName}
-  titleIconName="Building2"
-  description="Gestiona los datos de tu empresa y las ubicaciones conectadas."
-  toolbar={
-    hasCompany ? (
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={openEdit}
-        className="inline-flex items-center gap-2"
+      <PageShell
+        title={companyName}
+        titleIconName="Building2"
+        description="Gestiona los datos de tu empresa y las ubicaciones conectadas."
+        toolbar={
+          hasCompany ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openEdit}
+              className="inline-flex items-center gap-2"
+            >
+              <Pencil className="h-4 w-4" />
+              <span className="hidden sm:inline">Editar empresa</span>
+            </Button>
+          ) : undefined
+        }
+        isLoading={loading}
       >
-        <Pencil className="h-4 w-4" />
-
-        {/* Ocultar texto en móviles → visible solo desde sm: */}
-        <span className="hidden sm:inline">
-          Editar empresa
-        </span>
-      </Button>
-    ) : undefined
-  }
-  isLoading={loading}
->
-
         {/* banner en el BODY, arriba del todo */}
         <div className="mb-4">
           <GoogleBusinessConnectBanner companyId={companyId} />
