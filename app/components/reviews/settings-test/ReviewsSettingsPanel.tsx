@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   UserCheck,
   Cpu,
+  MonitorSmartphone,
 } from "lucide-react";
 
 import Header from "./Header";
@@ -132,10 +133,10 @@ export default function ReviewsSettingsPanel() {
   });
   const [hasChanges, setHasChanges] = useState(false);
 
-const onUpdate = (updates: Partial<ResponseSettings>) => {
-  setSettings((prev) => ({ ...prev, ...updates }));
-  setHasChanges(true);
-};
+  const onUpdate = (updates: Partial<ResponseSettings>) => {
+    setSettings((prev) => ({ ...prev, ...updates }));
+    setHasChanges(true);
+  };
 
   // Altura disponible
   useLayoutEffect(() => {
@@ -152,16 +153,16 @@ const onUpdate = (updates: Partial<ResponseSettings>) => {
     };
   }, []);
 
-const MENU_ITEMS: MenuItem[] = [
-  { label: "Preview", value: "preview", icon: Eye },
-  { label: "General", value: "general", icon: SlidersHorizontal },
-  { label: "Publicación", value: "publishing", icon: UserCheck },
-  { label: "Reglas por estrellas", value: "stars", icon: Sparkles },
-  { label: "Canales / CTA", value: "channels", icon: Globe },
-  { label: "Políticas", value: "policies", icon: ShieldCheck },
-  { label: "Idioma", value: "language", icon: Languages },
-  { label: "Modelo (IA)", value: "model", icon: Cpu },
-];
+  const MENU_ITEMS: MenuItem[] = [
+    { label: "Preview", value: "preview", icon: Eye },
+    { label: "General", value: "general", icon: SlidersHorizontal },
+    { label: "Publicación", value: "publishing", icon: UserCheck },
+    { label: "Reglas por estrellas", value: "stars", icon: Sparkles },
+    { label: "Canales / CTA", value: "channels", icon: Globe },
+    { label: "Políticas", value: "policies", icon: ShieldCheck },
+    { label: "Idioma", value: "language", icon: Languages },
+    { label: "Modelo (IA)", value: "model", icon: Cpu },
+  ];
 
   const scrollTo = (id: string) => {
     const scroller = scrollRef.current;
@@ -228,7 +229,6 @@ const MENU_ITEMS: MenuItem[] = [
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
   // Inicializa companyId y sector desde boot
   useEffect(() => {
     if (!boot) return;
@@ -277,7 +277,6 @@ const MENU_ITEMS: MenuItem[] = [
       if (json.settings) setSettings(json.settings);
       setHasChanges(false);
       setSaving(false);
-
     } catch (e) {
       console.error("Save settings exception", e);
       alert("No se pudo guardar (network/JS error). Revisa la consola.");
@@ -286,86 +285,108 @@ const MENU_ITEMS: MenuItem[] = [
   }
 
   return (
-    <div
-      ref={rootRef}
-      style={{ height: availH ? `${availH}px` : undefined }}
-      className="relative overflow-hidden bg-white rounded-xl"
-    >
-      {/* Grid principal */}
-      <div className="h-full min-h-0 w-full grid grid-cols-[220px_1px_1fr]">
-        {/* Sidebar */}
-        <aside className="h-full min-h-0 overflow-hidden">
-          <div className="h-full min-h-0 flex flex-col">
-            <div
-              className="px-4 border-b flex items-center"
-              style={{ height: SIDEBAR_HEADER_H }}
-            >
-              <div>
-                <div className="text-sm font-semibold leading-none">Configuración</div>
-                <div className="text-xs text-muted-foreground mt-1 leading-none">
-                  Reseñas · Respuestas
-                </div>
-              </div>
+    <>
+      {/* 🔹 Vista móvil / tablets / portátiles estrechos */}
+      <div className="xl:hidden">
+        <div className="max-w-md mx-auto my-8 px-4">
+          <div className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm px-6 py-8 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-100">
+              <MonitorSmartphone className="h-7 w-7 text-indigo-600" />
             </div>
-
-            <nav className="flex-1 min-h-0 overflow-y-auto py-2">
-              {MENU_ITEMS.map(({ value, label, icon: Icon }) => {
-                const isActive = active === value;
-                return (
-                  <button
-                    key={value}
-                    onClick={() => scrollTo(value)}
-                    className={[
-                      "w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors",
-                      isActive
-                        ? "text-primary bg-primary/5"
-                        : "text-foreground/80 hover:bg-muted/60",
-                    ].join(" ")}
-                    aria-current={isActive ? "page" : undefined}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{label}</span>
-                  </button>
-                );
-              })}
-            </nav>
+            <h2 className="text-base font-semibold text-slate-900 mb-2">
+              Configuración de respuestas
+            </h2>
+            <p className="text-sm text-slate-600">
+              Para configurar tus reseñas debes abrir esta sección en un
+              ordenador.
+            </p>
           </div>
-        </aside>
-
-        {/* Divider */}
-        <div className="h-full w-px bg-slate-200" />
-
-        {/* Columna derecha */}
-        <div className="h-full min-h-0 flex flex-col">
-          {/* Header fijo (solo botón guardar) */}
-          <Header
-          settings={settings}
-          onSave={handleSave}
-          saving={saving}
-          hasChanges={hasChanges}
-        />
-
-
-          {/* Scroller principal */}
-          <main
-            ref={scrollRef}
-            className="rs-panel__scroller flex-1 min-h-0 overflow-y-auto"
-            style={{
-              scrollBehavior: "smooth",
-              scrollPaddingTop: 16,
-              paddingBottom: 12,
-              overscrollBehavior: "contain",
-            }}
-          >
-            {/* 🔹 Chips de resumen al inicio de la primera sección */}
-            <div className="px-6 pt-4 pb-3 border-b border-slate-100 bg-background">
-              <SettingsChips settings={settings} />
-            </div>
-
-            <PanelSections settings={settings} onUpdate={onUpdate} />
-          </main>
         </div>
       </div>
-    </div>
+
+      {/* 🔹 Vista completa solo en portátil ancho / desktop */}
+      <div
+        ref={rootRef}
+        style={{ height: availH ? `${availH}px` : undefined }}
+        className="relative overflow-hidden bg-white rounded-xl hidden xl:block"
+      >
+        {/* Grid principal */}
+        <div className="h-full min-h-0 w-full grid grid-cols-[220px_1px_1fr]">
+          {/* Sidebar */}
+          <aside className="h-full min-h-0 overflow-hidden">
+            <div className="h-full min-h-0 flex flex-col">
+              <div
+                className="px-4 border-b flex items-center"
+                style={{ height: SIDEBAR_HEADER_H }}
+              >
+                <div>
+                  <div className="text-sm font-semibold leading-none">
+                    Configuración
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1 leading-none">
+                    Reseñas · Respuestas
+                  </div>
+                </div>
+              </div>
+
+              <nav className="flex-1 min-h-0 overflow-y-auto py-2">
+                {MENU_ITEMS.map(({ value, label, icon: Icon }) => {
+                  const isActive = active === value;
+                  return (
+                    <button
+                      key={value}
+                      onClick={() => scrollTo(value)}
+                      className={[
+                        "w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors",
+                        isActive
+                          ? "text-primary bg-primary/5"
+                          : "text-foreground/80 hover:bg-muted/60",
+                      ].join(" ")}
+                      aria-current={isActive ? "page" : undefined}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          </aside>
+
+          {/* Divider */}
+          <div className="h-full w-px bg-slate-200" />
+
+          {/* Columna derecha */}
+          <div className="h-full min-h-0 flex flex-col">
+            {/* Header fijo (solo botón guardar) */}
+            <Header
+              settings={settings}
+              onSave={handleSave}
+              saving={saving}
+              hasChanges={hasChanges}
+            />
+
+            {/* Scroller principal */}
+            <main
+              ref={scrollRef}
+              className="rs-panel__scroller flex-1 min-h-0 overflow-y-auto"
+              style={{
+                scrollBehavior: "smooth",
+                scrollPaddingTop: 16,
+                paddingBottom: 12,
+                overscrollBehavior: "contain",
+              }}
+            >
+              {/* 🔹 Chips de resumen al inicio de la primera sección */}
+              <div className="px-6 pt-4 pb-3 border-b border-slate-100 bg-background">
+                <SettingsChips settings={settings} />
+              </div>
+
+              <PanelSections settings={settings} onUpdate={onUpdate} />
+            </main>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
