@@ -46,6 +46,10 @@ type Props = {
   showResponded: boolean;
   onToggleResponded: (v: boolean) => void;
 
+  // 👇 NUEVO: solo publicadas
+  showPublishedOnly: boolean;
+  onTogglePublishedOnly: (v: boolean) => void;
+
   selectedStars: Set<number>;
   onToggleStar: (star: number) => void;
 
@@ -73,6 +77,9 @@ export default function ReviewsFilterPanel({
   showResponded,
   onToggleResponded,
 
+  showPublishedOnly,
+  onTogglePublishedOnly,
+
   selectedStars,
   onToggleStar,
 
@@ -82,8 +89,12 @@ export default function ReviewsFilterPanel({
   refreshDisabled,
 }: Props) {
   const activeFiltersCount = useMemo(
-    () => (showUnresponded ? 1 : 0) + (showResponded ? 1 : 0) + selectedStars.size,
-    [showUnresponded, showResponded, selectedStars]
+    () =>
+      (showUnresponded ? 1 : 0) +
+      (showResponded ? 1 : 0) +
+      (showPublishedOnly ? 1 : 0) +
+      selectedStars.size,
+    [showUnresponded, showResponded, showPublishedOnly, selectedStars]
   );
 
   return (
@@ -146,6 +157,12 @@ export default function ReviewsFilterPanel({
                 onCheckedChange={(v) => onToggleResponded(Boolean(v))}
               >
                 Respondidas
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={showPublishedOnly}
+                onCheckedChange={(v) => onTogglePublishedOnly(Boolean(v))}
+              >
+                Solo publicadas
               </DropdownMenuCheckboxItem>
 
               <DropdownMenuSeparator />

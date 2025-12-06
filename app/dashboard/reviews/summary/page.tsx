@@ -11,9 +11,6 @@ import LocationSelector, {
 import { useBootstrapData } from "@/app/providers/bootstrap-store";
 import AutoPublishSettingsPanel from "@/app/components/reviews/summary/AutoPublishSettingsPanel";
 import dynamic from "next/dynamic";
-import Link from "next/link";
-import { Settings2 } from "lucide-react";
-import { Button } from "@/app/components/ui/button";
 
 const ReviewsFilterPanel = dynamic(
   () =>
@@ -49,8 +46,10 @@ type ReviewForCard = {
   businessResponse: {
     content: string;
     status: "published" | "draft";
+    published?: boolean; // 👈 NUEVO, viene del backend
   } | null;
 };
+
 
 type ActiveEst = { id: string; name: string; location: string };
 
@@ -77,6 +76,7 @@ export default function ReviewsSummaryPage() {
   const [showUnresponded, setShowUnresponded] = useState(false);
   const [showResponded, setShowResponded] = useState(false);
   const [selectedStars, setSelectedStars] = useState<Set<number>>(new Set());
+  const [showPublishedOnly, setShowPublishedOnly] = useState(false);
 
   const toggleStar = (star: number) => {
     setSelectedStars((prev) => {
@@ -98,9 +98,10 @@ export default function ReviewsSummaryPage() {
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/reviews?locationId=${activeEst.id}`, {
-          cache: "no-store",
-        });
+        const res = await fetch(
+          `/api/reviews?locationId=${activeEst.id}`,
+          { cache: "no-store" }
+        );
         const json = await res.json();
         if (cancelled) return;
         setReviews(
@@ -159,6 +160,10 @@ export default function ReviewsSummaryPage() {
 
     if (showResponded) {
       list = list.filter((r) => !!r.businessResponse);
+    }
+
+    if (showPublishedOnly) {
+      list = list.filter((r) => r.businessResponse?.published === true);
     }
 
     if (selectedStars.size > 0) {
@@ -227,8 +232,7 @@ export default function ReviewsSummaryPage() {
 
   return (
     <div className="py-6 sm:py-8 overflow-x-hidden mx-6">
-
-      {/* PANEL DE AUTOPUBLICACIÓN */}
+      {/* NUEVO PANEL DE AUTOPUBLICACIÓN */}
       <div className="mb-4 sm:mb-6">
         <AutoPublishSettingsPanel />
       </div>
@@ -257,6 +261,8 @@ export default function ReviewsSummaryPage() {
           showResponded={showResponded}
           onToggleResponded={setShowResponded}
           selectedStars={selectedStars}
+          showPublishedOnly={showPublishedOnly}
+          onTogglePublishedOnly={setShowPublishedOnly}
           onToggleStar={toggleStar}
           onClearAllFilters={() => {
             setDateRange("all");
@@ -273,6 +279,10 @@ export default function ReviewsSummaryPage() {
           refreshDisabled={loading || !activeEst?.id}
         />
       </div>
+      <div className="mb-4 text-sm text-muted-foreground">
+  {filteredAll.length} reseñas encontradas
+</div>
+
 
       <SectionWrapper topPadding="pt-6 sm:pt-10">
         <motion.div

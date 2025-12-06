@@ -9,14 +9,6 @@ export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const locationId = url.searchParams.get("locationId");
-    const page = Math.max(
-      1,
-      parseInt(url.searchParams.get("page") ?? "1", 10) || 1
-    );
-    const size = Math.min(
-      50,
-      Math.max(1, parseInt(url.searchParams.get("size") ?? "9", 10) || 9)
-    ); // grid 3x3 por defecto
 
     if (!locationId) {
       return NextResponse.json(
@@ -25,16 +17,13 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // 👇 TOTAL real de reseñas de esa location
     const total = await prisma.review.count({ where: { locationId } });
-    const totalPages = Math.max(1, Math.ceil(total / size));
-    const clampedPage = Math.min(page, totalPages);
-    const skip = (clampedPage - 1) * size;
 
+    // 👇 SIN PAGINAR: traemos TODAS las reseñas
     const reviews = await prisma.review.findMany({
       where: { locationId },
       orderBy: [{ createdAtG: "desc" }, { ingestedAt: "desc" }],
-      skip,
-      take: size,
       include: {
         responses: {
           where: { active: true },
@@ -62,12 +51,8 @@ export async function GET(req: NextRequest) {
         author: r.reviewerName ?? "Anónimo",
         content: r.comment ?? "",
         rating: r.rating ?? 0,
-        date: r.createdAtG
-          ? new Date(r.createdAtG).toISOString()
-          : "",
+        date: r.createdAtG ? new Date(r.createdAtG).toISOString() : "",
         avatar: r.reviewerPhoto ?? undefined,
-
-        // 👇 ya traemos la última respuesta “lista para la UI”
         businessResponse: resp
           ? {
               id: resp.id,
@@ -83,10 +68,11 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      page: clampedPage,
-      size,
+      // 👇 mantenemos estos campos por compatibilidad, pero ya no hay páginas reales
+      page: 1,
+      size: total,
       total,
-      totalPages,
+      totalPages: 1,
       reviews: rows,
     });
   } catch (e: any) {
