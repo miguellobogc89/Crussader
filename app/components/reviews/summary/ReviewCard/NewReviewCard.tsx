@@ -78,7 +78,6 @@ function StatusChip({
 /* ======================================================= */
 export default function NewReviewCard({ review }: ReviewCardProps) {
   // Defensa extra por si en runtime llega undefined desde el padre
-  // (aunque el tipo diga ReviewT).
   if (!review) {
     return null;
   }
@@ -256,6 +255,65 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
     }
   }
 
+  // 🔴 NUEVO: quitar respuesta de Google
+  async function unpublish() {
+    if (!current?.id) return;
+
+    setBusy(true);
+    const prev = { ...current };
+
+    // Optimistic: marcamos como no publicada / draft
+    setList((prevList) =>
+      prevList.map((r, i) =>
+        i === idx
+          ? { ...r, published: false, status: "draft" }
+          : r
+      )
+    );
+
+    try {
+      const res = await fetch(
+        `/api/reviews/response/${current.id}/unpublish`,
+        {
+          method: "POST",
+          cache: "no-store",
+        }
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.ok) {
+        throw new Error(
+          (typeof data?.error === "string" && data.error) ||
+            "No se pudo quitar la respuesta de Google"
+        );
+      }
+
+      toast({
+        title: "Respuesta retirada",
+        description:
+          "La respuesta se ha eliminado de Google Business Profile.",
+      });
+    } catch (e: any) {
+      // revertimos si falla
+      setList((prevList) =>
+        prevList.map((r, i) =>
+          i === idx
+            ? { ...r, published: prev.published, status: prev.status }
+            : r
+        )
+      );
+
+      toast({
+        variant: "error",
+        title: "Error al retirar",
+        description: String(e?.message || e),
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function save(newContent: string) {
     if (!current?.id) return;
     setBusy(true);
@@ -305,6 +363,65 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
 
   async function removeCurrent() {
     if (!current?.id) return;
+
+    // 1) CASO PUBLICADA → unpublish en Google y BD
+    if (isPublished) {
+      const ok = confirm(
+        "Esta respuesta está publicada en Google. ¿Quieres retirarla también de Google?"
+      );
+      if (!ok) return;
+
+      setBusy(true);
+      try {
+        const res = await fetch(
+          `/api/reviews/response/${current.id}/unpublish`,
+          {
+            method: "POST",
+            cache: "no-store",
+          }
+        );
+
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok || !data?.ok) {
+          throw new Error(
+            (typeof data?.error === "string" && data.error) ||
+              "No se pudo retirar la respuesta de Google"
+          );
+        }
+
+        // Actualizamos la versión actual en memoria: ya NO publicada
+        setList((prev) =>
+          prev.map((r, i) =>
+            i === idx
+              ? {
+                  ...r,
+                  published: false,
+                  status: "draft",
+                }
+              : r
+          )
+        );
+
+        toast({
+          title: "Respuesta retirada",
+          description:
+            "La respuesta se ha eliminado de Google Business Profile.",
+        });
+      } catch (e: any) {
+        toast({
+          variant: "error",
+          title: "Error retirando respuesta",
+          description: String(e?.message || e),
+        });
+      } finally {
+        setBusy(false);
+      }
+
+      return;
+    }
+
+    // 2) CASO NO PUBLICADA → borrado local como antes
     const ok = confirm("¿Seguro que deseas borrar esta respuesta?");
     if (!ok) return;
 
@@ -314,8 +431,7 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
         method: "DELETE",
         cache: "no-store",
       });
-      if (!res.ok)
-        throw new Error("No se pudo borrar la respuesta");
+      if (!res.ok) throw new Error("No se pudo borrar la respuesta");
 
       setList((prev) => {
         const next = prev.filter((_, i) => i !== idx);
@@ -328,6 +444,7 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
         }
         return next;
       });
+
       toast({
         title: "Eliminada",
         description: "La respuesta se ha borrado.",
@@ -342,6 +459,7 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
       setBusy(false);
     }
   }
+
 
   function goPrev() {
     if (list.length <= 1) return;
@@ -449,6 +567,30 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
                     : undefined
                 }
               />
+
+              {/* 🔴 NUEVO: botón para quitar de Google si está publicada */}
+              {isPublished && (
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={unpublish}
+                    disabled={busy}
+                    className="
+                      inline-flex items-center justify-center gap-2
+                      rounded-full
+                      border border-destructive/50
+                      text-destructive
+                      bg-destructive/5
+                      h-8 px-3 text-[11px] font-medium
+                      hover:bg-destructive/10
+                      disabled:opacity-50
+                      transition
+                    "
+                  >
+                    Quitar de Google
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>

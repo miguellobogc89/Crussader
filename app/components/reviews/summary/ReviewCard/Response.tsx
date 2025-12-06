@@ -227,7 +227,7 @@ export default function Response({
             )}
 
             {/* Borrar: único botón visible cuando está publicada */}
-            {onDelete && (
+            {onDelete && isPublished && (
               <button
                 type="button"
                 onClick={onDelete}
@@ -239,6 +239,7 @@ export default function Response({
                 <Trash2 className="h-4 w-4" />
               </button>
             )}
+
 
             {/* Selector de versiones: siempre en la misma fila, pegado a la derecha */}
             {versionInfo && (

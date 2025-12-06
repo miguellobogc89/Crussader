@@ -1,6 +1,14 @@
 {
   "crons": [
     {
+      "path": "/api/reviews/response/auto-publish/cron",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/integrations/google/business-profile/cron/refresh-reviews-all",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/tasks/sync-reviews",
       "schedule": "0 10 * * *"
     }

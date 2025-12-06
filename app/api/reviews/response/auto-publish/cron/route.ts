@@ -49,10 +49,12 @@ function shouldAutoPublishRating(mode: AutoPublishMode, rating: number | null): 
   return false;
 }
 
-// Mínimo 10 min desde la creación de la Response
+// ⏳ Mínimo 10 min desde la creación de la Response (para no disparar al segundo)
 const MIN_DELAY_MS = 10 * 60 * 1000; // 10 minutos
-// 🆕 Máximo 6h desde la creación de la Response/review para autopublicar
-const MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 horas
+
+// 🕒 Máximo 24h desde la creación de la REVIEW para autopublicar
+const MAX_REVIEW_AGE_MS = 24 * 60 * 60 * 1000; // 24 horas
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -223,27 +225,32 @@ export async function POST(req: NextRequest) {
         const rating = resp.review.rating;
         const externalId = resp.review.externalId;
 
-        // Delay mínimo desde creación (usamos createdAt de Response; fallback a createdAtG)
-        const createdAt =
-          resp.createdAt ?? resp.review.createdAtG ?? new Date(now.getTime() - MIN_DELAY_MS);
-        const ageMs = now.getTime() - createdAt.getTime();
+// 1) Delay mínimo desde creación de la RESPONSE
+const responseCreatedAt =
+  resp.createdAt ?? new Date(now.getTime() - MIN_DELAY_MS);
+const responseAgeMs = now.getTime() - responseCreatedAt.getTime();
 
-        // ⏳ Aún no han pasado los 10 min mínimos: lo dejamos pending
-        if (ageMs < MIN_DELAY_MS) {
-          continue;
-        }
+// ⏳ Aún no han pasado los 10 min mínimos: lo dejamos pending
+if (responseAgeMs < MIN_DELAY_MS) {
+  continue;
+}
 
-        // 🆕 Más de 6h desde la creación → no autopublicamos nunca esta respuesta
-        if (ageMs > MAX_AGE_MS) {
-          await prisma.response.update({
-            where: { id: resp.id },
-            data: {
-              auto_publish_status: "skipped",
-            },
-          });
-          skipped += 1;
-          continue;
-        }
+// 2) Límite de edad de la REVIEW: solo autopublicar si la review tiene < 24h
+const reviewCreatedAt =
+  resp.review.createdAtG ?? responseCreatedAt;
+const reviewAgeMs = now.getTime() - reviewCreatedAt.getTime();
+
+if (reviewAgeMs > MAX_REVIEW_AGE_MS) {
+  await prisma.response.update({
+    where: { id: resp.id },
+    data: {
+      auto_publish_status: "skipped",
+    },
+  });
+  skipped += 1;
+  continue;
+}
+
 
         if (!shouldAutoPublishRating(mode, rating)) {
           // No entra en las reglas -> la marcamos como skipped
