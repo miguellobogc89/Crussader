@@ -34,8 +34,9 @@ export default function AutoPublishSettingsPanel() {
   const boot = useBootstrapData();
   const companyId = boot?.activeCompany?.id ?? null;
 
-  const [mode, setMode] = useState<AutoPublishMode>("positives");
-  const [savedMode, setSavedMode] = useState<AutoPublishMode>("positives");
+  // 🔹 Valor por defecto: "Revisión manual"
+  const [mode, setMode] = useState<AutoPublishMode>("manual");
+  const [savedMode, setSavedMode] = useState<AutoPublishMode>("manual");
   const [collapsed, setCollapsed] = useState(false);
 
   const [initialLoading, setInitialLoading] = useState<boolean>(!!companyId);
@@ -53,8 +54,7 @@ export default function AutoPublishSettingsPanel() {
 
   const hasChanges = mode !== savedMode;
 
-  const canSave =
-    !!companyId && !initialLoading && !saving && hasChanges;
+  const canSave = !!companyId && !initialLoading && !saving && hasChanges;
 
   // Cargar configuración inicial desde BD
   useEffect(() => {
@@ -131,6 +131,7 @@ export default function AutoPublishSettingsPanel() {
       <Card className="border-sky-200/80 bg-sky-50 backdrop-blur-sm shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-3">
+            {/* IZQUIERDA: título + resumen / descripción */}
             <div
               className={
                 collapsed
@@ -142,7 +143,6 @@ export default function AutoPublishSettingsPanel() {
                 <CardTitle className="text-base font-semibold tracking-tight sm:text-lg md:text-xl">
                   Respuestas automáticas
                 </CardTitle>
-                {/* Chip / banner eliminado */}
               </div>
 
               {collapsed ? (
@@ -163,53 +163,53 @@ export default function AutoPublishSettingsPanel() {
                   </div>
                 </div>
               ) : (
-                <>
-                  <CardDescription className="mt-1 max-w-xl text-xs text-slate-500 sm:text-sm">
-                    Elige qué reseñas se publican automáticamente. Todas las
-                    respuestas se generan con IA.
-                  </CardDescription>
-
-                  {/* Solo botón Guardar, sin banner extra */}
-                  <div className="mt-2 flex justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={!canSave}
-                      onClick={handleSave}
-                      className={[
-                        "h-7 px-3 py-0 text-[11px] font-medium rounded-full border transition-colors disabled:opacity-60 disabled:cursor-not-allowed",
-                        canSave
-                          ? "border-0 bg-gradient-to-r from-sky-500 to-violet-500 text-white shadow-sm hover:from-sky-500/90 hover:to-violet-500/90"
-                          : "border-slate-300 bg-white text-slate-500",
-                      ].join(" ")}
-                    >
-                      {saving ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : hasChanges ? (
-                        "Guardar"
-                      ) : (
-                        "Sin cambios"
-                      )}
-                    </Button>
-                  </div>
-                </>
+                <CardDescription className="text-xs text-slate-600 sm:text-sm">
+                  Elige cómo quieres que Crussader publique las respuestas en tu
+                  perfil de Google.
+                </CardDescription>
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setCollapsed((v) => !v)}
-              className="m-auto inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
-            >
-              {collapsed ? (
-                <ChevronDown className="h-3.5 w-3.5" />
-              ) : (
-                <ChevronUp className="h-3.5 w-3.5" />
+            {/* DERECHA: botón Guardar + chevron (alineados al título) */}
+            <div className="flex items-center gap-2">
+              {!collapsed && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!canSave}
+                  onClick={handleSave}
+                  className={[
+                    "h-7 px-3 py-0 text-[11px] font-medium rounded-full border transition-colors disabled:opacity-60 disabled:cursor-not-allowed",
+                    canSave
+                      ? "border-0 bg-gradient-to-r from-sky-500 to-violet-500 text-white shadow-sm hover:from-sky-500/90 hover:to-violet-500/90"
+                      : "border-slate-300 bg-white text-slate-500",
+                  ].join(" ")}
+                >
+                  {saving ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : hasChanges ? (
+                    "Guardar"
+                  ) : (
+                    "Sin cambios"
+                  )}
+                </Button>
               )}
-              <span className="sr-only">
-                {collapsed ? "Expandir panel" : "Contraer panel"}
-              </span>
-            </button>
+
+              <button
+                type="button"
+                onClick={() => setCollapsed((v) => !v)}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+              >
+                {collapsed ? (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronUp className="h-3.5 w-3.5" />
+                )}
+                <span className="sr-only">
+                  {collapsed ? "Expandir panel" : "Contraer panel"}
+                </span>
+              </button>
+            </div>
           </div>
         </CardHeader>
 

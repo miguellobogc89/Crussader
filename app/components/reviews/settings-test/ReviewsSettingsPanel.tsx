@@ -115,7 +115,7 @@ export default function ReviewsSettingsPanel() {
   const [settings, setSettings] = useState<ResponseSettings>({
     ...defaultResponseSettings,
     sector: "",
-    standardSignature: "— Añade aquí tu firma desde configuración",
+    standardSignature: "— Añade aquí tu firma desde la pestaña configuración",
     treatment: "tu",
     tone: 3,
     emojiIntensity: 1,

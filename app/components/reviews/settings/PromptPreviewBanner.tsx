@@ -51,7 +51,7 @@ export default function PromptPreviewBanner({ settings, reviewExample }: Props) 
   }, [JSON.stringify(settings), reviewExample]);
 
   // Barra superior con botón de colapso
-  return (
+  /*return (
     <div className="w-full bg-white">
       <div className="w-full h-10 flex items-center justify-between border-b">
         <div className="text-sm font-medium px-3">Prompt preview</div>
@@ -68,7 +68,7 @@ export default function PromptPreviewBanner({ settings, reviewExample }: Props) 
         </div>
       </div>
 
-      {/* Contenido colapsable */}
+      {/* Contenido colapsable 
       <div
         id="prompt-content"
         className={collapsed ? "hidden" : "block"}
@@ -110,5 +110,5 @@ export default function PromptPreviewBanner({ settings, reviewExample }: Props) 
         )}
       </div>
     </div>
-  );
+  );*/
 }

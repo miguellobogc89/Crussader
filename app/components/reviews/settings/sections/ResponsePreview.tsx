@@ -71,10 +71,10 @@ export default function ResponsePreview({ settings }: Props) {
 
   return (
     <div className="max-w-5xl mx-auto">
-      {/* BANNER: Vista previa del prompt en tiempo real (antes de guardar) */}
+      {/* BANNER: Vista previa del prompt en tiempo real (antes de guardar) 
       <div className="mb-6 rounded-xl border overflow-hidden">
         <PromptPreviewBanner settings={settings} reviewExample={reviewText} />
-      </div>
+      </div>*/}
 
       {/* Grid alineada */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">

@@ -5,7 +5,10 @@ import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/app/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import Review from "@/app/components/reviews/summary/ReviewCard/Review";
-import Response, { type UIStatus } from "@/app/components/reviews/summary/ReviewCard/Response";
+import Response, {
+  type UIStatus,
+} from "@/app/components/reviews/summary/ReviewCard/Response";
+import Spinner from "@/app/components/crussader/UX/Spinner";
 
 /* ------------------------- Tipos ------------------------- */
 interface BusinessResponse {
@@ -74,6 +77,12 @@ function StatusChip({
 
 /* ======================================================= */
 export default function NewReviewCard({ review }: ReviewCardProps) {
+  // Defensa extra por si en runtime llega undefined desde el padre
+  // (aunque el tipo diga ReviewT).
+  if (!review) {
+    return null;
+  }
+
   // Lista y versión activa (index 0 = la más reciente)
   const initialList = useMemo<BusinessResponse[]>(
     () =>
@@ -97,6 +106,7 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
     current?.published || current?.status === "published"
   );
 
+  // 🔸 Lógica del toast de configuración + spinner/busy
   async function regenerate() {
     setBusy(true);
     try {
@@ -106,12 +116,36 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
         body: JSON.stringify({ action: "generate" }),
         cache: "no-store",
       });
-      const data = await res.json();
-      if (!res.ok || !data?.ok || !data?.response) {
+
+      const data = await res.json().catch(() => null);
+
+      // Caso especial: falta configuración de respuestas
+      if (!res.ok) {
+        const code = data?.error;
+
+        if (code === "missing_response_settings") {
+          toast({
+            title: "Configura tus respuestas antes de usar el asistente",
+            description:
+              "Ve a Ajustes → Respuestas y completa al menos tu firma y el tono para poder generar respuestas automáticas.",
+            variant: "error",
+          });
+          return;
+        }
+
         throw new Error(
-          data?.error || "No se pudo generar la respuesta"
+          (typeof data?.error === "string" && data.error) ||
+            "No se pudo generar la respuesta"
         );
       }
+
+      if (!data?.ok || !data?.response) {
+        throw new Error(
+          (typeof data?.error === "string" && data.error) ||
+            "No se pudo generar la respuesta"
+        );
+      }
+
       const r = data.response;
       const normalized: BusinessResponse = {
         id: r.id,
@@ -121,6 +155,7 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
         edited: Boolean(r.edited),
         createdAt: r.createdAt,
       };
+
       setList((prev) => [normalized, ...prev]);
       setIdx(0);
       toast({
@@ -131,7 +166,7 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
       toast({
         variant: "error",
         title: "Error",
-        description: String(e.message || e),
+        description: String(e?.message || e),
       });
     } finally {
       setBusy(false);
@@ -214,7 +249,7 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
       toast({
         variant: "error",
         title: "Error publicando",
-        description: String(e.message || e),
+        description: String(e?.message || e),
       });
     } finally {
       setBusy(false);
@@ -241,9 +276,7 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
       const normalized: BusinessResponse = {
         id: updated?.id ?? current.id,
         content: updated?.content ?? newContent,
-        status: normalizeStatus(
-          updated?.status ?? current.status
-        ),
+        status: normalizeStatus(updated?.status ?? current.status),
         published: Boolean(
           updated?.published ?? current.published
         ),
@@ -263,7 +296,7 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
       toast({
         variant: "error",
         title: "Error guardando",
-        description: String(e.message || e),
+        description: String(e?.message || e),
       });
     } finally {
       setBusy(false);
@@ -303,7 +336,7 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
       toast({
         variant: "error",
         title: "Error borrando",
-        description: String(e.message || e),
+        description: String(e?.message || e),
       });
     } finally {
       setBusy(false);
@@ -348,34 +381,40 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
         />
 
         {/* PANEL SIEMPRE visible: CTA y/o respuesta */}
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className="mt-3"
-        >
+        <div onClick={(e) => e.stopPropagation()} className="mt-3">
           {/* Si no hay ninguna respuesta aún: botón "Responder" en gradiente */}
           {!hasResponse && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={regenerate}
-                disabled={busy}
-                className="
-                  inline-flex items-center justify-center gap-2
-                  rounded-full
-                  bg-gradient-to-r from-fuchsia-500 to-sky-500
-                  text-white
-                  h-9 px-4 text-xs font-medium
-                  shadow
-                  hover:brightness-110
-                  disabled:opacity-50
-                  transition
-                "
-                title="Responder"
-                aria-label="Responder"
-              >
-                Responder
-              </button>
-            </div>
+            <>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={regenerate}
+                  disabled={busy}
+                  className="
+                    inline-flex items-center justify-center gap-2
+                    rounded-full
+                    bg-gradient-to-r from-fuchsia-500 to-sky-500
+                    text-white
+                    h-9 px-4 text-xs font-medium
+                    shadow
+                    hover:brightness-110
+                    disabled:opacity-50
+                    transition
+                  "
+                  title="Responder"
+                  aria-label="Responder"
+                >
+                  {busy ? "Generando…" : "Responder"}
+                </button>
+              </div>
+
+              {/* Spinner en la zona donde luego aparecerá la respuesta */}
+              {busy && (
+                <div className="mt-3 flex justify-center py-4">
+                  <Spinner />
+                </div>
+              )}
+            </>
           )}
 
           {/* Con respuesta: separador + Response (sin chips antiguos abajo) */}

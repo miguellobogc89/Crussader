@@ -11,6 +11,9 @@ import LocationSelector, {
 import { useBootstrapData } from "@/app/providers/bootstrap-store";
 import AutoPublishSettingsPanel from "@/app/components/reviews/summary/AutoPublishSettingsPanel";
 import dynamic from "next/dynamic";
+import Link from "next/link";
+import { Settings2 } from "lucide-react";
+import { Button } from "@/app/components/ui/button";
 
 const ReviewsFilterPanel = dynamic(
   () =>
@@ -95,10 +98,9 @@ export default function ReviewsSummaryPage() {
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(
-          `/api/reviews?locationId=${activeEst.id}`,
-          { cache: "no-store" }
-        );
+        const res = await fetch(`/api/reviews?locationId=${activeEst.id}`, {
+          cache: "no-store",
+        });
         const json = await res.json();
         if (cancelled) return;
         setReviews(
@@ -225,7 +227,8 @@ export default function ReviewsSummaryPage() {
 
   return (
     <div className="py-6 sm:py-8 overflow-x-hidden mx-6">
-      {/* NUEVO PANEL DE AUTOPUBLICACIÓN */}
+
+      {/* PANEL DE AUTOPUBLICACIÓN */}
       <div className="mb-4 sm:mb-6">
         <AutoPublishSettingsPanel />
       </div>
