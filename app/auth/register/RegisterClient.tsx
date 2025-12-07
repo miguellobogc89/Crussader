@@ -224,23 +224,10 @@ export default function RegisterClient() {
           {/* Banner SOLO para modo email_verify */}
           {success && mode === "email_verify" && (
             <div className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs sm:text-sm text-emerald-800 mb-3">
-              Te hemos enviado un correo para <strong>verificar</strong> tu
-              cuenta.
-              {devVerifyUrl && process.env.NODE_ENV !== "production" && (
-                <>
-                  {" "}
-                  (dev){" "}
-                  <a
-                    href={devVerifyUrl}
-                    className="underline text-emerald-700"
-                    target="_blank"
-                  >
-                    Verificar ahora
-                  </a>
-                </>
-              )}
+              Te hemos enviado un correo para <strong>verificar</strong> tu cuenta.
             </div>
           )}
+
 
           {error && !success && (
             <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs sm:text-sm text-red-700 mb-3">

@@ -109,10 +109,19 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
   async function regenerate() {
     setBusy(true);
     try {
+      // Si ya hay respuesta, enviamos contexto para "regenerar"
+      const payload: any = { action: "generate" };
+
+      if (current && hasResponse) {
+        payload.mode = "regenerate";
+        payload.previousResponseId = current.id;
+        payload.previousContent = current.content;
+      }
+
       const res = await fetch(`/api/reviews/${review.id}/responses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "generate" }),
+        body: JSON.stringify(payload),
         cache: "no-store",
       });
 
@@ -157,8 +166,9 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
 
       setList((prev) => [normalized, ...prev]);
       setIdx(0);
+
       toast({
-        title: "Respuesta generada",
+        title: hasResponse ? "Respuesta regenerada" : "Respuesta generada",
         description: "Revisa y publica cuando quieras.",
       });
     } catch (e: any) {
@@ -171,6 +181,7 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
       setBusy(false);
     }
   }
+
 
   async function publish() {
     if (!current?.id) return;

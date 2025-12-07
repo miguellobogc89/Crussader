@@ -45,6 +45,60 @@ function getResend(): Resend | null {
 }
 
 /** ============ Templates ============ */
+const SUPPORT_CONFIRMATION_HTML = `<!DOCTYPE html>
+<html lang="es">
+  <head><meta charset="UTF-8" /><title>Hemos recibido tu mensaje - Crussader</title></head>
+  <body style="margin:0; padding:0; background-color:#f9fafb; font-family: Inter, Arial, sans-serif;">
+    <table width="100%" cellspacing="0" cellpadding="0" style="background-color:#f9fafb; padding: 40px 0;">
+      <tr><td align="center">
+        <table width="600" cellspacing="0" cellpadding="0" style="background:white; border-radius:16px; box-shadow:0 4px 12px rgba(0,0,0,0.05); overflow:hidden;">
+          <tr>
+            <td style="background:linear-gradient(135deg, #7c3aed, #2563eb); padding:24px; text-align:center;">
+              <h1 style="margin:0; font-size:24px; color:white; font-weight:700;">Hemos recibido tu mensaje</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 28px; color:#111827; text-align:left;">
+              <p style="font-size:16px; color:#4b5563; line-height:1.6;">
+                Gracias por escribir a <strong>Crussader</strong>.
+              </p>
+              <p style="font-size:16px; color:#4b5563; line-height:1.6; margin-top:8px;">
+                Tu solicitud de soporte se ha registrado correctamente y nuestro equipo la está revisando.
+              </p>
+              <p style="font-size:15px; color:#4b5563; line-height:1.6; margin-top:18px;">
+                <strong>Asunto:</strong><br />
+                <span style="color:#111827;">{{originalSubject}}</span>
+              </p>
+
+              <p style="font-size:15px; color:#4b5563; line-height:1.6; margin-top:18px;">
+                En breve te responderemos a este mismo correo con la solución o los próximos pasos. Mientras tanto, puedes seguir gestionando tus reseñas desde el panel:
+              </p>
+
+              <table cellspacing="0" cellpadding="0" style="margin:24px 0; text-align:center; width:100%;">
+                <tr><td align="center">
+                  <a href="{{supportUrl}}"
+                     style="background:linear-gradient(135deg, #7c3aed, #2563eb); color:white; text-decoration:none; padding:12px 26px; border-radius:999px; font-size:15px; font-weight:600; display:inline-block;">
+                    Ir al panel de soporte
+                  </a>
+                </td></tr>
+              </table>
+
+              <p style="font-size:13px; color:#6b7280; line-height:1.6; margin-top:12px;">
+                Gracias por confiar en Crussader para cuidar la reputación online de tu negocio.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#f3f4f6; padding:18px; text-align:center; font-size:11px; color:#6b7280;">
+              © 2025 Crussader. Todos los derechos reservados.<br/>
+              <a href="https://crussader.com" style="color:#7c3aed; text-decoration:none;">crussader.com</a>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`;
 
 const VERIFY_EMAIL_HTML = `<!DOCTYPE html>
 <html lang="es">
@@ -353,6 +407,43 @@ Si no reconoces a esta persona, puedes ignorar este mensaje.`;
   return sendEmail({
     to,
     subject: "Nueva solicitud de acceso a tu empresa - Crussader",
+    html,
+    text,
+  });
+}
+
+export async function sendSupportConfirmationEmail(params: {
+  to: string;
+  originalSubject?: string;
+}) {
+  const { to, originalSubject } = params;
+
+  const safeSubject =
+    typeof originalSubject === "string" && originalSubject.trim().length > 0
+      ? originalSubject.trim()
+      : "Tu mensaje de soporte";
+
+  // Ojo: la página es /dashboard/suppot (con la misma ruta que has creado)
+  const supportUrl = toAbsoluteUrl("/dashboard/support");
+
+  const html = SUPPORT_CONFIRMATION_HTML
+    .replace(/{{originalSubject}}/g, safeSubject)
+    .replace(/{{supportUrl}}/g, supportUrl);
+
+  const text = `Hemos recibido tu mensaje de soporte en Crussader.
+
+Asunto: ${safeSubject}
+
+Nuestro equipo lo revisará y te responderá lo antes posible a este mismo correo.
+
+Puedes volver al panel de soporte cuando quieras desde:
+${supportUrl}
+
+Gracias por usar Crussader.`;
+
+  return sendEmail({
+    to,
+    subject: "Hemos recibido tu mensaje de soporte - Crussader",
     html,
     text,
   });

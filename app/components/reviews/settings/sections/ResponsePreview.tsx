@@ -28,7 +28,7 @@ export default function ResponsePreview({ settings }: Props) {
     if (stars === 3) {
       return "Estuvo bien en general, aunque el servicio podría ser un poco más rápido.";
     }
-    return "¡Los helados son increíbles! El de piiiiistacho es mi favorito. El servicio fue excelente y el lugar está muy limpio.";
+    return "¡Los helados son increíbles! El de pistacho es mi favorito. El servicio fue excelente y el lugar está muy limpio.";
   }, [stars]);
 
   async function handleGenerate() {

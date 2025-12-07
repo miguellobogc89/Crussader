@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   RotateCcw,
   Edit3,
@@ -105,6 +105,14 @@ export default function Response({
     defaultEditing && !isPublished,
   );
   const [draft, setDraft] = useState<string>(content);
+
+  // 🔄 Mantener draft sincronizado con el contenido real cuando llega
+  // una nueva versión y NO estamos editando.
+  useEffect(() => {
+    if (!isEditing) {
+      setDraft(content);
+    }
+  }, [content, isEditing]);
 
   function startEdit() {
     if (!allowEdit || busy) return;
@@ -239,7 +247,6 @@ export default function Response({
                 <Trash2 className="h-4 w-4" />
               </button>
             )}
-
 
             {/* Selector de versiones: siempre en la misma fila, pegado a la derecha */}
             {versionInfo && (

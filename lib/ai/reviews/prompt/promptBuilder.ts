@@ -41,15 +41,36 @@ export function buildMessagesFromSettings(
   const starCfg = cfg.starSettings[bucket];
 
   const objectiveMap: Record<string, Record<"es" | "en" | "pt", string>> = {
-    apology: { es: "Pide disculpas y ofrece ayuda", en: "Apologize and offer help", pt: "Peça desculpas e ofereça ajuda" },
-    neutral: { es: "Responde de forma neutral y cortés", en: "Respond neutrally and politely", pt: "Responda de forma neutra e educada" },
-    thanks:  { es: "Agradece calurosamente y refuerza lo positivo", en: "Warmly thank and reinforce positives", pt: "Agradeça calorosamente e reforce o positivo" },
+    apology: {
+      es: "Pide disculpas y ofrece ayuda",
+      en: "Apologize and offer help",
+      pt: "Peça desculpas e ofereça ajuda",
+    },
+    neutral: {
+      es: "Responde de forma neutral y cortés",
+      en: "Respond neutrally and politely",
+      pt: "Responda de forma neutra e educada",
+    },
+    thanks: {
+      es: "Agradece calurosamente y refuerza lo positivo",
+      en: "Warmly thank and reinforce positives",
+      pt: "Agradeça calorosamente e reforce o positivo",
+    },
   };
   const objective = objectiveMap[starCfg.objective]?.[lang] ?? objectiveMap.neutral[lang];
 
   // Firma normalizada (añade '— ' si el usuario no lo puso)
   const sigRaw = (cfg.standardSignature ?? "").trim();
-  const finalSignature = sigRaw ? (sigRaw.startsWith("—") ? sigRaw : `— ${sigRaw}`) : "";
+  const finalSignature = sigRaw
+    ? sigRaw.startsWith("—")
+      ? sigRaw
+      : `— ${sigRaw}`
+    : "";
+
+  // Instrucción de firma: depende de si el usuario configuró firma o no
+  const signatureInstruction = finalSignature
+    ? `La firma del negocio es: ${finalSignature}. Debe ir al final en una línea nueva, exactamente así.`
+    : `No añadas firma, despedida ni guion final. No firmes la respuesta.`;
 
   // CTA según reglas (usa ctaByRating por bucket)
   let cta = "";
@@ -73,7 +94,7 @@ export function buildMessagesFromSettings(
   const comment = (review.comment ?? "").trim();
 
   const system = [
-    `Eres un asistente que redacta respuestas a reseñas para  (${cfg.sector}).`,
+    `Eres un asistente que redacta respuestas a reseñas para (${cfg.sector}).`,
     `Escribe en ${lang}. Usa el tratamiento de ${cfg.treatment === "tu" ? "tuteo" : "usted"}.`,
     `Tono: ${toneName}. Emplea ${emojiHint}, solo si encaja.`,
     `Objetivo principal: ${objective}.`,
@@ -81,11 +102,16 @@ export function buildMessagesFromSettings(
     lengthHint,
     // Reglas para evitar confusión de nombres
     `El nombre del cliente es "${customer}". Si decides usar su nombre, usa solo el del cliente y nunca el del negocio.`,
-    finalSignature ? `La firma del negocio es: ${finalSignature}. Debe ir al final en una línea nueva, exactamente así.` : "",
+    // 🔥 Nueva instrucción de firma / no firma
+    signatureInstruction,
     `No inventes nombres: si no estás seguro, no uses el nombre del cliente.`,
     cfg.noPublicCompensation ? "No prometas compensaciones públicas ni descuentos." : "",
-    cfg.avoidPersonalData ? "No pidas datos personales en público (email/teléfono/dirección)." : "",
-    cfg.bannedPhrases.length ? `Evita estas frases exactas: ${cfg.bannedPhrases.join(" | ")}.` : "",
+    cfg.avoidPersonalData
+      ? "No pidas datos personales en público (email/teléfono/dirección)."
+      : "",
+    cfg.bannedPhrases.length
+      ? `Evita estas frases exactas: ${cfg.bannedPhrases.join(" | ")}.`
+      : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -94,7 +120,7 @@ export function buildMessagesFromSettings(
     `Reseña (${review.rating}★) de ${customer}:`,
     comment ? `"${comment}"` : "(Sin comentario).",
     cta ? `Incluye una llamada a la acción sutil: "${cta}".` : "",
-    // la firma ya se fuerza en system; no repetimos aquí
+    // la firma ya se fuerza vía system / post-filtro; no repetimos aquí
   ].filter(Boolean);
 
   const user = userParts.join("\n");

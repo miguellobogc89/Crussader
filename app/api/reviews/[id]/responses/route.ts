@@ -43,9 +43,10 @@ export async function GET(
  */
 export async function POST(
   req: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = context.params;
+  const { id } = await params;
+
   if (!id) {
     return NextResponse.json(
       { ok: false, error: "id requerido" },
@@ -70,6 +71,18 @@ export async function POST(
   const source: "AI" | "HUMAN" = body?.source === "HUMAN" ? "HUMAN" : "AI";
   const action: string = body?.action ?? "generate";
 
+  // 🔹 Campos extra que vienen del cliente para regenerar
+  const mode: string | undefined =
+    typeof body?.mode === "string" ? body.mode : undefined;
+  const previousContent: string | undefined =
+    typeof body?.previousContent === "string"
+      ? body.previousContent
+      : undefined;
+  const previousResponseId: string | undefined =
+    typeof body?.previousResponseId === "string"
+      ? body.previousResponseId
+      : undefined;
+
   try {
     // 1) Guardar manual (HUMAN)
     if (content && source === "HUMAN") {
@@ -81,14 +94,27 @@ export async function POST(
           status: "PENDING",
         },
       });
-      return NextResponse.json({ ok: true, response: created }, { status: 201 });
+      return NextResponse.json(
+        { ok: true, response: created },
+        { status: 201 }
+      );
     }
 
-    // 2) Generar IA
+    // 2) Generar IA (primera vez o regenerar)
     if (action === "generate" || !content) {
-      const created = await createAIResponseForReview({ reviewId: id });
+      const created = await createAIResponseForReview({
+        reviewId: id,
+        // estos campos son opcionales y solo se usarán
+        // cuando realmente estemos regenerando
+        mode,               // p.ej. "regenerate"
+        previousContent,    // texto anterior completo
+        previousResponseId, // id de la respuesta previa
+      } as any); // si TS se queja por exceso de propiedades, lo dejamos así de momento
 
-      return NextResponse.json({ ok: true, response: created }, { status: 201 });
+      return NextResponse.json(
+        { ok: true, response: created },
+        { status: 201 }
+      );
     }
 
     // 3) Guardar content con source AI
@@ -101,7 +127,10 @@ export async function POST(
           status: "PENDING",
         },
       });
-      return NextResponse.json({ ok: true, response: created }, { status: 201 });
+      return NextResponse.json(
+        { ok: true, response: created },
+        { status: 201 }
+      );
     }
 
     return NextResponse.json(

@@ -276,25 +276,6 @@ export default function LoginClient() {
             </div>
           )}
 
-          {!isLogin && success && (
-            <div className="mb-4 rounded-md border border-emerald-400/70 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
-              Te hemos enviado un correo para <strong>verificar</strong> tu cuenta.
-              {verifyUrl && process.env.NODE_ENV !== "production" && (
-                <>
-                  {" "}
-                  (dev){" "}
-                  <a
-                    href={verifyUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline text-emerald-200"
-                  >
-                    Abrir enlace de verificación
-                  </a>
-                </>
-              )}
-            </div>
-          )}
 
           {error && (
             <div className="mb-4 rounded-md border border-red-400/70 bg-red-500/10 px-3 py-2 text-sm text-red-200">

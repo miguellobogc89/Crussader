@@ -1,7 +1,4 @@
 // lib/ai/reviews/createAIResponseForReview.adapter.ts
-// Adapter mínimo: delega en la implementación estable que ya persiste en Prisma.
-// Mantiene compatibilidad con las rutas actuales que esperan la FILA de Response.
-
 import type { Prisma } from "@prisma/client";
 import { createAIResponseForReview as runCore } from "@/lib/ai/reviews/createAIResponseForReview";
 
@@ -12,10 +9,11 @@ type AnyDict = Record<string, any>;
  *  - { reviewId }
  *  - { review: { id } }
  *  - { id }  (legacy)
- * Ignora el resto de campos; la lógica/ajustes se resuelven dentro de runCore().
- * Devuelve: la fila Prisma Response creada.
+ *  + opcionalmente: mode, previousContent, previousResponseId
  */
-export async function createAIResponseForReview(input: AnyDict): Promise<Prisma.ResponseGetPayload<any>> {
+export async function createAIResponseForReview(
+  input: AnyDict
+): Promise<Prisma.ResponseGetPayload<any>> {
   const reviewId: string | undefined =
     input?.reviewId ?? input?.review?.id ?? input?.id;
 
@@ -23,10 +21,12 @@ export async function createAIResponseForReview(input: AnyDict): Promise<Prisma.
     throw new Error("reviewId_required");
   }
 
-  // Delegamos toda la generación + guardado en la función estable
-  // lib/ai/reviews/createAIResponseForReview.ts
-  const saved = await runCore(reviewId);
+  const saved = await runCore({
+    reviewId,
+    mode: input.mode,
+    previousContent: input.previousContent,
+    previousResponseId: input.previousResponseId,
+  });
 
-  // Las rutas usan este adapter y esperan la fila ya creada
   return saved;
 }

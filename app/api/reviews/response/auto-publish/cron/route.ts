@@ -224,36 +224,47 @@ export async function POST(req: NextRequest) {
       for (const resp of responses) {
         const rating = resp.review.rating;
         const externalId = resp.review.externalId;
+        const reviewCreatedAtG = resp.review.createdAtG;
 
-// 1) Delay mínimo desde creación de la RESPONSE
-const responseCreatedAt =
-  resp.createdAt ?? new Date(now.getTime() - MIN_DELAY_MS);
-const responseAgeMs = now.getTime() - responseCreatedAt.getTime();
+        // 1) Delay mínimo desde creación de la RESPONSE
+        const responseCreatedAt =
+          resp.createdAt ?? new Date(now.getTime() - MIN_DELAY_MS);
+        const responseAgeMs = now.getTime() - responseCreatedAt.getTime();
 
-// ⏳ Aún no han pasado los 10 min mínimos: lo dejamos pending
-if (responseAgeMs < MIN_DELAY_MS) {
-  continue;
-}
+        // ⏳ Aún no han pasado los 10 min mínimos: lo dejamos pending (seguirá en pending para el próximo cron)
+        if (responseAgeMs < MIN_DELAY_MS) {
+          continue;
+        }
 
-// 2) Límite de edad de la REVIEW: solo autopublicar si la review tiene < 24h
-const reviewCreatedAt =
-  resp.review.createdAtG ?? responseCreatedAt;
-const reviewAgeMs = now.getTime() - reviewCreatedAt.getTime();
+        // 2) Límite de edad de la REVIEW: solo autopublicar si la review tiene < 24h (según createdAtG de Google)
+        if (!reviewCreatedAtG) {
+          // Sin fecha fiable de publicación en Google → por seguridad nunca autopublicamos
+          await prisma.response.update({
+            where: { id: resp.id },
+            data: {
+              auto_publish_status: "skipped",
+            },
+          });
+          skipped += 1;
+          continue;
+        }
 
-if (reviewAgeMs > MAX_REVIEW_AGE_MS) {
-  await prisma.response.update({
-    where: { id: resp.id },
-    data: {
-      auto_publish_status: "skipped",
-    },
-  });
-  skipped += 1;
-  continue;
-}
+        const reviewAgeMs = now.getTime() - reviewCreatedAtG.getTime();
 
+        // Si la review tiene más de 24h, no se autopublica nunca
+        if (reviewAgeMs > MAX_REVIEW_AGE_MS) {
+          await prisma.response.update({
+            where: { id: resp.id },
+            data: {
+              auto_publish_status: "skipped",
+            },
+          });
+          skipped += 1;
+          continue;
+        }
 
+        // 3) Rating según modo
         if (!shouldAutoPublishRating(mode, rating)) {
-          // No entra en las reglas -> la marcamos como skipped
           await prisma.response.update({
             where: { id: resp.id },
             data: {
@@ -336,6 +347,7 @@ if (reviewAgeMs > MAX_REVIEW_AGE_MS) {
           // Lo dejamos pending para reintento
         }
       }
+
 
       summary.push({
         companyId,

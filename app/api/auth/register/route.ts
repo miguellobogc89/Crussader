@@ -45,39 +45,48 @@ export async function POST(req: Request) {
 
     // --- validaciones básicas ---
     if (!firstName) {
-      return NextResponse.json({ ok: false, error: "FIRST_NAME_REQUIRED" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "FIRST_NAME_REQUIRED" },
+        { status: 400 },
+      );
     }
     if (!lastName) {
-      return NextResponse.json({ ok: false, error: "LAST_NAME_REQUIRED" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "LAST_NAME_REQUIRED" },
+        { status: 400 },
+      );
     }
     if (!email || !password) {
       return NextResponse.json(
         { ok: false, error: "EMAIL_AND_PASSWORD_REQUIRED" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (!acceptTerms) {
       return NextResponse.json(
         { ok: false, error: "TERMS_NOT_ACCEPTED" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (password.length < 6) {
-      return NextResponse.json({ ok: false, error: "WEAK_PASSWORD" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "WEAK_PASSWORD" },
+        { status: 400 },
+      );
     }
 
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists) {
       return NextResponse.json(
         { ok: false, error: "EMAIL_ALREADY_EXISTS" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
     const hasInvite = !!inviteCodeRaw;
     let invite:
       | (typeof prisma.invite extends { findUnique(args: any): any }
-          ? Awaited<ReturnType<typeof prisma.invite.findUnique>>
+          ? Awaited<ReturnType<(typeof prisma.invite)["findUnique"]>>
           : any)
       | null = null;
 
@@ -91,7 +100,7 @@ export async function POST(req: Request) {
       if (!invite) {
         return NextResponse.json(
           { ok: false, error: "INVALID_INVITE_CODE" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -100,7 +109,7 @@ export async function POST(req: Request) {
       if (invite.expires_at && invite.expires_at <= now) {
         return NextResponse.json(
           { ok: false, error: "INVITE_EXPIRED" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -111,27 +120,30 @@ export async function POST(req: Request) {
       ) {
         return NextResponse.json(
           { ok: false, error: "INVITE_MAX_USES_REACHED" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
       if (invite.email && invite.email.toLowerCase() !== email) {
         return NextResponse.json(
           { ok: false, error: "INVITE_EMAIL_MISMATCH" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
+
+    const fullName = `${firstName} ${lastName}`.trim();
 
     // --- rama con invite (beta cerrada) ---
     if (hasInvite && invite) {
       const result = await prisma.$transaction(async (tx) => {
         const passwordHash = await hashPassword(password);
-        const fullName = `${firstName} ${lastName}`.trim();
 
         const user = await tx.user.create({
           data: {
             name: fullName,
+            first_name: firstName,
+            last_name: lastName,
             email,
             passwordHash,
             role: "user",
@@ -165,11 +177,12 @@ export async function POST(req: Request) {
 
     // --- rama sin invite (registro abierto clásico) ---
     const passwordHash = await hashPassword(password);
-    const fullName = `${firstName} ${lastName}`.trim();
 
     await prisma.user.create({
       data: {
         name: fullName,
+        first_name: firstName,
+        last_name: lastName,
         email,
         passwordHash,
         role: "user",
@@ -195,7 +208,7 @@ export async function POST(req: Request) {
       "http://localhost:3000";
 
     const verifyUrl = `${base}/api/auth/verify?token=${encodeURIComponent(
-      token
+      token,
     )}&email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`;
 
     await sendVerificationEmail(email, verifyUrl);
@@ -210,7 +223,7 @@ export async function POST(req: Request) {
     console.error("[register] ERROR:", e);
     return NextResponse.json(
       { ok: false, error: e?.message ?? "REGISTER_ERROR" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

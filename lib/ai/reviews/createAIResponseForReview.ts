@@ -1,3 +1,4 @@
+// lib/ai/reviews/createAIResponseForReview.ts
 import { prisma } from "@/lib/prisma";
 import { buildMessagesFromSettings } from "@/lib/ai/reviews/prompt/promptBuilder";
 import { sanitizeAndConstrain } from "@/lib/ai/policy/postFilters";
@@ -144,6 +145,7 @@ function clampWithSignature(
 
 /**
  * Core compartido: genera texto usando cfg + datos de review (SIN persistir).
+ * Ahora admite modo "regenerate" + previousContent para obligar variante.
  */
 async function generateContentWithConfig(input: {
   cfg: ResponseSettings;
@@ -151,10 +153,20 @@ async function generateContentWithConfig(input: {
   comment: string | null;
   languageCode: string | null;
   reviewerName: string | null;
+  mode?: string;
+  previousContent?: string | null;
 }) {
-  const { cfg, rating, comment, languageCode, reviewerName } = input;
-
   const {
+    cfg,
+    rating,
+    comment,
+    languageCode,
+    reviewerName,
+    mode,
+    previousContent,
+  } = input;
+
+  let {
     system,
     user,
     targetLang,
@@ -168,8 +180,26 @@ async function generateContentWithConfig(input: {
     reviewerName,
   });
 
+  // 🧠 Si es regeneración y tenemos texto previo, añadimos instrucción explícita
+  if (
+    mode === "regenerate" &&
+    previousContent &&
+    previousContent.trim().length > 0
+  ) {
+    user +=
+      "\n\nIMPORTANTE: Esta fue una respuesta anterior que ya se usó o se propuso y NO debe repetirse ni casi copiarse:\n\n" +
+      `"""${previousContent}"""\n\n` +
+      "Genera ahora una nueva respuesta DIFERENTE en contenido y redacción, manteniendo el mismo tono, políticas y límites de longitud.";
+  }
+
   const resolvedModel = model ?? process.env.AI_MODEL ?? "gpt-4o-mini";
-  const resolvedTemp = Math.min(Math.max(temperature ?? 0.6, 0), 0.8);
+
+  let baseTemp = temperature ?? 0.6;
+  // Un pelín más creativa en regeneraciones para evitar clones
+  if (mode === "regenerate") {
+    baseTemp += 0.15;
+  }
+  const resolvedTemp = Math.min(Math.max(baseTemp, 0), 0.9);
 
   const raw = await completeOpenAI({
     system,
@@ -191,7 +221,27 @@ async function generateContentWithConfig(input: {
     customerName: customerFirst,
   });
 
+  // --- FIRMA OPCIONAL ---
   const signature = (cfg.standardSignature ?? "").toString().trim();
+
+  // Si NO hay firma → limpiamos posibles firmas generadas por IA y devolvemos
+  if (signature.length === 0) {
+    content = enforceSingleSignature(content, "");
+    content = clampWithSignature(
+      content,
+      "",
+      maxChars ?? cfg.maxCharacters ?? null
+    );
+    return {
+      content,
+      targetLang,
+      model: resolvedModel,
+      temperature: resolvedTemp,
+      maxChars: maxChars ?? cfg.maxCharacters ?? null,
+    };
+  }
+
+  // Si sí hay firma → aplicar lógica normal de firma única
   content = enforceSingleSignature(content, signature);
   content = clampWithSignature(
     content,
@@ -208,11 +258,27 @@ async function generateContentWithConfig(input: {
   };
 }
 
+/** Input extendido para soportar regeneración */
+type CreateCoreInput =
+  | string
+  | {
+      reviewId: string;
+      mode?: string;
+      previousContent?: string;
+      previousResponseId?: string;
+    };
+
 /**
  * Genera, post-filtra y persiste. Devuelve la fila Response creada.
  * (flujo REAL para reseñas de verdad)
  */
-export async function createAIResponseForReview(reviewId: string) {
+export async function createAIResponseForReview(input: CreateCoreInput) {
+  const reviewId = typeof input === "string" ? input : input.reviewId;
+  const mode =
+    typeof input === "string" ? "generate" : input.mode ?? "generate";
+  const previousContent =
+    typeof input === "string" ? undefined : input.previousContent ?? undefined;
+
   const review = await prisma.review.findUnique({
     where: { id: reviewId },
     select: {
@@ -230,14 +296,14 @@ export async function createAIResponseForReview(reviewId: string) {
   if (!review) throw new Error("review_not_found");
 
   // 🆕 CORTE DE 30 DÍAS (SUAVIZADO):
-  // - Si la reseña es muy antigua y YA hay respuesta → usamos la existente.
-  // - Si no hay respuesta existente → generamos igualmente (no bloqueamos el botón "Responder").
+  // - Si la reseña es muy antigua y YA hay respuesta → usamos la existente,
+  //   SOLO cuando no estamos en modo regenerar.
   if (review.createdAtG instanceof Date) {
     const now = new Date();
     const diffMs = now.getTime() - review.createdAtG.getTime();
     const days = diffMs / (1000 * 60 * 60 * 24);
 
-    if (days > 30) {
+    if (days > 30 && mode !== "regenerate") {
       const existing = await prisma.response.findFirst({
         where: { reviewId: review.id },
         orderBy: { createdAt: "desc" },
@@ -269,6 +335,8 @@ export async function createAIResponseForReview(reviewId: string) {
     comment: review.comment ?? null,
     languageCode: review.languageCode ?? null,
     reviewerName: review.reviewerName ?? null,
+    mode,
+    previousContent: previousContent ?? null,
   });
 
   const saved = await prisma.response.create({

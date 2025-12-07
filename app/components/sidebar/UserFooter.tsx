@@ -8,7 +8,7 @@ import * as React from "react";
 
 // Flags para ocultar secciones manteniendo el código
 const SHOW_NOTIFICATIONS = false;
-const SHOW_SUPPORT = false;
+const SHOW_SUPPORT = true;
 
 export function UserFooter({
   collapsed,
