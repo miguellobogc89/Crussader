@@ -175,7 +175,7 @@ export default function RegisterClient() {
             />
             <Link
               href="/"
-              className="text-2xl font-bold bg-gradient-to-r from-primary via-accent to-[hsl(280,100%,70%)] bg-clip-text text-transparent"
+              className="text-2xl font-bold bg-gradient-to-r from-primary via-accent to-[hsl(280,100%,70%)] bg-clip-text text-white"
             >
               Crussader
             </Link>

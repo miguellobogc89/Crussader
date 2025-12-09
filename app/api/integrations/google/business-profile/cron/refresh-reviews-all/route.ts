@@ -35,7 +35,9 @@ export async function POST(req: NextRequest) {
 
     // 2) Base URL para llamar al endpoint existente de refresh por location
     const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin || "http://localhost:3000";
+      process.env.NEXT_PUBLIC_APP_URL ||
+      req.nextUrl.origin ||
+      "http://localhost:3000";
 
     let successCount = 0;
     let errorCount = 0;
@@ -86,6 +88,92 @@ export async function POST(req: NextRequest) {
           error: err?.message ?? String(err),
         });
       }
+    }
+
+    // 4) 🔍 Limpieza extra: desincronizaciones donde Google ya no tiene reply
+    try {
+      // Limitamos a las companies efectivamente procesadas
+      const companiesToCheck: string[] = companyId
+        ? [companyId]
+        : Array.from(new Set(locations.map((l) => l.companyId)));
+
+      for (const cId of companiesToCheck) {
+        // a) GBP reviews sin reply (estado real en Google, tras el refresh por location)
+        const gbpReviewsWithoutReply = await prisma.google_gbp_reviews.findMany({
+          where: {
+            company_id: cId,
+            reply_comment: null,
+          },
+          select: {
+            company_id: true,
+            google_review_id: true,
+          },
+        });
+
+        if (gbpReviewsWithoutReply.length === 0) {
+          continue;
+        }
+
+        const externalIds = gbpReviewsWithoutReply.map(
+          (r) => r.google_review_id,
+        );
+
+        // b) Reviews internas que aún figuran como respondidas para esas GBP reviews
+        const reviewsToFix = await prisma.review.findMany({
+          where: {
+            companyId: cId,
+            externalId: { in: externalIds },
+            responded: true,
+          },
+          select: { id: true },
+        });
+
+        const reviewIds = reviewsToFix.map((r) => r.id);
+        if (reviewIds.length === 0) {
+          continue;
+        }
+
+        // c) Dejar coherente Review, Response y espejo de respuestas GBP
+        await prisma.$transaction([
+          // Reviews internas: marcar como no respondidas
+          prisma.review.updateMany({
+            where: { id: { in: reviewIds } },
+            data: {
+              responded: false,
+              respondedAt: null,
+              replyComment: null,
+              replyUpdatedAtG: null,
+            },
+          }),
+
+          // Responses internas: despublicar
+          prisma.response.updateMany({
+            where: {
+              reviewId: { in: reviewIds },
+              published: true,
+            },
+            data: {
+              published: false,
+              publishedAt: null,
+              status: "PENDING",
+            },
+          }),
+
+          // Espejo de respuestas GBP (por si quedara algo huérfano)
+          prisma.google_gbp_responses.deleteMany({
+            where: {
+              company_id: cId,
+              google_review_id: { in: externalIds },
+            },
+          }),
+        ]);
+      }
+    } catch (cleanupErr: any) {
+      console.error(
+        "[gbp][cron][refresh-reviews-all] cleanup deleted replies error",
+        cleanupErr,
+      );
+      // No rompemos el cron si falla solo la limpieza
     }
 
     return NextResponse.json({

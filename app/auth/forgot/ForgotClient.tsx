@@ -46,13 +46,22 @@ export default function ForgotClient() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 p-4 relative overflow-hidden">
-      {/* Gradient mesh background (igual que login) */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(262,83%,58%,0.15)_0%,transparent_50%),radial-gradient(ellipse_at_bottom_right,hsl(217,91%,60%,0.15)_0%,transparent_50%)]" />
+    <div
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden text-slate-50"
+      style={{
+        // mismo fondo que LoginClient
+        background: "radial-gradient(circle at top, #1f2937 0, #020617 55%)",
+      }}
+    >
+      {/* glow rosa/azul suave por detrás, como en LoginClient */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,hsl(262,83%,58%,0.16)_0%,transparent_55%),radial-gradient(ellipse_at_bottom_right,hsl(217,91%,60%,0.18)_0%,transparent_55%)]" />
 
-      <Card className="w-full max-w-md relative backdrop-blur-sm bg-card/95 border-border shadow-elegant">
-        <CardHeader className="space-y-6 pb-4">
-          {/* Logo + título con el mismo gradiente */}
+      <Card className="w-full max-w-md relative overflow-hidden border border-slate-700/70 bg-slate-950/75 backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.85)]">
+        {/* halo suave de color en el panel */}
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,#a855f71f,transparent_55%),radial-gradient(circle_at_bottom,#38bdf81a,transparent_55%)]" />
+
+        <CardHeader className="space-y-6 pb-4 relative z-10">
+          {/* Logo + título mismo estilo que LoginClient */}
           <div className="flex flex-col items-center space-y-3">
             <div className="flex items-center gap-3">
               <div
@@ -68,7 +77,7 @@ export default function ForgotClient() {
               />
               <Link
                 href="/"
-                className="text-2xl font-bold bg-gradient-to-r from-primary via-accent to-[hsl(280,100%,70%)] bg-clip-text text-transparent"
+                className="text-2xl font-bold bg-gradient-to-r from-primary via-accent to-[hsl(280,100%,70%)] bg-clip-text text-white"
               >
                 Crussader
               </Link>
@@ -76,25 +85,26 @@ export default function ForgotClient() {
           </div>
 
           <div className="flex flex-col items-center space-y-1">
-            <h2 className="text-xl font-semibold text-foreground">
+            <h2 className="text-xl font-semibold text-slate-50">
               Recuperar contraseña
             </h2>
-            <p className="text-xs text-muted-foreground text-center max-w-xs">
-              Te enviaremos un enlace para restablecer tu contraseña si el correo existe en Crussader.
+            <p className="text-xs text-slate-400 text-center max-w-xs">
+              Te enviaremos un enlace para restablecer tu contraseña si el correo
+              existe en Crussader.
             </p>
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="relative z-10">
           {sent && (
-            <div className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-              Si el correo existe, te hemos enviado un enlace para restablecer tu contraseña.
-
+            <div className="mb-4 rounded-md border border-emerald-400/70 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+              Si el correo existe, te hemos enviado un enlace para restablecer tu
+              contraseña.
             </div>
           )}
 
           {error && (
-            <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="mb-4 rounded-md border border-red-400/70 bg-red-500/10 px-3 py-2 text-sm text-red-200">
               {error}
             </div>
           )}
@@ -102,7 +112,7 @@ export default function ForgotClient() {
           {!sent && (
             <form className="space-y-4" onSubmit={onSubmit} noValidate>
               <div className="space-y-2">
-                <Label htmlFor="forgot-email" className="text-foreground">
+                <Label htmlFor="forgot-email" className="text-slate-50">
                   Email
                 </Label>
                 <Input
@@ -112,7 +122,7 @@ export default function ForgotClient() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="tu@email.com"
-                  className="bg-background border-border focus:border-primary transition-colors"
+                  className="bg-slate-950/70 border-slate-700 focus:border-primary transition-colors text-slate-50 placeholder:text-slate-500"
                 />
               </div>
 
@@ -126,7 +136,7 @@ export default function ForgotClient() {
             </form>
           )}
 
-          <div className="mt-6 text-center text-xs text-muted-foreground">
+          <div className="mt-6 text-center text-xs text-slate-400">
             <Link
               href="/auth/login"
               className="text-primary hover:underline underline-offset-4"

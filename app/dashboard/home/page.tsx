@@ -92,7 +92,8 @@ export default function DashboardHomePage() {
   const hasCompany = !!companyId;
 
   return (
-    <div className="space-y-8 px-4 sm:px-6 lg:px-8 xl:px-32 py-8">
+    <div className=" space-y-8 px-4 xl2:px-28 py-8">
+
       {/* Saludo superior */}
       <WelcomePanel name={name} />
 

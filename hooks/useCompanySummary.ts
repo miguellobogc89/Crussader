@@ -10,6 +10,7 @@ export type Metrics = {
   last30Reviews: number;
   prev30Reviews: number;
   monthlyGrowthPct: number;
+  totalUsers: number;          // 👈 NUEVO
 };
 
 const qk = {
@@ -19,8 +20,7 @@ const qk = {
 async function fetchCompanySummary(companyId: string): Promise<Metrics> {
   const res = await fetch(`/api/companies/${companyId}/summary`, {
     method: "GET",
-    headers: { "Accept": "application/json" },
-    // Importantísimo: evita caché del navegador, dejamos que React Query gestione el cache
+    headers: { Accept: "application/json" },
     cache: "no-store",
   });
 
@@ -38,27 +38,16 @@ async function fetchCompanySummary(companyId: string): Promise<Metrics> {
   return metrics;
 }
 
-/**
- * Hook de lectura con cache/buffer gestionado por React Query.
- * - No dispara hasta tener companyId (enabled).
- * - Usa las políticas por defecto definidas en QueryProvider (staleTime, gcTime…).
- */
 export function useCompanySummary(companyId: string | null) {
-  // Clave siempre definida; no dispara mientras enabled=false
   const id = companyId ?? "pending";
 
   return useQuery<Metrics, Error>({
     queryKey: qk.companySummary(id),
     queryFn: () => fetchCompanySummary(id),
-    enabled: Boolean(companyId), // solo fetch si hay companyId real
+    enabled: Boolean(companyId),
   });
 }
 
-
-/**
- * Utilidad para precargar en el buffer (prefetch) tras login.
- * La usaremos en el paso de “precarga en paralelo”.
- */
 export async function prefetchCompanySummary(client: QueryClient, companyId: string) {
   await client.prefetchQuery({
     queryKey: qk.companySummary(companyId),
