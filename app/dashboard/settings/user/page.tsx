@@ -1,4 +1,5 @@
-  "use client";
+ // dashboard/settings/user/page.tsx
+ "use client";
 
   import { useState } from "react";
   import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/card";

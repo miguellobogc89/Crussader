@@ -65,7 +65,7 @@ export function ResponseTimeCard({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-rose-700">
           <History className="h-5 w-5 text-rose-600" />
-          Tiempo de respuesta
+          Tiempo de respuesta este mes
         </CardTitle>
       </CardHeader>
 

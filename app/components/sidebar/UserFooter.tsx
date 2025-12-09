@@ -121,6 +121,25 @@ export function UserFooter({
             )}
           </Link>
         )}
+        {/* CONFIGURACIÓN */}
+      <div className="border-t border-slate-800">
+        <Link
+          href="/dashboard/settings"
+          onClick={onItemNavigate}
+          className={[
+            "flex items-center min-h-11 transition-colors",
+            "text-slate-300 hover:text-white hover:bg-slate-800/60",
+            collapsed ? "justify-center px-2" : "justify-start gap-3 px-3",
+          ].join(" ")}
+          title={collapsed ? "Configuración" : undefined}
+        >
+          <span className="text-base">⚙️</span>
+          {!collapsed && (
+            <span className="text-sm font-medium">Configuración</span>
+          )}
+        </Link>
+      </div>
+
       </div>
 
       <div className="border-t border-slate-800" />
