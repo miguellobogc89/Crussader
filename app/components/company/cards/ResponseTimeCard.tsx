@@ -85,7 +85,7 @@ export function ResponseTimeCard({
         <p className="text-sm text-slate-500">
           Tiempo medio de respuesta: <strong>{totalText}</strong>
         </p>
-      </CardContent>
+      </CardContent>    
     </Card>
   );
 }
