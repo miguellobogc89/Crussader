@@ -25,8 +25,7 @@ export default function ReviewsLayout({ children }: { children: React.ReactNode 
 }*/
 
 
-"use client";
-
+// app/dashboard/settings/layout.tsx
 import type { ReactNode } from "react";
 import PageShell from "@/app/components/layouts/PageShell";
 
@@ -38,12 +37,17 @@ export default function SettingsLayout({
   return (
     <PageShell
       title="Ajustes de cuenta"
+      titleIconName="Settings" // 👈 icono en el header (ajusta el nombre si usas otro mapeo)
       description="Gestiona tu perfil, tu cuenta y la configuración general."
       variant="narrow"
     >
-      {children}
+      <div className="mx-auto w-full max-w-4xl px-3 sm:px-6">
+        {children}
+      </div>
     </PageShell>
   );
 }
+
+
 
 
