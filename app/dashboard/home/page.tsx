@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import WelcomePanel from "@/app/components/home/WelcomePanel";
-import CompanyKpiRow from "@/app/components/company/cards/CompanyKpiRow";
+import CompanyKpiRow from "@/app/components/mybusiness/cards/CompanyKpiRow";
 import { Card, CardHeader, CardTitle, CardContent } from "@/app/components/ui/card";
 
 /* ----------------------- helpers (fetchers) ----------------------- */

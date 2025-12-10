@@ -1,6 +1,9 @@
+// app/dashboard/reviews/reports/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { LineChart, PieChart, MapPin, Gauge } from "lucide-react";
+
 import TabMenu, {
   type TabItem,
 } from "@/app/components/crussader/navigation/TabMenu";
@@ -30,10 +33,26 @@ const SECTION_META: Record<SectionKey, { title: string; desc: string }> = {
 };
 
 const TABS: TabItem[] = [
-  { label: "Tendencias", href: "/dashboard/reviews/reports#trends" },
-  { label: "Análisis", href: "/dashboard/reviews/reports#analysis" },
-  { label: "Ubicaciones", href: "/dashboard/reviews/reports#locations" },
-  { label: "Rendimiento", href: "/dashboard/reviews/reports#performance" },
+  {
+    label: "Tendencias",
+    href: "/dashboard/reviews/reports#trends",
+    icon: <LineChart className="w-4 h-4" />,
+  },
+  {
+    label: "Análisis",
+    href: "/dashboard/reviews/reports#analysis",
+    icon: <PieChart className="w-4 h-4" />,
+  },
+  {
+    label: "Ubicaciones",
+    href: "/dashboard/reviews/reports#locations",
+    icon: <MapPin className="w-4 h-4" />,
+  },
+  {
+    label: "Rendimiento",
+    href: "/dashboard/reviews/reports#performance",
+    icon: <Gauge className="w-4 h-4" />,
+  },
 ];
 
 function getHashSection(): SectionKey {
@@ -50,8 +69,12 @@ function getHashSection(): SectionKey {
 
 export default function ReportsPage() {
   const [section, setSection] = useState<SectionKey>(() => getHashSection());
-  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
-  const [selectedLocation, setSelectedLocation] = useState<LocationLite | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(
+    null,
+  );
+  const [selectedLocation, setSelectedLocation] = useState<LocationLite | null>(
+    null,
+  );
 
   useEffect(() => {
     const onHash = () => setSection(getHashSection());
@@ -62,7 +85,10 @@ export default function ReportsPage() {
 
   const meta = useMemo(() => SECTION_META[section], [section]);
 
-  const handleLocationSelect = (id: string | null, location?: LocationLite | null) => {
+  const handleLocationSelect = (
+    id: string | null,
+    location?: LocationLite | null,
+  ) => {
     setSelectedLocationId(id);
     setSelectedLocation(location ?? null);
   };
@@ -91,4 +117,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-

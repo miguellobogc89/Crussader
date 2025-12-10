@@ -1,3 +1,4 @@
+// app/api/settings/user/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
@@ -10,13 +11,15 @@ export const dynamic = "force-dynamic";
 const UpdateSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   phone: z.string().trim().max(50).nullable().optional(),
-  image: z.string().url().max(2048).nullable().optional(),
+  // ⬇⬇ antes: .max(2048)
+  image: z.string().trim().max(65535).nullable().optional(),
   locale: z.string().trim().max(10).optional(),
   timezone: z.string().trim().max(64).optional(),
   marketingOptIn: z.boolean().optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
   uiTheme: z.enum(["system", "light", "dark"]).optional(),
 });
+
 
 const userSelect = {
   id: true,
@@ -54,7 +57,12 @@ async function getSessionUserId() {
     const userId = (session?.user as any)?.id as string | undefined;
     return { userId, sessionPresent: !!session, sessionEmail: session?.user?.email ?? null };
   } catch (e: any) {
-    return { userId: undefined, sessionPresent: false, sessionEmail: null, error: e?.message || "getServerSession failed" };
+    return {
+      userId: undefined,
+      sessionPresent: false,
+      sessionEmail: null,
+      error: e?.message || "getServerSession failed",
+    };
   }
 }
 
@@ -70,7 +78,7 @@ export async function GET() {
           error: "Unauthorized",
           debug: { sessionPresent, sessionEmail, reason: error ?? "no userId in session" },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -82,7 +90,7 @@ export async function GET() {
     if (!user) {
       return NextResponse.json(
         { ok: false, error: "Not found", debug: { userId } },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -90,7 +98,7 @@ export async function GET() {
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: "Internal error (GET)", debug: e?.message || String(e) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -106,7 +114,7 @@ export async function PUT(req: Request) {
           error: "Unauthorized",
           debug: { sessionPresent, sessionEmail, reason: error ?? "no userId in session" },
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -117,7 +125,7 @@ export async function PUT(req: Request) {
     } catch {
       return NextResponse.json(
         { ok: false, error: "Invalid JSON body", debug: { raw } },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -125,7 +133,7 @@ export async function PUT(req: Request) {
     if (!parsed.success) {
       return NextResponse.json(
         { ok: false, error: "Validation error", details: parsed.error.flatten() },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -150,7 +158,8 @@ export async function PUT(req: Request) {
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: "Internal error (PUT)", debug: e?.message || String(e) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
+

@@ -5,18 +5,36 @@ import { usePathname } from "next/navigation";
 import PageShell from "@/app/components/layouts/PageShell";
 import TabMenu, { type TabItem } from "@/app/components/crussader/navigation/TabMenu";
 
+import { MessageSquare, BarChart3, Smile, Settings } from "lucide-react";
+
 // 👇 importa SOLO el tipo del componente para sacar su prop "iconName"
 import type PageTitle from "@/app/components/layouts/PageTitle";
 import type { ComponentProps } from "react";
 
-// 👇 tipo exacto de iconName (union de nombres de iconos de lucide)
+// 👇 union exacta de nombres de iconos aceptados por PageTitle
 type LucideIconName = ComponentProps<typeof PageTitle>["iconName"];
 
 const TABS: TabItem[] = [
-  { label: "Reseñas",       href: "/dashboard/reviews/summary" },
-  { label: "Informes",      href: "/dashboard/reviews/reports" },
-  { label: "Sentimiento",   href: "/dashboard/reviews/sentiment" },
-  { label: "Configuración", href: "/dashboard/reviews/settings" },
+  {
+    label: "Reseñas",
+    href: "/dashboard/reviews/summary",
+    icon: <MessageSquare className="w-4 h-4" />,
+  },
+  {
+    label: "Informes",
+    href: "/dashboard/reviews/reports",
+    icon: <BarChart3 className="w-4 h-4" />,
+  },
+  {
+    label: "Sentimiento",
+    href: "/dashboard/reviews/sentiment",
+    icon: <Smile className="w-4 h-4" />,
+  },
+  {
+    label: "Configuración",
+    href: "/dashboard/reviews/settings",
+    icon: <Settings className="w-4 h-4" />,
+  },
 ];
 
 const PAGE_META: Record<
@@ -35,21 +53,29 @@ const PAGE_META: Record<
   },
   sentiment: {
     title: "Análisis de Sentimiento",
-    description: "Distribución emocional, palabras clave y opiniones destacadas",
+    description:
+      "Distribución emocional, palabras clave y opiniones destacadas",
     icon: "Smile",
   },
   settings: {
     title: "Configuración de Respuestas",
-    description: "Personaliza el tono, idioma y comportamiento de las respuestas automáticas",
+    description:
+      "Personaliza el tono, idioma y comportamiento de las respuestas automáticas",
     icon: "Settings",
   },
 };
 
-export default function ReviewsLayout({ children }: { children: React.ReactNode }) {
+export default function ReviewsLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
 
   const activeTab =
-    Object.keys(PAGE_META).find((key) => pathname?.includes(`/dashboard/reviews/${key}`)) ?? "summary";
+    Object.keys(PAGE_META).find((key) =>
+      pathname?.includes(`/dashboard/reviews/${key}`),
+    ) ?? "summary";
 
   const { title, description, icon } = PAGE_META[activeTab];
 
@@ -57,7 +83,7 @@ export default function ReviewsLayout({ children }: { children: React.ReactNode 
     <PageShell
       title={title}
       description={description}
-      titleIconName={icon} // ✅ ahora tipado correctamente
+      titleIconName={icon}
       headerBand={
         <div key={pathname}>
           <TabMenu items={TABS} />

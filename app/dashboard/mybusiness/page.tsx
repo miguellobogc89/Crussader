@@ -11,12 +11,12 @@ import { useToast } from "@/app/components/crussader/UX/Toast";
 import {
   CompanyModal,
   type CompanyForm,
-} from "@/app/components/company/CompanyModal";
+} from "@/app/components/mybusiness/CompanyModal";
 
 // Cards de cabecera de Company
-import CompanyKpiRow from "@/app/components/company/cards/CompanyKpiRow";
+import CompanyKpiRow from "@/app/components/mybusiness/cards/CompanyKpiRow";
 import { useCompanySummary } from "@/hooks/useCompanySummary";
-import { CompanyEstablishments } from "@/app/components/company/CompanyEstablishments";
+import { CompanyEstablishments } from "@/app/components/mybusiness/CompanyEstablishments";
 
 /* ----------------------- helpers (fetchers) ----------------------- */
 

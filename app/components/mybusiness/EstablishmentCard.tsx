@@ -30,7 +30,7 @@ import type { LocationRow } from "@/hooks/useCompanyLocations";
 import { useBillingStatus } from "@/hooks/useBillingStatus";
 import LocationSettingsModal, {
   type LocationForm,
-} from "@/app/components/company/LocationSettingsModal";
+} from "@/app/components/mybusiness/LocationSettingsModal";
 
 type Props = {
   companyId: string;

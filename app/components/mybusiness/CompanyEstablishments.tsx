@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { EstablishmentCard } from "@/app/components/company/EstablishmentCard";
+import { EstablishmentCard } from "@/app/components/mybusiness/EstablishmentCard";
 import type { LocationRow } from "@/hooks/useCompanyLocations";
 import { getBusinessIcon } from "@/lib/businessTypeIcons";
 import { Button } from "@/app/components/ui/button";
@@ -12,7 +12,7 @@ import LinkGbpLocationModal from "@/app/components/mybusiness/locations/LinkGbpL
 import {
   AddLocationsModal,
   type NewLocation,
-} from "@/app/components/company/AddLocationsModal";
+} from "@/app/components/mybusiness/AddLocationsModal";
 
 type Props = {
   companyId: string | null;
