@@ -2,7 +2,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import ChartCard from "@/app/components/charts/ChartCard";
 import { ChartContainer, ChartTooltipContent } from "@/app/components/ui/chart";
 import {
   ResponsiveContainer,
@@ -44,27 +43,24 @@ export type LineComboProps<T extends Record<string, unknown>> = {
     radius?: number | [number, number, number, number]; // bar border radius
   };
 
-  /** Altura del área del gráfico (se aplica en la Card). Default 300 */
+  /** Altura del área del gráfico. Default 300 */
   height?: number;
 
   xTickFormatter?: (v: any) => string;
   leftTickFormatter?: (v: number) => string;
   rightTickFormatter?: (v: number) => string;
 
-  /** Opciones de la Card contenedora */
+  /** Opciones del contenedor “card” */
   card?: {
     title?: ReactNode;
     description?: ReactNode;
     /** Altura del área de contenido; tiene prioridad sobre `height` */
     height?: number | string;
-    defaultFavorite?: boolean;
-    onFavoriteChange?: (isFav: boolean) => void;
-    onRemove?: () => void;
     className?: string;
     contentClassName?: string;
   };
 
-  /* (deprecado) — ya no se usa, la Card maneja los botones */
+  // props antiguos, ya no usados, se dejan por compatibilidad
   withActions?: boolean;
   actionsProps?: {
     defaultFavorite?: boolean;
@@ -109,69 +105,102 @@ export function LineCombo<T extends Record<string, unknown>>({
       : {}),
   };
 
+  const hasHeader = card?.title || card?.description;
+  const descriptionIsPrimitive =
+    typeof card?.description === "string" ||
+    typeof card?.description === "number";
+
   return (
-    <ChartCard
-      title={card?.title}
-      description={card?.description}
-      height={effectiveHeight}
-      className={card?.className}
-      contentClassName={card?.contentClassName}
-    >
-      <ChartContainer config={config} className="h-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data}>
-            <XAxis dataKey={xKeyStr} tickFormatter={xTickFormatter} />
-            {/* Eje izquierdo (línea) */}
-            <YAxis
-              yAxisId="left"
-              domain={line.yDomain}
-              tickFormatter={leftTickFormatter}
-            />
-            {/* Eje derecho (secundaria) */}
-            {showRightAxis && (
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                domain={secondary?.yDomain}
-                tickFormatter={rightTickFormatter}
-              />
+    <div className={card?.className}>
+      <div className="w-full max-w-full overflow-hidden rounded-xl border bg-card/80 px-3 py-4 sm:px-5 sm:py-5 text-sm text-muted-foreground shadow-sm h-full flex flex-col">
+        {hasHeader && (
+          <div className="pb-3 space-y-1">
+            {card?.title && (
+              <div className="flex items-center gap-2 text-foreground">
+                {card.title}
+              </div>
             )}
-            <Tooltip content={<ChartTooltipContent />} />
 
-            {/* Serie secundaria */}
-            {secondary && secKey && (
-              secType === "bar" ? (
-                <Bar
-                  yAxisId={secAxis}
-                  dataKey={secKey}
-                  fill={secColor}
-                  radius={secondary.radius ?? [4, 4, 0, 0]}
-                />
+            {card?.description &&
+              (descriptionIsPrimitive ? (
+                <p className="text-xs sm:text-sm text-muted-foreground max-w-full sm:max-w-3xl">
+                  {card.description}
+                </p>
               ) : (
-                <Area
-                  yAxisId={secAxis}
-                  type="monotone"
-                  dataKey={secKey}
-                  stroke={secColor}
-                  fill={secColor}
-                  fillOpacity={secOpacity}
-                />
-              )
-            )}
+                <div className="text-xs sm:text-sm text-muted-foreground max-w-full sm:max-w-3xl">
+                  {card.description}
+                </div>
+              ))}
+          </div>
+        )}
 
-            {/* Serie línea (principal) */}
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey={lineKey}
-              stroke={lineColor}
-              strokeWidth={3}
-              dot={line.showDots ?? true ? { fill: lineColor, r: 6 } : false}
-              activeDot={{ r: 7 }}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </ChartContainer>
-    </ChartCard>
+        <div
+          className={`flex-1 min-h-[220px] ${
+            card?.contentClassName ?? ""
+          }`}
+          style={
+            typeof effectiveHeight === "number"
+              ? { height: `${effectiveHeight}px` }
+              : { height: effectiveHeight }
+          }
+        >
+          <ChartContainer config={config} className="h-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={data}>
+                <XAxis dataKey={xKeyStr} tickFormatter={xTickFormatter} />
+                {/* Eje izquierdo (línea) */}
+                <YAxis
+                  yAxisId="left"
+                  domain={line.yDomain}
+                  tickFormatter={leftTickFormatter}
+                />
+                {/* Eje derecho (secundaria) */}
+                {showRightAxis && (
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    domain={secondary?.yDomain}
+                    tickFormatter={rightTickFormatter}
+                  />
+                )}
+                <Tooltip content={<ChartTooltipContent />} />
+
+                {/* Serie secundaria */}
+                {secondary && secKey && (
+                  secType === "bar" ? (
+                    <Bar
+                      yAxisId={secAxis}
+                      dataKey={secKey}
+                      fill={secColor}
+                      radius={secondary.radius ?? [4, 4, 0, 0]}
+                    />
+                  ) : (
+                    <Area
+                      yAxisId={secAxis}
+                      type="monotone"
+                      dataKey={secKey}
+                      stroke={secColor}
+                      fill={secColor}
+                      fillOpacity={secOpacity}
+                    />
+                  )
+                )}
+
+                {/* Serie línea (principal) */}
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey={lineKey}
+                  stroke={lineColor}
+                  strokeWidth={3}
+                  dot={line.showDots ?? true ? { fill: lineColor, r: 6 } : false}
+                  activeDot={{ r: 7 }}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+        </div>
+      </div>
+    </div>
   );
 }

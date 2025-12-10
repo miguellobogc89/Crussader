@@ -2,7 +2,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { LineChart, PieChart, MapPin, Gauge, ChevronDown } from "lucide-react";
+import {
+  LineChart,
+  PieChart,
+  MapPin,
+  Gauge,
+  ChevronDown,
+  RotateCcw,
+} from "lucide-react";
 
 import SubTabMenu, {
   type TabItem,
@@ -44,21 +51,25 @@ const TABS: TabItem[] = [
     label: "Tendencias",
     href: "/dashboard/reviews/reports#trends",
     icon: <LineChart className="w-4 h-4" />,
+    disabled: false,
   },
   {
     label: "Análisis",
     href: "/dashboard/reviews/reports#analysis",
     icon: <PieChart className="w-4 h-4" />,
+    disabled: true,
   },
   {
     label: "Ubicaciones",
     href: "/dashboard/reviews/reports#locations",
     icon: <MapPin className="w-4 h-4" />,
+    disabled: true,
   },
   {
     label: "Rendimiento",
     href: "/dashboard/reviews/reports#performance",
     icon: <Gauge className="w-4 h-4" />,
+    disabled: true,
   },
 ];
 
@@ -83,6 +94,7 @@ export default function ReportsPage() {
     null,
   );
   const [rangeMonths, setRangeMonths] = useState<number>(12);
+  const [refreshToken, setRefreshToken] = useState<number>(0);
 
   useEffect(() => {
     const onHash = () => setSection(getHashSection());
@@ -99,6 +111,10 @@ export default function ReportsPage() {
   ) => {
     setSelectedLocationId(id);
     setSelectedLocation(location ?? null);
+  };
+
+  const handleRefresh = () => {
+    setRefreshToken((x) => x + 1);
   };
 
   const RangeSelector = (
@@ -139,14 +155,22 @@ export default function ReportsPage() {
         <SubTabMenu items={TABS} />
       </div>
 
-      {/* fila: ubicación izquierda, rango de tiempo derecha */}
+      {/* fila: ubicación izquierda, rango de tiempo + actualizar derecha */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="w-full sm:w-80 shrink-0">
           <LocationSelector onSelect={handleLocationSelect} />
         </div>
 
-        <div className="flex justify-start sm:justify-end">
+        <div className="flex items-center gap-2 justify-start sm:justify-end">
           {RangeSelector}
+
+          <button
+            onClick={handleRefresh}
+            className="p-2 rounded-md border hover:bg-accent transition-colors"
+            title="Actualizar datos"
+          >
+            <RotateCcw className="w-4 h-4 text-foreground" />
+          </button>
         </div>
       </div>
 
@@ -156,6 +180,7 @@ export default function ReportsPage() {
         selectedLocationId={selectedLocationId}
         selectedLocation={selectedLocation}
         rangeMonths={rangeMonths}
+        refreshToken={refreshToken}
       />
     </div>
   );

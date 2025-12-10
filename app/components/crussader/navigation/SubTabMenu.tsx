@@ -1,4 +1,4 @@
-// app/components/crussader/navigation/SubTabMenu.tsx 
+// app/components/crussader/navigation/SubTabMenu.tsx
 "use client";
 
 import Link from "next/link";
@@ -10,6 +10,7 @@ export type TabItem = {
   href: string;
   icon?: ReactNode;
   exact?: boolean;
+  disabled?: boolean;
 };
 
 export default function SubTabMenu({
@@ -21,11 +22,10 @@ export default function SubTabMenu({
 }) {
   const pathname = usePathname();
 
-const isActive = (href: string, exact?: boolean) =>
-  exact
-    ? pathname === href
-    : pathname === href || pathname.startsWith(href + "/");
-
+  const isActive = (href: string, exact?: boolean) =>
+    exact
+      ? pathname === href
+      : pathname === href || pathname.startsWith(href + "/");
 
   return (
     <div
@@ -38,8 +38,31 @@ const isActive = (href: string, exact?: boolean) =>
       aria-label="Subsecciones"
     >
       <div className="inline-flex min-w-full gap-1 relative">
-        {items.map((it) => {
-          const active = isActive(it.href, it.exact);
+        {items.map((it, index) => {
+          const active = !it.disabled && (index === 0 || isActive(it.href, it.exact));
+
+          const baseClasses =
+            "inline-flex items-center whitespace-nowrap rounded-full border transition-colors transition-shadow gap-1 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm";
+
+          if (it.disabled) {
+            return (
+              <div
+                key={it.href}
+                role="tab"
+                aria-disabled="true"
+                className={[
+                  baseClasses,
+                  "bg-muted text-muted-foreground/70 border-dashed border-muted-foreground/20 cursor-not-allowed opacity-60",
+                ].join(" ")}
+                title="Próximamente"
+              >
+                {it.icon ? (
+                  <span className="text-base flex-shrink-0">{it.icon}</span>
+                ) : null}
+                <span className="hidden sm:inline">{it.label}</span>
+              </div>
+            );
+          }
 
           return (
             <Link
@@ -48,22 +71,15 @@ const isActive = (href: string, exact?: boolean) =>
               role="tab"
               aria-selected={active}
               className={[
-                "inline-flex items-center whitespace-nowrap rounded-full border transition-colors transition-shadow",
-                "gap-1 sm:gap-2",
-                "px-3 sm:px-4",
-                "py-1.5 sm:py-2",
-                "text-xs sm:text-sm",
+                baseClasses,
                 active
                   ? "bg-primary/10 text-primary border-primary/30 shadow-sm"
                   : "bg-background text-muted-foreground border-transparent hover:bg-muted hover:text-foreground",
               ].join(" ")}
             >
-              {/* ICONO */}
               {it.icon ? (
                 <span className="text-base flex-shrink-0">{it.icon}</span>
               ) : null}
-
-              {/* LABEL solo en sm+ */}
               <span className="hidden sm:inline">{it.label}</span>
             </Link>
           );
