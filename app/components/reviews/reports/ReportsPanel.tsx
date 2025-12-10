@@ -27,17 +27,26 @@ export default function ReportsPanel({
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trendsData, setTrendsData] = useState<TrendRow[]>([]);
 
-  // === Meses abreviados ===
   const MONTHS_ES = [
-    "Ene","Feb","Mar","Abr","May","Jun",
-    "Jul","Ago","Sep","Oct","Nov","Dic",
+    "Ene",
+    "Feb",
+    "Mar",
+    "Abr",
+    "May",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dic",
   ];
+
   const formatMonth = (value: string) => {
     const m = Number(value.slice(5, 7));
     return MONTHS_ES[m - 1] ?? value;
   };
 
-  // === FETCH function extraíble (para usar en botón refresh) ===
   const fetchTrends = useCallback(async () => {
     if (section !== "trends") return;
     if (!selectedLocationId) return;
@@ -100,12 +109,10 @@ export default function ReportsPanel({
     setTrendsLoading(false);
   }, [section, selectedLocationId, rangeMonths]);
 
-  // Primera carga
   useEffect(() => {
     fetchTrends();
   }, [fetchTrends]);
 
-  // Data para LineCombo
   const comboData = useMemo(
     () =>
       trendsData.map((row) => ({
@@ -113,7 +120,7 @@ export default function ReportsPanel({
         cumVolume: row.cumReviews ?? row.reviews ?? 0,
         cumRating: row.cumAvg ?? row.avgRating ?? 0,
       })),
-    [trendsData]
+    [trendsData],
   );
 
   const trendsHeading = (
@@ -144,12 +151,9 @@ export default function ReportsPanel({
 
   return (
     <div className="space-y-6">
-
-      {/* ===== HEADER DEL PANEL (Botón Refresh incluido) ===== */}
+      {/* Header: botón actualizar a la derecha del selector (ya lo tienes arriba) */}
       {section === "trends" && (
         <div className="flex justify-end items-center gap-3 pr-1">
-          {/* Suele ir aquí tu selector de rango — ya estaba arriba */}
-          {/* Añadimos botón Refresh */}
           <button
             onClick={fetchTrends}
             className="p-2 rounded-md border hover:bg-accent transition-colors"
@@ -160,13 +164,14 @@ export default function ReportsPanel({
         </div>
       )}
 
-      {/* ===== GRAFICO / SPINNER ===== */}
+      {/* Loading */}
       {section === "trends" && trendsLoading && (
         <div className="flex justify-center py-16">
           <Spinner size={32} speed={1.0} />
         </div>
       )}
 
+      {/* Gráfico */}
       {section === "trends" && !trendsLoading && comboData.length > 0 && (
         <LineCombo
           data={comboData}
@@ -190,19 +195,15 @@ export default function ReportsPanel({
           rightTickFormatter={(v) => String(v)}
           card={{
             title: trendsHeading,
-            // 🔥 CAMBIO P → DIV (arregla error turbopack)
-            description: (
-              <div className="text-xs sm:text-sm text-muted-foreground max-w-full sm:max-w-3xl">
-                {trendsDescription}
-              </div>
-            ),
+            // 👉 Aquí solo string, sin <p> ni <div>, para evitar nesting dentro del <p> interno del ChartCard
+            description: trendsDescription,
             height: 280,
             contentClassName: "pt-4",
           }}
         />
       )}
 
-      {/* STATE: no data */}
+      {/* Sin datos */}
       {section === "trends" && !trendsLoading && comboData.length === 0 && (
         <div className="text-center text-muted-foreground py-10">
           No hay datos para el periodo seleccionado.

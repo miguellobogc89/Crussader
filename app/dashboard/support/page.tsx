@@ -118,84 +118,140 @@ export default function SupportPage() {
               Preguntas frecuentes
             </CardTitle>
             <CardDescription className="text-slate-500">
-              Hemos recopilado las dudas más habituales sobre reseñas, IA y
-              conexiones con Google.
+              Te explicamos, paso a paso y sin tecnicismos, cómo
+              empezar con Crussader, conectar Google y responder reseñas.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Accordion type="single" collapsible className="w-full space-y-2">
+              {/* FAQ 1: Onboarding básico */}
               <AccordionItem
                 value="faq-1"
                 className="rounded-lg border border-slate-200 px-4"
               >
                 <AccordionTrigger className="text-left text-slate-900">
-                  ¿Cómo se generan las respuestas automáticas a las reseñas?
+                  ¿Qué tengo que hacer para empezar a usar Crussader?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-slate-600">
-                  Crussader analiza el texto de la reseña, el rating, el idioma
-                  y las preferencias de tu marca (tono, emojis, CTA, etc.) para
-                  proponer una respuesta coherente y personalizada. Tú decides
-                  si quieres revisarlas antes de publicar o dejarlas en modo
-                  autopublicación.
+                  El proceso es sencillo:
+                  <br />
+                  1) Creas tu cuenta y tu negocio (empresa) en Crussader.
+                  <br />
+                  2) Añades tus establecimientos (por ejemplo, cada clínica,
+                  tienda o local).
+                  <br />
+                  3) Conectas tu cuenta de Google Business para que podamos ver
+                  tus reseñas.
+                  <br />
+                  A partir de ahí, verás todas las opiniones en un único panel y
+                  podrás responderlas con ayuda de la IA.
                 </AccordionContent>
               </AccordionItem>
 
+              {/* FAQ 2: Conexión con Google */}
               <AccordionItem
                 value="faq-2"
                 className="rounded-lg border border-slate-200 px-4"
               >
                 <AccordionTrigger className="text-left text-slate-900">
-                  ¿Puedo limitar qué personas de mi equipo pueden responder?
+                  ¿Cómo conecto mi cuenta de Google Business con Crussader?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-slate-600">
-                  Sí. Desde la sección de empresa puedes configurar qué usuarios
-                  tienen permisos para responder reseñas, configurar la IA o
-                  conectar nuevas ubicaciones de Google Business Profile.
+                  Desde la sección de &quot;Mi negocio&quot; verás un botón para
+                  conectar con Google. Al pulsarlo, te llevaremos a la página
+                  oficial de Google, donde iniciarás sesión y elegirás la cuenta
+                  que quieres usar.
+                  <br />
+                  <br />
+                  Una vez aceptes los permisos, volverás a Crussader y tus
+                  establecimientos de Google aparecerán para que los vincules a
+                  tu negocio. No modificamos nada en tu ficha de Google sin tu
+                  permiso: solo leemos reseñas y publicamos respuestas cuando tú
+                  lo decidas.
                 </AccordionContent>
               </AccordionItem>
 
+              {/* FAQ 3: Establecimientos */}
               <AccordionItem
                 value="faq-3"
                 className="rounded-lg border border-slate-200 px-4"
               >
                 <AccordionTrigger className="text-left text-slate-900">
-                  ¿Cada cuánto se sincronizan las reseñas nuevas?
+                  ¿Qué es un &quot;establecimiento&quot; dentro de Crussader?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-slate-600">
-                  Revisamos periódicamente tus ubicaciones conectadas y traemos
-                  las reseñas nuevas para que puedas gestionarlas desde el
-                  panel. También puedes forzar una actualización manual en la
-                  sección de integraciones.
+                  Un establecimiento es cada lugar físico donde atiendes a tus
+                  clientes: una clínica, un restaurante, una tienda, etc.
+                  <br />
+                  <br />
+                  Si conectas Google Business, importamos automáticamente tus
+                  establecimientos para que veas las reseñas de cada uno por
+                  separado. Si aún no quieres conectar Google, también puedes
+                  crearlos manualmente para ir configurando la cuenta poco a
+                  poco.
                 </AccordionContent>
               </AccordionItem>
 
+              {/* FAQ 4: Sincronización de reseñas */}
               <AccordionItem
                 value="faq-4"
                 className="rounded-lg border border-slate-200 px-4"
               >
                 <AccordionTrigger className="text-left text-slate-900">
-                  ¿Qué pasa si desconecto mi cuenta de Google Business?
+                  ¿Cada cuánto se actualizan las reseñas desde Google?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-slate-600">
-                  Dejaremos de sincronizar reseñas nuevas y no podremos publicar
-                  respuestas en tu nombre, pero no borraremos ningún histórico
-                  que ya exista en Crussader. Siempre puedes volver a conectar
-                  tu cuenta más adelante.
+                  Crussader revisa de forma periódica tus establecimientos
+                  conectados para traer las reseñas nuevas y mantener tus datos
+                  al día.
+                  <br />
+                  <br />
+                  Además, en la sección de reseñas puedes forzar una
+                  actualización manual si quieres asegurarte de que una reseña
+                  muy reciente aparezca al momento.
                 </AccordionContent>
               </AccordionItem>
 
+              {/* FAQ 5: Respuestas con IA */}
               <AccordionItem
                 value="faq-5"
                 className="rounded-lg border border-slate-200 px-4"
               >
                 <AccordionTrigger className="text-left text-slate-900">
-                  ¿Cómo protegéis los datos de mis clientes?
+                  ¿Crussader responde solo a las reseñas o tengo que aprobarlas?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-slate-600">
-                  Tratamos los datos siguiendo buenas prácticas de seguridad y
-                  solo los usamos para prestar el servicio (análisis y
-                  respuesta de reseñas). Puedes consultar todos los detalles en
-                  nuestra política de privacidad.
+                  Tú eliges cómo quieres trabajar:
+                  <br />
+                  <br />
+                  • Modo automático: Crussader redacta y publica respuestas a
+                  las reseñas según las reglas que hayas configurado (por
+                  ejemplo, solo reseñas positivas).
+                  <br />
+                  • Modo asistido: la IA propone una respuesta y tú decides si
+                  la editas o la publicas tal cual.
+                  <br />
+                  • Modo manual: Crussader solo te ayuda a redactar, pero no
+                  publica nada sin que tú lo confirmes.
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* FAQ 6: Desconectar Google */}
+              <AccordionItem
+                value="faq-6"
+                className="rounded-lg border border-slate-200 px-4"
+              >
+                <AccordionTrigger className="text-left text-slate-900">
+                  ¿Qué ocurre si desconecto mi cuenta de Google Business?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-slate-600">
+                  Si desconectas Google, dejaremos de traer reseñas nuevas y no
+                  podremos publicar respuestas en tu nombre.
+                  <br />
+                  <br />
+                  Tus datos históricos seguirán visibles en Crussader para que
+                  puedas consultarlos, y siempre podrás volver a conectar tu
+                  cuenta más adelante cuando lo necesites.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

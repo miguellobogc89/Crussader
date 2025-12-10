@@ -98,7 +98,7 @@ export default function AccountDangerZone({
         </div>
         <div>
           <CardTitle className="text-base sm:text-lg text-red-900">
-            Zona de peligro
+            Eliminar datos
           </CardTitle>
           <CardDescription className="text-xs sm:text-sm text-red-800/80">
             Aquí puedes eliminar tu usuario o cerrar por completo tu cuenta.

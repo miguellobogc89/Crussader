@@ -1,3 +1,4 @@
+// app/components/charts/LineCombo.tsx
 "use client";
 
 import type { ReactNode } from "react";
@@ -27,34 +28,48 @@ export type LineComboProps<T extends Record<string, unknown>> = {
   line: {
     key: keyof T;
     label?: string;
-    color?: string;         // default: hsl(var(--primary))
+    color?: string; // default: hsl(var(--primary))
     yDomain?: AxisDomainLike;
-    showDots?: boolean;
+    showDots?: boolean; // default: true
   };
 
   secondary?: {
     key: keyof T;
     type: "area" | "bar";
     label?: string;
-    color?: string;
-    axis?: "left" | "right";
+    color?: string; // default: hsl(var(--accent))
+    axis?: "left" | "right"; // default: right
     yDomain?: AxisDomainLike;
-    opacity?: number;
-    radius?: number | [number, number, number, number];
+    opacity?: number; // area fill opacity (default 0.2)
+    radius?: number | [number, number, number, number]; // bar border radius
   };
 
+  /** Altura del área del gráfico (se aplica en la Card). Default 300 */
   height?: number;
 
   xTickFormatter?: (v: any) => string;
   leftTickFormatter?: (v: number) => string;
   rightTickFormatter?: (v: number) => string;
 
+  /** Opciones de la Card contenedora */
   card?: {
     title?: ReactNode;
     description?: ReactNode;
+    /** Altura del área de contenido; tiene prioridad sobre `height` */
     height?: number | string;
+    defaultFavorite?: boolean;
+    onFavoriteChange?: (isFav: boolean) => void;
+    onRemove?: () => void;
     className?: string;
     contentClassName?: string;
+  };
+
+  /* (deprecado) — ya no se usa, la Card maneja los botones */
+  withActions?: boolean;
+  actionsProps?: {
+    defaultFavorite?: boolean;
+    onFavoriteChange?: (isFav: boolean) => void;
+    onRemove?: () => void;
   };
 };
 
@@ -106,13 +121,13 @@ export function LineCombo<T extends Record<string, unknown>>({
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data}>
             <XAxis dataKey={xKeyStr} tickFormatter={xTickFormatter} />
-
+            {/* Eje izquierdo (línea) */}
             <YAxis
               yAxisId="left"
               domain={line.yDomain}
               tickFormatter={leftTickFormatter}
             />
-
+            {/* Eje derecho (secundaria) */}
             {showRightAxis && (
               <YAxis
                 yAxisId="right"
@@ -121,9 +136,9 @@ export function LineCombo<T extends Record<string, unknown>>({
                 tickFormatter={rightTickFormatter}
               />
             )}
-
             <Tooltip content={<ChartTooltipContent />} />
 
+            {/* Serie secundaria */}
             {secondary && secKey && (
               secType === "bar" ? (
                 <Bar
@@ -144,6 +159,7 @@ export function LineCombo<T extends Record<string, unknown>>({
               )
             )}
 
+            {/* Serie línea (principal) */}
             <Line
               yAxisId="left"
               type="monotone"
