@@ -78,30 +78,6 @@ export default function UserTab() {
             </div>
           </div>
 
-          {/* Idioma de la interfaz */}
-          <div className="space-y-2">
-            <Label>Idioma de la interfaz</Label>
-            <Select
-              value={language}
-              onValueChange={(value) => {
-                setLanguage(value);
-                handleChange();
-              }}
-            >
-              <SelectTrigger className="rounded-xl max-w-xs">
-                <div className="flex items-center space-x-2">
-                  <Globe className="h-4 w-4" />
-                  <SelectValue />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="es">🇪🇸 Español</SelectItem>
-                <SelectItem value="en">🇺🇸 English</SelectItem>
-                <SelectItem value="pt">🇵🇹 Português</SelectItem>
-                <SelectItem value="fr">🇫🇷 Français</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </CardContent>
       </Card>
 

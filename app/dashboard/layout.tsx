@@ -52,7 +52,7 @@ export default async function DashboardLayout({
           <AppSidebar />
 
           {/* Contenido (derecha): ahora es el "scope" del overlay */}
-          <div className="relative flex h-svh min-w-0 flex-1 overflow-y-auto overflow-x-hidden pt-12 md:pt-0">
+          <div className="relative flex h-svh min-w-0 flex-1 overflow-y-auto overflow-x-hidden pt-3 md:pt-0">
             {/* 👇 Overlay limitado al área de página, NO tapa la sidebar */}
             <RouteTransitionOverlay scope="container" />
 

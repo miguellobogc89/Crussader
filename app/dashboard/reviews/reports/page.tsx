@@ -2,16 +2,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { LineChart, PieChart, MapPin, Gauge } from "lucide-react";
+import { LineChart, PieChart, MapPin, Gauge, ChevronDown } from "lucide-react";
 
-import TabMenu, {
+import SubTabMenu, {
   type TabItem,
-} from "@/app/components/crussader/navigation/TabMenu";
+} from "@/app/components/crussader/navigation/SubTabMenu";
 import ReportsPanel from "@/app/components/reviews/reports/ReportsPanel";
 import type { SectionKey } from "@/app/components/reviews/reports/types";
 import LocationSelector, {
   type LocationLite,
 } from "@/app/components/crussader/LocationSelector";
+
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/app/components/ui/dropdown-menu";
 
 const SECTION_META: Record<SectionKey, { title: string; desc: string }> = {
   trends: {
@@ -75,6 +82,7 @@ export default function ReportsPage() {
   const [selectedLocation, setSelectedLocation] = useState<LocationLite | null>(
     null,
   );
+  const [rangeMonths, setRangeMonths] = useState<number>(12);
 
   useEffect(() => {
     const onHash = () => setSection(getHashSection());
@@ -93,18 +101,52 @@ export default function ReportsPage() {
     setSelectedLocation(location ?? null);
   };
 
+  const RangeSelector = (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-muted-foreground">Rango:</span>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium text-foreground bg-background hover:bg-accent transition-colors">
+            {rangeMonths} meses
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent align="end" className="w-40">
+          {[3, 6, 12, 24].map((m) => (
+            <DropdownMenuItem
+              key={m}
+              onClick={() => setRangeMonths(m)}
+              className={
+                rangeMonths === m
+                  ? "bg-primary/10 text-primary font-medium cursor-pointer"
+                  : "cursor-pointer"
+              }
+            >
+              {m} meses
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+
   return (
     <div className="mx-auto w-full max-w-screen-2xl px-3 sm:px-6 py-6 space-y-6">
-      {/* fila superior: tabs izquierda, selector ubicación derecha */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex-1 min-w-0">
-          <TabMenu items={TABS} />
+      {/* Submenú superior */}
+      <div className="flex-1 min-w-0">
+        <SubTabMenu items={TABS} />
+      </div>
+
+      {/* fila: ubicación izquierda, rango de tiempo derecha */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="w-full sm:w-80 shrink-0">
+          <LocationSelector onSelect={handleLocationSelect} />
         </div>
 
-        <div className="sm:pl-4 w-full sm:w-80 shrink-0">
-          <div className="flex flex-col gap-1 items-stretch sm:items-end">
-            <LocationSelector onSelect={handleLocationSelect} />
-          </div>
+        <div className="flex justify-start sm:justify-end">
+          {RangeSelector}
         </div>
       </div>
 
@@ -113,6 +155,7 @@ export default function ReportsPage() {
         meta={meta}
         selectedLocationId={selectedLocationId}
         selectedLocation={selectedLocation}
+        rangeMonths={rangeMonths}
       />
     </div>
   );

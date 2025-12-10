@@ -21,7 +21,6 @@ export async function GET(req: Request) {
   const email = session?.user?.email ?? null;
   if (!email) return bad(401, "unauth");
 
-  // ---- Usuario y empresa por defecto
   const user = await prisma.user.findUnique({
     where: { email },
     select: { id: true },
@@ -35,8 +34,8 @@ export async function GET(req: Request) {
   });
   const defaultCompanyId = membership?.companyId ?? null;
 
-  // ---- Params
   const { searchParams } = new URL(req.url);
+
   const mode = (searchParams.get("mode") as Mode) || "overview";
   const granularity = (searchParams.get("granularity") as Granularity) || "day";
   const companyId = searchParams.get("companyId") ?? defaultCompanyId ?? undefined;
@@ -46,7 +45,7 @@ export async function GET(req: Request) {
 
   if (!companyId) return NextResponse.json({ ok: true, data: [] });
 
-  // ------------------ MODE: OVERVIEW (tu 'locations-today') ------------------
+  // ------------------ MODE: OVERVIEW ------------------
   if (mode === "overview") {
     const snapshotDate = todayUtcStart();
 
@@ -93,16 +92,40 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, data: rows });
   }
 
-  // ------------------ MODE: TRENDS (monthly table para la nueva page) ------------------
+  // ------------------ MODE: TRENDS ------------------
   if (mode === "trends") {
-    if (granularity !== "month") {
-      return bad(400, "granularity inválida; usa month");
-    }
-    if (!from || !to) {
-      return bad(400, "Parámetros 'from' y 'to' son obligatorios (YYYY-MM-DD).");
-    }
+    if (granularity !== "month") return bad(400, "granularity inválida; usa month");
+    if (!from || !to) return bad(400, "from/to obligatorios");
 
-    // Construimos filtros parametrizados (evita inyección)
+    //
+    // 1) BASELINE — acumulado antes del `from`
+    //
+    const baselineSql = `
+      SELECT 
+        COUNT(*) AS reviews_before,
+        AVG(r.rating) AS avg_before
+      FROM "Review" r
+      WHERE r."createdAtG" < $1::date
+        AND r."companyId" = $2
+        ${locationId ? `AND r."locationId" = $3` : ""}
+    `;
+
+    const baselineParams = locationId
+      ? [from, companyId, locationId]
+      : [from, companyId];
+
+    const [baselineRow] = await prisma.$queryRawUnsafe<any[]>(
+      baselineSql,
+      ...baselineParams
+    );
+
+    const reviewsBefore = Number(baselineRow?.reviews_before ?? 0);
+    const avgBefore =
+      baselineRow?.avg_before == null ? null : Number(baselineRow.avg_before);
+
+    //
+    // 2) DATA MENSUAL
+    //
     const filters: string[] = [
       'r."createdAtG" IS NOT NULL',
       'r."createdAtG" >= $1::date',
@@ -111,7 +134,6 @@ export async function GET(req: Request) {
     const params: any[] = [from, to];
     let idx = 3;
 
-    // companyId es obligatorio en este modo (para limitar el scope)
     filters.push(`r."companyId" = $${idx++}`);
     params.push(companyId);
 
@@ -124,15 +146,14 @@ export async function GET(req: Request) {
 
     const sql = `
       SELECT to_char(date_trunc('month', r."createdAtG"), 'YYYY-MM') AS month,
-             ROUND(AVG(r.rating)::numeric, 2)                         AS "avgRating",
-             COUNT(*)                                                  AS reviews
+             ROUND(AVG(r.rating)::numeric, 2) AS "avgRating",
+             COUNT(*) AS reviews
       FROM "Review" r
       ${where}
       GROUP BY 1
       ORDER BY 1 ASC
     `;
 
-    // Nota: usamos $queryRawUnsafe para pasar SQL + params array
     const rows = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
 
     const data = rows.map((x) => ({
@@ -141,7 +162,14 @@ export async function GET(req: Request) {
       reviews: Number(x.reviews),
     }));
 
-    return NextResponse.json({ ok: true, data });
+    return NextResponse.json({
+      ok: true,
+      data,
+      baseline: {
+        reviewsBefore,
+        avgBefore,
+      },
+    });
   }
 
   return bad(400, "mode inválido");

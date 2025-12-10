@@ -6,8 +6,6 @@
   import { Button } from "@/app/components/ui/button";
   import { Input } from "@/app/components/ui/input";
   import { Label } from "@/app/components/ui/label";
-  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
-  import { RadioGroup, RadioGroupItem } from "@/app/components/ui/radio-group";
   import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/ui/avatar";
   import { Badge } from "@/app/components/ui/badge";
   import { Separator } from "@/app/components/ui/separator";
@@ -71,30 +69,7 @@
               </div>
             </div>
 
-            {/* Idioma de la interfaz */}
-            <div className="space-y-2">
-              <Label>Idioma de la interfaz</Label>
-              <Select
-                value={language}
-                onValueChange={(value) => {
-                  setLanguage(value);
-                  handleChange();
-                }}
-              >
-                <SelectTrigger className="rounded-xl max-w-xs">
-                  <div className="flex items-center space-x-2">
-                    <Globe className="h-4 w-4" />
-                    <SelectValue />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="es">🇪🇸 Español</SelectItem>
-                  <SelectItem value="en">🇺🇸 English</SelectItem>
-                  <SelectItem value="pt">🇵🇹 Português</SelectItem>
-                  <SelectItem value="fr">🇫🇷 Français</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+
           </CardContent>
         </Card>
 

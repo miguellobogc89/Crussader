@@ -54,7 +54,6 @@ export default function AccountDangerZone({
       }
 
       alert("Tu usuario se ha eliminado correctamente. Te vamos a desconectar.");
-      // Forzar signout (lado cliente) por ahora:
       window.location.href = "/api/auth/signout";
     } finally {
       setLoadingUserDelete(false);

@@ -25,18 +25,25 @@ export default function ReviewsLayout({ children }: { children: React.ReactNode 
 }*/
 
 
+"use client";
+
+import type { ReactNode } from "react";
 import PageShell from "@/app/components/layouts/PageShell";
 
-export default function ReviewsLayout({ children }: { children: React.ReactNode }) {
+export default function SettingsLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   return (
     <PageShell
-      title="Configuración"
-      description="Ajusta la configuración general de tu cuenta"
+      title="Ajustes de cuenta"
+      description="Gestiona tu perfil, tu cuenta y la configuración general."
+      variant="narrow"
     >
-      <div className="mx-auto w-full max-w-screen-2xl px-3 sm:px-6">
-        {children}
-      </div>
+      {children}
     </PageShell>
   );
 }
+
 
