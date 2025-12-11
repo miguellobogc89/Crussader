@@ -19,9 +19,7 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import Spinner from "@/app/components/crussader/UX/Spinner";
@@ -40,6 +38,7 @@ type TopicApi = {
   mean_age_days?: number | null;
   avg_created_at?: string | null;
   avgCreatedAt?: string | null;
+  is_stable?: boolean | null; // 👈 ya no filtramos aquí
 };
 
 interface TopicData {
@@ -67,7 +66,7 @@ const getColorByScore = (score: number, alpha: number = 0.75): string => {
     const t = score / 2;
     r = 220 + (239 - 220) * t;
     g = 38 + (68 - 38) * t;
-    b = 38 + (68 - 68) * t;
+    b = 38;
   } else if (score <= 3) {
     const t = score - 2;
     r = 239 + (251 - 239) * t;
@@ -84,9 +83,7 @@ const getColorByScore = (score: number, alpha: number = 0.75): string => {
     g = 204 - (204 - 185) * t;
     b = 22 + (129 - 22) * t;
   }
-  return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(
-    b,
-  )}, ${alpha})`;
+  return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${alpha})`;
 };
 
 function deriveAvgAgeDays(t: TopicApi): number | null {
@@ -153,7 +150,9 @@ const FadingTooltip = ({ active, payload }: any) => {
         </div>
         <div className="flex justify-between gap-4">
           <span className="text-muted-foreground">Peso:</span>
-          <span className="font-medium text-foreground">{data.weight}%</span>
+          <span className="font-medium text-foreground">
+            {data.weight}%
+          </span>
         </div>
         <div className="flex justify-between gap-4">
           <span className="text-muted-foreground">Antigüedad media:</span>
@@ -242,6 +241,7 @@ export default function BubbleInsightsChart({
   const [err, setErr] = useState<string | null>(null);
   const [totalReviews, setTotalReviews] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [cw, setCw] = useState(0); // chart width
@@ -259,16 +259,15 @@ export default function BubbleInsightsChart({
     return () => ro.disconnect();
   }, []);
 
-  // escala respecto a un ancho base de 900px, permitiendo bajar más en móvil
+  // escala respecto a un ancho base de 900px
   const baseW = 900;
-  const s = Math.max(0.35, Math.min(1, cw / baseW)); // escala general
-  const fs = Math.max(9, Math.round(12 * s)); // fuente ticks
+  const s = Math.max(0.35, Math.min(1, cw / baseW));
   const mTop = Math.round(32 * s);
-  const mLR = Math.max(40, Math.round(56 * s)); // márgenes laterales
+  const mLR = Math.max(40, Math.round(56 * s));
   const mBot = Math.round(48 * s);
-  const strokeW = Math.max(1, Math.round(2 * s)); // grosor burbuja
-  const showRefLabel = cw >= 380; // evita label en móviles muy estrechos
-  const bubbleScale = Math.max(0.3, Math.min(1, cw / baseW)); // burbujas más pequeñas en móvil
+  const strokeW = Math.max(1, Math.round(2 * s));
+  const showRefLabel = cw >= 380;
+  const bubbleScale = Math.max(0.3, Math.min(1, cw / baseW));
   const zMin = Math.round(80 * bubbleScale);
   const zMax = Math.round(12000 * bubbleScale);
 
@@ -308,37 +307,45 @@ export default function BubbleInsightsChart({
         const topics: TopicApi[] = Array.isArray(json.topics)
           ? json.topics
           : [];
-        const mapped: TopicData[] = topics
-          .map((t) => {
-            const scoreRaw =
-              typeof t.avg_rating === "number" ? t.avg_rating : 0;
-            const score = Math.max(0, Math.min(5, scoreRaw));
-            const percent =
-              typeof t.percent === "number" ? t.percent : 0;
-            const weight = Math.max(
-              0,
-              Math.min(100, Math.round(percent * 100)),
-            );
-            const reviews =
-              typeof t.concepts_count === "number"
-                ? t.concepts_count
-                : typeof t.review_count === "number"
-                ? t.review_count
-                : 0;
 
-            return {
-              id: t.id ?? null,
-              topic: t.label ?? "",
-              description: t.description ?? null,
-              score,
-              weight,
-              avgAge: deriveAvgAgeDays(t),
-              reviews,
-            };
-          })
-          .filter((d) => d.topic && Number.isFinite(d.score));
+        const mapped: TopicData[] = topics.map((t) => {
+          const scoreRaw =
+            typeof t.avg_rating === "number" ? t.avg_rating : 0;
+          const score = Math.max(0, Math.min(5, scoreRaw));
 
-        setData(mapped);
+          const percent =
+            typeof t.percent === "number" ? t.percent : 0;
+          const weight = Math.max(
+            0,
+            Math.min(100, Math.round(percent * 100)),
+          );
+
+          const reviews =
+            typeof t.concepts_count === "number"
+              ? t.concepts_count
+              : typeof t.review_count === "number"
+              ? t.review_count
+              : 0;
+
+          return {
+            id: t.id ?? null,
+            topic: t.label ?? "",
+            description: t.description ?? null,
+            score,
+            weight,
+            avgAge: deriveAvgAgeDays(t),
+            reviews,
+          };
+        });
+
+        const cleaned: TopicData[] = mapped.filter(
+          (d) =>
+            !!d &&
+            !!d.topic &&
+            Number.isFinite(d.score),
+        );
+
+        setData(cleaned);
         setTotalReviews(Number(json.totalReviews ?? 0));
       } catch (e: any) {
         if (!cancelled) {
@@ -355,10 +362,12 @@ export default function BubbleInsightsChart({
     return () => {
       cancelled = true;
     };
-  }, [url, hasFilters]);
+  }, [url, hasFilters, refreshTick]);
 
   const handleRefresh = () => {
+    if (!hasFilters) return;
     setIsRefreshing(true);
+    setRefreshTick((n) => n + 1);
     setTimeout(() => setIsRefreshing(false), 600);
   };
 
@@ -370,17 +379,30 @@ export default function BubbleInsightsChart({
   const minWeight = weights.length ? Math.min(...weights) : 0;
   const denom = Math.max(1, maxWeight - minWeight);
 
+  // 👉 calcular edad máxima para invertir el eje Y
+  const ages = data.map((d) =>
+    Number.isFinite(d.avgAge ?? NaN) ? (d.avgAge as number) : 0,
+  );
+  const maxAge = ages.length ? Math.max(...ages) : 0;
+
   const chartData = data.map((item) => {
     const weight = Number.isFinite(item.weight) ? item.weight : 0;
     const score = Number.isFinite(item.score) ? item.score : 0;
     const age = Number.isFinite(item.avgAge ?? NaN)
       ? (item.avgAge as number)
       : 0;
+
     const normalizedWeight = (weight - minWeight) / denom; // 0..1
     const scaledSize =
-      Math.pow(Math.max(0, normalizedWeight), 0.6) * 1800 * bubbleScale +
+      Math.pow(Math.max(0, normalizedWeight), 0.6) *
+        1800 *
+        bubbleScale +
       200;
-    return { ...item, x: score, y: age, z: scaledSize };
+
+    // 🔁 invertimos la edad: arriba = más reciente
+    const invertedAge = maxAge > 0 ? maxAge - age : age;
+
+    return { ...item, x: score, y: invertedAge, z: scaledSize };
   });
 
   const showChart = !isLoading;
@@ -389,12 +411,12 @@ export default function BubbleInsightsChart({
     <Card className="w-full bg-card border-border shadow-sm">
       <CardHeader className="pb-4">
         <div className="flex items-start justify-between gap-4">
-
+          {/* podrías mostrar totalReviews/err aquí si quieres */}
           <Button
             variant="ghost"
             size="sm"
             onClick={handleRefresh}
-            disabled={isRefreshing}
+            disabled={isRefreshing || !hasFilters}
             className="shrink-0 h-8 px-3 text-xs border border-border/50 hover:bg-accent"
           >
             <RefreshCw
@@ -434,43 +456,36 @@ export default function BubbleInsightsChart({
                   opacity={0.15}
                 />
 
-                <XAxis
-                  type="number"
-                  dataKey="x"
-                  domain={[0.9, 5.1]}
-                  ticks={[1, 2, 3, 4, 5]}
-                  allowDataOverflow={false}
-                  stroke="hsl(var(--muted-foreground))"
-                  tick={{
-                    fill: "hsl(var(--muted-foreground))",
-                    fontSize: fs,
-                  }}
-                  tickLine={{
-                    stroke: "hsl(var(--border))",
-                    opacity: 0.4,
-                  }}
-                  axisLine={{
-                    stroke: "hsl(var(--border))",
-                    opacity: 0.4,
-                  }}
-                >
-                  <Label
-                    value="Puntuación (1–5)"
-                    position="bottom"
-                    offset={Math.round(20 * s)}
-                    style={{
-                      fill: "hsl(var(--muted-foreground))",
-                      fontSize: fs,
-                      fontWeight: 500,
-                    }}
-                  />
-                </XAxis>
+<XAxis
+  type="number"
+  dataKey="x"
+  domain={[0, 5.1]}              // 👈 incluimos el 0
+  ticks={[0, 1, 2, 3, 4, 5]}     // opcional: mostramos también el 0
+  allowDataOverflow={false}
+  tick={false}
+  tickLine={false}
+  axisLine={{
+    stroke: "hsl(var(--border))",
+    opacity: 0.4,
+  }}
+>
+  <Label
+    value="Puntuación (0–5)"
+    position="bottom"
+    offset={Math.round(20 * s)}
+    style={{
+      fill: "hsl(var(--muted-foreground))",
+      fontSize: 11,
+      fontWeight: 500,
+    }}
+  />
+</XAxis>
 
-                {/* Y oculto por completo (solo usamos la posición) */}
+
+                {/* Y oculto: 0 abajo = más antiguo, arriba = más reciente */}
                 <YAxis
                   type="number"
                   dataKey="y"
-                  reversed
                   domain={[
                     0,
                     (dataMax: number) =>
@@ -497,7 +512,7 @@ export default function BubbleInsightsChart({
                           value: "Umbral crítico",
                           position: "top",
                           fill: "hsl(var(--muted-foreground))",
-                          fontSize: fs - 1,
+                          fontSize: 10,
                         }
                       : undefined
                   }
@@ -520,10 +535,14 @@ export default function BubbleInsightsChart({
                     content={<SafePointLabel />}
                   />
                   {chartData.map((entry, index) => {
-                    const sizeRatio =
-                      (entry.z - 200) / (2000 - 200);
-                    const baseAlpha =
-                      0.2 + sizeRatio * 0.25;
+                    const sizeRatio = Math.max(
+                      0,
+                      Math.min(
+                        1,
+                        (entry.z - 200) / (2000 - 200),
+                      ),
+                    );
+                    const baseAlpha = 0.2 + sizeRatio * 0.25;
                     return (
                       <Cell
                         key={`cell-${index}`}
@@ -596,13 +615,6 @@ export default function BubbleInsightsChart({
             <div className="text-muted-foreground">
               <span className="font-medium">Tamaño</span> = Peso %
             </div>
-          </div>
-          <div className="mt-3 p-2 bg-muted/30 rounded-lg">
-            <p className="text-[11px] text-muted-foreground">
-              💡{" "}
-              <span className="font-medium">Zona crítica:</span>{" "}
-              Izquierda-inferior = problemas recientes con alto impacto
-            </p>
           </div>
         </div>
       </CardContent>

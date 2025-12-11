@@ -5,7 +5,7 @@
 // ======================================================
 
 import { prisma } from "@/app/server/db";
-import { extractConceptsFromReview } from "./extractConcepts";
+import { extractConceptsFromReview } from "../../server/concepts/extractConcepts";
 
 type RawReview = {
   id: string;

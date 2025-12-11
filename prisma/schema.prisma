@@ -8,12 +8,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// *
-/// * =========================
-/// * Core Auth
-/// * =========================
-
-
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique
@@ -448,6 +442,7 @@ model Lead {
   @@index([ownerId])
   @@index([status])
 }
+
 model WebchatSite {
   id             String            @id @default(cuid())
   companyId      String
@@ -1367,6 +1362,7 @@ model concept {
   rating      Int?
   review_date DateTime? @db.Timestamptz(6)
   location_id String?
+  structured  Json?
   review      Review?   @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   topic       topic?    @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
 
@@ -1761,15 +1757,18 @@ model google_gbp_reviews {
   updated_at                 DateTime              @default(now()) @db.Timestamptz(6)
   reply_comment              String?
   reply_update_time          DateTime?             @db.Timestamptz(6)
+  reviewid                   String?               @db.VarChar
   google_gbp_responses       google_gbp_responses?
   Company                    Company               @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_google_gbp_reviews_company")
   google_gbp_location        google_gbp_location?  @relation(fields: [gbp_location_id], references: [id], onUpdate: NoAction, map: "fk_google_gbp_reviews_gbp_location")
   Location                   Location?             @relation(fields: [location_id], references: [id], onUpdate: NoAction, map: "fk_google_gbp_reviews_location")
+  Review                     Review?               @relation(fields: [reviewid], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_google_gbp_reviews_review")
 
   @@unique([company_id, google_review_id], map: "google_gbp_reviews_uniq_company_review")
   @@index([company_id], map: "idx_google_gbp_reviews_company")
   @@index([gbp_location_id], map: "idx_google_gbp_reviews_gbp_location")
   @@index([location_id], map: "idx_google_gbp_reviews_location")
+  @@index([reviewid], map: "idx_google_gbp_reviews_reviewid")
 }
 
 model google_gbp_responses {
@@ -1788,36 +1787,37 @@ model google_gbp_responses {
 }
 
 model Review {
-  id                String          @id @default(cuid())
-  companyId         String
-  locationId        String
-  provider          ReviewProvider
-  externalId        String
-  reviewerName      String?
-  reviewerPhoto     String?
-  reviewerAnon      Boolean?
-  rating            Int
-  comment           String?
-  languageCode      String?         @db.VarChar(8)
-  createdAtG        DateTime?
-  updatedAtG        DateTime?
-  replyComment      String?
-  replyUpdatedAtG   DateTime?
-  ingestedAt        DateTime        @default(now())
-  updatedAt         DateTime        @default(now()) @updatedAt
-  isTest            Boolean         @default(false)
-  is_conceptualized Boolean         @default(false)
-  responded         Boolean         @default(false)
-  respondedAt       DateTime?       @db.Timestamptz(6)
-  respondedSource   ResponseOrigin?
-  responseDelaySec  Int?
-  jobs              Job[]
-  Notification      Notification[]
-  responses         Response[]
-  Company           Company         @relation("CompanyReviews", fields: [companyId], references: [id], onDelete: Cascade)
-  Location          Location        @relation("LocationReviews", fields: [locationId], references: [id], onDelete: Cascade)
-  analysis          ReviewAnalysis?
-  concept           concept[]
+  id                 String               @id @default(cuid())
+  companyId          String
+  locationId         String
+  provider           ReviewProvider
+  externalId         String
+  reviewerName       String?
+  reviewerPhoto      String?
+  reviewerAnon       Boolean?
+  rating             Int
+  comment            String?
+  languageCode       String?              @db.VarChar(8)
+  createdAtG         DateTime?
+  updatedAtG         DateTime?
+  replyComment       String?
+  replyUpdatedAtG    DateTime?
+  ingestedAt         DateTime             @default(now())
+  updatedAt          DateTime             @default(now()) @updatedAt
+  isTest             Boolean              @default(false)
+  is_conceptualized  Boolean              @default(false)
+  responded          Boolean              @default(false)
+  respondedAt        DateTime?            @db.Timestamptz(6)
+  respondedSource    ResponseOrigin?
+  responseDelaySec   Int?
+  jobs               Job[]
+  Notification       Notification[]
+  responses          Response[]
+  Company            Company              @relation("CompanyReviews", fields: [companyId], references: [id], onDelete: Cascade)
+  Location           Location             @relation("LocationReviews", fields: [locationId], references: [id], onDelete: Cascade)
+  analysis           ReviewAnalysis?
+  concept            concept[]
+  google_gbp_reviews google_gbp_reviews[]
 
   @@unique([provider, externalId])
   @@index([companyId])

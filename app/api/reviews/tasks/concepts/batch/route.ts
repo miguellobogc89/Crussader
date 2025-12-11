@@ -1,6 +1,6 @@
 // app/api/reviews/tasks/concepts/batch/route.ts
 import { NextResponse } from "next/server";
-import { processUnconceptualizedBatch } from "@/app/server/concepts/processBatch";
+import { processUnconceptualizedBatch } from "@/app/api/_archive/processBatch";
 
 // GET /api/reviews/tasks/concepts/batch?locationId=...&limit=50
 export async function GET(req: Request) {
