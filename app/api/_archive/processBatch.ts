@@ -81,25 +81,7 @@ export async function processUnconceptualizedForLocation(locationId: string, lim
     const rating = normalizeRating(r.rating);
 
     // 🔹 Insertar 1 concept por ítem extraído
-    for (const item of extracted) {
-      if (!item?.label) continue;
 
-      await prisma.concept.create({
-        data: {
-          label: item.label,
-          model: "gpt-4o-mini",
-          review_id: r.id,
-          sentiment: item.sentiment ?? null,
-          confidence:
-            typeof item.confidence === "number" ? item.confidence : null,
-          relevance: 1,
-          rating: rating ?? undefined,
-          review_date: reviewDateISO ? new Date(reviewDateISO) : undefined,
-        },
-      });
-
-      insertedConcepts++;
-    }
 
     // 🔹 Marcar la review como conceptualizada
     await prisma.review.update({

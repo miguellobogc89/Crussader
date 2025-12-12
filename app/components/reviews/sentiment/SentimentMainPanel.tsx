@@ -1,4 +1,3 @@
-// app/components/reviews/sentiment/SentimentMainPanel.tsx
 "use client";
 
 import * as React from "react";
@@ -17,6 +16,8 @@ type SentimentMainPanelProps = {
 
 export default function SentimentMainPanel(props: SentimentMainPanelProps) {
   const {
+    title,
+    description,
     isLoading = false,
     onRefresh,
     toolbarLeft,
@@ -26,18 +27,15 @@ export default function SentimentMainPanel(props: SentimentMainPanelProps) {
 
   return (
     <div className="w-full flex flex-col gap-4 p-0 m-0">
-      {/* Toolbar superior */}
       <div className="flex flex-wrap items-center justify-between gap-2 p-0 m-0">
-        {/* Izquierda: selector de ubicación, filtros, etc. */}
         <div className="flex flex-wrap items-center gap-2 p-0 m-0">
           {toolbarLeft}
         </div>
 
-        {/* Derecha: botones, switches, settings… */}
         <div className="flex flex-wrap items-center gap-2 p-0 m-0">
           {toolbarRight}
 
-          {onRefresh && (
+          {onRefresh ? (
             <button
               type="button"
               disabled={isLoading}
@@ -56,12 +54,24 @@ export default function SentimentMainPanel(props: SentimentMainPanelProps) {
                 </>
               )}
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
-      {/* Contenido principal: charts, tabla, lo que sea */}
-      <div className="w-full p-0 m-0">{children}</div>
+      <div className="w-full p-0 m-0">
+        {title || description ? (
+          <div className="mb-3">
+            {title ? (
+              <div className="text-lg font-semibold text-slate-900">{title}</div>
+            ) : null}
+            {description ? (
+              <div className="text-sm text-slate-600">{description}</div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {children}
+      </div>
     </div>
   );
 }

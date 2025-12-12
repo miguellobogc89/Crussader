@@ -1,24 +1,28 @@
-// app/dashboard/reviews/sentiment/page.tsx
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useBootstrapData } from "@/app/providers/bootstrap-store";
 import LocationSelector from "@/app/components/crussader/LocationSelector";
-import BubbleInsightsChart from "@/app/components/charts/BubbleInsightsChart";
 import TopicsUpdater from "@/app/components/insights/TopicsUpdater";
 import ConceptsUpdater from "@/app/components/insights/ConceptsUpdater";
 import TopicsList from "@/app/components/insights/TopicsList";
 import SentimentMainPanel from "@/app/components/reviews/sentiment/SentimentMainPanel";
 
+import TopicsBarsPanel, {
+  type TopicBarRow,
+} from "@/app/components/insights/TopicsBarsPanel";
+
 function rangeDefaults() {
   const today = new Date();
   const to = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
-  const from = new Date(
-    Date.UTC(to.getUTCFullYear(), to.getUTCMonth() - 11, 1)
-  );
+  const from = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth() - 11, 1));
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
   return { from: fmt(from), to: fmt(to) };
 }
+
+type TopicsTopResponse =
+  | { ok: true; topics: TopicBarRow[] }
+  | { ok: false; error?: string };
 
 export default function SentimentPage() {
   const boot = useBootstrapData();
@@ -28,15 +32,68 @@ export default function SentimentPage() {
   const [locationId, setLocationId] = useState<string | null>(null);
   const topRef = useRef<HTMLDivElement | null>(null);
 
+  const [topics, setTopics] = useState<TopicBarRow[]>([]);
+  const [loadingTopics, setLoadingTopics] = useState(false);
+  const [topicsError, setTopicsError] = useState<string | null>(null);
+
+  const topicsQueryUrl = useMemo(() => {
+    if (!locationId) return null;
+    const u = new URL("/api/reviews/topics/top", window.location.origin);
+    u.searchParams.set("locationId", locationId);
+    u.searchParams.set("limit", "5");
+    u.searchParams.set("from", from);
+    u.searchParams.set("to", to);
+    return u.toString();
+  }, [locationId, from, to]);
+
+  async function fetchTopics() {
+    if (!topicsQueryUrl) {
+      setTopics([]);
+      setTopicsError(null);
+      return;
+    }
+
+    setLoadingTopics(true);
+    setTopicsError(null);
+
+    try {
+      const res = await fetch(topicsQueryUrl, { cache: "no-store" });
+      const json = (await res.json().catch(() => null)) as TopicsTopResponse | null;
+
+      if (!res.ok || !json || json.ok === false) {
+        const msg =
+          (json && "error" in json && typeof json.error === "string" && json.error) ||
+          `HTTP ${res.status}`;
+        setTopics([]);
+        setTopicsError(msg);
+        return;
+      }
+
+      setTopics(Array.isArray(json.topics) ? json.topics : []);
+    } catch (e) {
+      setTopics([]);
+      setTopicsError(e instanceof Error ? e.message : "Error desconocido");
+    } finally {
+      setLoadingTopics(false);
+    }
+  }
+
+  useEffect(() => {
+    // Auto-fetch al cambiar location o rango
+    fetchTopics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topicsQueryUrl]);
+
   return (
     <div
       ref={topRef}
       className="mx-auto w-full max-w-screen-2xl px-3 sm:px-6 py-6 sm:py-8 space-y-6"
     >
-      {/* Panel principal: toolbar (selector + botones) + gráfico */}
       <SentimentMainPanel
-        title="Análisis de temas y sentimiento"
-        description="Visualiza los temas más relevantes en tus reseñas y su impacto en la satisfacción de tus clientes."
+        title="¿Cómo me perciben mis clientes?"
+        description="Explora los principales topics detectados en tus reseñas y profundiza en cada uno."
+        isLoading={loadingTopics}
+        onRefresh={locationId ? fetchTopics : undefined}
         toolbarLeft={
           <LocationSelector
             onSelect={(id) => {
@@ -62,47 +119,28 @@ export default function SentimentPage() {
               limit={500}
               minTopicSize={2}
               onDone={() => {
-                // aquí luego podemos refrescar datos del gráfico si hace falta
+                // Tras reconstruir topics, refrescamos la vista
+                fetchTopics();
               }}
             />
           </div>
         }
       >
-        <BubbleInsightsChart
-          companyId={activeCompanyId}
-          locationId={locationId}
-          from={from}
-          to={to}
-          previewN={12}
+        <TopicsBarsPanel
+          topics={topics}
+          topN={5}
+          emptyLabel={
+            !locationId
+              ? "Selecciona una ubicación para ver los topics."
+              : topicsError
+              ? `No se pudieron cargar los topics: ${topicsError}`
+              : loadingTopics
+              ? "Cargando topics…"
+              : "No hay topics para este rango."
+          }
         />
       </SentimentMainPanel>
 
-      {/* Banner explicativo */}
-      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-900">
-        <p className="font-medium mb-2">Cómo interpretar este gráfico</p>
-        <ul className="list-disc pl-5 space-y-1">
-          <li>
-            <strong>Más a la derecha</strong> = mejores opiniones.
-          </li>
-          <li>
-            <strong>Más arriba</strong> = tema más reciente en las reseñas.
-          </li>
-          <li>
-            <strong>Burbujas grandes</strong> = aparece con más frecuencia.
-          </li>
-          <li>
-            Actúa primero sobre las{" "}
-            <strong>grandes arriba-izquierda</strong> (problemas recientes y
-            frecuentes).
-          </li>
-          <li>
-            Refuerza las <strong>grandes arriba-derecha</strong> (puntos fuertes
-            recientes).
-          </li>
-        </ul>
-      </div>
-
-      {/* Lista de topics */}
       <TopicsList
         companyId={activeCompanyId}
         locationId={locationId ?? undefined}

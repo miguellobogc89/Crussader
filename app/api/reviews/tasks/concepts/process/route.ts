@@ -104,6 +104,7 @@ export async function GET(req: Request) {
             relevance: 1,
             rating,
             review_date: reviewDate,
+            location_id: locationId,
 
             // 🔥 Nuevo: payload estructurado completo
             structured: {

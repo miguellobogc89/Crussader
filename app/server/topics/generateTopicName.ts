@@ -1,98 +1,125 @@
 // app/server/topics/generateTopicName.ts
-//
-// Genera un nombre de topic a partir de un cluster de conceptos.
-// Usa los conceptos representativos (previewSummaries) y datos del negocio
-// para producir un nombre ESPECÍFICO, ACCIONABLE y COHERENTE con el sector.
-//
-// Ejemplos de salida esperada:
-//  - “Precio del cucurucho percibido como alto”
-//  - “Sabor del helado de pistacho muy valorado”
-//  - “Demoras en el servicio entre 12:00–14:00”
-//  - “Falta de opciones sin lactosa”
-//  - “Amabilidad del personal muy apreciada”
-//  - “Variedad de sabores insuficiente”
-//
-
 import { openai } from "../openaiClient";
 
+const MODEL = "gpt-4o-mini";
+
+type ClusterInput = {
+  previewSummaries: string[];
+};
+
+type TopicContext = {
+  businessType?: string | null;
+  activityName?: string | null;
+};
+
+/**
+ * Genera un nombre de topic NEUTRO a partir de un cluster de concepts.
+ *
+ * Reglas:
+ * - Nombre corto (3–10 palabras).
+ * - SIN juicio: no usar "positivo", "negativo", "valorado", "satisfecho",
+ *   "queja", "encantado", "contento", etc.
+ * - Describe el TEMA, no el SENTIMIENTO.
+ * - Si hay productos/servicios concretos repetidos (sabores, platos, etc.),
+ *   incluir 1–3 ejemplos entre paréntesis al final:
+ *     "Sabores favoritos de los clientes (chocolate, italiano, polvito)"
+ */
 export async function generateTopicName(
-  cluster: {
-    previewSummaries: string[];
-  },
-  options: {
-    businessType?: string | null;
-    activityName?: string | null;
-  } = {},
+  cluster: ClusterInput,
+  context?: TopicContext,
 ): Promise<string> {
-  const { businessType, activityName } = options;
+  const { previewSummaries } = cluster;
+  const { businessType, activityName } = context ?? {};
 
-  // Seleccionamos 2–3 summaries representativas
-  const summaries = cluster.previewSummaries.slice(0, 3);
-  const joinedSummaries = summaries.map((s) => `- ${s}`).join("\n");
+  if (!previewSummaries || previewSummaries.length === 0) {
+    return "Tema general";
+  }
 
-  const sys = [
-    "Eres un analista experto en tendencias de clientes.",
-    "Tu misión es sintetizar varios conceptos similares en UN ÚNICO topic claro, preciso y accionable.",
-    "",
-    "Un buen nombre de topic debe:",
-    " - Ser muy específico.",
-    " - Reflejar el patrón común de los summaries.",
-    " - Ser coherente con el tipo de negocio indicado.",
-    " - Evitar títulos genéricos como “Buen servicio”, “Calidad general”, “Experiencia positiva”.",
-    " - Evitar frases largas, máximo ~10–12 palabras.",
-    " - Ser útil para tomar decisiones: precio, sabor, disponibilidad, tiempos, trato, instalaciones, resultados…",
-    "",
-    "Ejemplos de nombres válidos:",
-    "  · “Precio del cucurucho percibido como alto”",
-    "  · “Falta de opciones sin lactosa”",
-    "  · “Alta valoración del helado de pistacho”",
-    "  · “Demoras en el servicio en horas punta”",
-    "  · “Amabilidad del personal muy apreciada”",
-    "",
-    "Ejemplos de nombres NO válidos:",
-    "  ✘ “Buen servicio”",
-    "  ✘ “Clientes contentos”",
-    "  ✘ “Comentarios positivos”",
-    "",
-    businessType
-      ? `Tipo de negocio: ${businessType}. El nombre del topic debe ajustarse a este tipo de negocio.`
-      : "",
-    activityName
-      ? `Actividad específica: ${activityName}. El topic debe ser coherente con esta actividad.`
-      : "",
-    "",
-    "Prohibido inventar sectores que no correspondan al tipo de negocio.",
-    "Si en los summaries aparece vocabulario ajeno al sector, neutralízalo.",
-    "",
-    "Devuelve SOLO una frase corta, sin comillas ni explicaciones."
-  ]
-    .filter(Boolean)
-    .join("\n");
+const sysLines = [
+  "Eres un asistente experto en análisis de experiencia de cliente.",
+  "Tu tarea es poner NOMBRE a un TEMA (topic) que agrupa varias opiniones de clientes.",
+  "",
+  "El nombre del topic debe ser NEUTRO, sin juicio.",
+  "NO expreses si la opinión es buena o mala. Eso lo mostrará el dashboard.",
+  "",
+  "REGLA CRÍTICA (muy estricta):",
+  "- PROHIBIDO mencionar productos/sabores/servicios concretos o ejemplos: nada de 'limón', 'chocolate', 'brownie', etc.",
+  "- PROHIBIDO usar paréntesis con ejemplos.",
+  "",
+  "El nombre del topic debe caer en UNA de estas familias (elige la más adecuada):",
+  "- Variedad de productos",
+  "- Calidad del producto",
+  "- Calidad del servicio",
+  "- Precio y valor percibido",
+  "- Instalaciones y limpieza",
+  "- Tiempos de espera y organización",
+  "- Accesibilidad",
+  "",
+  "Si el cluster habla de sabores o productos específicos → usa 'Calidad del producto' o 'Variedad de productos' según corresponda.",
+  "Si habla de trato, atención, profesionalidad → usa 'Calidad del servicio'.",
+  "Si habla de caro/barato/relación calidad-precio → usa 'Precio y valor percibido'.",
+  "",
+  "Devuelve SOLO el nombre exacto en una línea, sin comillas y sin punto final.",
+];
+
+
+  if (businessType) {
+    sysLines.push(
+      `Tipo de negocio: ${businessType}. Alinea el nombre del topic con este tipo de negocio.`,
+    );
+  }
+  if (activityName) {
+    sysLines.push(
+      `Actividad concreta: ${activityName}. Ajusta el lenguaje al contexto de esta actividad.`,
+    );
+  }
+
+  const sys = sysLines.join("\n");
 
   const user = [
-    "Genera un nombre de topic representativo para este conjunto de conceptos:",
+    "Tienes un conjunto de RESÚMENES de opiniones de clientes que pertenecen al MISMO tema.",
+    "Genera un único nombre de topic NEUTRO siguiendo las reglas.",
     "",
-    joinedSummaries,
+    "RESÚMENES DEL CLUSTER:",
+    ...previewSummaries.map((s, i) => `- (${i + 1}) ${s}`),
     "",
-    "Devuelve SOLO la frase final."
+    "Recuerda:",
+    "- No expreses si son opiniones buenas o malas.",
+    "- No uses palabras de valoración (positivo, negativo, valorado, satisfacción, etc.).",
+    "- Usa un nombre corto, claro y que represente el tema.",
+    "- Si procede, añade 1–3 ejemplos de productos/servicios entre paréntesis.",
+    "",
+    "Devuelve SOLO el nombre del topic en una única línea, sin comillas y sin punto final.",
   ].join("\n");
 
   try {
     const resp = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.1,
-      max_tokens: 50,
+      model: MODEL,
+      temperature: 0.2,
+      max_tokens: 80,
       messages: [
         { role: "system", content: sys },
-        { role: "user", content: user }
-      ]
+        { role: "user", content: user },
+      ],
     });
 
-    const raw = resp.choices?.[0]?.message?.content?.trim() ?? "";
+    let name = resp.choices?.[0]?.message?.content?.trim() ?? "";
 
-    return raw.replace(/^"|"$/g, "").trim(); // por si devuelve comillas
+    // Limpieza mínima: quitar comillas o puntos finales si los ha puesto igual.
+    name = name.replace(/^["'«»]+/, "").replace(/["'«».…]+$/, "").trim();
+
+    if (!name) {
+      return "Tema general";
+    }
+
+    // Fallback de longitud por si se va de madre
+    if (name.length > 120) {
+      name = name.slice(0, 120).trim();
+    }
+
+    return name;
   } catch (err) {
     console.error("generateTopicName error:", err);
-    return "Topic sin nombre";
+    return "Tema general";
   }
 }

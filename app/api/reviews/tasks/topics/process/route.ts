@@ -1,3 +1,4 @@
+// app/api/reviews/tasks/topics/process/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/server/db";
 
@@ -7,16 +8,15 @@ export const revalidate = 0;
 function normalizeTopicLabel(label: string | null | undefined): string {
   if (!label) return "";
   return label
-    .normalize("NFD") // separa tildes
-    .replace(/[\u0300-\u036f]/g, "") // quita tildes
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/[^a-z0-9áéíóúüñ\s]/gi, " ") // limpia signos raros
-    .replace(/\s+/g, " ") // colapsa espacios
+    .replace(/[^a-z0-9áéíóúüñ\s]/gi, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
-// 🔧 Construye una clave compacta para el topic
-// Usamos las primeras 5 palabras del label normalizado.
+// 🔧 Construye una clave compacta para el topic (primeras 5 palabras)
 function buildTopicKey(normalizedLabel: string): string {
   const words = normalizedLabel.split(" ").filter(Boolean);
   if (words.length <= 5) return normalizedLabel;
@@ -26,9 +26,8 @@ function buildTopicKey(normalizedLabel: string): string {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const locationId = searchParams.get("locationId");
+    const locationId = (searchParams.get("locationId") ?? "").trim();
 
-    // 👇 Solo aplicamos recency si VIENE en el querystring
     const recencyParam = searchParams.get("recencyDays");
     const hasRecencyFilter = recencyParam !== null;
     const recencyDays = hasRecencyFilter
@@ -47,10 +46,15 @@ export async function GET(req: Request) {
       );
     }
 
-    // 1) Conceptos candidatos
-    //    Si hay recencyDays en el query: filtramos por fecha.
-    //    Si no, usamos TODAS las reseñas de esa location.
-    let concepts: { id: string; label: string; rating: number | null; topic_id: string | null }[];
+    // 1) Conceptos candidatos (YA usamos concept.location_id)
+    //    Si hay recencyDays: filtramos por concept.review_date (que ya guardas).
+    //    Además evitamos re-linkear a topics estables.
+    let concepts: {
+      id: string;
+      label: string;
+      rating: number | null;
+      topic_id: string | null;
+    }[];
 
     if (hasRecencyFilter) {
       concepts = await prisma.$queryRaw<
@@ -58,10 +62,9 @@ export async function GET(req: Request) {
       >`
         SELECT c.id::text, c.label, c.rating, c.topic_id
         FROM concept c
-        JOIN "Review" r ON r.id = c.review_id
         LEFT JOIN topic t ON t.id = c.topic_id
-        WHERE r."locationId" = ${locationId}
-          AND COALESCE(r."createdAtG", r."ingestedAt")
+        WHERE c.location_id = ${locationId}
+          AND COALESCE(c.review_date, c.created_at)
               >= now() - (${recencyDays}::int || ' days')::interval
           AND (c.topic_id IS NULL OR COALESCE(t.is_stable, false) = false)
         ORDER BY c.updated_at DESC NULLS LAST
@@ -73,9 +76,8 @@ export async function GET(req: Request) {
       >`
         SELECT c.id::text, c.label, c.rating, c.topic_id
         FROM concept c
-        JOIN "Review" r ON r.id = c.review_id
         LEFT JOIN topic t ON t.id = c.topic_id
-        WHERE r."locationId" = ${locationId}
+        WHERE c.location_id = ${locationId}
           AND (c.topic_id IS NULL OR COALESCE(t.is_stable, false) = false)
         ORDER BY c.updated_at DESC NULLS LAST
         LIMIT ${limit}
@@ -92,12 +94,13 @@ export async function GET(req: Request) {
       });
     }
 
-    // 2) Cargar topics existentes y mapearlos por clave normalizada
+    // 2) Cargar SOLO topics de esa location (clave: no mezclar ubicaciones)
     const existingTopics = await prisma.$queryRaw<
       { id: string; label: string; is_stable: boolean | null }[]
     >`
       SELECT t.id::text, t.label, t.is_stable
       FROM topic t
+      WHERE t.location_id = ${locationId}
     `;
 
     const byKey = new Map<string, { id: string; stable: boolean }>();
@@ -114,7 +117,7 @@ export async function GET(req: Request) {
       }
     }
 
-    // 3) Upsert por clave normalizada
+    // 3) Crear / enlazar por clave normalizada (scope: location)
     let createdTopics = 0;
     let linked = 0;
 
@@ -127,10 +130,8 @@ export async function GET(req: Request) {
 
       const entry = byKey.get(key);
       let topicId = entry?.id ?? null;
-      const topicStable = entry?.stable ?? false;
 
       if (topicId) {
-        // topic existente → solo enlazamos concept
         await prisma.concept.update({
           where: { id: c.id },
           data: { topic_id: topicId },
@@ -139,28 +140,43 @@ export async function GET(req: Request) {
         continue;
       }
 
-      // Nuevo topic inestable con el label del concept
-      const created = await prisma.topic.create({
-        data: {
-          label: c.label,
-          is_stable: false,
-        },
-        select: { id: true },
-      });
+// 1) Intentar reutilizar si ya existe (por label exacto en esta location)
+const existing = await prisma.topic.findFirst({
+  where: {
+    location_id: locationId,
+    label: c.label,
+  },
+  select: { id: true },
+});
 
-      topicId = created.id;
-      byKey.set(key, { id: topicId, stable: false });
-      createdTopics++;
+let newTopicId = existing?.id ?? null;
 
-      await prisma.concept.update({
-        where: { id: c.id },
-        data: { topic_id: topicId },
-      });
-      linked++;
+if (!newTopicId) {
+  const created = await prisma.topic.create({
+    data: {
+      label: c.label,
+      is_stable: false,
+      location_id: locationId,
+    },
+    select: { id: true },
+  });
+
+  newTopicId = created.id;
+  createdTopics++;
+}
+
+byKey.set(key, { id: newTopicId, stable: false });
+
+await prisma.concept.update({
+  where: { id: c.id },
+  data: { topic_id: newTopicId },
+});
+linked++;
+
     }
 
-    // 4) Recalcular métricas básicas
-    await prisma.$executeRawUnsafe(`
+    // 4) Recalcular métricas SOLO para topics de esta location
+    await prisma.$executeRaw`
       UPDATE topic t SET
         concept_count = sub.cnt,
         avg_rating   = sub.avg
@@ -170,10 +186,12 @@ export async function GET(req: Request) {
                AVG(c.rating)::float AS avg
         FROM concept c
         WHERE c.topic_id IS NOT NULL
+          AND c.location_id = ${locationId}
         GROUP BY c.topic_id
       ) sub
       WHERE t.id = sub.topic_id
-    `);
+        AND t.location_id = ${locationId}
+    `;
 
     return NextResponse.json({
       ok: true,
