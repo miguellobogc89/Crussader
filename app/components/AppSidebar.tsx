@@ -50,10 +50,10 @@ const MYBUSINESS: NavItem = {
 };
 
 const INTEGRATIONS: NavItem = {
-  title: "Conexiones",
-  href: "/dashboard/integrations",
-  icon: "🔌",
-  description: "Conecta tus plataformas sociales",
+  title: "Labs",
+  href: "/dashboard/labs",
+  icon: "🧪",
+  description: "Próximas funcionalidades en Crussader",
 };
 
 export function AppSidebar() {

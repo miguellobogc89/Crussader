@@ -1,6 +1,6 @@
 // app/auth/register/page.tsx
 import { Suspense } from "react";
-import RegisterClient from "./RegisterClient_old";
+import RegisterClient from "./RegisterClient";
 
 export const metadata = { title: "Crear cuenta — Crussader" };
 

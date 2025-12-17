@@ -14,14 +14,14 @@ const inter = Inter({
 export const metadata = {
   metadataBase: new URL("https://www.crussader.com"),
   title: {
-    default: "Crussader — Respuestas de IA para reseñas",
+    default: "Crussader",
     template: "%s · Crussader",
   },
   description:
     "Gestiona reseñas con IA: voz de marca, notificaciones y reportes.",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Crussader — Respuestas de IA para reseñas",
+    title: "Crussader",
     description: "Configura tu voz de marca y responde reseñas en minutos.",
     url: "https://www.crussader.com",
     siteName: "Crussader",

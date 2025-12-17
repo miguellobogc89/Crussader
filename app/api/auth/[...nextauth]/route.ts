@@ -13,7 +13,6 @@ const adminEmail = "miguel.lobogc.89@gmail.com";
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
 
-  /* 🔹 BLOQUE NUEVO: cookies dev/producción */
   cookies: {
     sessionToken: {
       name:
@@ -28,10 +27,8 @@ export const authOptions: NextAuthOptions = {
       },
     },
   },
-  /* 🔹 FIN DEL BLOQUE NUEVO */
 
   providers: [
-    // --- Credenciales (email + password) ---
     Credentials({
       name: "Credentials",
       credentials: {
@@ -39,8 +36,9 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(creds) {
-        if (!creds?.email || !creds?.password)
+        if (!creds?.email || !creds?.password) {
           throw new Error("MISSING_CREDENTIALS");
+        }
 
         const email = creds.email.trim().toLowerCase();
         const user = await prisma.user.findUnique({ where: { email } });
@@ -82,13 +80,12 @@ export const authOptions: NextAuthOptions = {
         return {
           id: user.id,
           name: user.name ?? "",
-          email: user.email!,
+          email: user.email ?? "",
           role: user.role,
         };
       },
     }),
 
-    // --- Google OAuth ---
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
@@ -102,13 +99,11 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
 
-  // Página de login separada
   pages: {
     signIn: "/auth/login",
   },
 
   callbacks: {
-    // 🔹 Lógica de alta/verificación con Google
     async signIn({ user, account, profile }) {
       if (account?.provider !== "google") return true;
 
@@ -119,34 +114,81 @@ export const authOptions: NextAuthOptions = {
         (profile as any)?.email_verified === true ||
         (profile as any)?.email_verified === "true";
 
-      // 🔎 Buscamos usuario en Prisma por email
+      function extractNames(p: any, fallbackFullName: string) {
+        let first_name = "";
+        let last_name = "";
+
+        if (p && typeof p.given_name === "string") {
+          first_name = p.given_name.trim();
+        }
+
+        if (p && typeof p.family_name === "string") {
+          last_name = p.family_name.trim();
+        }
+
+        if (first_name === "" && last_name === "") {
+          let full = "";
+
+          if (p && typeof p.name === "string") {
+            full = p.name.trim();
+          } else {
+            full = (fallbackFullName || "").trim();
+          }
+
+          if (full !== "") {
+            const parts = full.split(/\s+/);
+            first_name = (parts[0] || "").trim();
+            last_name = parts.slice(1).join(" ").trim();
+          }
+        }
+
+        return { first_name, last_name };
+      }
+
+      const { first_name, last_name } = extractNames(
+        profile as any,
+        user?.name ?? "",
+      );
+
       const existing = await prisma.user.findUnique({ where: { email } });
 
       if (existing) {
         if (existing.isSuspended) return false;
         if (!existing.isActive) return false;
 
-        // Marcar email como verificado si Google lo garantiza
+        const updates: {
+          emailVerified?: Date | null;
+          lastLoginAt: Date;
+          loginCount: { increment: number };
+          failedLoginCount: number;
+          first_name?: string;
+          last_name?: string;
+        } = {
+          lastLoginAt: new Date(),
+          loginCount: { increment: 1 },
+          failedLoginCount: 0,
+        };
+
         if (emailVerifiedGoogle && !existing.emailVerified) {
-          await prisma.user.update({
-            where: { id: existing.id },
-            data: { emailVerified: new Date() },
-          });
+          updates.emailVerified = new Date();
         }
 
-        // 🔸 IMPORTANTE: sincronizar datos hacia NextAuth
-        (user as any).id = existing.id;   // 👈 UUID de Prisma
-        (user as any).role = existing.role;
+        // Autocompletar solo si están vacíos en DB
+        if ((!existing.first_name || existing.first_name.trim() === "") && first_name !== "") {
+          updates.first_name = first_name;
+        }
 
-        // Opcional: registrar login
+        if ((!existing.last_name || existing.last_name.trim() === "") && last_name !== "") {
+          updates.last_name = last_name;
+        }
+
         await prisma.user.update({
           where: { id: existing.id },
-          data: {
-            lastLoginAt: new Date(),
-            loginCount: { increment: 1 },
-            failedLoginCount: 0,
-          },
+          data: updates,
         });
+
+        (user as any).id = existing.id;
+        (user as any).role = existing.role;
 
         await prisma.userLogin.create({
           data: {
@@ -159,11 +201,12 @@ export const authOptions: NextAuthOptions = {
         return true;
       }
 
-      // 🆕 No existe: lo creamos
       const created = await prisma.user.create({
         data: {
           email,
           name: user?.name ?? "",
+          first_name: first_name !== "" ? first_name : null,
+          last_name: last_name !== "" ? last_name : null,
           role: "user",
           isActive: true,
           isSuspended: false,
@@ -171,8 +214,7 @@ export const authOptions: NextAuthOptions = {
         },
       });
 
-      // 🔸 Sincronizar también en alta nueva
-      (user as any).id = created.id;   // 👈 UUID de Prisma
+      (user as any).id = created.id;
       (user as any).role = created.role;
 
       await prisma.userLogin.create({
@@ -186,25 +228,19 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
 
-    // 🔹 Construir JWT (lo dejamos igual que lo tenías)
     async jwt({ token, user, account, profile }) {
-      // 1) Rol desde el user (si viene en este ciclo)
       if (user && (user as any).role) {
         (token as any).role = (user as any).role;
       }
 
-      // 2) Si no hay rol aún, inferir por email (admin vs user)
       if (!(token as any).role && token?.email) {
         (token as any).role =
           token.email === adminEmail ? "system_admin" : "user";
       }
 
-      // 3) Intentar poner siempre uid = User.id de Prisma
       if (user && (user as any).id) {
-        // Caso credenciales u otros flows donde el user ya viene de Prisma
         (token as any).uid = (user as any).id;
       } else if (!(token as any).uid && token.email) {
-        // Fallback: buscamos en Prisma por email
         try {
           const dbUser = await prisma.user.findUnique({
             where: { email: token.email.toLowerCase() },
@@ -220,7 +256,6 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // 4) Datos extra si viene de Google
       if (account?.provider === "google" && profile) {
         token.name = (profile as any).name ?? token.name;
         token.email = (profile as any).email ?? token.email;
@@ -231,7 +266,6 @@ export const authOptions: NextAuthOptions = {
         token.sub = token.sub ?? (profile as any).sub;
       }
 
-      // 5) Tokens de acceso/refresh de Google
       if (account?.provider === "google") {
         (token as any).google_access_token = account.access_token;
         (token as any).google_refresh_token =
@@ -239,9 +273,9 @@ export const authOptions: NextAuthOptions = {
         (token as any).google_expires_at = account.expires_at;
       }
 
-      // 6) Refresh de token de Google si hace falta
       const exp = (token as any).google_expires_at as number | undefined;
       const needsRefresh = !!exp && Date.now() / 1000 > exp - 60;
+
       if (needsRefresh && (token as any).google_refresh_token) {
         try {
           const client = new google.auth.OAuth2(
@@ -265,12 +299,10 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
 
-    // 🔹 Propagar a session (igual que lo tenías)
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).role = (token as any).role || "user";
-        if ((token as any).uid)
-          (session.user as any).id = (token as any).uid;
+        if ((token as any).uid) (session.user as any).id = (token as any).uid;
 
         session.user.name = (token.name as string) ?? session.user.name;
         session.user.email = (token.email as string) ?? session.user.email;
@@ -282,7 +314,6 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-
 };
 
 const handler = NextAuth(authOptions);

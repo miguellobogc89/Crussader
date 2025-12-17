@@ -1,4 +1,3 @@
-// app/components/WelcomePanel.tsx
 "use client";
 
 import Image from "next/image";
@@ -9,10 +8,13 @@ type Props = {
 };
 
 export default function WelcomePanel({ name, firstName }: Props) {
-  const displayName =
-    (firstName && firstName.trim()) ||
-    (name && name.trim().split(/\s+/)[0]) ||
-    "";
+  let displayName = "";
+
+  if (firstName && firstName.trim() !== "") {
+    displayName = firstName.trim();
+  } else if (name && name.trim() !== "") {
+    displayName = name.trim().split(/\s+/)[0];
+  }
 
   return (
     <div
@@ -31,7 +33,9 @@ export default function WelcomePanel({ name, firstName }: Props) {
             leading-tight
           "
         >
-          Bienvenido, {displayName || "👤"} 👋
+          {displayName !== ""
+            ? `Bienvenido, ${displayName} 👋`
+            : "Bienvenido 👋"}
         </h1>
 
         <p
@@ -52,10 +56,7 @@ export default function WelcomePanel({ name, firstName }: Props) {
           alt="Crussader Logo"
           width={300}
           height={300}
-          className="
-            object-contain
-            w-[clamp(6rem,26vw,14rem)]
-          "
+          className="object-contain w-[clamp(6rem,26vw,14rem)]"
         />
       </div>
     </div>
