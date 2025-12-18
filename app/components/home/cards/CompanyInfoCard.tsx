@@ -27,24 +27,25 @@ export function CompanyInfoCard({
 }) {
   return (
     <StandardCard
-      title={name}
+      title="Empresa"
       icon={Building2}
       bgIcon={Building2}
       cardClassName="bg-gradient-to-br from-white via-white to-violet-50 shadow-card"
       borderClassName="border-violet-200"
       iconTintClassName="text-violet-700"
       bgIconTintClassName="text-violet-300"
-      titleClassName="text-slate-900 text-base sm:text-lg lg:text-xl leading-tight"
-      headerClassName="pb-3"
-      contentClassName="pt-0 pb-3"
     >
-      <div className="flex items-center gap-5 flex-nowrap text-sm text-slate-600">
-        <div className="flex items-center gap-2">
+      <div className="text-base sm:text-lg font-semibold text-slate-900 leading-tight line-clamp-2">
+        {name}
+      </div>
+
+      <div className="flex items-center gap-4 text-sm text-slate-600 flex-nowrap">
+        <div className="flex items-center gap-1.5">
           <Store className="h-4 w-4 text-violet-700/80" />
           <span className="font-semibold text-slate-900">{totalEstablishments}</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Users className="h-4 w-4 text-violet-700/80" />
           <span className="font-semibold text-slate-900">{totalUsers}</span>
         </div>

@@ -10,11 +10,7 @@ type Props = {
   subtitle?: string;
 };
 
-export function TrendCard({
-  current,
-  prev,
-  subtitle = "Reseñas este mes vs mes pasado",
-}: Props) {
+export function TrendCard({ current, prev, subtitle = "Reseñas este mes vs mes pasado" }: Props) {
   const curr = current ?? 0;
   const last = prev ?? 0;
 
@@ -38,14 +34,11 @@ export function TrendCard({
       borderClassName="border-sky-200"
       iconTintClassName="text-blue-700"
       bgIconTintClassName="text-blue-300"
-      titleClassName="text-slate-900 text-base sm:text-lg"
-      headerClassName="pb-3"
-      contentClassName="pt-0 pb-3 space-y-1"
     >
-      <div className="flex items-center gap-2">
-        <span className="text-3xl font-bold text-blue-600">{curr}</span>
+      <div className="flex items-end gap-2">
+        <div className="text-3xl font-bold text-blue-600 leading-none">{curr}</div>
 
-        <div className="flex items-center gap-1 text-xs sm:text-sm">
+        <div className="flex items-center gap-1 text-xs sm:text-sm pb-1">
           <TrendIcon className={["h-4 w-4", trendColor].join(" ")} />
           <span className={["font-semibold", trendColor].join(" ")}>
             {pctText}

@@ -17,14 +17,21 @@ export default function WelcomePanel({ name, firstName }: Props) {
   }
 
   return (
-    <div
-      className="
-        relative overflow-hidden rounded-xl
-        bg-gradient-to-br from-primary via-accent to-primary/80
-        p-4 sm:p-6 md:p-8 lg:p-10
-        text-primary-foreground shadow-md
-      "
-    >
+<div
+  className="
+    relative overflow-hidden rounded-xl
+    bg-gradient-to-br from-primary via-accent to-primary/80
+    text-primary-foreground shadow-md
+
+    /* padding interno */
+    p-4 sm:p-6 md:p-8 lg:p-10
+
+    /* 👇 margen superior sincronizado con el layout */
+    mt-4
+    2xl:mt-28
+  "
+>
+
       <div className="relative z-10 space-y-3">
         <h1
           className="

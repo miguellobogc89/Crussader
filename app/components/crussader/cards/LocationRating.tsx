@@ -1,3 +1,4 @@
+//  app/components/crussader/cards/LocationRating.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";

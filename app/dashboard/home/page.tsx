@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import WelcomePanel from "@/app/components/home/WelcomePanel";
-import CompanyKpiRow from "@/app/components/mybusiness/cards/CompanyKpiRow";
+import HomeCardsRow from "@/app/components/home/HomeCardsRow";
 import { Card, CardHeader, CardTitle, CardContent } from "@/app/components/ui/card";
 
 /* ----------------------- helpers (fetchers) ----------------------- */
@@ -113,7 +113,7 @@ export default function DashboardHomePage() {
     {
       href: "/dashboard/reviews/settings",
       title: "Ajustes de respuesta",
-      description: "Configura el tono y las reglas de tus respuestas automáticas.",
+      description: "Configura el tono y las reglas de tus respuestas.",
       icon: ShieldCheck,
     },
     {
@@ -125,22 +125,23 @@ export default function DashboardHomePage() {
   ];
 
   return (
-    <div className="space-y-8 px-4 xl2:px-28 py-8">
+    <div className="space-y-8 px-4 xl2:px-28">
       {/* Saludo superior */}
       <WelcomePanel name={name} />
 
       {/* Fila de KPIs (solo si hay empresa) */}
-      {hasCompany && (
-        <CompanyKpiRow
-          key={companyId ?? "none"}
-          companyId={companyId}
-          name={companyName}
-          email={infoEmail}
-          phone={infoPhone}
-          address={infoAddress}
-          employeesText={infoEmployees}
-        />
-      )}
+{hasCompany && (
+  <HomeCardsRow
+    key={companyId ?? "none"}
+    companyId={companyId}
+    name={companyName}
+    email={infoEmail}
+    phone={infoPhone}
+    address={infoAddress}
+    employeesText={infoEmployees}
+  />
+)}
+
 
       {/* Panel de accesos rápidos */}
       <Card className="border-slate-200 shadow-md">
