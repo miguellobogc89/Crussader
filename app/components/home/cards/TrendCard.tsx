@@ -1,7 +1,7 @@
 // app/components/mybusiness/cards/TrendCard.tsx
 "use client";
 
-import StandardCard from "@/app/components/crussader/cards/StandardCard";
+import StandardCard from "@/app/components/home/cards/StandardCard";
 import { BarChart3, TrendingUp, TrendingDown } from "lucide-react";
 
 type Props = {

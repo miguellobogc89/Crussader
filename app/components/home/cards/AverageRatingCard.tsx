@@ -1,7 +1,7 @@
 // app/components/company/cards/AverageRatingCard.tsx
 "use client";
 
-import StandardCard from "@/app/components/crussader/cards/StandardCard";
+import StandardCard from "@/app/components/home/cards/StandardCard";
 import { Star, TrendingUp, TrendingDown } from "lucide-react";
 
 type Props = {

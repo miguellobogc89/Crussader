@@ -1,19 +1,20 @@
 // app/components/mybusiness/cards/NewReviewsWeekCard.tsx
 "use client";
 
-import StandardCard from "@/app/components/crussader/cards/StandardCard";
+import StandardCard from "@/app/components/home/cards/StandardCard";
 import { MessageSquarePlus } from "lucide-react";
 
 type Props = {
-  count?: number | null;
+  count: number | null;
   subtitle?: string;
 };
 
 export default function NewReviewsWeekCard({
-  count = 12,
+  count,
   subtitle = "Nuevas reseñas esta semana",
 }: Props) {
-  const value = count ?? 0;
+  const isLoading = count === null;
+  const value = isLoading ? "—" : count;
 
   return (
     <StandardCard
@@ -25,8 +26,18 @@ export default function NewReviewsWeekCard({
       iconTintClassName="text-lime-700"
       bgIconTintClassName="text-lime-300"
     >
-      <div className="text-3xl font-bold text-lime-700 leading-none">{value}</div>
-      <p className="text-sm text-slate-500">{subtitle}</p>
+      <div
+        className={[
+          "text-3xl font-bold leading-none",
+          isLoading ? "text-slate-300" : "text-lime-700",
+        ].join(" ")}
+      >
+        {value}
+      </div>
+
+      <p className="text-sm text-slate-500">
+        {isLoading ? "Cargando…" : subtitle}
+      </p>
     </StandardCard>
   );
 }

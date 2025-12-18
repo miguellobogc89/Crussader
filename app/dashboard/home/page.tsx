@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import WelcomePanel from "@/app/components/home/WelcomePanel";
-import HomeCardsRow from "@/app/components/home/HomeCardsRow";
+import HomeMainPanel from "@/app/components/home/panels/HomeMainPanel";
 import { Card, CardHeader, CardTitle, CardContent } from "@/app/components/ui/card";
 
 /* ----------------------- helpers (fetchers) ----------------------- */
@@ -130,18 +130,17 @@ export default function DashboardHomePage() {
       <WelcomePanel name={name} />
 
       {/* Fila de KPIs (solo si hay empresa) */}
-{hasCompany && (
-  <HomeCardsRow
-    key={companyId ?? "none"}
-    companyId={companyId}
-    name={companyName}
-    email={infoEmail}
-    phone={infoPhone}
-    address={infoAddress}
-    employeesText={infoEmployees}
-  />
-)}
-
+      {hasCompany && (
+        <HomeMainPanel
+          key={companyId ?? "none"}
+          companyId={companyId}
+          name={companyName}
+          email={infoEmail}
+          phone={infoPhone}
+          address={infoAddress}
+          employeesText={infoEmployees}
+        />
+      )}
 
       {/* Panel de accesos rápidos */}
       <Card className="border-slate-200 shadow-md">

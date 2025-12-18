@@ -1,7 +1,7 @@
 // app/components/mybusiness/cards/CompanyInfoCard.tsx
 "use client";
 
-import StandardCard from "@/app/components/crussader/cards/StandardCard";
+import StandardCard from "@/app/components/home/cards/StandardCard";
 import { Building2, Star, Store, Users } from "lucide-react";
 
 export function CompanyInfoCard({

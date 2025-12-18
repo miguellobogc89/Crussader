@@ -2,6 +2,8 @@
 "use client";
 
 import * as React from "react";
+import { motion } from "framer-motion";
+
 import { CompanyInfoCard } from "@/app/components/home/cards/CompanyInfoCard";
 import { AverageRatingCard } from "@/app/components/home/cards/AverageRatingCard";
 import { TrendCard } from "@/app/components/home/cards/TrendCard";
@@ -15,6 +17,17 @@ type Props = {
   phone: string;
   address: string;
   employeesText: string;
+};
+
+const containerVariants = {
+  hidden: {},
+  show: {
+    transition: {
+    staggerChildren: 0.14,
+    delayChildren: 0.12,
+
+    },
+  },
 };
 
 export default function HomeCardsRow({
@@ -48,17 +61,23 @@ export default function HomeCardsRow({
       : Number((metrics as any).totalUsers);
 
   // ──────────────────────────────────────────────
-  // Reseñas mensuales + rating mes
+  // KPI: tendencias mensuales (trend + rating mes)
   // ──────────────────────────────────────────────
   const [reviewsThisMonth, setReviewsThisMonth] = React.useState<number | null>(null);
   const [reviewsLastMonth, setReviewsLastMonth] = React.useState<number | null>(null);
   const [ratingThisMonth, setRatingThisMonth] = React.useState<number | null>(null);
+
+  // ──────────────────────────────────────────────
+  // KPI: nuevas reseñas esta semana
+  // ──────────────────────────────────────────────
+  const [reviewsThisWeek, setReviewsThisWeek] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     if (!companyId) {
       setReviewsThisMonth(null);
       setReviewsLastMonth(null);
       setRatingThisMonth(null);
+      setReviewsThisWeek(null);
       return;
     }
 
@@ -119,7 +138,6 @@ export default function HomeCardsRow({
           prevMonthStart.getUTCMonth() + 1,
         ).padStart(2, "0")}`;
 
-        // Reseñas este mes / mes pasado
         const totalThisMonth = data
           .filter((r) => r.month === currentKey)
           .reduce((acc, r) => acc + (Number(r.reviewsCount) || 0), 0);
@@ -128,7 +146,6 @@ export default function HomeCardsRow({
           .filter((r) => r.month === prevKey)
           .reduce((acc, r) => acc + (Number(r.reviewsCount) || 0), 0);
 
-        // Rating mes: ponderado por nº reseñas
         const thisMonthRows = data.filter((r) => r.month === currentKey);
         const totalReviewsForRating = thisMonthRows.reduce(
           (acc, r) => acc + (Number(r.reviewsCount) || 0),
@@ -157,7 +174,47 @@ export default function HomeCardsRow({
       }
     }
 
+    async function loadWeekCount() {
+      try {
+        const now = new Date();
+
+        const toDate = new Date(
+          Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth(),
+            now.getUTCDate(),
+            23,
+            59,
+            59,
+            999,
+          ),
+        );
+
+        const fromDate = new Date(toDate);
+        fromDate.setUTCDate(fromDate.getUTCDate() - 6);
+        fromDate.setUTCHours(0, 0, 0, 0);
+
+        const params = new URLSearchParams({
+          companyId: companyIdSafe,
+          from: fromDate.toISOString(),
+          to: toDate.toISOString(),
+        });
+
+        const res = await fetch(`/api/reviews/kpis/count-week?${params.toString()}`);
+        if (!res.ok) throw new Error("Failed to fetch week count");
+
+        const json = (await res.json()) as { ok: boolean; count: number };
+
+        if (!aborted) {
+          setReviewsThisWeek(json.ok ? Number(json.count) || 0 : null);
+        }
+      } catch {
+        if (!aborted) setReviewsThisWeek(null);
+      }
+    }
+
     loadMonthlyTrends();
+    loadWeekCount();
 
     return () => {
       aborted = true;
@@ -165,7 +222,12 @@ export default function HomeCardsRow({
   }, [companyId]);
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <motion.div
+      className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 min-h-[118px]"
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+    >
       <CompanyInfoCard
         name={name}
         email={email}
@@ -190,7 +252,7 @@ export default function HomeCardsRow({
         subtitle="Reseñas este mes vs mes pasado"
       />
 
-      <NewReviewsWeekCard />
-    </div>
+      <NewReviewsWeekCard count={reviewsThisWeek} />
+    </motion.div>
   );
 }
