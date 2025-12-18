@@ -252,7 +252,7 @@ export default function CompanyKpiRow({
       <TrendCard
         current={reviewsThisMonth}
         prev={reviewsLastMonth}
-        subtitle="Reseñas este mes vs mes pasado"
+        subtitle="Reseñas este mes"
       />
 
       <ResponseTimeCard

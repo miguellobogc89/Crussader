@@ -249,7 +249,7 @@ export default function HomeCardsRow({
       <TrendCard
         current={reviewsThisMonth}
         prev={reviewsLastMonth}
-        subtitle="Reseñas este mes vs mes pasado"
+        subtitle="Reseñas este mes"
       />
 
       <NewReviewsWeekCard count={reviewsThisWeek} />

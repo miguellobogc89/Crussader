@@ -17,16 +17,31 @@ type Props = {
 function timeAgoEs(iso: string) {
   const dt = new Date(iso);
   if (isNaN(dt.getTime())) return "";
+
   const now = new Date();
-  const d = Math.floor((now.getTime() - dt.getTime()) / 86400000);
+  const diffMs = now.getTime() - dt.getTime();
+
+  // Si viene una fecha futura o igual (por desfase / timezone), lo suavizamos.
+  if (diffMs <= 0) return "Hace unas horas";
+
+  const d = Math.floor(diffMs / 86400000);
   if (d <= 0) return "Hace unas horas";
   if (d === 1) return "Hace 1 día";
   if (d < 7) return `Hace ${d} días`;
+
   const w = Math.floor(d / 7);
   if (w === 1) return "Hace 1 semana";
-  if (w <= 3) return `Hace ${w} semanas`;
-  return "Hace 1 mes";
+  if (w < 5) return `Hace ${w} semanas`;
+
+  const m = Math.floor(d / 30);
+  if (m <= 1) return "Hace 1 mes";
+  if (m < 12) return `Hace ${m} meses`;
+
+  const y = Math.floor(d / 365);
+  if (y <= 1) return "Hace 1 año";
+  return `Hace ${y} años`;
 }
+
 
 function Stars({ value }: { value: number }) {
   const size = "clamp(16px, 1.6vw, 20px)";
@@ -66,6 +81,7 @@ export default function Review({ author, content, rating, dateISO, avatarUrl, ma
         textOverflow: "ellipsis",
       }
     : baseTextStyle;
+console.log("[ReviewCard] dateISO:", dateISO, "->", new Date(dateISO).toISOString());
 
   return (
     <div

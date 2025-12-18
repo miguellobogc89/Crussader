@@ -327,18 +327,7 @@ export default function MyBusinessPage() {
         {/* ── CON EMPRESA ─────────────────────────────── */}
         {hasCompany && (
           <section className="mt-6 space-y-6">
-            {/* Cards de cabecera (datos de empresa) */}
-            <div>
-              <CompanyKpiRow
-                key={companyId ?? "none"}
-                companyId={companyId}
-                name={companyName}
-                email={infoEmail}
-                phone={infoPhone}
-                address={infoAddress}
-                employeesText={infoEmployees}
-              />
-            </div>
+
 
             {/* Listado de establecimientos / ubicaciones */}
             <CompanyEstablishments companyId={companyId} />

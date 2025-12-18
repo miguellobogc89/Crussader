@@ -10,7 +10,7 @@ type Props = {
   subtitle?: string;
 };
 
-export function TrendCard({ current, prev, subtitle = "Reseñas este mes vs mes pasado" }: Props) {
+export function TrendCard({ current, prev, subtitle = "Reseñas este mes" }: Props) {
   const curr = current ?? 0;
   const last = prev ?? 0;
 
