@@ -49,248 +49,7 @@ model UserStatusEvent {
   @@index([userId, createdAt])
 }
 
-model ExternalConnection {
-  id                  String                @id @default(cuid())
-  userId              String
-  provider            String
-  accountEmail        String?
-  access_token        String
-  refresh_token       String?
-  expires_at          Int?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  companyId           String?
-  accountName         String?
-  providerUserId      String?
-  scope               String?
-  status              String                @default("active")
-  User                User                  @relation(fields: [userId], references: [id])
-  Location            Location[]
-  google_gbp_account  google_gbp_account[]
-  google_gbp_location google_gbp_location[]
 
-  @@unique([userId, provider])
-  @@index([companyId])
-}
-
-model Company {
-  id                          String                        @id @default(cuid())
-  name                        String
-  createdById                 String
-  createdAt                   DateTime                      @default(now())
-  activity                    String?                       @db.VarChar(64)
-  cif                         String?                       @db.VarChar(32)
-  employeesBand               String?                       @db.VarChar(32)
-  logoUrl                     String?
-  address                     String?
-  brandColor                  String?                       @db.VarChar(16)
-  city                        String?
-  country                     String?
-  countryCode                 String?                       @db.VarChar(2)
-  description                 String?
-  email                       String?
-  facebookUrl                 String?
-  instagramUrl                String?
-  lastSyncAt                  DateTime?
-  linkedinUrl                 String?
-  matrix                      String?                       @db.VarChar(128)
-  phone                       String?
-  postalCode                  String?
-  region                      String?
-  registryId                  String?                       @db.VarChar(64)
-  reviewsAvg                  Decimal?                      @db.Decimal(3, 2)
-  reviewsCount                Int                           @default(0)
-  twitterUrl                  String?
-  updatedAt                   DateTime                      @default(now()) @updatedAt
-  vatNumber                   String?                       @db.VarChar(32)
-  website                     String?
-  plan                        String?                       @default("free")
-  planRenewsAt                DateTime?
-  stripeCustomerId            String?
-  stripeSubscriptionId        String?
-  agentSettings               Json?
-  voiceAgentId                String?
-  account_id                  String                        @db.Uuid
-  Agents                      Agent[]
-  AgentSessions               AgentSession[]
-  voiceAgent                  VoiceAgent?                   @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id])
-  account                     account                       @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_company_account")
-  customers                   CompanyCustomer[]
-  CompanyHoliday              CompanyHoliday[]
-  EmployeeShift               EmployeeShift[]
-  jobs                        Job[]
-  knowledgeItems              KnowledgeItem[]
-  knowledgeSections           KnowledgeSection[]
-  knowledgeSpaces             KnowledgeSpace[]
-  Lead                        Lead[]
-  Location                    Location[]
-  LocationKpiDaily            LocationKpiDaily[]            @relation("CompanyToKpiDaily")
-  LocationReviewHourlyMonthly LocationReviewHourlyMonthly[]
-  LocationReviewMonthly       LocationReviewMonthly[]
-  responseSettings            ResponseSettings?
-  Reviews                     Review[]                      @relation("CompanyReviews")
-  ShiftEvent                  ShiftEvent[]
-  UserCompany                 UserCompany[]
-  WebchatSites                WebchatSite[]                 @relation("CompanyToWebchatSite")
-  billing_account             billing_account?
-  discount_redemption         discount_redemption[]
-  google_gbp_account          google_gbp_account[]
-  google_gbp_location         google_gbp_location[]
-  google_gbp_reviews          google_gbp_reviews[]
-  invoice                     invoice[]
-  subscription                subscription[]
-  theme_candidate             theme_candidate[]
-  themes                      themes[]
-
-  @@index([name])
-  @@index([activity])
-  @@index([matrix])
-  @@index([account_id], map: "idx_company_account")
-}
-
-model UserCompany {
-  id        String      @id @default(cuid())
-  userId    String
-  companyId String
-  role      CompanyRole @default(MEMBER)
-  createdAt DateTime    @default(now())
-  Company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  User      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, companyId])
-  @@index([userId])
-  @@index([companyId])
-}
-
-model User {
-  id                                  String               @id @default(cuid())
-  name                                String?
-  email                               String?              @unique
-  emailVerified                       DateTime?
-  image                               String?
-  role                                Role                 @default(user)
-  createdAt                           DateTime             @default(now())
-  deactivatedAt                       DateTime?
-  failedLoginCount                    Int                  @default(0)
-  isActive                            Boolean              @default(true)
-  isSuspended                         Boolean              @default(false)
-  lastLoginAt                         DateTime?
-  lastSeenAt                          DateTime?
-  locale                              String?              @default("es-ES")
-  loginCount                          Int                  @default(0)
-  marketingOptIn                      Boolean              @default(false)
-  notes                               String?
-  passwordHash                        String?
-  phone                               String?
-  privacyAcceptedAt                   DateTime?
-  suspendedAt                         DateTime?
-  suspendedReason                     String?
-  termsAcceptedAt                     DateTime?
-  timezone                            String?              @default("Europe/Madrid")
-  updatedAt                           DateTime             @updatedAt
-  onboardingStatus                    OnboardingStatus     @default(PENDING)
-  account_id                          String?              @db.Uuid
-  pendingEmail                        String?
-  pendingEmailToken                   String?
-  pendingEmailTokenExpiresAt          DateTime?            @db.Timestamptz(6)
-  phoneVerifiedAt                     DateTime?            @db.Timestamptz(6)
-  uiTheme                             String               @default("system")
-  invited_via_id                      String?
-  first_name                          String?
-  last_name                           String?
-  AuthAccount                         AuthAccount[]
-  ExternalConnection                  ExternalConnection[]
-  Invite_Invite_invited_by_idToUser   Invite[]             @relation("Invite_invited_by_idToUser")
-  Notification                        Notification[]
-  phasesCreated                       Phase[]              @relation("UserPhasesCreated")
-  responsesCreated                    Response[]           @relation("ResponseCreatedBy")
-  responsesEdited                     Response[]           @relation("ResponseEditedBy")
-  Session                             Session[]
-  Invite_User_invited_via_idToInvite  Invite?              @relation("User_invited_via_idToInvite", fields: [invited_via_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  account_User_account_idToaccount    account?             @relation("User_account_idToaccount", fields: [account_id], references: [id], onUpdate: NoAction, map: "fk_user_account")
-  UserCompany                         UserCompany[]
-  UserLocation                        UserLocation[]
-  UserLogin                           UserLogin[]
-  UserStatusEvent                     UserStatusEvent[]
-  account_account_owner_user_idToUser account[]            @relation("account_owner_user_idToUser")
-
-  @@index([role])
-  @@index([isActive, isSuspended])
-  @@index([lastLoginAt])
-  @@index([account_id], map: "idx_user_account")
-  @@index([invited_via_id], map: "idx_user_invited_via")
-}
-
-model Location {
-  id                          String                        @id @default(cuid())
-  companyId                   String
-  title                       String
-  address                     String?
-  city                        String?
-  region                      String?
-  country                     String?
-  postalCode                  String?
-  phone                       String?
-  website                     String?
-  googleName                  String?
-  googlePlaceId               String?                       @unique
-  createdAt                   DateTime                      @default(now())
-  updatedAt                   DateTime                      @default(now()) @updatedAt
-  address2                    String?
-  countryCode                 String?                       @db.VarChar(2)
-  email                       String?
-  externalConnectionId        String?
-  facebookUrl                 String?
-  featuredImageUrl            String?
-  googleAccountId             String?
-  googleLocationId            String?
-  instagramUrl                String?
-  lastSyncAt                  DateTime?
-  latitude                    Decimal?                      @db.Decimal(10, 7)
-  longitude                   Decimal?                      @db.Decimal(10, 7)
-  openingHours                Json?
-  reviewsAvg                  Decimal?                      @db.Decimal(3, 2)
-  reviewsCount                Int                           @default(0)
-  slug                        String?                       @unique
-  status                      LocationStatus?               @default(DRAFT)
-  timezone                    String?
-  isFeatured                  Boolean                       @default(false)
-  activityId                  String?
-  typeId                      String?
-  exceptions                  Json?
-  agentSessions               AgentSession[]
-  appointments                Appointment[]
-  CompanyHoliday              CompanyHoliday[]
-  employeeLinks               EmployeeLocation[]
-  EmployeeShift               EmployeeShift[]
-  employeeTimeOffs            EmployeeTimeOff[]
-  jobs                        Job[]
-  activity                    Activity?                     @relation(fields: [activityId], references: [id])
-  company                     Company                       @relation(fields: [companyId], references: [id])
-  ExternalConnection          ExternalConnection?           @relation(fields: [externalConnectionId], references: [id])
-  type                        Type?                         @relation(fields: [typeId], references: [id])
-  KpiDaily                    LocationKpiDaily[]            @relation("LocationToKpiDaily")
-  LocationReviewHourlyMonthly LocationReviewHourlyMonthly[]
-  LocationReviewMonthly       LocationReviewMonthly[]
-  resources                   Resource[]
-  resourceTimeOffs            ResourceTimeOff[]
-  Reviews                     Review[]                      @relation("LocationReviews")
-  services                    Service[]
-  ShiftEvent                  ShiftEvent[]
-  UserLocation                UserLocation[]
-  WebchatSites                WebchatSite[]                 @relation("LocationToWebchatSite")
-  google_gbp_location         google_gbp_location[]
-  google_gbp_reviews          google_gbp_reviews[]
-  theme_candidate             theme_candidate[]
-  themes                      themes[]
-  topic                       topic[]
-
-  @@index([companyId])
-  @@index([googleAccountId])
-  @@index([status])
-  @@index([activityId])
-  @@index([typeId])
-}
 
 model UserLocation {
   id         String       @id @default(cuid())
@@ -1481,41 +1240,7 @@ model AuthAccount {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
-model account {
-  id                               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name                             String
-  slug                             String
-  owner_user_id                    String?
-  status                           String             @default("active")
-  plan_slug                        String?
-  plan_started_at                  DateTime?          @db.Timestamptz(6)
-  plan_renews_at                   DateTime?          @db.Timestamptz(6)
-  trial_start_at                   DateTime?          @db.Timestamptz(6)
-  trial_end_at                     DateTime?          @db.Timestamptz(6)
-  trial_used                       Boolean            @default(false)
-  max_users                        Int                @default(1)
-  max_companies                    Int                @default(1)
-  max_locations                    Int                @default(1)
-  current_users                    Int                @default(0)
-  current_companies                Int                @default(0)
-  current_locations                Int                @default(0)
-  meta                             Json?
-  created_at                       DateTime           @default(now()) @db.Timestamptz(6)
-  updated_at                       DateTime           @default(now()) @db.Timestamptz(6)
-  subscription_status              SubscriptionStatus @default(NONE)
-  is_beta_trial                    Boolean?           @default(false)
-  Company                          Company[]
-  Invite                           Invite[]
-  Notification                     Notification[]
-  User_User_account_idToaccount    User[]             @relation("User_account_idToaccount")
-  User_account_owner_user_idToUser User?              @relation("account_owner_user_idToUser", fields: [owner_user_id], references: [id], onUpdate: NoAction)
-  billing_account                  billing_account[]
-  entitlement                      entitlement[]
 
-  @@index([owner_user_id], map: "idx_account_owner")
-  @@index([plan_slug], map: "idx_account_plan_slug")
-  @@index([status], map: "idx_account_status")
-}
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model LocationReviewHourlyMonthly {
@@ -1680,6 +1405,285 @@ model ShiftEvent {
   @@index([employeeId], map: "ShiftEvent_employee_idx")
   @@index([locationId], map: "ShiftEvent_location_idx")
   @@index([startAt])
+}
+
+model account {
+  id                               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                             String
+  slug                             String
+  owner_user_id                    String?
+  status                           String             @default("active")
+  plan_slug                        String?
+  plan_started_at                  DateTime?          @db.Timestamptz(6)
+  plan_renews_at                   DateTime?          @db.Timestamptz(6)
+  trial_start_at                   DateTime?          @db.Timestamptz(6)
+  trial_end_at                     DateTime?          @db.Timestamptz(6)
+  trial_used                       Boolean            @default(false)
+  max_users                        Int                @default(1)
+  max_companies                    Int                @default(1)
+  max_locations                    Int                @default(1)
+  current_users                    Int                @default(0)
+  current_companies                Int                @default(0)
+  current_locations                Int                @default(0)
+  meta                             Json?
+  created_at                       DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at                       DateTime           @default(now()) @db.Timestamptz(6)
+  subscription_status              SubscriptionStatus @default(NONE)
+  is_beta_trial                    Boolean?           @default(false)
+  Company                          Company[]
+  Invite                           Invite[]
+  Notification                     Notification[]
+  User_User_account_idToaccount    User[]             @relation("User_account_idToaccount")
+  User_account_owner_user_idToUser User?              @relation("account_owner_user_idToUser", fields: [owner_user_id], references: [id], onUpdate: NoAction)
+  billing_account                  billing_account[]
+  entitlement                      entitlement[]
+
+  @@index([owner_user_id], map: "idx_account_owner")
+  @@index([plan_slug], map: "idx_account_plan_slug")
+  @@index([status], map: "idx_account_status")
+}
+
+model ExternalConnection {
+  id                  String                @id @default(cuid())
+  userId              String
+  provider            String
+  accountEmail        String?
+  access_token        String
+  refresh_token       String?
+  expires_at          Int?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  companyId           String?
+  accountName         String?
+  providerUserId      String?
+  scope               String?
+  status              String                @default("active")
+  User                User                  @relation(fields: [userId], references: [id])
+  Location            Location[]
+  google_gbp_account  google_gbp_account[]
+  google_gbp_location google_gbp_location[]
+
+  @@unique([userId, provider])
+  @@index([companyId])
+}
+
+model Company {
+  id                          String                        @id @default(cuid())
+  name                        String
+  createdById                 String
+  createdAt                   DateTime                      @default(now())
+  activity                    String?                       @db.VarChar(64)
+  cif                         String?                       @db.VarChar(32)
+  employeesBand               String?                       @db.VarChar(32)
+  logoUrl                     String?
+  address                     String?
+  brandColor                  String?                       @db.VarChar(16)
+  city                        String?
+  country                     String?
+  countryCode                 String?                       @db.VarChar(2)
+  description                 String?
+  email                       String?
+  facebookUrl                 String?
+  instagramUrl                String?
+  lastSyncAt                  DateTime?
+  linkedinUrl                 String?
+  matrix                      String?                       @db.VarChar(128)
+  phone                       String?
+  postalCode                  String?
+  region                      String?
+  registryId                  String?                       @db.VarChar(64)
+  reviewsAvg                  Decimal?                      @db.Decimal(3, 2)
+  reviewsCount                Int                           @default(0)
+  twitterUrl                  String?
+  updatedAt                   DateTime                      @default(now()) @updatedAt
+  vatNumber                   String?                       @db.VarChar(32)
+  website                     String?
+  plan                        String?                       @default("free")
+  planRenewsAt                DateTime?
+  stripeCustomerId            String?
+  stripeSubscriptionId        String?
+  agentSettings               Json?
+  voiceAgentId                String?
+  account_id                  String                        @db.Uuid
+  Agents                      Agent[]
+  AgentSessions               AgentSession[]
+  voiceAgent                  VoiceAgent?                   @relation("CompanyVoiceAgent", fields: [voiceAgentId], references: [id])
+  account                     account                       @relation(fields: [account_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_company_account")
+  customers                   CompanyCustomer[]
+  CompanyHoliday              CompanyHoliday[]
+  EmployeeShift               EmployeeShift[]
+  jobs                        Job[]
+  knowledgeItems              KnowledgeItem[]
+  knowledgeSections           KnowledgeSection[]
+  knowledgeSpaces             KnowledgeSpace[]
+  Lead                        Lead[]
+  Location                    Location[]
+  LocationKpiDaily            LocationKpiDaily[]            @relation("CompanyToKpiDaily")
+  LocationReviewHourlyMonthly LocationReviewHourlyMonthly[]
+  LocationReviewMonthly       LocationReviewMonthly[]
+  responseSettings            ResponseSettings?
+  Reviews                     Review[]                      @relation("CompanyReviews")
+  ShiftEvent                  ShiftEvent[]
+  UserCompany                 UserCompany[]
+  WebchatSites                WebchatSite[]                 @relation("CompanyToWebchatSite")
+  billing_account             billing_account?
+  discount_redemption         discount_redemption[]
+  google_gbp_account          google_gbp_account[]
+  google_gbp_location         google_gbp_location[]
+  google_gbp_reviews          google_gbp_reviews[]
+  invoice                     invoice[]
+  subscription                subscription[]
+  theme_candidate             theme_candidate[]
+  themes                      themes[]
+
+  @@index([name])
+  @@index([activity])
+  @@index([matrix])
+  @@index([account_id], map: "idx_company_account")
+}
+
+model UserCompany {
+  id        String      @id @default(cuid())
+  userId    String
+  companyId String
+  role      CompanyRole @default(MEMBER)
+  createdAt DateTime    @default(now())
+  Company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  User      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+  @@index([userId])
+  @@index([companyId])
+}
+
+model User {
+  id                                  String               @id @default(cuid())
+  name                                String?
+  email                               String?              @unique
+  emailVerified                       DateTime?
+  image                               String?
+  role                                Role                 @default(user)
+  createdAt                           DateTime             @default(now())
+  deactivatedAt                       DateTime?
+  failedLoginCount                    Int                  @default(0)
+  isActive                            Boolean              @default(true)
+  isSuspended                         Boolean              @default(false)
+  lastLoginAt                         DateTime?
+  lastSeenAt                          DateTime?
+  locale                              String?              @default("es-ES")
+  loginCount                          Int                  @default(0)
+  marketingOptIn                      Boolean              @default(false)
+  notes                               String?
+  passwordHash                        String?
+  phone                               String?
+  privacyAcceptedAt                   DateTime?
+  suspendedAt                         DateTime?
+  suspendedReason                     String?
+  termsAcceptedAt                     DateTime?
+  timezone                            String?              @default("Europe/Madrid")
+  updatedAt                           DateTime             @updatedAt
+  onboardingStatus                    OnboardingStatus     @default(PENDING)
+  account_id                          String?              @db.Uuid
+  pendingEmail                        String?
+  pendingEmailToken                   String?
+  pendingEmailTokenExpiresAt          DateTime?            @db.Timestamptz(6)
+  phoneVerifiedAt                     DateTime?            @db.Timestamptz(6)
+  uiTheme                             String               @default("system")
+  invited_via_id                      String?
+  first_name                          String?
+  last_name                           String?
+  AuthAccount                         AuthAccount[]
+  ExternalConnection                  ExternalConnection[]
+  Invite_Invite_invited_by_idToUser   Invite[]             @relation("Invite_invited_by_idToUser")
+  Notification                        Notification[]
+  phasesCreated                       Phase[]              @relation("UserPhasesCreated")
+  responsesCreated                    Response[]           @relation("ResponseCreatedBy")
+  responsesEdited                     Response[]           @relation("ResponseEditedBy")
+  Session                             Session[]
+  Invite_User_invited_via_idToInvite  Invite?              @relation("User_invited_via_idToInvite", fields: [invited_via_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  account_User_account_idToaccount    account?             @relation("User_account_idToaccount", fields: [account_id], references: [id], onUpdate: NoAction, map: "fk_user_account")
+  UserCompany                         UserCompany[]
+  UserLocation                        UserLocation[]
+  UserLogin                           UserLogin[]
+  UserStatusEvent                     UserStatusEvent[]
+  account_account_owner_user_idToUser account[]            @relation("account_owner_user_idToUser")
+
+  @@index([role])
+  @@index([isActive, isSuspended])
+  @@index([lastLoginAt])
+  @@index([account_id], map: "idx_user_account")
+  @@index([invited_via_id], map: "idx_user_invited_via")
+}
+
+model Location {
+  id                          String                        @id @default(cuid())
+  companyId                   String
+  title                       String
+  address                     String?
+  city                        String?
+  region                      String?
+  country                     String?
+  postalCode                  String?
+  phone                       String?
+  website                     String?
+  googleName                  String?
+  googlePlaceId               String?                       @unique
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime                      @default(now()) @updatedAt
+  address2                    String?
+  countryCode                 String?                       @db.VarChar(2)
+  email                       String?
+  externalConnectionId        String?
+  facebookUrl                 String?
+  featuredImageUrl            String?
+  googleAccountId             String?
+  googleLocationId            String?
+  instagramUrl                String?
+  lastSyncAt                  DateTime?
+  latitude                    Decimal?                      @db.Decimal(10, 7)
+  longitude                   Decimal?                      @db.Decimal(10, 7)
+  openingHours                Json?
+  reviewsAvg                  Decimal?                      @db.Decimal(3, 2)
+  reviewsCount                Int                           @default(0)
+  slug                        String?                       @unique
+  status                      LocationStatus?               @default(DRAFT)
+  timezone                    String?
+  isFeatured                  Boolean                       @default(false)
+  activityId                  String?
+  typeId                      String?
+  exceptions                  Json?
+  agentSessions               AgentSession[]
+  appointments                Appointment[]
+  CompanyHoliday              CompanyHoliday[]
+  employeeLinks               EmployeeLocation[]
+  EmployeeShift               EmployeeShift[]
+  employeeTimeOffs            EmployeeTimeOff[]
+  jobs                        Job[]
+  activity                    Activity?                     @relation(fields: [activityId], references: [id])
+  company                     Company                       @relation(fields: [companyId], references: [id])
+  ExternalConnection          ExternalConnection?           @relation(fields: [externalConnectionId], references: [id])
+  type                        Type?                         @relation(fields: [typeId], references: [id])
+  KpiDaily                    LocationKpiDaily[]            @relation("LocationToKpiDaily")
+  LocationReviewHourlyMonthly LocationReviewHourlyMonthly[]
+  LocationReviewMonthly       LocationReviewMonthly[]
+  resources                   Resource[]
+  resourceTimeOffs            ResourceTimeOff[]
+  Reviews                     Review[]                      @relation("LocationReviews")
+  services                    Service[]
+  ShiftEvent                  ShiftEvent[]
+  UserLocation                UserLocation[]
+  WebchatSites                WebchatSite[]                 @relation("LocationToWebchatSite")
+  google_gbp_location         google_gbp_location[]
+  google_gbp_reviews          google_gbp_reviews[]
+  theme_candidate             theme_candidate[]
+  themes                      themes[]
+  topic                       topic[]
+
+  @@index([companyId])
+  @@index([googleAccountId])
+  @@index([status])
+  @@index([activityId])
+  @@index([typeId])
 }
 
 model google_gbp_account {
