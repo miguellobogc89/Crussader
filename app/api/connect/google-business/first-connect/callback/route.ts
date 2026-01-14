@@ -1,18 +1,12 @@
 // app/api/connect/google-business/first-connect/callback/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
-import {
-  head,
-  exchangeCodeForTokens,
-  getGoogleUserEmail,
-  listAndPickFirstAccount,
-  listLocations,
-} from "@/app/connect/_server/gbp";
-
-import { ensureUserByEmail } from "@/app/connect/_server/user";
+import { head, exchangeCodeForTokens } from "@/app/connect/_server/gbp";
 import { computeScenario } from "@/app/connect/_server/scenario";
-import { ensureCompanyAndGbpAccount } from "@/app/connect/_server/register/company";
-import { createNewAccount } from "@/app/connect/_server/newAccount";
+import { runFirstConnectOrchestration } from "@/app/connect/_server/orchestrator";
+
+import { prisma } from "@/app/server/db";
+import { encode } from "next-auth/jwt";
 
 export const runtime = "nodejs";
 
@@ -39,9 +33,54 @@ function redirectToConnect(
   return NextResponse.redirect(u, 302);
 }
 
-function clearCookies(res: NextResponse) {
+function clearTempCookies(res: NextResponse) {
   res.cookies.set("gb_state", "", { path: "/", maxAge: 0 });
   res.cookies.set("gb_ctx", "", { path: "/", maxAge: 0 });
+}
+
+function getNextAuthSessionCookieName() {
+  const isProd = process.env.NODE_ENV === "production";
+  return isProd ? "__Secure-next-auth.session-token" : "next-auth.session-token";
+}
+
+function getNextAuthSessionCookieOptions() {
+  const isProd = process.env.NODE_ENV === "production";
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    path: "/",
+    secure: isProd,
+  };
+}
+
+async function setNextAuthSessionCookie(res: NextResponse, user: { id: string; email: string; name?: string | null; role?: any }) {
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error("Missing NEXTAUTH_SECRET");
+  }
+
+  // En NextAuth JWT strategy, se guarda un JWT en la cookie session-token.
+  const maxAge = 60 * 60 * 24 * 30; // 30 días (ajústalo si quieres)
+  const now = Math.floor(Date.now() / 1000);
+
+  const token = {
+    // Campos estándar que NextAuth usa
+    sub: user.id,
+    email: user.email,
+    name: user.name ?? "",
+    // Tus campos custom que ya consumes en callbacks jwt/session
+    uid: user.id,
+    role: user.role ?? "user",
+    iat: now,
+    exp: now + maxAge,
+  };
+
+  const jwt = await encode({ token, secret, maxAge });
+
+  res.cookies.set(getNextAuthSessionCookieName(), jwt, {
+    ...getNextAuthSessionCookieOptions(),
+    maxAge,
+  });
 }
 
 export async function GET(req: NextRequest) {
@@ -60,7 +99,7 @@ export async function GET(req: NextRequest) {
     });
 
     const res = redirectToConnect(req, { error: oauthError, scenario });
-    clearCookies(res);
+    clearTempCookies(res);
     return res;
   }
 
@@ -69,21 +108,20 @@ export async function GET(req: NextRequest) {
 
   if (!code) {
     const res = redirectToConnect(req, { error: "missing_code" });
-    clearCookies(res);
+    clearTempCookies(res);
     return res;
   }
 
   if (!state) {
     const res = redirectToConnect(req, { error: "missing_state" });
-    clearCookies(res);
+    clearTempCookies(res);
     return res;
   }
 
   const cookieState = req.cookies.get("gb_state")?.value;
   if (!cookieState || cookieState !== state) {
-    console.log("[first-connect] bad_state", { cookieState, state });
     const res = redirectToConnect(req, { error: "bad_state" });
-    clearCookies(res);
+    clearTempCookies(res);
     return res;
   }
 
@@ -96,213 +134,145 @@ export async function GET(req: NextRequest) {
   });
 
   if (!token.ok || !token.accessToken) {
-    console.log(
-      "[first-connect] token exchange FAIL",
-      token.status,
-      head(token.text, 500)
-    );
+    console.log("[first-connect] token exchange FAIL", token.status, head(token.text, 500));
     const res = redirectToConnect(req, { error: "token_exchange_failed" });
-    clearCookies(res);
+    clearTempCookies(res);
     return res;
   }
 
-  const accessToken = token.accessToken;
+  // 2) Orquestador “alto nivel”
+  const scope = url.searchParams.get("scope");
 
-  // 2) email (lead/user)
-  const { profile, accountEmail } = await getGoogleUserEmail(accessToken);
-
-  const ensuredUser = await ensureUserByEmail({
-    emailRaw: accountEmail,
-    profileJson: profile?.json,
+  const run = await runFirstConnectOrchestration({
+    accessToken: token.accessToken,
+    refreshToken: token.refreshToken ?? null,
+    expiresIn: token.expiresIn ?? null,
+    scope: scope ?? null,
   });
 
-  const userCase = ensuredUser.ok ? ensuredUser.userCase : "UNKNOWN";
-  const userId = ensuredUser.ok ? ensuredUser.userId : null;
-  const userAccountId = ensuredUser.ok ? ensuredUser.accountId : null;
-
-  // 3) accounts list + pick
-  const picked = await listAndPickFirstAccount(accessToken);
-
-  if (!picked.ok) {
-    console.log(
-      "[first-connect] accounts FAIL",
-      picked.status,
-      head(picked.accountsRes.text, 500)
-    );
-
-    const scenario = computeScenario({
-      accountsCount: 0,
-      pickedAccountOk: false,
-      locationsListOk: false,
-      locationsCount: 0,
-    });
-
-    const res = redirectToConnect(req, {
-      error: "accounts_list_failed",
-      scenario,
-      account: accountEmail,
-      userCase,
-    });
-    clearCookies(res);
-    return res;
-  }
-
-  const accountsCount = picked.pick?.accountsCount ?? 0;
-
-  if (!picked.pick) {
-    const scenario = computeScenario({
-      accountsCount,
-      pickedAccountOk: false,
-      locationsListOk: false,
-      locationsCount: 0,
-    });
-
-    const res = redirectToConnect(req, {
-      status: "ok",
-      scenario,
-      account: accountEmail,
-      userCase,
-      accountsCount: String(accountsCount),
-      locations: "0",
-    });
-    clearCookies(res);
-    return res;
-  }
-
-  const { gbAccountName, gbAccountDisplayName, pickedAccountRaw } =
-    picked.pick as any;
-
-  // 4) locations
-  const loc = await listLocations(accessToken, gbAccountName);
-
-  const locationsListOk = loc.locRes.ok;
-  const locationsCount = loc.locationsCount;
-
-  if (!locationsListOk) {
-    console.log(
-      "[first-connect] locations FAIL",
-      loc.locRes.status,
-      head(loc.locRes.text, 500)
-    );
-
-    const scenario = computeScenario({
-      accountsCount,
-      pickedAccountOk: true,
-      locationsListOk: false,
-      locationsCount: 0,
-    });
-
-    const res = redirectToConnect(req, {
-      error: "locations_list_failed",
-      scenario,
-      account: accountEmail,
-      accountName: gbAccountDisplayName,
-      userCase,
-      accountsCount: String(accountsCount),
-    });
-    clearCookies(res);
-    return res;
-  }
-
-  // 5) Si hay ubicaciones, aseguramos Company + gbp_account.
-  // Si el user NO tiene account_id, es un "bootstrap": newAccount crea account + todo lo demás.
-  let companyCase: string | null = null;
-  let companyId: string | null = null;
-  let gbpAccountCaseError: string | null = null;
-
-  console.log("[first-connect] PRE-REGISTER", {
-    locationsCount,
-    hasUserId: Boolean(userId),
-    userId,
-    userAccountId,
-    gbAccountName,
-    gbAccountDisplayName,
-  });
-
-if (locationsCount > 0 && userId && accountEmail) {
-  try {
-    if (!userAccountId) {
-      const created = await createNewAccount({
-        userId,
-        email: accountEmail,
-        googleAccountId: gbAccountName,
-        googleAccountName: gbAccountDisplayName ?? null,
-        pickedAccountRaw: pickedAccountRaw ?? null,
-        accessToken,
-        refreshToken: token.refreshToken ?? null,
-        expiresIn: token.expiresIn ?? null,
-        scope: url.searchParams.get("scope"),
-        locations: (loc.locations || []).map((x: any) => ({
-          name: x?.name,
-          title: x?.title ?? null,
-          raw: x,
-        })),
-      });
-
-      if (created.ok) {
-        companyCase = "CREATED";
-        companyId = created.companyId;
-      } else {
-        gbpAccountCaseError = created.error;
-      }
-    } else {
-      const ensuredCompany = await ensureCompanyAndGbpAccount({
-        userId,
-        userAccountId,
-        googleAccountId: gbAccountName,
-        googleAccountName: gbAccountDisplayName ?? null,
-        pickedAccountRaw: pickedAccountRaw ?? null,
-      });
-
-      console.log("[first-connect] REGISTER-RESULT", ensuredCompany);
-
-      if (ensuredCompany.ok) {
-        companyCase = ensuredCompany.companyCase;
-        companyId = ensuredCompany.companyId;
-      } else {
-        gbpAccountCaseError = ensuredCompany.error;
-      }
-    }
-  } catch (e) {
-    console.error("[first-connect] register flow failed", e);
-    gbpAccountCaseError = "register_flow_throw";
-  }
-}
-
-
+  // 3) scenario (solo UI)
   const scenario = computeScenario({
-    accountsCount,
-    pickedAccountOk: true,
-    locationsListOk: true,
-    locationsCount,
+    accountsCount: run.accountsCount,
+    pickedAccountOk: run.accountsCount > 0,
+    locationsListOk: run.locationsCount >= 0,
+    locationsCount: run.locationsCount,
   });
 
+  const orchestration = run.orchestration;
+
+  const resultCase =
+    orchestration && orchestration.ok ? orchestration.case : undefined;
+
+  const companyId =
+    orchestration && orchestration.ok && "companyId" in orchestration
+      ? orchestration.companyId
+      : undefined;
+
+  const companyCase =
+    orchestration && orchestration.ok && "companyCase" in orchestration
+      ? orchestration.companyCase
+      : undefined;
+
+  const registerError =
+    run.orchestrationError ??
+    (orchestration && !orchestration.ok ? orchestration.error : undefined);
+
+  // ✅ Si la conexión fue OK y hay locations, la UX que quieres es ir a dashboard
+  const hasLocations = Number.isFinite(run.locationsCount) && run.locationsCount > 0;
+  const orchestrationOk = !!(orchestration && orchestration.ok);
+
+  if (orchestrationOk && hasLocations && run.accountEmail) {
+    const email = run.accountEmail.toLowerCase().trim();
+
+    // Asegura usuario (si tu orquestador ya lo crea, esto simplemente lo “recoge”)
+    let user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, name: true, role: true },
+    });
+
+    if (!user) {
+      // Si aún no existía (caso raro), lo creamos para que haya sesión
+      user = await prisma.user.create({
+        data: {
+          email,
+          name: run.accountName ?? email,
+          role: "user",
+          isActive: true,
+          isSuspended: false,
+          emailVerified: new Date(),
+        },
+        select: { id: true, email: true, name: true, role: true },
+      });
+    }
+
+    // ✅ IMPORTANTE: asocia el usuario a la company adoptada/creada (si existe)
+    if (companyId) {
+      await prisma.userCompany.upsert({
+        where: {
+          userId_companyId: { userId: user.id, companyId },
+        },
+        create: {
+          userId: user.id,
+          companyId,
+          role: "MEMBER" as any,
+        },
+        update: {
+          role: "MEMBER" as any,
+        },
+        select: { id: true },
+      });
+    }
+
+    const dash = new URL("/dashboard/home", req.url);
+    const res = NextResponse.redirect(dash, 302);
+
+    // ✅ Crea sesión NextAuth real (cookie)
+    await setNextAuthSessionCookie(res, {
+      id: user.id,
+      email,              // ✅ string asegurado
+      name: user.name,
+      role: user.role,
+    });
+
+    clearTempCookies(res);
+
+    console.log("[first-connect:callback] DONE -> /dashboard/home", {
+      email,
+      userId: user.id,
+      companyId,
+      resultCase,
+    });
+
+    return res;
+  }
+
+  // Si no hay locations o falló algo -> volvemos a /connect con banner/debug
   const res = redirectToConnect(req, {
     status: "ok",
     scenario,
-    account: accountEmail,
-    accountName: gbAccountDisplayName,
-    accountsCount: String(accountsCount),
-    locations: String(locationsCount),
-    userCase,
-    companyCase: companyCase ?? undefined,
-    companyId: companyId ?? undefined,
-    registerError: gbpAccountCaseError ?? undefined,
+    account: run.accountEmail ?? undefined,
+    accountName: run.accountName ?? undefined,
+    accountsCount: String(run.accountsCount),
+    locations: String(run.locationsCount),
+    userCase: run.userCase,
+    resultCase: resultCase,
+    companyId: companyId,
+    companyCase: companyCase,
+    registerError: registerError ?? undefined,
   });
 
-  clearCookies(res);
+  clearTempCookies(res);
 
   console.log("[first-connect:callback] DONE -> /connect", {
     scenario,
-    accountsCount,
-    locationsCount,
-    userCase,
-    companyCase,
-    companyId,
-    registerError: gbpAccountCaseError,
-    accountEmail,
-    accountName: gbAccountDisplayName,
-    profileStatus: profile.status,
+    accountsCount: run.accountsCount,
+    locationsCount: run.locationsCount,
+    userCase: run.userCase,
+    orchestration: run.orchestration,
+    orchestrationError: run.orchestrationError,
+    accountEmail: run.accountEmail,
+    accountName: run.accountName,
+    profileStatus: run.profileStatus,
   });
 
   return res;

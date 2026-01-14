@@ -23,6 +23,40 @@ function uniqSuffix() {
   return Math.random().toString(36).slice(2, 8);
 }
 
+// "accounts/118141498427943054563" -> "118141498427943054563"
+function extractGoogleAccountId(gbAccountName: string): string {
+  const s = normStr(gbAccountName);
+  if (!s) return "";
+  const parts = s.split("/");
+  const last = parts[parts.length - 1] || "";
+  return last.trim();
+}
+
+// "accounts/.../locations/123" -> "123"
+function extractGoogleLocationId(locationName: string): string {
+  const s = normStr(locationName);
+  if (!s) return "";
+  const parts = s.split("/");
+  const last = parts[parts.length - 1] || "";
+  return last.trim();
+}
+
+// "accounts/118..." o "118..." -> "118..."
+function canonicalGoogleAccountId(v: string): string {
+  const s = normStr(v);
+  if (!s) return "";
+  if (s.includes("/")) return extractGoogleAccountId(s);
+  return s;
+}
+
+// compara tolerante: acepta que en DB haya prefijo o no
+function sameGoogleAccountId(a: string | null | undefined, b: string): boolean {
+  const aa = canonicalGoogleAccountId(a || "");
+  const bb = canonicalGoogleAccountId(b);
+  if (!aa || !bb) return false;
+  return aa === bb;
+}
+
 export type GoogleLocationLite = {
   name: string; // "accounts/.../locations/..."
   title?: string | null;
@@ -43,7 +77,6 @@ export type CreateNewAccountResult =
       error:
         | "external_connection_exists"
         | "google_account_already_registered"
-        | "location_already_exists"
         | "location_conflict"
         | "invalid_locations_payload";
       detail?: any;
@@ -52,7 +85,7 @@ export type CreateNewAccountResult =
 export async function createNewAccount(params: {
   userId: string;
   email: string;
-  googleAccountId: string; // "accounts/..."
+  googleAccountId: string; // "accounts/..." o "118..."
   googleAccountName: string | null;
   pickedAccountRaw?: any;
 
@@ -65,48 +98,73 @@ export async function createNewAccount(params: {
 }): Promise<CreateNewAccountResult> {
   const userId = normStr(params.userId);
   const email = normStr(params.email);
-  const googleAccountId = normStr(params.googleAccountId);
-  const googleAccountName = params.googleAccountName ? normStr(params.googleAccountName) : null;
+
+  const googleAccountIdRaw = normStr(params.googleAccountId);
+  const googleAccountId = canonicalGoogleAccountId(googleAccountIdRaw); // ✅ SIEMPRE sin "accounts/"
+  const googleAccountName = params.googleAccountName
+    ? normStr(params.googleAccountName)
+    : null;
 
   if (!userId) throw new Error("createNewAccount: missing userId");
   if (!email) throw new Error("createNewAccount: missing email");
   if (!googleAccountId) throw new Error("createNewAccount: missing googleAccountId");
   if (!params.accessToken) throw new Error("createNewAccount: missing accessToken");
 
-  const googleLocationIds = (params.locations || [])
-    .map((l) => normStr(l?.name))
-    .filter((x) => x.length > 0);
+  // Recibimos resourceName completo; guardamos ID canónico y preservamos el name completo en googleName
+  const incomingLocations = (params.locations || [])
+    .map((l) => {
+      const fullName = normStr(l?.name);
+      const id = extractGoogleLocationId(fullName); // ✅ canonical (solo el último segmento)
+      const title = l?.title ? normStr(l.title) : null;
+      return { fullName, id, title, raw: l?.raw };
+    })
+    .filter((x) => x.id.length > 0);
 
-  if (googleLocationIds.length === 0) {
+  if (incomingLocations.length === 0) {
     return { ok: false, error: "invalid_locations_payload" };
   }
 
-  // ✅ GUARDIA 1: si ya existe google_gbp_account para ese google_account_id, no es "new"
-  // (Ojo: tu unique real es (company_id, google_account_id), así que esto es una guardia lógica)
+  const googleLocationIds = incomingLocations.map((x) => x.id);
+
+  // ✅ GUARDIA 1: si ya existe google_gbp_account para ese google_account_id (canonical o legacy con prefijo) -> no es "new"
   const existingGbp = await prisma.google_gbp_account.findFirst({
-    where: { google_account_id: googleAccountId },
-    select: { id: true, company_id: true },
+    where: {
+      OR: [
+        { google_account_id: googleAccountId },
+        { google_account_id: `accounts/${googleAccountId}` },
+      ],
+    },
+    select: { id: true, company_id: true, google_account_id: true },
   });
 
   if (existingGbp?.id) {
     return {
       ok: false,
       error: "google_account_already_registered",
-      detail: { gbpAccountId: existingGbp.id, companyId: existingGbp.company_id },
+      detail: {
+        gbpAccountId: existingGbp.id,
+        companyId: existingGbp.company_id,
+        storedGoogleAccountId: existingGbp.google_account_id,
+        incomingGoogleAccountId: googleAccountId,
+      },
     };
   }
 
-  // ✅ GUARDIA 2: si existe Location por googleLocationId, NO petamos: la adoptamos si es del mismo googleAccountId
-  // Pero si pertenece a otro googleAccountId -> conflicto (no tocamos)
+  // ✅ GUARDIA 2: si existe Location por googleLocationId, solo aceptamos si coincide googleAccountId (tolerante prefijo)
   const existingLocations = await prisma.location.findMany({
     where: { googleLocationId: { in: googleLocationIds } },
-    select: { id: true, googleLocationId: true, companyId: true, googleAccountId: true },
-    take: 50,
+    select: {
+      id: true,
+      googleLocationId: true,
+      companyId: true,
+      googleAccountId: true,
+    },
+    take: 200,
   });
 
   if (existingLocations.length > 0) {
     for (const ex of existingLocations) {
-      if (ex.googleAccountId && ex.googleAccountId !== googleAccountId) {
+      if (ex.googleAccountId && !sameGoogleAccountId(ex.googleAccountId, googleAccountId)) {
         return {
           ok: false,
           error: "location_conflict",
@@ -119,7 +177,6 @@ export async function createNewAccount(params: {
         };
       }
     }
-    // Si estamos aquí: existen, pero no contradicen googleAccountId -> luego las adoptamos dentro de la tx.
   }
 
   let expires_at: number | null = null;
@@ -170,11 +227,13 @@ export async function createNewAccount(params: {
       select: { id: true },
     });
 
-    // 4) userCompany
-    await tx.userCompany.create({
-      data: { userId, companyId: company.id },
-      select: { id: true },
-    });
+    // 4) userCompany (incluye role por si es requerido en schema)
+    await tx.userCompany
+      .create({
+        data: { userId, companyId: company.id, role: "MEMBER" as any },
+        select: { id: true },
+      })
+      .catch(() => {});
 
     // 5) external connection
     const ext = await tx.externalConnection.create({
@@ -193,12 +252,12 @@ export async function createNewAccount(params: {
       select: { id: true },
     });
 
-    // 6) google_gbp_account
+    // 6) google_gbp_account (✅ canonical google_account_id)
     const gbp = await tx.google_gbp_account.create({
       data: {
         company_id: company.id,
         external_connection_id: ext.id,
-        google_account_id: googleAccountId,
+        google_account_id: googleAccountId, // ✅ SIEMPRE sin "accounts/"
         google_account_name: googleAccountName,
         status: "active",
         meta: params.pickedAccountRaw ?? undefined,
@@ -210,30 +269,32 @@ export async function createNewAccount(params: {
     // 7) locations + google_gbp_location (idempotente y seguro)
     const createdLocations: Array<{ locationId: string; googleGbpLocationId: string }> = [];
 
-    for (const l of params.locations) {
-      const google_location_id = normStr(l.name);
-      if (!google_location_id) continue;
+    for (const l of incomingLocations) {
+      const google_location_id = l.id; // ✅ canonical (solo el ID)
+      const google_location_name = l.fullName; // ✅ resourceName completo
 
       const titleRaw = l.title ? normStr(l.title) : "";
       const finalTitle = titleRaw || "Ubicación";
 
-      // A) ¿Existe ya Location por googleLocationId?
-const existingLoc = await tx.location.findFirst({
-  where: { googleLocationId: google_location_id },
-  select: {
-    id: true,
-    companyId: true,
-    googleAccountId: true,
-    externalConnectionId: true,
-  },
-});
-
+      // A) ¿Existe ya Location por googleLocationId (canonical)?
+      const existingLoc = await tx.location.findFirst({
+        where: { googleLocationId: google_location_id },
+        select: {
+          id: true,
+          companyId: true,
+          googleAccountId: true,
+          externalConnectionId: true,
+        },
+      });
 
       let locId: string;
 
       if (existingLoc?.id) {
-        // ✅ Seguridad: solo adoptamos si coincide el googleAccountId (o está vacío)
-        if (existingLoc.googleAccountId && existingLoc.googleAccountId !== googleAccountId) {
+        // ✅ Seguridad: solo adoptamos si coincide el googleAccountId (tolerante prefijo)
+        if (
+          existingLoc.googleAccountId &&
+          !sameGoogleAccountId(existingLoc.googleAccountId, googleAccountId)
+        ) {
           return {
             ok: false,
             error: "location_conflict",
@@ -252,9 +313,8 @@ const existingLoc = await tx.location.findFirst({
             companyId: company.id,
             title: finalTitle,
             externalConnectionId: ext.id,
-            googleAccountId: googleAccountId,
-            googleLocationId: google_location_id,
-            googleName: google_location_id,
+            googleAccountId: googleAccountId, // ✅ canonical
+            googleName: google_location_name || google_location_id, // ✅ resourceName
           },
           select: { id: true },
         });
@@ -266,9 +326,9 @@ const existingLoc = await tx.location.findFirst({
             companyId: company.id,
             title: finalTitle,
             externalConnectionId: ext.id,
-            googleAccountId: googleAccountId,
-            googleLocationId: google_location_id,
-            googleName: google_location_id,
+            googleAccountId: googleAccountId, // ✅ canonical
+            googleLocationId: google_location_id, // ✅ canonical (solo aquí, una vez)
+            googleName: google_location_name || google_location_id, // ✅ resourceName
             status: "DRAFT",
           },
           select: { id: true },
@@ -279,23 +339,22 @@ const existingLoc = await tx.location.findFirst({
 
       // B) google_gbp_location: upsert por unique (company_id, google_location_id)
       const gbpLoc = await tx.google_gbp_location.upsert({
-where: {
-  company_id_google_location_id: {
-    company_id: company.id,
-    google_location_id: google_location_id,
-  },
-},
-
+        where: {
+          company_id_google_location_id: {
+            company_id: company.id,
+            google_location_id: google_location_id, // ✅ canonical
+          },
+        },
         create: {
           company_id: company.id,
           account_id: gbp.id,
           external_connection_id: ext.id,
-          google_location_id: google_location_id,
+          google_location_id: google_location_id, // ✅ canonical
           google_location_title: finalTitle,
-          raw_json: l.raw ?? { name: google_location_id, title: finalTitle },
+          raw_json: l.raw ?? { name: google_location_name, title: finalTitle },
           status: "active",
           updated_at: new Date(),
-          google_location_name: google_location_id,
+          google_location_name: google_location_name || google_location_id, // ✅ resourceName
           title: finalTitle,
           location_id: locId,
           is_active: false,
@@ -305,7 +364,7 @@ where: {
           google_location_title: finalTitle,
           raw_json: l.raw ?? undefined,
           updated_at: new Date(),
-          google_location_name: google_location_id,
+          google_location_name: google_location_name || google_location_id, // ✅ resourceName
           title: finalTitle,
           location_id: locId,
         },
