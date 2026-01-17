@@ -17,8 +17,7 @@ export const metadata = {
     default: "Crussader",
     template: "%s · Crussader",
   },
-  description:
-    "Gestiona reseñas con IA: voz de marca, notificaciones y reportes.",
+  description: "Gestiona reseñas con IA: voz de marca, notificaciones y reportes.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "Crussader",
@@ -62,15 +61,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-background text-foreground font-sans">
         <QueryProvider>
           <Providers>
-            <ToastProvider>
-              {/* Barra beta superior */}
-              <div className="w-full bg-amber-500/10 border-b border-amber-500/30  text-xs sm:text-[13px] py-1.5 text-center">
-                <span className="font-medium">Crussader está en fase beta</span>
-                <span className="hidden sm:inline"> · Algunas funciones pueden cambiar mientras lo mejoramos.</span>
-              </div>
-
-              {children}
-            </ToastProvider>
+            <ToastProvider>{children}</ToastProvider>
           </Providers>
         </QueryProvider>
       </body>

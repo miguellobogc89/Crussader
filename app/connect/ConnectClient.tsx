@@ -46,17 +46,17 @@ function InfoModal(props: { open: boolean; onClose: () => void }) {
       <button
         type="button"
         onClick={onClose}
-        className="absolute inset-0 bg-slate-950/20 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm"
         aria-label="Cerrar"
       />
-      <div className="absolute left-1/2 top-1/2 w-[min(560px,calc(100vw-24px))] -translate-x-1/2 -translate-y-1/2">
-        <div className="relative overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-[0_26px_70px_rgba(15,23,42,0.18)]">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(1000px_circle_at_20%_0%,rgba(124,58,237,0.12),transparent_38%),radial-gradient(900px_circle_at_90%_30%,rgba(236,72,153,0.10),transparent_40%)]" />
+      <div className="absolute left-1/2 top-1/2 w-[min(620px,calc(100vw-24px))] -translate-x-1/2 -translate-y-1/2">
+        <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_30px_90px_rgba(2,6,23,0.35)]">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(1100px_circle_at_20%_0%,rgba(99,102,241,0.10),transparent_45%),radial-gradient(900px_circle_at_90%_20%,rgba(236,72,153,0.08),transparent_45%)]" />
           <div className="relative p-5 sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[12px] font-semibold text-slate-900">Antes de continuar</p>
-                <p className="mt-1 text-[12px] leading-relaxed text-slate-600">
+                <p className="text-xs font-semibold text-slate-900">Antes de continuar</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">
                   Google mostrará una pantalla de permisos. Marca las opciones necesarias para que
                   podamos importar tus ubicaciones y reseñas.
                 </p>
@@ -64,7 +64,7 @@ function InfoModal(props: { open: boolean; onClose: () => void }) {
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex h-8 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-[12px] font-medium text-slate-700 hover:bg-slate-50"
+                className="inline-flex h-8 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
                 Cerrar
               </button>
@@ -83,7 +83,7 @@ function InfoModal(props: { open: boolean; onClose: () => void }) {
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <p className="text-[11px] font-semibold text-slate-900">Transparencia</p>
-                <p className="mt-2 text-sm sm:text-base text-slate-600">
+                <p className="mt-2 text-sm text-slate-600">
                   Solo importamos datos para el dashboard y guardamos la vinculación con tu cuenta.
                   Puedes revocar el acceso desde Google cuando quieras.
                 </p>
@@ -154,142 +154,139 @@ export default function ConnectClient() {
   });
 
   return (
-    <main className="fixed inset-0 overflow-hidden bg-white">
-      {/* Background: Stripe-like, very light, no scroll ever */}
+    <main className="min-h-dvh bg-slate-950 text-slate-100">
+      {/* Background (sin trama) */}
       <div className="pointer-events-none fixed inset-0">
-        <div className="absolute inset-0 bg-white" />
-        <div className="absolute inset-0 bg-[radial-gradient(1200px_circle_at_20%_-10%,rgba(124,58,237,0.14),transparent_42%),radial-gradient(1100px_circle_at_90%_10%,rgba(236,72,153,0.10),transparent_40%),radial-gradient(900px_circle_at_50%_120%,rgba(244,63,94,0.08),transparent_45%)]" />
-        <div className="absolute inset-0 opacity-[0.45] [background-image:linear-gradient(to_right,rgba(15,23,42,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.04)_1px,transparent_1px)] [background-size:28px_28px]" />
+        <div className="absolute inset-0 bg-slate-950" />
+        <div className="absolute inset-0 opacity-95 bg-[radial-gradient(1200px_circle_at_15%_-10%,rgba(99,102,241,0.28),transparent_45%),radial-gradient(1100px_circle_at_90%_10%,rgba(236,72,153,0.16),transparent_48%),radial-gradient(900px_circle_at_50%_120%,rgba(34,197,94,0.10),transparent_55%)]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/0 via-slate-950/20 to-slate-950/60" />
       </div>
 
-      <div className="relative z-10 grid h-dvh place-items-center px-3 py-3 sm:px-6">
-        {/* Hard height cap: no scroll */}
-        <section className="w-full max-w-[520px]">
-          <div className="
-            relative overflow-hidden
-            rounded-3xl
-            bg-white/80
-            backdrop-blur-xl
-            border border-white/60
-            shadow-[0_20px_60px_rgba(15,23,42,0.12)]
-            px-0
-          ">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_circle_at_10%_0%,rgba(124,58,237,0.12),transparent_40%),radial-gradient(800px_circle_at_95%_30%,rgba(236,72,153,0.10),transparent_42%)]" />
+      {/* Layout responsive: contenido centrado + footer legal abajo */}
+      <div className="relative z-10 flex min-h-dvh flex-col">
+        <div className="flex-1 px-4 py-10 sm:px-6 sm:py-14">
+          <div className="mx-auto w-full max-w-[560px]">
+            <section className="relative overflow-hidden rounded-3xl bg-white text-slate-900 shadow-[0_24px_80px_rgba(0,0,0,0.35)] ring-1 ring-black/5">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_circle_at_10%_0%,rgba(99,102,241,0.10),transparent_45%),radial-gradient(800px_circle_at_95%_30%,rgba(236,72,153,0.08),transparent_45%)]" />
 
-            <div className="relative px-5 py-5 sm:px-8 sm:py-7">
-              {/* Header */}
-              <div className="flex items-center justify-center gap-3">
-                <div
-                  className="
-                    h-9 w-9
-                    bg-[linear-gradient(90deg,var(--tw-gradient-stops))]
-                    from-violet-600 via-fuchsia-600 to-rose-500
-                    [mask:url('/logo/Logo%201-05.svg')]
-                    [mask-size:contain]
-                    [mask-repeat:no-repeat]
-                    [mask-position:center]
-                  "
-                />
-                <div className="text-[18px] font-semibold tracking-tight text-slate-900">
-                  Crussader
-                </div>
-              </div>
-
-              <div className="mt-3 text-center">
-                <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900">
-                  Conecta tu negocio
-                </h1>
-                <p className="mt-1 text-[12px] leading-relaxed text-slate-600">
-                  Importa ubicaciones y reseñas desde Google Business Profile.
-                </p>
-              </div>
-
-              {/* Status blocks (compact) */}
-              {ok ? (
-                <div
-                  className={[
-                    "mt-4 rounded-2xl border px-3 py-2.5",
-                    hasLocations
-                      ? "border-emerald-200/70 bg-emerald-50/70"
-                      : "border-amber-200/70 bg-amber-50/70",
-                  ].join(" ")}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p
-                        className={[
-                          "text-[12px] font-semibold",
-                          hasLocations ? "text-emerald-900" : "text-amber-900",
-                        ].join(" ")}
-                      >
-                        {hasLocations ? "✅ Conexión realizada" : "⚠️ Sin establecimientos"}
-                      </p>
-                      <p
-                        className={[
-                          "mt-0.5 text-[11px] leading-relaxed",
-                          hasLocations ? "text-emerald-900/90" : "text-amber-900/90",
-                        ].join(" ")}
-                      >
-                        {hasLocations ? (
-                          <>
-                            <span className="font-semibold">{accountName || "tu empresa"}</span>{" "}
-                            ·{" "}
-                            <span className="font-semibold">
-                              {locationsCount} {locationsCount === 1 ? "ubicación" : "ubicaciones"}
-                            </span>
-                            {synced ? (
-                              <>
-                                {" "}
-                                · creadas: <span className="font-semibold">{synced}</span>
-                              </>
-                            ) : null}
-                          </>
-                        ) : (
-                          <>
-                            Cuenta usada: <span className="font-semibold">{account || "—"}</span>
-                          </>
-                        )}
-                      </p>
-                    </div>
-
-                    <Link
-                      href="/dashboard/home"
-                      className="shrink-0 inline-flex h-8 items-center justify-center rounded-full bg-slate-900 px-3 text-[11px] font-semibold text-white hover:bg-slate-800"
-                    >
-                      Dashboard
-                    </Link>
+              <div className="relative px-5 py-6 sm:px-8 sm:py-8">
+                {/* Header */}
+                <div className="flex items-center justify-center gap-3">
+                  <div
+                    className="
+                      h-9 w-9
+                      bg-[linear-gradient(90deg,var(--tw-gradient-stops))]
+                      from-violet-600 via-fuchsia-600 to-rose-500
+                      [mask:url('/logo/Logo%201-05.svg')]
+                      [mask-size:contain]
+                      [mask-repeat:no-repeat]
+                      [mask-position:center]
+                    "
+                    aria-hidden="true"
+                  />
+                  <div className="text-[18px] font-semibold tracking-tight text-slate-900">
+                    Crussader
                   </div>
-
-                  {debugEntries.length > 0 ? (
-                    <div className="mt-2 rounded-xl border border-slate-200 bg-white/80 p-2">
-                      <p className="text-[10px] font-semibold text-slate-700">Debug</p>
-                      <div className="mt-1 space-y-1">
-                        {debugEntries.map((e) => (
-                          <div key={e.key} className="flex items-start gap-2 text-[10px] text-slate-700">
-                            <span className="font-mono text-slate-500">{e.key}</span>
-                            <span className="text-slate-400">=</span>
-                            <span className="font-mono break-all">{e.value}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
-              ) : null}
 
-              {error ? (
-                <div className="mt-4 rounded-2xl border border-rose-200/70 bg-rose-50/70 px-3 py-2.5">
-                  <p className="text-[12px] font-semibold text-rose-900">
-                    No se pudo completar la conexión
+                <div className="mt-3 text-center">
+                  <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                    Conecta tu negocio
+                  </h1>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                    Importa ubicaciones y reseñas desde Google Business Profile.
                   </p>
-                  <p className="mt-0.5 text-[11px] text-rose-900/90">Error: {error}</p>
                 </div>
-              ) : null}
 
-              {/* CTA */}
-              <div className="mt-4">
-                <a
-                  href="/api/connect/google-business/first-connect/start"
+                {/* Status */}
+                {ok ? (
+                  <div
+                    className={[
+                      "mt-5 rounded-2xl border px-4 py-3",
+                      hasLocations
+                        ? "border-emerald-200 bg-emerald-50"
+                        : "border-amber-200 bg-amber-50",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p
+                          className={[
+                            "text-xs font-semibold",
+                            hasLocations ? "text-emerald-900" : "text-amber-900",
+                          ].join(" ")}
+                        >
+                          {hasLocations ? "✅ Conexión realizada" : "⚠️ Sin establecimientos"}
+                        </p>
+                        <p
+                          className={[
+                            "mt-0.5 text-[11px] leading-relaxed",
+                            hasLocations ? "text-emerald-900/90" : "text-amber-900/90",
+                          ].join(" ")}
+                        >
+                          {hasLocations ? (
+                            <>
+                              <span className="font-semibold">{accountName || "tu empresa"}</span>{" "}
+                              ·{" "}
+                              <span className="font-semibold">
+                                {locationsCount} {locationsCount === 1 ? "ubicación" : "ubicaciones"}
+                              </span>
+                              {synced ? (
+                                <>
+                                  {" "}
+                                  · creadas: <span className="font-semibold">{synced}</span>
+                                </>
+                              ) : null}
+                            </>
+                          ) : (
+                            <>
+                              Cuenta usada: <span className="font-semibold">{account || "—"}</span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+
+                      <Link
+                        href="/dashboard/home"
+                        className="shrink-0 inline-flex h-9 items-center justify-center rounded-full bg-slate-900 px-4 text-xs font-semibold text-white hover:bg-slate-800"
+                      >
+                        Dashboard
+                      </Link>
+                    </div>
+
+                    {debugEntries.length > 0 ? (
+                      <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+                        <p className="text-[10px] font-semibold text-slate-700">Debug</p>
+                        <div className="mt-1 space-y-1">
+                          {debugEntries.map((e) => (
+                            <div
+                              key={e.key}
+                              className="flex items-start gap-2 text-[10px] text-slate-700"
+                            >
+                              <span className="font-mono text-slate-500">{e.key}</span>
+                              <span className="text-slate-400">=</span>
+                              <span className="font-mono break-all">{e.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {error ? (
+                  <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
+                    <p className="text-xs font-semibold text-rose-900">
+                      No se pudo completar la conexión
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-rose-900/90">Error: {error}</p>
+                  </div>
+                ) : null}
+
+                {/* CTA */}
+                <div className="mt-6">
+                  <a
+                    href="/api/connect/google-business/first-connect/start"
                     className="
                       group relative inline-flex w-full items-center justify-center
                       rounded-2xl
@@ -298,63 +295,95 @@ export default function ConnectClient() {
                       text-base sm:text-sm
                       font-semibold text-white
                       bg-gradient-to-r from-violet-600 via-fuchsia-600 to-rose-500
-                      shadow-[0_14px_34px_rgba(124,58,237,0.22)]
+                      shadow-[0_18px_44px_rgba(99,102,241,0.28)]
                       hover:brightness-110
                       focus:outline-none focus:ring-2 focus:ring-violet-400/40
                     "
-
-                >
-                  <span className="absolute inset-0 rounded-2xl opacity-0 transition-opacity group-hover:opacity-100 bg-white/10" />
-                  <span className="relative">Conectar Reseñas</span>
-                </a>
-
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setInfoOpen(true)}
-                    className="inline-flex h-8 items-center justify-center rounded-full border border-slate-200 bg-white/70 px-3 text-[11px] font-medium text-slate-700 hover:bg-white"
                   >
-                    Más info
-                  </button>
+                    <span className="absolute inset-0 rounded-2xl opacity-0 transition-opacity group-hover:opacity-100 bg-white/10" />
+                    <span className="relative">Conectar reseñas</span>
+                  </a>
 
-                  <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                    <a
-                      className="hover:text-slate-700"
-                      href="https://crussader.com/terms.html"
-                      target="_blank"
-                      rel="noreferrer"
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setInfoOpen(true)}
+                      className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-xs font-medium text-slate-700 hover:bg-slate-50"
                     >
-                      Términos
-                    </a>
-                    <span className="text-slate-300">•</span>
+                      Más info
+                    </button>
+
+                    <div className="flex items-center gap-3 text-xs text-slate-500">
+                      <a
+                        className="hover:text-slate-800"
+                        href="https://crussader.com/terms.html"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Términos
+                      </a>
+                      <span className="text-slate-300">•</span>
+                      <a
+                        className="hover:text-slate-800"
+                        href="https://crussader.com/privacy.html"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Privacidad
+                      </a>
+                    </div>
+                  </div>
+
+                  <p className="mt-4 text-center text-[11px] leading-relaxed text-slate-500">
+                    Te redirigiremos a Google. Podrás revocar el acceso cuando quieras.
+                  </p>
+
+                  <div className="mt-3 flex justify-center">
                     <a
-                      className="hover:text-slate-700"
-                      href="https://crussader.com/privacy.html"
-                      target="_blank"
-                      rel="noreferrer"
+                      href="/api/connect/google-business/first-connect/start"
+                      className="text-[11px] font-medium text-slate-600 hover:text-slate-900"
                     >
-                      Privacidad
+                      ¿Problemas? Reintentar conexión
                     </a>
                   </div>
                 </div>
+              </div>
+            </section>
+          </div>
+        </div>
 
-                <p className="mt-3 text-center text-[11px] leading-relaxed text-slate-500">
-                  Te redirigiremos a Google. Podrás revocar el acceso cuando quieras.
+        {/* Nota legal corporativa */}
+        <footer className="relative z-10 px-4 pb-6 sm:px-6">
+          <div className="mx-auto w-full max-w-[560px]">
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-[11px] leading-relaxed text-slate-200/90">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p>
+                  Tecnología impulsada por <span className="font-semibold text-white">Crussader®</span>.
+                  Google y Google Business Profile son marcas de Google LLC.
                 </p>
-
-                {/* Secondary action (very light) */}
-                <div className="mt-3 flex justify-center">
+                <div className="flex items-center gap-3">
                   <a
-                    href="/api/connect/google-business/first-connect/start"
-                    className="text-[11px] font-medium text-slate-600 hover:text-slate-900"
+                    className="text-slate-100 hover:text-white"
+                    href="https://crussader.com/terms.html"
+                    target="_blank"
+                    rel="noreferrer"
                   >
-                    ¿Problemas? Reintentar conexión
+                    Términos
+                  </a>
+                  <span className="text-white/20">•</span>
+                  <a
+                    className="text-slate-100 hover:text-white"
+                    href="https://crussader.com/privacy.html"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Privacidad
                   </a>
                 </div>
               </div>
             </div>
           </div>
-        </section>
+        </footer>
       </div>
 
       <InfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />

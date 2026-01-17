@@ -24,7 +24,7 @@ export default function HomeMainPanel({
   return (
     <Card className="bg-white border-slate-200 shadow-md">
       <CardHeader className="pb-3">
-        <CardTitle className="text-slate-800 text-lg">Resumen</CardTitle>
+        <CardTitle className="text-slate-800 text-lg">Vista general de tu negocio</CardTitle>
       </CardHeader>
 
       <CardContent className="pt-0">

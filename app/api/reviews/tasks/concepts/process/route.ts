@@ -39,7 +39,7 @@ export async function GET(req: Request) {
   const businessType = loc?.type?.name ?? null;
   const activityName = loc?.type?.activity?.name ?? null;
 
-  // 🔹 Reviews pendientes con texto (las que define el contador de "pendientes")
+  // 🔹 Reviews pendientes con texto
   const reviews = await prisma.$queryRaw<
     {
       id: string;
@@ -89,14 +89,14 @@ export async function GET(req: Request) {
               ? Math.max(0, Math.min(5, Math.round(r.rating!)))
               : null;
 
-          // 🔹 Mapeamos el modelo estructurado a tu tabla actual
+          // 🔹 Mapeamos a tabla concept
           batchData = concepts.map((c: ExtractedConcept) => ({
-            label: c.summary,                    // 👈 usamos SOLO summary
+            label: c.summary,
             model: "gpt-4o-mini",
             review_id: r.id,
-            sentiment: c.judgment,               // mismo campo que antes
+            sentiment: c.judgment,
             confidence:
-              typeof c.intensity === "number"    // usamos intensity como antes
+              typeof c.intensity === "number"
                 ? c.intensity
                 : typeof c.confidence === "number"
                   ? c.confidence
@@ -106,14 +106,16 @@ export async function GET(req: Request) {
             review_date: reviewDate,
             location_id: locationId,
 
-            // 🔥 Nuevo: payload estructurado completo
+            // ✅ NUEVO: guardamos el texto original de la review
+            review_text: text,
+
+            // ✅ Payload estructurado (sin category en FASE A)
             structured: {
               entity: c.entity,
               aspect: c.aspect,
               judgment: c.judgment,
               intensity: c.intensity,
               descriptor: c.descriptor ?? null,
-              category: c.category,
               summary: c.summary,
             },
           }));
@@ -127,7 +129,7 @@ export async function GET(req: Request) {
     } catch (err) {
       console.error("Error procesando review", r.id, err);
     } finally {
-      // 💡 Importante: se marque o no conceptos, esta review ya no se reintenta
+      // se marque o no conceptos, no se reintenta
       await prisma.$executeRaw`
         UPDATE "Review"
         SET is_conceptualized = true, "updatedAt" = now()

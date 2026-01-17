@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 import { useBootstrapData } from "@/app/providers/bootstrap-store";
 import LocationSelector from "@/app/components/crussader/LocationSelector";
 import TopicsUpdater from "@/app/components/insights/TopicsUpdater";
@@ -28,6 +29,73 @@ export default function SentimentPage() {
   const boot = useBootstrapData();
   const activeCompanyId = boot?.activeCompany?.id ?? null;
 
+  const { data: session } = useSession();
+
+  // ===== admin flag (replicado de AppSidebar)
+  const user = session?.user;
+  const roleRaw = (user as any)?.role ?? (user as any)?.companyRole ?? "";
+  const rolesArrRaw = (user as any)?.roles ?? [];
+  const permsArrRaw = (user as any)?.permissions ?? (user as any)?.perms ?? [];
+  const role = String(roleRaw || "").toLowerCase();
+  const rolesArr = Array.isArray(rolesArrRaw)
+    ? rolesArrRaw.map((r: any) => String(r).toLowerCase())
+    : [];
+  const permsArr = Array.isArray(permsArrRaw)
+    ? permsArrRaw.map((p: any) => String(p).toLowerCase())
+    : [];
+
+  const ADMIN_ALIASES = new Set([
+    "admin",
+    "administrator",
+    "owner",
+    "superadmin",
+    "super_admin",
+    "system_admin",
+    "sysadmin",
+    "root",
+  ]);
+
+  const adminFlags = {
+    a_isAdminField: (user as any)?.isAdmin === true,
+    b_roleEqAdmin: ADMIN_ALIASES.has(role) || /admin/.test(role),
+    c_rolesArrayHasAdmin: rolesArr.some((r) => ADMIN_ALIASES.has(r) || /admin/.test(r)),
+    d_permissionsHaveAdmin: permsArr.some((p) => ADMIN_ALIASES.has(p) || /admin/.test(p)),
+    e_forceAdminLocal:
+      typeof window !== "undefined" && localStorage.getItem("forceAdmin") === "1",
+  };
+
+  const isAdmin = Object.values(adminFlags).some(Boolean);
+
+  // ===== gate: si no es admin, mostramos "próximamente"
+  if (!isAdmin) {
+    return (
+      <div className="mx-auto w-full max-w-screen-md px-3 sm:px-6 py-10 sm:py-14">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 sm:p-8">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-500">Labs</p>
+              <h1 className="mt-1 text-xl sm:text-2xl font-semibold text-slate-900">
+                Disponible próximamente
+              </h1>
+              <p className="mt-2 text-sm text-slate-600">
+                Este panel estará disponible en una próxima fase.
+              </p>
+            </div>
+
+            <div className="mt-3 sm:mt-0 inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">
+              Crussader®
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+            Si necesitas acceso anticipado, dímelo y lo activamos para tu cuenta.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ===== a partir de aquí, tu página normal (solo admin)
   const [{ from, to }] = useState(rangeDefaults());
   const [locationId, setLocationId] = useState<string | null>(null);
   const topRef = useRef<HTMLDivElement | null>(null);
@@ -79,7 +147,6 @@ export default function SentimentPage() {
   }
 
   useEffect(() => {
-    // Auto-fetch al cambiar location o rango
     fetchTopics();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topicsQueryUrl]);
@@ -119,7 +186,6 @@ export default function SentimentPage() {
               limit={500}
               minTopicSize={2}
               onDone={() => {
-                // Tras reconstruir topics, refrescamos la vista
                 fetchTopics();
               }}
             />

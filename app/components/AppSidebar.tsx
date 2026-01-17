@@ -13,6 +13,7 @@ import type { NavItem } from "@/app/components/sidebar/types";
 import { Brand } from "@/app/components/sidebar/Brand";
 import { UserFooter } from "@/app/components/sidebar/UserFooter";
 import { Menu } from "lucide-react";
+import { BetaPlanCard } from "@/app/components/sidebar/BetaPlanCard";
 
 /* ======== util ======== */
 function isActivePath(pathname: string, href: string) {
@@ -87,8 +88,7 @@ export function AppSidebar() {
   const user = session?.user;
   const roleRaw = (user as any)?.role ?? (user as any)?.companyRole ?? "";
   const rolesArrRaw = (user as any)?.roles ?? [];
-  const permsArrRaw =
-    (user as any)?.permissions ?? (user as any)?.perms ?? [];
+  const permsArrRaw = (user as any)?.permissions ?? (user as any)?.perms ?? [];
   const role = String(roleRaw || "").toLowerCase();
   const rolesArr = Array.isArray(rolesArrRaw)
     ? rolesArrRaw.map((r: any) => String(r).toLowerCase())
@@ -111,15 +111,10 @@ export function AppSidebar() {
   const adminFlags = {
     a_isAdminField: (user as any)?.isAdmin === true,
     b_roleEqAdmin: ADMIN_ALIASES.has(role) || /admin/.test(role),
-    c_rolesArrayHasAdmin: rolesArr.some(
-      (r) => ADMIN_ALIASES.has(r) || /admin/.test(r),
-    ),
-    d_permissionsHaveAdmin: permsArr.some(
-      (p) => ADMIN_ALIASES.has(p) || /admin/.test(p),
-    ),
+    c_rolesArrayHasAdmin: rolesArr.some((r) => ADMIN_ALIASES.has(r) || /admin/.test(r)),
+    d_permissionsHaveAdmin: permsArr.some((p) => ADMIN_ALIASES.has(p) || /admin/.test(p)),
     e_forceAdminLocal:
-      typeof window !== "undefined" &&
-      localStorage.getItem("forceAdmin") === "1",
+      typeof window !== "undefined" && localStorage.getItem("forceAdmin") === "1",
   };
 
   const isAdmin = Object.values(adminFlags).some(Boolean);
@@ -218,9 +213,7 @@ export function AppSidebar() {
   // ===== Helpers active: solo uno activo cuando hay pendingHref =====
   const hasPending = !!pendingHref;
 
-  const homeActive = hasPending
-    ? pendingHref === HOME.href
-    : isActivePath(pathname, HOME.href);
+  const homeActive = hasPending ? pendingHref === HOME.href : isActivePath(pathname, HOME.href);
 
   const reviewsActive = hasPending
     ? pendingHref === REVIEWS.href
@@ -235,10 +228,7 @@ export function AppSidebar() {
     : isActivePath(pathname, INTEGRATIONS.href);
 
   const adminActive =
-    ADMIN &&
-    (hasPending
-      ? pendingHref === ADMIN.href
-      : isActivePath(pathname, ADMIN.href));
+    ADMIN && (hasPending ? pendingHref === ADMIN.href : isActivePath(pathname, ADMIN.href));
 
   return (
     <aside
@@ -289,6 +279,9 @@ export function AppSidebar() {
           />
         )}
       </nav>
+
+      {/* Cajetín de estado (beta ahora, plan después) */}
+      <BetaPlanCard collapsed={collapsed} variant="beta" />
 
       <UserFooter
         collapsed={collapsed}

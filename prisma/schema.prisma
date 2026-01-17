@@ -49,8 +49,6 @@ model UserStatusEvent {
   @@index([userId, createdAt])
 }
 
-
-
 model UserLocation {
   id         String       @id @default(cuid())
   userId     String
@@ -1108,29 +1106,34 @@ model subscription_item {
 }
 
 model concept {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  label       String
-  model       String
-  created_at  DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at  DateTime  @default(now()) @db.Timestamptz(6)
-  topic_id    String?   @db.Uuid
-  review_id   String?
-  sentiment   String?
-  confidence  Float?    @db.Real
-  relevance   Float?    @default(1) @db.Real
-  assigned_at DateTime? @db.Timestamptz(6)
-  rating      Int?
-  review_date DateTime? @db.Timestamptz(6)
-  location_id String?
-  structured  Json?
-  review      Review?   @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  topic       topic?    @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
+  id                        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label                     String
+  model                     String
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  topic_id                  String?                     @db.Uuid
+  review_id                 String?
+  sentiment                 String?
+  confidence                Float?                      @db.Real
+  relevance                 Float?                      @default(1) @db.Real
+  assigned_at               DateTime?                   @db.Timestamptz(6)
+  rating                    Int?
+  review_date               DateTime?                   @db.Timestamptz(6)
+  location_id               String?
+  structured                Json?
+  family                    String?                     @db.VarChar(24)
+  review_text               String?
+  review                    Review?                     @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  topic                     topic?                      @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
+  concept_normalized_aspect concept_normalized_aspect[]
+  concept_normalized_entity concept_normalized_entity[]
 
   @@index([topic_id], map: "idx_concept_topic_id")
   @@index([review_id], map: "idx_concept_review_id")
   @@index([rating], map: "idx_concept_rating")
   @@index([review_date], map: "idx_concept_review_date")
   @@index([sentiment], map: "idx_concept_sentiment")
+  @@index([family], map: "idx_concept_family")
 }
 
 model topic {
@@ -1237,10 +1240,6 @@ model AuthAccount {
   @@unique([provider, providerAccountId], map: "Account_provider_providerAccountId_key")
   @@index([userId], map: "Account_userId_idx")
 }
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
-
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model LocationReviewHourlyMonthly {
@@ -1407,6 +1406,7 @@ model ShiftEvent {
   @@index([startAt])
 }
 
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model account {
   id                               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name                             String
@@ -1637,7 +1637,7 @@ model Location {
   facebookUrl                 String?
   featuredImageUrl            String?
   googleAccountId             String?
-  googleLocationId            String?
+  googleLocationId            String?                       @unique(map: "ux_location_googlelocationid")
   instagramUrl                String?
   lastSyncAt                  DateTime?
   latitude                    Decimal?                      @db.Decimal(10, 7)
@@ -1690,7 +1690,7 @@ model google_gbp_account {
   id                     String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   company_id             String
   external_connection_id String?
-  google_account_id      String
+  google_account_id      String                @unique(map: "ux_google_gbp_account_google_account_id")
   google_account_name    String?
   status                 String                @default("active")
   meta                   Json?
@@ -1710,7 +1710,7 @@ model google_gbp_location {
   company_id             String
   account_id             String               @db.Uuid
   external_connection_id String?
-  google_location_id     String
+  google_location_id     String               @unique(map: "ux_google_gbp_location_google_location_id")
   google_location_title  String?
   google_place_id        String?
   address                String?
@@ -1936,6 +1936,97 @@ model commercial_product {
 
   @@index([launch_at], map: "idx_commercial_product_launch_at")
   @@index([status], map: "idx_commercial_product_status")
+}
+
+model normalized_aspect {
+  id                        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  canonical_key             String                      @unique
+  display_name              String
+  description               String?
+  examples                  String[]                    @default([])
+  created_by                String                      @default("ai")
+  confidence                Float?                      @default(0.8) @db.Real
+  usage_count               Int                         @default(0)
+  is_active                 Boolean                     @default(true)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  merged_into_id            String?                     @db.Uuid
+  concept_normalized_aspect concept_normalized_aspect[]
+  normalized_aspect         normalized_aspect?          @relation("normalized_aspectTonormalized_aspect", fields: [merged_into_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  other_normalized_aspect   normalized_aspect[]         @relation("normalized_aspectTonormalized_aspect")
+
+  @@index([is_active], map: "idx_normalized_aspect_active")
+  @@index([usage_count(sort: Desc)], map: "idx_normalized_aspect_usage")
+  @@index([merged_into_id], map: "idx_normalized_aspect_merged_into")
+}
+
+model concept_normalized_aspect {
+  id                   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  concept_id           String            @db.Uuid
+  normalized_aspect_id String            @db.Uuid
+  matched_by           String            @default("ai")
+  match_confidence     Float             @default(0.8) @db.Real
+  status               String            @default("active")
+  original_aspect      String
+  original_entity      String?
+  created_at           DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime          @default(now()) @db.Timestamptz(6)
+  concept              concept           @relation(fields: [concept_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  normalized_aspect    normalized_aspect @relation(fields: [normalized_aspect_id], references: [id], onUpdate: NoAction)
+
+  @@unique([concept_id, normalized_aspect_id])
+  @@index([concept_id], map: "idx_cna_concept")
+  @@index([normalized_aspect_id], map: "idx_cna_normalized_aspect")
+  @@index([status], map: "idx_cna_status")
+}
+
+model concept_normalized_entity {
+  id                   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  concept_id           String            @db.Uuid
+  normalized_entity_id String            @db.Uuid
+  matched_by           String            @default("ai")
+  match_confidence     Float             @default(0.8) @db.Real
+  status               String            @default("active")
+  original_entity      String
+  original_aspect      String?
+  created_at           DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime          @default(now()) @db.Timestamptz(6)
+  concept              concept           @relation(fields: [concept_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_cne_concept")
+  normalized_entity    normalized_entity @relation(fields: [normalized_entity_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_cne_normalized_entity")
+
+  @@unique([concept_id, normalized_entity_id])
+  @@index([concept_id], map: "idx_cne_concept")
+  @@index([normalized_entity_id], map: "idx_cne_normalized_entity")
+  @@index([status], map: "idx_cne_status")
+}
+
+model normalized_entity {
+  id                        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  canonical_key             String                      @unique
+  display_name              String
+  description               String?
+  examples                  String[]                    @default([])
+  created_by                String                      @default("ai")
+  confidence                Float?                      @default(0.8) @db.Real
+  usage_count               Int                         @default(0)
+  is_active                 Boolean                     @default(true)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  concept_normalized_entity concept_normalized_entity[]
+
+  @@index([is_active], map: "idx_normalized_entity_active")
+  @@index([usage_count(sort: Desc)], map: "idx_normalized_entity_usage")
+}
+
+model normalized_entity_alias {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  loser_canonical_key  String   @unique
+  winner_canonical_key String
+  reason               String?
+  created_by           String   @default("ai")
+  created_at           DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([winner_canonical_key], map: "idx_nea_winner")
 }
 
 /// *

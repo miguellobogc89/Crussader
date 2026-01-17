@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/ca
 import type { LucideIcon } from "lucide-react";
 import { motion, type Variants } from "framer-motion";
 
-
 type Props = {
   title: string;
 
@@ -26,6 +25,10 @@ type Props = {
   iconClassName?: string;
 
   children: React.ReactNode;
+
+  // ✅ Nuevo: footer estándar “pegado abajo”
+  footer?: React.ReactNode;
+  footerClassName?: string;
 };
 
 const itemVariants: Variants = {
@@ -37,8 +40,6 @@ const itemVariants: Variants = {
     transition: { type: "spring" as const, stiffness: 260, damping: 22 },
   },
 };
-
-
 
 export default function StandardCard({
   title,
@@ -57,11 +58,15 @@ export default function StandardCard({
   titleClassName = "",
 
   iconClassName = "",
+
+  footer,
+  footerClassName = "",
 }: Props) {
   const cardClasses = [
     "relative overflow-hidden",
     "min-h-[118px]",
     "border",
+    "flex flex-col", // ✅ necesario para que el contenido pueda “estirar”
     borderClassName ? borderClassName : "border-slate-100",
     cardClassName,
   ]
@@ -96,8 +101,27 @@ export default function StandardCard({
           </CardTitle>
         </CardHeader>
 
-        <CardContent className={["pt-0 pb-4 px-4", "space-y-1", contentClassName].filter(Boolean).join(" ")}>
-          {children}
+        <CardContent
+          className={[
+            "pt-0 pb-4 px-4",
+            "space-y-1",
+            "flex-1 flex flex-col", // ✅ permite footer abajo con mt-auto
+            contentClassName,
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          {/* contenido */}
+          <div className="space-y-1">
+            {children}
+          </div>
+
+          {/* footer estándar */}
+          {footer ? (
+            <div className={["mt-auto", footerClassName].filter(Boolean).join(" ")}>
+              {footer}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </motion.div>
