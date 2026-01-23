@@ -1,17 +1,19 @@
+// app/components/reviews/summary/ReviewCard/Response.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import {
   RotateCcw,
   Edit3,
   Save,
   X,
   Send,
-  Trash2,
   ChevronLeft,
   ChevronRight,
   Loader2,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 
 export type UIStatus = "pending" | "published" | "draft";
@@ -29,9 +31,9 @@ type Props = {
   published?: boolean;
   edited?: boolean;
   title?: string;
+  onUnpublish?: () => Promise<void> | void;
 
-  // 🔥 NUEVO: origen real de la respuesta
-  // valores típicos en BD: "AI", "HUMAN", "GOOGLE", "GOOGLE_SYNC", etc.
+  // origen real (AI/HUMAN/GOOGLE/GOOGLE_SYNC...)
   source?: string;
 
   allowRegenerate?: boolean;
@@ -59,7 +61,6 @@ export default function Response({
   published,
   edited, // mantenido por compat aunque no se pinte
   title = "Respuesta generada con IA",
-
   source,
 
   allowRegenerate = true,
@@ -72,6 +73,7 @@ export default function Response({
   onPublish,
   onSave,
   onDelete,
+  onUnpublish,
 
   defaultEditing = false,
   versionInfo,
@@ -81,33 +83,24 @@ export default function Response({
     return status === "published";
   }, [published, status]);
 
-  // 🔥 Determinamos el origen REAL en base a `source`
-  // y, si no está definido, hacemos un fallback:
-  // - si está publicada → asumimos Google
-  // - si no → asumimos IA (como hasta ahora)
   const origin = useMemo<"ai" | "google" | "human">(() => {
     const s = (source || "").toUpperCase();
-
     if (s === "AI") return "ai";
     if (s === "GOOGLE" || s === "GOOGLE_SYNC") return "google";
     if (s === "HUMAN") return "human";
 
-    // Fallback para registros antiguos:
     if (isPublished) return "google";
     return "ai";
   }, [source, isPublished]);
 
   const isGoogleOrigin = origin === "google";
-  const isAIOrigin = origin === "ai";
   const isHumanOrigin = origin === "human";
 
   const [isEditing, setIsEditing] = useState<boolean>(
-    defaultEditing && !isPublished,
+    defaultEditing && !isPublished
   );
   const [draft, setDraft] = useState<string>(content);
 
-  // 🔄 Mantener draft sincronizado con el contenido real cuando llega
-  // una nueva versión y NO estamos editando.
   useEffect(() => {
     if (!isEditing) {
       setDraft(content);
@@ -136,49 +129,131 @@ export default function Response({
 
   const canRegenerate = !!onRegenerate && allowRegenerate && !isPublished;
   const canPublish = !!onPublish && allowPublish && !isPublished;
+  const canUnpublish = !!onUnpublish && isPublished;
 
-  // Texto de cabecera según origen
   const headerTitle = useMemo(() => {
     if (isGoogleOrigin) return "Respuesta escrita en Google";
     if (isHumanOrigin) return "Respuesta escrita a mano";
-    // IA (o fallback) → usamos el título por defecto
     return title;
   }, [isGoogleOrigin, isHumanOrigin, title]);
 
+  const showPaginator =
+    !!versionInfo && versionInfo.total > 1 && !isPublished;
+
+  const baseTextStyle: CSSProperties = {
+    fontSize: "clamp(14px,1.0vw,15px)",
+    lineHeight: "clamp(20px,2.2vw,24px)",
+    letterSpacing: "0.005em",
+  };
+
+  const headerTextStyle: CSSProperties = {
+    fontSize: "clamp(14px,1.3vw,16px)",
+    lineHeight: "clamp(18px,2.0vw,22px)",
+    letterSpacing: "0.005em",
+    fontWeight: 600,
+  };
+
+  const wrapperStyle: CSSProperties = {
+    fontFamily:
+      '"Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, "Noto Sans", sans-serif',
+    fontWeight: 400,
+  };
+
   return (
     <section
-      className="relative p-3 sm:p-4 max-w-full space-y-3 sm:space-y-4 rounded-xl"
+      className={[
+        "relative max-w-full rounded-xl",
+        isPublished ? "p-2 sm:p-3 space-y-2" : "p-3 sm:p-4 space-y-3 sm:space-y-4",
+      ].join(" ")}
       aria-live="polite"
+      style={wrapperStyle}
     >
-      {/* Overlay spinner mientras está ocupado */}
       {busy && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[1px]">
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-xl">
           <Loader2 className="w-6 h-6 animate-spin text-neutral-500" />
         </div>
       )}
 
-      {/* Header: icono + título */}
-      <div className="flex items-center gap-2">
-        {isGoogleOrigin ? (
-          <img
-            src="/platform-icons/google-business.png"
-            alt="Google Business Profile"
-            className="w-4 h-4"
-          />
-        ) : (
-          <Sparkles className="w-4 h-4 text-violet-500" />
-        )}
-        <h5
-          className="font-medium text-foreground"
-          style={{ fontSize: "clamp(13px,1.2vw,14px)" }}
-        >
-          {headerTitle}
-        </h5>
+      {/* Header: izquierda (icono+título) / derecha (paginador o papelera) */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          {isGoogleOrigin ? (
+            <img
+              src="/platform-icons/google-business.png"
+              alt="Google Business Profile"
+              className="w-[clamp(14px,1.2vw,16px)] h-[clamp(14px,1.2vw,16px)]"
+            />
+          ) : (
+            <Sparkles className="w-4 h-4 text-violet-500" />
+          )}
+          <h5 className="text-foreground truncate" style={headerTextStyle}>
+            {headerTitle}
+          </h5>
+        </div>
+
+        {/* Derecha */}
+        <div className="flex items-center gap-2 shrink-0">
+          {canUnpublish && (
+            <button
+              type="button"
+              onClick={onUnpublish}
+              disabled={busy}
+              title="Quitar de Google"
+              aria-label="Quitar de Google"
+              className="
+                inline-flex items-center justify-center
+                h-8 w-8 rounded-md
+                bg-white
+                text-red-600
+                ring-1 ring-red-200/60
+                hover:bg-red-50
+                disabled:opacity-50
+                transition-colors
+              "
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+
+          {showPaginator && (
+            <div className="flex items-center gap-1 text-xs text-neutral-500">
+              <button
+                type="button"
+                onClick={versionInfo.onPrev}
+                disabled={busy || versionInfo.total <= 1}
+                className="
+                  h-7 w-7 flex items-center justify-center rounded-full
+                  border border-neutral-200 text-neutral-400
+                  hover:text-neutral-700 hover:bg-neutral-50
+                  disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-neutral-400
+                "
+              >
+                <ChevronLeft className="h-3 w-3" />
+              </button>
+              <span className="px-1 min-w-[44px] text-center text-neutral-500">
+                {versionInfo.index + 1}/{versionInfo.total}
+              </span>
+              <button
+                type="button"
+                onClick={versionInfo.onNext}
+                disabled={busy || versionInfo.total <= 1}
+                className="
+                  h-7 w-7 flex items-center justify-center rounded-full
+                  border border-neutral-200 text-neutral-400
+                  hover:text-neutral-700 hover:bg-neutral-50
+                  disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-neutral-400
+                "
+              >
+                <ChevronRight className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Contenido */}
       {!isEditing ? (
-        <div className="text-foreground/90 whitespace-pre-wrap text-[15px] leading-6">
+        <div className="text-foreground/90 whitespace-pre-wrap" style={baseTextStyle}>
           {content}
         </div>
       ) : (
@@ -189,116 +264,91 @@ export default function Response({
             rows={6}
             disabled={busy}
             className="
-              w-full rounded-lg border border-border p-3 text-[15px] leading-6 outline-none
+              w-full rounded-lg border border-border p-3 outline-none
               focus:border-muted-foreground/50 disabled:opacity-60
             "
+            style={baseTextStyle}
             placeholder="Edita la respuesta…"
           />
         </div>
       )}
 
-      {/* Footer: siempre misma línea horizontal */}
-      <div className="pt-2">
-        {/* Modo no edición: misma fila tanto para draft como publicado */}
-        {!isEditing && (
-          <div className="flex items-center gap-2 flex-nowrap w-full">
-            {/* Draft / pendiente: botones activos */}
-            {!isPublished && (
-              <>
-                {canRegenerate && (
-                  <IconButton
-                    icon={<RotateCcw className="h-4 w-4" />}
-                    label="Regenerar"
-                    onClick={onRegenerate}
-                    disabled={busy}
-                  />
-                )}
+      {/* Footer: solo si NO está publicada (si está publicada, no queremos botones abajo) */}
+      {!isPublished && (
+        <div className="pt-0">
+          {!isEditing && (
+            <div className="flex items-center gap-2 flex-nowrap w-full justify-end">
+              {canRegenerate && (
+                <IconButton
+                  icon={<RotateCcw className="h-4 w-4" />}
+                  label="Regenerar"
+                  onClick={onRegenerate}
+                  disabled={busy}
+                />
+              )}
 
-                {allowEdit && (
-                  <IconButton
-                    icon={<Edit3 className="h-4 w-4" />}
-                    label="Editar"
-                    onClick={startEdit}
-                    disabled={busy}
-                  />
-                )}
+              {allowEdit && (
+                <IconButton
+                  icon={<Edit3 className="h-4 w-4" />}
+                  label="Editar"
+                  onClick={startEdit}
+                  disabled={busy}
+                />
+              )}
 
-                {canPublish && (
-                  <IconButton
-                    icon={<Send className="h-4 w-4" />}
-                    label="Publicar"
-                    onClick={onPublish}
-                    disabled={busy}
-                  />
-                )}
-              </>
-            )}
+              {canPublish && (
+                <button
+                  type="button"
+                  onClick={onPublish}
+                  disabled={busy}
+                  title="Publicar"
+                  aria-label="Publicar"
+                  className="
+                    inline-flex items-center gap-2
+                    h-8 px-3 rounded-full
+                    text-[11px] font-medium
+                    text-white
+                    bg-gradient-to-r from-violet-600 to-fuchsia-600
+                    shadow-sm
+                    hover:brightness-110
+                    focus-visible:outline-none
+                    focus-visible:ring-2 focus-visible:ring-violet-300
+                    disabled:opacity-50
+                    transition
+                  "
+                >
+                  <Send className="h-4 w-4" />
+                  Publicar
+                </button>
+              )}
 
-            {/* Borrar: único botón visible cuando está publicada */}
-            {onDelete && isPublished && (
-              <button
-                type="button"
-                onClick={onDelete}
+
+            </div>
+          )}
+
+          {isEditing && (
+            <div className="flex items-center gap-2">
+              <IconButton
+                icon={<Save className="h-4 w-4" />}
+                label="Guardar"
+                onClick={saveEdit}
+                disabled={busy || draft.trim().length === 0}
+                solid
+              />
+              <IconButton
+                icon={<X className="h-4 w-4" />}
+                label="Cancelar"
+                onClick={cancelEdit}
                 disabled={busy}
-                title="Eliminar"
-                aria-label="Eliminar"
-                className="ml-1 text-neutral-400 hover:text-red-600 disabled:opacity-50"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            )}
-
-            {/* Selector de versiones: siempre en la misma fila, pegado a la derecha */}
-            {versionInfo && (
-              <div className="ml-auto flex items-center gap-1 text-xs text-neutral-500">
-                <button
-                  type="button"
-                  onClick={versionInfo.onPrev}
-                  disabled={busy || versionInfo.total <= 1}
-                  className="h-6 w-6 flex items-center justify-center rounded-full border border-neutral-200 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-neutral-400"
-                >
-                  <ChevronLeft className="h-3 w-3" />
-                </button>
-                <span className="px-1 min-w-[40px] text-center text-neutral-500">
-                  {versionInfo.index + 1}/{versionInfo.total}
-                </span>
-                <button
-                  type="button"
-                  onClick={versionInfo.onNext}
-                  disabled={busy || versionInfo.total <= 1}
-                  className="h-6 w-6 flex items-center justify-center rounded-full border border-neutral-200 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-neutral-400"
-                >
-                  <ChevronRight className="h-3 w-3" />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Modo edición */}
-        {isEditing && (
-          <div className="flex items-center gap-2">
-            <IconButton
-              icon={<Save className="h-4 w-4" />}
-              label="Guardar"
-              onClick={saveEdit}
-              disabled={busy || draft.trim().length === 0}
-              solid
-            />
-            <IconButton
-              icon={<X className="h-4 w-4" />}
-              label="Cancelar"
-              onClick={cancelEdit}
-              disabled={busy}
-            />
-          </div>
-        )}
-      </div>
+              />
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
 
-/* ======= Botón icono para toolbar ======= */
 function IconButton({
   icon,
   label,
@@ -319,15 +369,11 @@ function IconButton({
       disabled={disabled}
       title={label}
       aria-label={label}
-      className={`
-        inline-flex items-center justify-center h-8 w-8 rounded-md text-neutral-600
-        transition-colors disabled:opacity-50
-        ${
-          solid
-            ? "bg-foreground text-white hover:brightness-95"
-            : "hover:text-foreground"
-        }
-      `}
+      className={[
+        "inline-flex items-center justify-center h-8 w-8 rounded-md text-neutral-600",
+        "transition-colors disabled:opacity-50",
+        solid ? "bg-foreground text-white hover:brightness-95" : "hover:text-foreground",
+      ].join(" ")}
     >
       {icon}
     </button>

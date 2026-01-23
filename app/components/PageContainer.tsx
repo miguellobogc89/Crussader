@@ -16,10 +16,13 @@ export default function PageContainer({
   return (
     <div
       className={cn(
-        "transition-all duration-300 ease-in-out px-50",
+        "transition-all duration-300 ease-in-out",
         "flex-1 min-h-[100dvh] overflow-y-auto",
-        "bg-gradient-to-br from-[#e0f7fa] via-white via-40% to-[#fce4ec] to-90%",
-        "bg-fixed", // 👈 fondo fijo
+        // sin padding aquí (lo gestiona PageBody)
+        "bg-background",
+        // gradiente solo en sm+
+        "sm:bg-gradient-to-br sm:from-[#e0f7fa] sm:via-white sm:via-40% sm:to-[#fce4ec] sm:to-90%",
+        "sm:bg-fixed",
         className
       )}
     >
@@ -27,4 +30,3 @@ export default function PageContainer({
     </div>
   );
 }
-  

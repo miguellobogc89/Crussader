@@ -1,16 +1,15 @@
-// app/server/concepts/normalization/aspects/applyMergeAspects.ts
+// app/server/concepts/normalization/entity/applyMergeEntities.ts
 import { prisma } from "@/app/server/db";
 import { canonicalizeKey } from "../canonicalizeKey";
 
-type AspectRow = {
+type EntityRow = {
   id: string;
   display_name: string;
   created_at: Date;
   usage_count: number | null;
-  is_active: boolean;
 };
 
-export type AppliedMerge = {
+export type AppliedEntityMerge = {
   det_key: string;
   winner_id: string;
   loser_ids: string[];
@@ -19,21 +18,22 @@ export type AppliedMerge = {
   winner_usage_added: number;
 };
 
-export async function applyMergeAspects(limitClusters = 50): Promise<AppliedMerge[]> {
-  const rows: AspectRow[] = await prisma.normalized_aspect.findMany({
+export async function applyMergeEntities(
+  limitClusters = 50,
+): Promise<AppliedEntityMerge[]> {
+  const rows: EntityRow[] = await prisma.normalized_entity.findMany({
     where: { is_active: true },
     select: {
       id: true,
       display_name: true,
       created_at: true,
       usage_count: true,
-      is_active: true,
     },
     orderBy: { created_at: "asc" },
   });
 
   // group by det_key
-  const groups = new Map<string, AspectRow[]>();
+  const groups = new Map<string, EntityRow[]>();
   for (const r of rows) {
     const det = canonicalizeKey(r.display_name);
     const bucket = groups.get(det);
@@ -43,59 +43,59 @@ export async function applyMergeAspects(limitClusters = 50): Promise<AppliedMerg
 
   const clusters = [...groups.entries()]
     .filter(([, list]) => list.length > 1)
-    .map(([det_key, list]) => {
-      // list already sorted by created_at asc due to query + insertion order
-      const winner = list[0];
-      const losers = list.slice(1);
-      return { det_key, winner, losers };
-    })
+    .map(([det_key, list]) => ({
+      det_key,
+      winner: list[0],
+      losers: list.slice(1),
+    }))
     .sort((a, b) => b.losers.length - a.losers.length)
     .slice(0, limitClusters);
 
-  const applied: AppliedMerge[] = [];
+  const applied: AppliedEntityMerge[] = [];
 
   for (const c of clusters) {
     const winnerId = c.winner.id;
     const loserIds = c.losers.map((x) => x.id);
+    const winnerUsageAdded = c.losers.reduce(
+      (acc, x) => acc + (x.usage_count ?? 0),
+      0,
+    );
 
-    const winnerUsageAdded = c.losers.reduce((acc, x) => acc + (x.usage_count ?? 0), 0);
-
-    // Transacción por cluster (seguro y fácil de depurar)
     const res = await prisma.$transaction(async (tx) => {
-      // 1) Eliminar links duplicados: conceptos que ya tienen winner y además loser
-      //    - primero buscamos concept_ids que tengan winner link
-      const winnerLinks = await tx.concept_normalized_aspect.findMany({
-        where: { normalized_aspect_id: winnerId },
+      // 1) eliminar duplicados (concepts que ya tenían winner)
+      const winnerLinks = await tx.concept_normalized_entity.findMany({
+        where: { normalized_entity_id: winnerId },
         select: { concept_id: true },
       });
+
       const conceptIdsWithWinner = winnerLinks.map((x) => x.concept_id);
 
       let removedDup = 0;
       if (conceptIdsWithWinner.length > 0) {
-        const del = await tx.concept_normalized_aspect.deleteMany({
+        const del = await tx.concept_normalized_entity.deleteMany({
           where: {
-            normalized_aspect_id: { in: loserIds },
+            normalized_entity_id: { in: loserIds },
             concept_id: { in: conceptIdsWithWinner },
           },
         });
         removedDup = del.count;
       }
 
-      // 2) Reapuntar links restantes loser -> winner
-      const upd = await tx.concept_normalized_aspect.updateMany({
-        where: { normalized_aspect_id: { in: loserIds } },
-        data: { normalized_aspect_id: winnerId },
+      // 2) reapuntar losers → winner
+      const upd = await tx.concept_normalized_entity.updateMany({
+        where: { normalized_entity_id: { in: loserIds } },
+        data: { normalized_entity_id: winnerId },
       });
 
-      // 3) Desactivar losers para que no vuelvan a aparecer como candidatos
-      await tx.normalized_aspect.updateMany({
+      // 3) desactivar losers
+      await tx.normalized_entity.updateMany({
         where: { id: { in: loserIds } },
         data: { is_active: false },
       });
 
-      // 4) Sumar usage_count al winner (si te interesa mantener métrica)
+      // 4) sumar usage_count
       if (winnerUsageAdded > 0) {
-        await tx.normalized_aspect.update({
+        await tx.normalized_entity.update({
           where: { id: winnerId },
           data: { usage_count: { increment: winnerUsageAdded } },
         });

@@ -82,44 +82,50 @@ export async function GET(req: Request) {
           activityName,
         });
 
-        if (concepts && concepts.length > 0) {
-          const reviewDate = (r.createdAtG ?? r.ingestedAt) ?? null;
-          const rating =
-            Number.isFinite(r.rating)
-              ? Math.max(0, Math.min(5, Math.round(r.rating!)))
-              : null;
+      if (concepts && concepts.length > 0) {
+        const reviewDate = (r.createdAtG ?? r.ingestedAt) ?? null;
 
-          // 🔹 Mapeamos a tabla concept
-          batchData = concepts.map((c: ExtractedConcept) => ({
-            label: c.summary,
-            model: "gpt-4o-mini",
-            review_id: r.id,
-            sentiment: c.judgment,
-            confidence:
-              typeof c.intensity === "number"
-                ? c.intensity
-                : typeof c.confidence === "number"
-                  ? c.confidence
-                  : null,
-            relevance: 1,
-            rating,
-            review_date: reviewDate,
-            location_id: locationId,
+        const reviewPublishedAt = r.createdAtG ?? r.ingestedAt;
+        const reviewPublishedYear = reviewPublishedAt ? reviewPublishedAt.getUTCFullYear() : null;
+        const reviewPublishedMonth = reviewPublishedAt ? reviewPublishedAt.getUTCMonth() + 1 : null;
 
-            // ✅ NUEVO: guardamos el texto original de la review
-            review_text: text,
+        const rating =
+          Number.isFinite(r.rating)
+            ? Math.max(0, Math.min(5, Math.round(r.rating!)))
+            : null;
 
-            // ✅ Payload estructurado (sin category en FASE A)
-            structured: {
-              entity: c.entity,
-              aspect: c.aspect,
-              judgment: c.judgment,
-              intensity: c.intensity,
-              descriptor: c.descriptor ?? null,
-              summary: c.summary,
-            },
-          }));
-        }
+        batchData = concepts.map((c: ExtractedConcept) => ({
+          label: c.summary,
+          model: "gpt-4o-mini",
+          review_id: r.id,
+          sentiment: c.judgment,
+          confidence: typeof c.intensity === "number"
+            ? c.intensity
+            : typeof c.confidence === "number"
+              ? c.confidence
+              : null,
+          relevance: 1,
+          rating,
+          review_date: reviewDate,
+          location_id: locationId,
+          review_text: text,
+
+          // ✅ NUEVO
+          review_published_at: reviewPublishedAt,
+          review_published_year: reviewPublishedYear,
+          review_published_month: reviewPublishedMonth,
+
+          structured: {
+            entity: c.entity,
+            aspect: c.aspect,
+            judgment: c.judgment,
+            intensity: c.intensity,
+            descriptor: c.descriptor ?? null,
+            summary: c.summary,
+          },
+        }));
+      }
+
       }
 
       if (batchData.length) {

@@ -150,7 +150,7 @@ export function AppSidebar() {
     };
   }
 
-  const width = isOverlay ? "100vw" : collapsed ? "4rem" : "18rem";
+  const width = isOverlay ? "18rem" : collapsed ? "4rem" : "18rem";
 
   // Bloquear scroll cuando overlay móvil está abierto
   useEffect(() => {
@@ -231,12 +231,21 @@ export function AppSidebar() {
     ADMIN && (hasPending ? pendingHref === ADMIN.href : isActivePath(pathname, ADMIN.href));
 
   return (
+  <>
+    {isOverlay && (
+      <button
+        type="button"
+        aria-label="Cerrar menú"
+        onClick={() => setCollapsed(true)}
+        className="fixed inset-0 z-40 bg-slate-900/70"
+      />
+    )}
+
     <aside
       style={{ width }}
       className={[
         "h-svh shrink-0 border-r border-slate-800 bg-slate-900 text-slate-200 shadow-lg flex flex-col transition-[width] duration-300 ease-in-out",
-        // En móvil overlay: panel fijo que cubre desde arriba, sin hueco
-        isOverlay ? "fixed inset-0 z-50" : "",
+        isOverlay ? "fixed left-0 top-0 bottom-0 z-50" : "",
       ].join(" ")}
     >
       <Brand collapsed={collapsed} setCollapsed={setCollapsed} />
@@ -290,5 +299,6 @@ export function AppSidebar() {
         onItemNavigate={onItemNavigate}
       />
     </aside>
+      </>
   );
 }

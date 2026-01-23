@@ -1,167 +1,73 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useSession } from "next-auth/react";
+import { useRef, useState } from "react";
 import { useBootstrapData } from "@/app/providers/bootstrap-store";
 import LocationSelector from "@/app/components/crussader/LocationSelector";
-import TopicsUpdater from "@/app/components/insights/TopicsUpdater";
-import ConceptsUpdater from "@/app/components/insights/ConceptsUpdater";
-import TopicsList from "@/app/components/insights/TopicsList";
-import SentimentMainPanel from "@/app/components/reviews/sentiment/SentimentMainPanel";
-
-import TopicsBarsPanel, {
-  type TopicBarRow,
-} from "@/app/components/insights/TopicsBarsPanel";
-
-function rangeDefaults() {
-  const today = new Date();
-  const to = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
-  const from = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth() - 11, 1));
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
-  return { from: fmt(from), to: fmt(to) };
-}
-
-type TopicsTopResponse =
-  | { ok: true; topics: TopicBarRow[] }
-  | { ok: false; error?: string };
+import HighlightsShell from "@/app/components/reviews/sentiment/HighlightsShell";
 
 export default function SentimentPage() {
   const boot = useBootstrapData();
   const activeCompanyId = boot?.activeCompany?.id ?? null;
 
-  const { data: session } = useSession();
-
-  // ===== admin flag (replicado de AppSidebar)
-  const user = session?.user;
-  const roleRaw = (user as any)?.role ?? (user as any)?.companyRole ?? "";
-  const rolesArrRaw = (user as any)?.roles ?? [];
-  const permsArrRaw = (user as any)?.permissions ?? (user as any)?.perms ?? [];
-  const role = String(roleRaw || "").toLowerCase();
-  const rolesArr = Array.isArray(rolesArrRaw)
-    ? rolesArrRaw.map((r: any) => String(r).toLowerCase())
-    : [];
-  const permsArr = Array.isArray(permsArrRaw)
-    ? permsArrRaw.map((p: any) => String(p).toLowerCase())
-    : [];
-
-  const ADMIN_ALIASES = new Set([
-    "admin",
-    "administrator",
-    "owner",
-    "superadmin",
-    "super_admin",
-    "system_admin",
-    "sysadmin",
-    "root",
-  ]);
-
-  const adminFlags = {
-    a_isAdminField: (user as any)?.isAdmin === true,
-    b_roleEqAdmin: ADMIN_ALIASES.has(role) || /admin/.test(role),
-    c_rolesArrayHasAdmin: rolesArr.some((r) => ADMIN_ALIASES.has(r) || /admin/.test(r)),
-    d_permissionsHaveAdmin: permsArr.some((p) => ADMIN_ALIASES.has(p) || /admin/.test(p)),
-    e_forceAdminLocal:
-      typeof window !== "undefined" && localStorage.getItem("forceAdmin") === "1",
-  };
-
-  const isAdmin = Object.values(adminFlags).some(Boolean);
-
-  // ===== gate: si no es admin, mostramos "próximamente"
-  if (!isAdmin) {
-    return (
-      <div className="mx-auto w-full max-w-screen-md px-3 sm:px-6 py-10 sm:py-14">
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 sm:p-8">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500">Labs</p>
-              <h1 className="mt-1 text-xl sm:text-2xl font-semibold text-slate-900">
-                Disponible próximamente
-              </h1>
-              <p className="mt-2 text-sm text-slate-600">
-                Este panel estará disponible en una próxima fase.
-              </p>
-            </div>
-
-            <div className="mt-3 sm:mt-0 inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">
-              Crussader®
-            </div>
-          </div>
-
-          <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-            Si necesitas acceso anticipado, dímelo y lo activamos para tu cuenta.
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ===== a partir de aquí, tu página normal (solo admin)
-  const [{ from, to }] = useState(rangeDefaults());
   const [locationId, setLocationId] = useState<string | null>(null);
   const topRef = useRef<HTMLDivElement | null>(null);
-
-  const [topics, setTopics] = useState<TopicBarRow[]>([]);
-  const [loadingTopics, setLoadingTopics] = useState(false);
-  const [topicsError, setTopicsError] = useState<string | null>(null);
-
-  const topicsQueryUrl = useMemo(() => {
-    if (!locationId) return null;
-    const u = new URL("/api/reviews/topics/top", window.location.origin);
-    u.searchParams.set("locationId", locationId);
-    u.searchParams.set("limit", "5");
-    u.searchParams.set("from", from);
-    u.searchParams.set("to", to);
-    return u.toString();
-  }, [locationId, from, to]);
-
-  async function fetchTopics() {
-    if (!topicsQueryUrl) {
-      setTopics([]);
-      setTopicsError(null);
-      return;
-    }
-
-    setLoadingTopics(true);
-    setTopicsError(null);
-
-    try {
-      const res = await fetch(topicsQueryUrl, { cache: "no-store" });
-      const json = (await res.json().catch(() => null)) as TopicsTopResponse | null;
-
-      if (!res.ok || !json || json.ok === false) {
-        const msg =
-          (json && "error" in json && typeof json.error === "string" && json.error) ||
-          `HTTP ${res.status}`;
-        setTopics([]);
-        setTopicsError(msg);
-        return;
-      }
-
-      setTopics(Array.isArray(json.topics) ? json.topics : []);
-    } catch (e) {
-      setTopics([]);
-      setTopicsError(e instanceof Error ? e.message : "Error desconocido");
-    } finally {
-      setLoadingTopics(false);
-    }
-  }
-
-  useEffect(() => {
-    fetchTopics();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topicsQueryUrl]);
 
   return (
     <div
       ref={topRef}
       className="mx-auto w-full max-w-screen-2xl px-3 sm:px-6 py-6 sm:py-8 space-y-6"
     >
-      <SentimentMainPanel
-        title="¿Cómo me perciben mis clientes?"
-        description="Explora los principales topics detectados en tus reseñas y profundiza en cada uno."
-        isLoading={loadingTopics}
-        onRefresh={locationId ? fetchTopics : undefined}
-        toolbarLeft={
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          {/* Icon: blanco con borde + líneas en gradiente */}
+          <div className="mt-0.5 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              className="h-5 w-5"
+            >
+              <defs>
+                <linearGradient id="crsGradient" x1="0" y1="0" x2="24" y2="24">
+                  <stop offset="0%" stopColor="#6366F1" />
+                  <stop offset="55%" stopColor="#06B6D4" />
+                  <stop offset="100%" stopColor="#F43F5E" />
+                </linearGradient>
+              </defs>
+
+              <path
+                d="M21 15a4 4 0 0 1-4 4H7l-4 4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"
+                stroke="url(#crsGradient)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M7 8h10"
+                stroke="url(#crsGradient)"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M7 12h6"
+                stroke="url(#crsGradient)"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900">
+              ¿Qué opinan tus clientes de tu negocio?
+            </h1>
+            <p className="mt-1 text-sm text-slate-600 max-w-xl">
+              Un resumen claro de lo que más valoran… y lo que podrías mejorar para subir tu reputación.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
           <LocationSelector
             onSelect={(id) => {
               setLocationId(id);
@@ -171,49 +77,16 @@ export default function SentimentPage() {
                     behavior: "smooth",
                     block: "start",
                   }),
-                0
+                0,
               );
             }}
           />
-        }
-        toolbarRight={
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <ConceptsUpdater locationId={locationId} />
-            <TopicsUpdater
-              locationId={locationId}
-              companyId={activeCompanyId ?? undefined}
-              recencyDays={180}
-              limit={500}
-              minTopicSize={2}
-              onDone={() => {
-                fetchTopics();
-              }}
-            />
-          </div>
-        }
-      >
-        <TopicsBarsPanel
-          topics={topics}
-          topN={5}
-          emptyLabel={
-            !locationId
-              ? "Selecciona una ubicación para ver los topics."
-              : topicsError
-              ? `No se pudieron cargar los topics: ${topicsError}`
-              : loadingTopics
-              ? "Cargando topics…"
-              : "No hay topics para este rango."
-          }
-        />
-      </SentimentMainPanel>
+        </div>
+      </div>
 
-      <TopicsList
-        companyId={activeCompanyId}
-        locationId={locationId ?? undefined}
-        from={from}
-        to={to}
-        previewN={8}
-      />
+      <div className="mt-6">
+        <HighlightsShell locationId={locationId} limit={5} />
+      </div>
     </div>
   );
 }

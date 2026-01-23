@@ -1,3 +1,4 @@
+// app/components/crussader/LocationSelector.tsx
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -54,7 +55,7 @@ export default function LocationSelector({
     }
 
     if (!defaultId && rows.length > 0) {
-      defaultId = rows[0].id; // por defecto la primera ubicación
+      defaultId = rows[0].id;
     }
 
     setSelectedLocationId(defaultId);
@@ -70,12 +71,23 @@ export default function LocationSelector({
     }
 
     setLoading(false);
-  }, [boot]); // solo depende de boot
+  }, [boot, onSelect]);
 
   const selected = useMemo(
     () => locations.find((l) => l.id === selectedLocationId) ?? null,
     [locations, selectedLocationId]
   );
+
+  const otherLocations = useMemo(() => {
+    if (!selectedLocationId) return locations;
+    return locations.filter((l) => l.id !== selectedLocationId);
+  }, [locations, selectedLocationId]);
+
+  const hasMoreOptions = otherLocations.length > 0;
+
+  const label = selected
+    ? `${selected.title}${selected.city ? " — " + selected.city : ""}`
+    : "Selecciona ubicación";
 
   const handleSelect = (id: string) => {
     const loc = locations.find((x) => x.id === id) ?? null;
@@ -88,61 +100,74 @@ export default function LocationSelector({
 
   if (loading) {
     return (
-      <div className="w-full flex justify-center items-center h-10 text-muted-foreground rounded-lg border bg-card/40">
-        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-        Cargando ubicaciones...
+      <div className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-card/40 text-xs sm:text-sm xl2:text-base text-muted-foreground">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        Cargando ubicaciones…
       </div>
     );
   }
 
-  return (
-    <div className="w-full">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            className="group inline-flex items-center justify-between gap-2 rounded-lg
-                       border bg-card/80 px-3 py-2 text-sm font-medium text-foreground
-                       shadow-sm hover:bg-card transition-colors w-full"
-          >
-            <span className="inline-flex items-center gap-2 truncate flex-1 text-left">
-              <MapPin className="w-4 h-4 text-primary/70 shrink-0" />
-              <span className="truncate">
-                {selected
-                  ? `${selected.title}${
-                      selected.city ? " — " + selected.city : ""
-                    }`
-                  : "Selecciona ubicación"}
-              </span>
-            </span>
-            <ChevronDown className="h-4 w-4 text-foreground/50 group-hover:text-foreground/70 transition-colors shrink-0" />
-          </button>
-        </DropdownMenuTrigger>
+  const TriggerButton = (
+    <button
+      type="button"
+      className="
+        group inline-flex items-center gap-2
+        rounded-lg bg-card/80
+        px-3 py-2 font-medium text-foreground
+        hover:bg-card transition-colors
+        max-w-full
+        text-xs sm:text-sm xl2:text-base
+      "
+      disabled={!hasMoreOptions}
+      aria-disabled={!hasMoreOptions}
+    >
+      <span className="inline-flex items-center gap-2 truncate text-left">
+        <MapPin className="w-4 h-4 text-primary/70 shrink-0" />
+        <span className="truncate">{label}</span>
+      </span>
 
-        <DropdownMenuContent
-          align="end"
-          className="w-[280px] max-w-[90vw] rounded-lg"
-        >
-          {locations.map((l) => {
-            const isActive = l.id === selectedLocationId;
-            return (
-              <DropdownMenuItem
-                key={l.id}
-                onClick={() => handleSelect(l.id)}
-                className={`flex flex-col items-start rounded-md ${
-                  isActive ? "bg-primary/10 text-primary" : ""
-                }`}
-              >
-                <span className="truncate w-full text-sm">{l.title}</span>
-                {l.city && (
-                  <span className="text-xs text-muted-foreground truncate w-full">
-                    {l.city}
-                  </span>
-                )}
-              </DropdownMenuItem>
-            );
-          })}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+      <ChevronDown
+        className={[
+          "h-4 w-4 shrink-0 transition-colors",
+          hasMoreOptions
+            ? "text-foreground/50 group-hover:text-foreground/70"
+            : "text-muted-foreground/40",
+        ].join(" ")}
+      />
+    </button>
+  );
+
+  if (!hasMoreOptions) {
+    return TriggerButton;
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{TriggerButton}</DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        align="start"
+        className="w-[280px] max-w-[90vw] rounded-lg"
+      >
+        {otherLocations.map((l) => {
+          return (
+            <DropdownMenuItem
+              key={l.id}
+              onClick={() => handleSelect(l.id)}
+              className="flex flex-col items-start rounded-md"
+            >
+              <span className="truncate w-full text-sm xl2:text-base">
+                {l.title}
+              </span>
+              {l.city ? (
+                <span className="text-xs xl2:text-sm text-muted-foreground truncate w-full">
+                  {l.city}
+                </span>
+              ) : null}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

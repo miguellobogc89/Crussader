@@ -11,10 +11,11 @@ export async function GET(req: Request) {
 
   // 1) Conceptos pendientes: structured NO null + sin link entity todavía
   const pending = await prisma.concept.findMany({
-    where: {
-      structured: { not: Prisma.JsonNull },
-      concept_normalized_entity: { none: {} },
-    },
+where: {
+  structured: { not: Prisma.JsonNull },
+  normalized_entity_id: null,
+},
+
     select: {
       id: true,
       structured: true,

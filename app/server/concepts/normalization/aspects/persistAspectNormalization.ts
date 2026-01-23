@@ -3,6 +3,11 @@ import { prisma } from "@/app/server/db";
 import type { NormalizeAspectResult } from "./normalizeAspect";
 import { canonicalizeKey } from "../canonicalizeKey";
 
+const NORMALIZATION_VERSION = "v1";
+
+function isUuid(v: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+}
 
 export async function persistAspectNormalization(
   conceptId: string,
@@ -10,71 +15,89 @@ export async function persistAspectNormalization(
   originalEntity: string | null,
   result: NormalizeAspectResult,
 ) {
-  if (result.action === "match") {
-    // 1️⃣ Enlace directo (idempotente)
-    await prisma.concept_normalized_aspect.createMany({
-      data: [
-        {
-          concept_id: conceptId,
-          normalized_aspect_id: result.normalized_aspect_id,
-          matched_by: "ai",
-          match_confidence: result.confidence,
-          original_aspect: originalAspect,
-          original_entity: originalEntity,
-        },
-      ],
-      skipDuplicates: true,
-    });
-
-    // 2️⃣ Incrementa uso
-    await prisma.normalized_aspect.update({
-      where: { id: result.normalized_aspect_id },
-      data: {
-        usage_count: { increment: 1 },
-        is_active: true,
-        updated_at: new Date(),
-      },
-    });
-
-    return;
+  if (!isUuid(conceptId)) {
+    throw new Error(`[persistAspectNormalization] conceptId is not UUID: ${conceptId}`);
   }
 
-  // ===== CREATE =====
+  await prisma.$transaction(async (tx) => {
+    let normalizedAspectId: string;
 
-  // 1️⃣ Upsert por canonical_key para evitar P2002
-const canonicalKey = canonicalizeKey(result.display_name);
+    if (result.action === "match") {
+      normalizedAspectId = result.normalized_aspect_id;
 
-const created = await prisma.normalized_aspect.upsert({
-  where: { canonical_key: canonicalKey },
-  create: {
-    canonical_key: canonicalKey,
-    display_name: result.display_name,
-    description: result.description,
-    examples: result.examples,
-    confidence: result.confidence,
-    created_by: "ai",
-    is_active: true,
-    usage_count: 1,
-  },
-  update: {
-    is_active: true,
-    usage_count: { increment: 1 },
-  },
-});
+      if (!isUuid(normalizedAspectId)) {
+        throw new Error(
+          `[persistAspectNormalization] normalizeAspect returned non-UUID normalized_aspect_id="${normalizedAspectId}". Result=${JSON.stringify(result)}`
+        );
+      }
 
+      await tx.concept_normalized_aspect.createMany({
+        data: [
+          {
+            concept_id: conceptId,
+            normalized_aspect_id: normalizedAspectId,
+            matched_by: "ai",
+            match_confidence: result.confidence,
+            original_aspect: originalAspect,
+            original_entity: originalEntity,
+          },
+        ],
+        skipDuplicates: true,
+      });
 
-  // 2️⃣ Crear enlace (idempotente)
-  await prisma.concept_normalized_aspect.createMany({
-    data: [
-      {
-        concept_id: conceptId,
-        normalized_aspect_id: created.id,
-        matched_by: "ai",
-        match_confidence: result.confidence,
-        original_aspect: originalAspect,
-        original_entity: originalEntity,
+      await tx.normalized_aspect.update({
+        where: { id: normalizedAspectId },
+        data: {
+          usage_count: { increment: 1 },
+          is_active: true,
+          updated_at: new Date(),
+        },
+      });
+    } else {
+      const canonicalKey = canonicalizeKey(result.display_name);
+
+      const created = await tx.normalized_aspect.upsert({
+        where: { canonical_key: canonicalKey },
+        create: {
+          canonical_key: canonicalKey,
+          display_name: result.display_name,
+          description: result.description,
+          examples: result.examples,
+          confidence: result.confidence,
+          created_by: "ai",
+          is_active: true,
+          usage_count: 1,
+        },
+        update: {
+          is_active: true,
+          usage_count: { increment: 1 },
+          updated_at: new Date(),
+        },
+      });
+
+      normalizedAspectId = created.id;
+
+      await tx.concept_normalized_aspect.createMany({
+        data: [
+          {
+            concept_id: conceptId,
+            normalized_aspect_id: normalizedAspectId,
+            matched_by: "ai",
+            match_confidence: result.confidence,
+            original_aspect: originalAspect,
+            original_entity: originalEntity,
+          },
+        ],
+        skipDuplicates: true,
+      });
+    }
+
+    await tx.concept.update({
+      where: { id: conceptId },
+      data: {
+        normalized_aspect_id: normalizedAspectId,
+        normalization_version: NORMALIZATION_VERSION,
       },
-    ],
-    skipDuplicates: true,
+    });
   });
 }

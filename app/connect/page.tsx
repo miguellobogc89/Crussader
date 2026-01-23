@@ -5,14 +5,20 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/app/server/db";
 import ConnectClient from "./ConnectClient";
 
+function devLog(...args: any[]) {
+  if (process.env.NODE_ENV === "development") {
+    console.log(...args);
+  }
+}
+
 export default async function ConnectPage() {
   const session = await getServerSession(authOptions);
 
-  console.log("[connect/page] session email =", session?.user?.email ?? null);
+  devLog("[connect/page] session email =", session?.user?.email ?? null);
 
   if (!session?.user?.email) {
-    console.log("[connect/page] no session -> render ConnectClient");
-    return <ConnectClient />;
+    devLog("[connect/page] no session -> render ConnectClient");
+    return <ConnectClient initialEmail={session?.user?.email ?? null} />;
   }
 
   const user = await prisma.user.findUnique({
@@ -20,11 +26,11 @@ export default async function ConnectPage() {
     select: { id: true, email: true },
   });
 
-  console.log("[connect/page] db user =", user);
+  devLog("[connect/page] db user =", user);
 
   if (!user?.id) {
-    console.log("[connect/page] user not found -> render ConnectClient");
-    return <ConnectClient />;
+    devLog("[connect/page] user not found -> render ConnectClient");
+    return <ConnectClient initialEmail={session.user.email} />;
   }
 
   const hasAnyLocation = await prisma.userCompany.findFirst({
@@ -46,13 +52,13 @@ export default async function ConnectPage() {
     },
   });
 
-  console.log("[connect/page] hasAnyLocation =", hasAnyLocation);
+  devLog("[connect/page] hasAnyLocation =", hasAnyLocation);
 
   if (hasAnyLocation?.id) {
-    console.log("[connect/page] redirect -> /dashboard/home");
+    devLog("[connect/page] redirect -> /dashboard/home");
     redirect("/dashboard/home");
   }
 
-  console.log("[connect/page] no locations for user -> render ConnectClient");
-  return <ConnectClient />;
+  devLog("[connect/page] no locations for user -> render ConnectClient");
+  return <ConnectClient initialEmail={session.user.email} />;
 }

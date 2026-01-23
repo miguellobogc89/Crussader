@@ -1105,54 +1105,6 @@ model subscription_item {
   @@index([subscription_id], map: "idx_sitem_sub")
 }
 
-model concept {
-  id                        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  label                     String
-  model                     String
-  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
-  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
-  topic_id                  String?                     @db.Uuid
-  review_id                 String?
-  sentiment                 String?
-  confidence                Float?                      @db.Real
-  relevance                 Float?                      @default(1) @db.Real
-  assigned_at               DateTime?                   @db.Timestamptz(6)
-  rating                    Int?
-  review_date               DateTime?                   @db.Timestamptz(6)
-  location_id               String?
-  structured                Json?
-  family                    String?                     @db.VarChar(24)
-  review_text               String?
-  review                    Review?                     @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  topic                     topic?                      @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
-  concept_normalized_aspect concept_normalized_aspect[]
-  concept_normalized_entity concept_normalized_entity[]
-
-  @@index([topic_id], map: "idx_concept_topic_id")
-  @@index([review_id], map: "idx_concept_review_id")
-  @@index([rating], map: "idx_concept_rating")
-  @@index([review_date], map: "idx_concept_review_date")
-  @@index([sentiment], map: "idx_concept_sentiment")
-  @@index([family], map: "idx_concept_family")
-}
-
-model topic {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  label         String
-  description   String?
-  model         String?
-  concept_count Int?      @default(0)
-  avg_rating    Float?    @default(0)
-  is_stable     Boolean?  @default(false)
-  created_at    DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime  @default(now()) @db.Timestamptz(6)
-  location_id   String?
-  concept       concept[]
-  Location      Location? @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_topic_location")
-
-  @@index([location_id], map: "idx_topic_location_id")
-}
-
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model theme_candidate {
   id                    String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -1938,6 +1890,68 @@ model commercial_product {
   @@index([status], map: "idx_commercial_product_status")
 }
 
+model topic {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label         String
+  description   String?
+  model         String?
+  concept_count Int?      @default(0)
+  avg_rating    Float?    @default(0)
+  is_stable     Boolean?  @default(false)
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime  @default(now()) @db.Timestamptz(6)
+  location_id   String?
+  concept       concept[]
+  Location      Location? @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_topic_location")
+
+  @@index([location_id], map: "idx_topic_location_id")
+}
+
+model concept {
+  id                        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label                     String
+  model                     String
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  topic_id                  String?                     @db.Uuid
+  review_id                 String?
+  sentiment                 String?
+  confidence                Float?                      @db.Real
+  relevance                 Float?                      @default(1) @db.Real
+  assigned_at               DateTime?                   @db.Timestamptz(6)
+  rating                    Int?
+  review_date               DateTime?                   @db.Timestamptz(6)
+  location_id               String?
+  structured                Json?
+  family                    String?                     @db.VarChar(24)
+  review_text               String?
+  normalized_aspect_id      String?                     @db.Uuid
+  normalized_entity_id      String?                     @db.Uuid
+  normalized_at             DateTime?                   @db.Timestamptz(6)
+  normalization_version     String?
+  review_published_at       DateTime?                   @db.Timestamptz(6)
+  review_published_year     Int?
+  review_published_month    Int?
+  review                    Review?                     @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  topic                     topic?                      @relation(fields: [topic_id], references: [id], onUpdate: NoAction)
+  normalized_aspect         normalized_aspect?          @relation(fields: [normalized_aspect_id], references: [id], onUpdate: NoAction, map: "fk_concept_normalized_aspect")
+  normalized_entity         normalized_entity?          @relation(fields: [normalized_entity_id], references: [id], onUpdate: NoAction, map: "fk_concept_normalized_entity")
+  concept_normalized_aspect concept_normalized_aspect[]
+  concept_normalized_entity concept_normalized_entity[]
+
+  @@index([topic_id], map: "idx_concept_topic_id")
+  @@index([review_id], map: "idx_concept_review_id")
+  @@index([rating], map: "idx_concept_rating")
+  @@index([review_date], map: "idx_concept_review_date")
+  @@index([sentiment], map: "idx_concept_sentiment")
+  @@index([family], map: "idx_concept_family")
+  @@index([normalized_aspect_id], map: "idx_concept_norm_aspect_id")
+  @@index([normalized_entity_id], map: "idx_concept_norm_entity_id")
+  @@index([review_published_at], map: "idx_concept_review_published_at")
+  @@index([normalized_at], map: "idx_concept_normalized_at")
+  @@index([review_published_year, review_published_month], map: "idx_concept_pub_year_month")
+}
+
 model normalized_aspect {
   id                        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   canonical_key             String                      @unique
@@ -1951,6 +1965,7 @@ model normalized_aspect {
   created_at                DateTime                    @default(now()) @db.Timestamptz(6)
   updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
   merged_into_id            String?                     @db.Uuid
+  concept                   concept[]
   concept_normalized_aspect concept_normalized_aspect[]
   normalized_aspect         normalized_aspect?          @relation("normalized_aspectTonormalized_aspect", fields: [merged_into_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
   other_normalized_aspect   normalized_aspect[]         @relation("normalized_aspectTonormalized_aspect")
@@ -2012,10 +2027,15 @@ model normalized_entity {
   is_active                 Boolean                     @default(true)
   created_at                DateTime                    @default(now()) @db.Timestamptz(6)
   updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  merged_into_id            String?                     @db.Uuid
+  concept                   concept[]
   concept_normalized_entity concept_normalized_entity[]
+  normalized_entity         normalized_entity?          @relation("normalized_entityTonormalized_entity", fields: [merged_into_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "fk_normalized_entity_merged_into")
+  other_normalized_entity   normalized_entity[]         @relation("normalized_entityTonormalized_entity")
 
   @@index([is_active], map: "idx_normalized_entity_active")
   @@index([usage_count(sort: Desc)], map: "idx_normalized_entity_usage")
+  @@index([merged_into_id], map: "idx_normalized_entity_merged_into")
 }
 
 model normalized_entity_alias {

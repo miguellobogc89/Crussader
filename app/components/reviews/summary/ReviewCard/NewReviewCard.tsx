@@ -57,16 +57,20 @@ function StatusChip({
   if (!hasResponse) return null;
 
   const label = isPublished ? "Publicada" : "Pendiente";
+
   const cls = isPublished
-    ? "bg-emerald-600 text-white"
-    : "bg-slate-700 text-white";
+    ? "border-emerald-500 text-emerald-600"
+    : "border-slate-400 text-slate-500";
 
   return (
     <div
       className={`
         absolute top-3 right-3 z-10
         inline-flex items-center justify-center
-        h-7 px-3 rounded-full text-[11px] font-medium shadow-lg
+        h-7 px-3 rounded-full
+        border
+        text-[11px] font-medium
+        bg-transparent
         ${cls}
       `}
     >
@@ -74,6 +78,7 @@ function StatusChip({
     </div>
   );
 }
+
 
 /* ======================================================= */
 export default function NewReviewCard({ review }: ReviewCardProps) {
@@ -567,6 +572,7 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
                 onPublish={publish}
                 onSave={save}
                 onDelete={removeCurrent}
+                onUnpublish={unpublish}
                 versionInfo={
                   list.length
                     ? {
@@ -579,29 +585,7 @@ export default function NewReviewCard({ review }: ReviewCardProps) {
                 }
               />
 
-              {/* 🔴 NUEVO: botón para quitar de Google si está publicada */}
-              {isPublished && (
-                <div className="mt-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={unpublish}
-                    disabled={busy}
-                    className="
-                      inline-flex items-center justify-center gap-2
-                      rounded-full
-                      border border-destructive/50
-                      text-destructive
-                      bg-destructive/5
-                      h-8 px-3 text-[11px] font-medium
-                      hover:bg-destructive/10
-                      disabled:opacity-50
-                      transition
-                    "
-                  >
-                    Quitar de Google
-                  </button>
-                </div>
-              )}
+
             </>
           )}
         </div>
