@@ -278,6 +278,7 @@ model Employee {
   exceptions    Json?
   openingHours  Json?
   timezone      String             @default("Europe/Madrid")
+  job_title     String?            @db.VarChar(64)
   appointments  Appointment[]
   locations     EmployeeLocation[]
   roles         EmployeeRole[]
@@ -1310,6 +1311,7 @@ model CompanyHoliday {
   Company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   Location   Location? @relation(fields: [locationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@unique([companyId, locationId, date], map: "uq_companyholiday_company_location_date")
   @@index([companyId, date], map: "idx_company_holiday_company_date")
   @@index([locationId, date], map: "idx_company_holiday_location_date")
 }
@@ -1335,27 +1337,30 @@ model EmployeeShift {
 }
 
 model ShiftEvent {
-  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  companyId          String
-  locationId         String?
-  employeeId         String?
-  startAt            DateTime         @db.Timestamptz(6)
-  endAt              DateTime         @db.Timestamptz(6)
-  kind               shift_event_kind @default(WORK)
-  label              String?
-  externalProvider   String?
-  externalCalendarId String?
-  externalEventId    String?
-  createdAt          DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt          DateTime         @default(now()) @db.Timestamptz(6)
-  Company            Company          @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  Employee           Employee?        @relation(fields: [employeeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  Location           Location?        @relation(fields: [locationId], references: [id], onUpdate: NoAction)
+  id                    String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId             String
+  locationId            String?
+  employeeId            String?
+  startAt               DateTime               @db.Timestamptz(6)
+  endAt                 DateTime               @db.Timestamptz(6)
+  kind                  shift_event_kind       @default(WORK)
+  label                 String?
+  externalProvider      String?
+  externalCalendarId    String?
+  externalEventId       String?
+  createdAt             DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime               @default(now()) @db.Timestamptz(6)
+  templateId            String?                @db.Uuid
+  Company               Company                @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Employee              Employee?              @relation(fields: [employeeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Location              Location?              @relation(fields: [locationId], references: [id], onUpdate: NoAction)
+  LocationShiftTemplate LocationShiftTemplate? @relation(fields: [templateId], references: [id], onUpdate: NoAction, map: "ShiftEvent_template_fk")
 
   @@index([companyId], map: "ShiftEvent_company_idx")
   @@index([employeeId], map: "ShiftEvent_employee_idx")
   @@index([locationId], map: "ShiftEvent_location_idx")
   @@index([startAt])
+  @@index([templateId], map: "ShiftEvent_template_idx")
 }
 
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
@@ -1473,6 +1478,7 @@ model Company {
   LocationKpiDaily            LocationKpiDaily[]            @relation("CompanyToKpiDaily")
   LocationReviewHourlyMonthly LocationReviewHourlyMonthly[]
   LocationReviewMonthly       LocationReviewMonthly[]
+  LocationShiftTemplate       LocationShiftTemplate[]
   responseSettings            ResponseSettings?
   Reviews                     Review[]                      @relation("CompanyReviews")
   ShiftEvent                  ShiftEvent[]
@@ -1604,6 +1610,7 @@ model Location {
   activityId                  String?
   typeId                      String?
   exceptions                  Json?
+  address_id                  String?                       @unique(map: "ux_location_address_id") @db.Uuid
   agentSessions               AgentSession[]
   appointments                Appointment[]
   CompanyHoliday              CompanyHoliday[]
@@ -1615,9 +1622,11 @@ model Location {
   company                     Company                       @relation(fields: [companyId], references: [id])
   ExternalConnection          ExternalConnection?           @relation(fields: [externalConnectionId], references: [id])
   type                        Type?                         @relation(fields: [typeId], references: [id])
+  addressRef                  address?                      @relation("fk_location_address_id", fields: [address_id], references: [id], onUpdate: NoAction, map: "fk_location_address_id")
   KpiDaily                    LocationKpiDaily[]            @relation("LocationToKpiDaily")
   LocationReviewHourlyMonthly LocationReviewHourlyMonthly[]
   LocationReviewMonthly       LocationReviewMonthly[]
+  LocationShiftTemplate       LocationShiftTemplate[]
   resources                   Resource[]
   resourceTimeOffs            ResourceTimeOff[]
   Reviews                     Review[]                      @relation("LocationReviews")
@@ -2049,6 +2058,122 @@ model normalized_entity_alias {
   @@index([winner_canonical_key], map: "idx_nea_winner")
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model BankHoliday {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scope         holiday_scope
+  date          DateTime      @db.Date
+  name          String
+  is_closed     Boolean       @default(true)
+  country_code  String?       @db.VarChar(2)
+  region_code   String?       @db.VarChar(32)
+  province_code String?       @db.VarChar(32)
+  municipality  String?       @db.VarChar(128)
+  company_id    String?
+  location_id   String?
+  created_at    DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime      @default(now()) @db.Timestamptz(6)
+  admin1_code   String?       @db.VarChar(16)
+  admin2_code   String?       @db.VarChar(16)
+  city          String?
+  ccaa_id       String?       @db.Uuid
+  province_id   String?       @db.Uuid
+  es_ccaa       es_ccaa?      @relation(fields: [ccaa_id], references: [id], onUpdate: NoAction, map: "fk_bankholiday_ccaa")
+  es_province   es_province?  @relation(fields: [province_id], references: [id], onUpdate: NoAction, map: "fk_bankholiday_province")
+
+  @@index([company_id, date], map: "idx_bankholiday_company_date")
+  @@index([country_code, date], map: "idx_bankholiday_country_date")
+  @@index([country_code, region_code, province_code, municipality, date], map: "idx_bankholiday_municipal_date")
+  @@index([country_code, region_code, province_code, date], map: "idx_bankholiday_province_date")
+  @@index([country_code, region_code, date], map: "idx_bankholiday_region_date")
+  @@index([scope, country_code, date], map: "idx_bankholiday_scope_country_date")
+  @@index([ccaa_id, date], map: "ix_bankholiday_ccaa_date")
+  @@index([province_id, date], map: "ix_bankholiday_province_date")
+}
+
+model address {
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  street_line1       String       @db.VarChar(160)
+  street_line2       String?      @db.VarChar(160)
+  postal_code        String       @db.VarChar(12)
+  country_code       String       @default("ES") @db.VarChar(2)
+  latitude           Decimal?     @db.Decimal(10, 7)
+  longitude          Decimal?     @db.Decimal(10, 7)
+  google_place_id    String?      @unique(map: "uq_address_google_place_id")
+  formatted_address  String?
+  locality           String?
+  admin_area_level_2 String?
+  admin_area_level_1 String?
+  raw_components     Json?
+  province_id        String?      @db.Uuid
+  ccaa_id            String?      @db.Uuid
+  location           Location?    @relation("fk_location_address_id")
+  es_ccaa            es_ccaa?     @relation(fields: [ccaa_id], references: [id], onUpdate: NoAction, map: "fk_address_ccaa_id")
+  es_province        es_province? @relation(fields: [province_id], references: [id], onUpdate: NoAction, map: "fk_address_province_id")
+
+  @@index([ccaa_id], map: "ix_address_ccaa_id")
+  @@index([google_place_id], map: "ix_address_google_place_id")
+  @@index([postal_code], map: "ix_address_postal_code")
+  @@index([province_id], map: "ix_address_province_id")
+}
+
+model es_ccaa {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String        @unique @db.VarChar(4)
+  name        String        @db.VarChar(80)
+  BankHoliday BankHoliday[]
+  address     address[]
+  es_province es_province[]
+
+  @@index([name], map: "ix_es_ccaa_name")
+}
+
+model es_province {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ccaa_id     String        @db.Uuid
+  code        String        @unique @db.VarChar(4)
+  name        String        @db.VarChar(80)
+  BankHoliday BankHoliday[]
+  address     address[]
+  es_ccaa     es_ccaa       @relation(fields: [ccaa_id], references: [id], onUpdate: NoAction)
+
+  @@index([ccaa_id], map: "ix_es_province_ccaa_id")
+  @@index([name], map: "ix_es_province_name")
+}
+
+model company_holiday {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id  String
+  location_id String?
+  date        DateTime @db.Date
+  name        String
+  is_closed   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model LocationShiftTemplate {
+  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String
+  locationId String
+  name       String
+  startMin   Int
+  endMin     Int
+  kind       shift_event_kind @default(WORK)
+  color      String?
+  isActive   Boolean          @default(true)
+  createdAt  DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime         @default(now()) @db.Timestamptz(6)
+  Company    Company          @relation(fields: [companyId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LocationShiftTemplate_company_fk")
+  Location   Location         @relation(fields: [locationId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "LocationShiftTemplate_location_fk")
+  ShiftEvent ShiftEvent[]
+
+  @@unique([locationId, name], map: "LocationShiftTemplate_location_name_ux")
+  @@index([companyId], map: "LocationShiftTemplate_company_idx")
+  @@index([locationId], map: "LocationShiftTemplate_location_idx")
+}
+
 /// *
 /// * =========================
 /// * Enums
@@ -2403,4 +2528,12 @@ enum commercial_product_status {
   AVAILABLE
   IN_PROGRESS
   COMING_SOON
+}
+
+enum holiday_scope {
+  NATIONAL
+  REGIONAL
+  PROVINCIAL
+  MUNICIPAL
+  COMPANY
 }

@@ -29,7 +29,7 @@ export function BetaPlanCard({
   }
 
   const isBeta = variant === "beta";
-  const title = isBeta ? "Fase beta" : "Plan actual";
+  const title = isBeta ? "Fase de prueba" : "Plan actual";
   const badge = isBeta ? "BETA" : (planLabel ?? "PLAN");
   const desc = isBeta
     ? "Algunas funciones pueden ajustarse mientras lo mejoramos."

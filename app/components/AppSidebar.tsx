@@ -50,6 +50,14 @@ const MYBUSINESS: NavItem = {
   description: "Gestión de mis establecimientos",
 };
 
+const SHIFT_CALENDAR: NavItem = {
+  title: "Turnos de empleados",
+  href: "/dashboard/shift-calendar",
+  icon: "📅",
+  description: "Calendario de turnos del equipo",
+};
+
+
 const INTEGRATIONS: NavItem = {
   title: "Labs",
   href: "/dashboard/labs",
@@ -223,6 +231,11 @@ export function AppSidebar() {
     ? pendingHref === MYBUSINESS.href
     : isActivePath(pathname, MYBUSINESS.href);
 
+  const shiftCalendarActive = hasPending
+    ? pendingHref === SHIFT_CALENDAR.href
+    : isActivePath(pathname, SHIFT_CALENDAR.href);
+
+
   const integrationsActive = hasPending
     ? pendingHref === INTEGRATIONS.href
     : isActivePath(pathname, INTEGRATIONS.href);
@@ -271,6 +284,14 @@ export function AppSidebar() {
           collapsed={collapsed}
           onNavigate={makeItemNavigate(MYBUSINESS.href)}
         />
+
+        <SidebarItem
+          item={SHIFT_CALENDAR}
+          active={shiftCalendarActive}
+          collapsed={collapsed}
+          onNavigate={makeItemNavigate(SHIFT_CALENDAR.href)}
+        />
+
 
         <SidebarItem
           item={INTEGRATIONS}

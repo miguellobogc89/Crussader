@@ -89,6 +89,8 @@ export async function GET(req: NextRequest) {
  *
  * Nota: Este endpoint no devuelve nada especial; el modal solo comprueba 2xx.
  */
+
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -98,17 +100,26 @@ export async function POST(req: NextRequest) {
       active = true,
       locationIds = [],
       roleIds = [],
+
+      // ✅ NUEVO
+      jobTitle,
     }: {
       id?: string;
       name?: string;
       active?: boolean;
       locationIds?: string[];
       roleIds?: string[];
+
+      // ✅ NUEVO
+      jobTitle?: string;
     } = body ?? {};
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "Falta 'name' válido" }, { status: 400 });
     }
+
+    const job_title =
+      typeof jobTitle === "string" ? jobTitle.trim().slice(0, 64) : null;
 
     // Normaliza arrays (únicos, strings)
     const locIds = Array.isArray(locationIds)
@@ -127,6 +138,9 @@ export async function POST(req: NextRequest) {
           data: {
             name: name.trim(),
             active: !!active,
+
+            // ✅ NUEVO
+            job_title,
           },
           select: { id: true },
         });
@@ -144,32 +158,31 @@ export async function POST(req: NextRequest) {
           data: {
             name: name.trim(),
             active: !!active,
+
+            // ✅ NUEVO
+            job_title,
           },
         });
       }
 
       // === Sincronizar ubicaciones ===
-      // Si vienen IDs, dejamos exactamente esas. Si viene [] vaciamos todas.
-      // 1) eliminar las que sobran
       await tx.employeeLocation.deleteMany({
         where: {
           employeeId: employeeId!,
           ...(locIds.length > 0 ? { locationId: { notIn: locIds } } : {}),
         },
       });
-      // 2) crear las que falten
+
       if (locIds.length > 0) {
         await tx.employeeLocation.createMany({
           data: locIds.map((locationId) => ({ employeeId: employeeId!, locationId })),
           skipDuplicates: true,
         });
       } else {
-        // si mandas [], asegúrate de no dejar restos
         await tx.employeeLocation.deleteMany({ where: { employeeId: employeeId! } });
       }
 
       // === Sincronizar roles ===
-      // Igual que ubicaciones; además, marcamos el primero como isPrimary=true
       await tx.employeeRole.deleteMany({
         where: {
           employeeId: employeeId!,
@@ -178,14 +191,11 @@ export async function POST(req: NextRequest) {
       });
 
       if (rIds.length > 0) {
-        // Aseguramos que solo 1 sea primario:
-        // primero ponemos todo a false, luego marcamos el primero como true
         await tx.employeeRole.updateMany({
           where: { employeeId: employeeId! },
           data: { isPrimary: false },
         });
 
-        // crea los que falten (todos isPrimary:false de inicio)
         await tx.employeeRole.createMany({
           data: rIds.map((roleId) => ({
             employeeId: employeeId!,
@@ -195,7 +205,6 @@ export async function POST(req: NextRequest) {
           skipDuplicates: true,
         });
 
-        // establece primario el primero del array
         await tx.employeeRole.update({
           where: { employeeId_roleId: { employeeId: employeeId!, roleId: rIds[0] } },
           data: { isPrimary: true },

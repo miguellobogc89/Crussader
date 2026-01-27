@@ -65,6 +65,7 @@ export type BootstrapData = {
     postalCode: string | null;
     country: string | null;
     countryCode: string | null;
+    openingHours: any | null;
     phone: string | null;
     email: string | null;
     website: string | null;
@@ -168,7 +169,8 @@ export async function getBootstrapData(): Promise<BootstrapData> {
         where: { companyId: activeCompanyId },
         select: {
           id: true, companyId: true, title: true, slug: true, status: true, type: true,
-          address: true, address2: true, city: true, region: true, postalCode: true,
+          address: true, address2: true,openingHours: true,
+          city: true, region: true, postalCode: true,
           country: true, countryCode: true, phone: true, email: true, website: true,
           googleName: true, googlePlaceId: true, googleLocationId: true, googleAccountId: true,
           externalConnectionId: true, featuredImageUrl: true, instagramUrl: true, facebookUrl: true,

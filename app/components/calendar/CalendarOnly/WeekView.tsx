@@ -1,3 +1,4 @@
+// app/components/calendar/CalendarOnly/WeekView.tsx
 "use client";
 
 import AppointmentPill from "@/app/components/calendar/AppointmentPill";
@@ -6,15 +7,18 @@ import HourGuides from "./HourGuides";
 import { layoutDayAppts, COL_GAP_PX } from "./layout";
 import { localKeyTZ } from "./tz";
 import type { CalendarAppt } from "./types";
+import type { CellPainter } from "@/hooks/calendar/useCellPainter";
 
 type Props = {
-  days: Date[];                               // ✅ ahora dinámico (3, 5 o 7 días)
+  days: Date[];
   apptsByDay: Map<string, CalendarAppt[]>;
   onSelect?: (id: string) => void;
   onEdit?: (id: string) => void;
   START_HOUR: number;
   HOURS_COUNT: number;
   ROW_PX: number;
+
+  painter: CellPainter;
 };
 
 export default function WeekView({
@@ -25,13 +29,15 @@ export default function WeekView({
   START_HOUR,
   HOURS_COUNT,
   ROW_PX,
+  painter,
 }: Props) {
   const hours = Array.from({ length: HOURS_COUNT }, (_, i) => START_HOUR + i);
-  const WEEK_HEADER_PX = 40; // h-10
+  const WEEK_HEADER_PX = 40;
+
+  const makeCellId = (dayKey: string, hourIndex: number) => `${dayKey}|${hourIndex}`;
 
   return (
     <div className="relative h-full">
-      {/* Línea “ahora” a lo ancho del lienzo (para cualquier multi-día) */}
       <CurrentTimeLineFullSpan
         referenceDate={new Date()}
         START_HOUR={START_HOUR}
@@ -40,43 +46,49 @@ export default function WeekView({
         HEADER_OFFSET_PX={WEEK_HEADER_PX}
       />
 
-      {/* Guías con offset de cabecera */}
       <HourGuides count={HOURS_COUNT} rowPx={ROW_PX} headerOffset={WEEK_HEADER_PX} />
 
-      {/* Grid con columna de horas + N columnas de días */}
       <div
         className="grid h-full gap-2"
         style={{ gridTemplateColumns: `64px repeat(${days.length}, minmax(0,1fr))` }}
       >
-        {/* columna horas */}
         <div className="flex flex-col">
           <div className="h-10" />
           {hours.map((h) => (
-            <div
-              key={h}
-              className="h-16 text-xs text-muted-foreground flex items-start pt-0.5"
-            >
+            <div key={h} className="h-16 text-xs text-muted-foreground flex items-start pt-0.5">
               {String(h).padStart(2, "0")}:00
             </div>
           ))}
         </div>
 
-        {/* columnas de días */}
         {days.map((d) => {
-          const key = localKeyTZ(d);
-          const list = apptsByDay.get(key) ?? [];
+          const dayKey = localKeyTZ(d);
+          const list = apptsByDay.get(dayKey) ?? [];
 
           return (
-            <div key={key} className="min-w-0">
-              <div
-                className="relative"
-                style={{ height: WEEK_HEADER_PX + HOURS_COUNT * ROW_PX }}
-              >
-                {/* Contenedor de pills debajo del header del día */}
+            <div key={dayKey} className="min-w-0">
+              <div className="relative" style={{ height: WEEK_HEADER_PX + HOURS_COUNT * ROW_PX }}>
                 <div
                   className="absolute left-0 right-0"
                   style={{ top: WEEK_HEADER_PX, height: HOURS_COUNT * ROW_PX }}
                 >
+                  {/* overlays pintables */}
+                  {Array.from({ length: HOURS_COUNT }, (_, hourIndex) => {
+                    const cellId = makeCellId(dayKey, hourIndex);
+                    const className = painter.getOverlayClass(cellId);
+                    const handlers = painter.getCellHandlers(cellId);
+
+                    return (
+                      <div
+                        key={cellId}
+                        className={className}
+                        style={{ top: hourIndex * ROW_PX, height: ROW_PX }}
+                        {...handlers}
+                      />
+                    );
+                  })}
+
+                  {/* pills */}
                   {(() => {
                     const layout = layoutDayAppts(list, START_HOUR, ROW_PX);
                     return list.map((a) => {
@@ -97,9 +109,7 @@ export default function WeekView({
                           <AppointmentPill
                             startAtISO={a.startAt}
                             title={a.serviceName ?? "Cita"}
-                            subtitle={[a.employeeName, a.resourceName]
-                              .filter(Boolean)
-                              .join(" · ")}
+                            subtitle={[a.employeeName, a.resourceName].filter(Boolean).join(" · ")}
                             color={a.serviceColor ?? undefined}
                             onClick={() => onSelect?.(a.id)}
                             onDoubleClick={() => onEdit?.(a.id)}

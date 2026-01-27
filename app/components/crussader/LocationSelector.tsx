@@ -1,7 +1,7 @@
 // app/components/crussader/LocationSelector.tsx
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { MapPin, ChevronDown, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
@@ -16,6 +16,7 @@ export type LocationLite = {
   title: string;
   city?: string | null;
   reviewsCount?: number | null;
+  openingHours?: any | null;
 };
 
 export default function LocationSelector({
@@ -29,49 +30,59 @@ export default function LocationSelector({
     null
   );
   const [loading, setLoading] = useState(true);
+  const onSelectRef = useRef(onSelect);
 
-  useEffect(() => {
-    if (!boot) return;
+useEffect(() => {
+  onSelectRef.current = onSelect;
+}, [onSelect]);
 
-    const rows = Array.isArray(boot.locations)
-      ? boot.locations.map((l: any) => ({
-          id: String(l.id),
-          title: String(l.title ?? "Sin nombre"),
-          city: l.city ?? null,
-          reviewsCount: l.reviewsCount ?? 0,
-        }))
-      : [];
 
-    setLocations(rows);
+useEffect(() => {
+  if (!boot) return;
 
-    let defaultId: string | null = null;
+const rows = Array.isArray(boot.locations)
+  ? boot.locations.map((l: any) => ({
+      id: String(l.id),
+      title: String(l.title ?? "Sin nombre"),
+      city: l.city ?? null,
+      reviewsCount: l.reviewsCount ?? 0,
 
+      // ✅ NUEVO (la clave del tema)
+      openingHours: l.openingHours ?? null,
+    }))
+  : [];
+
+
+  setLocations(rows);
+
+  let defaultId: string | null = null;
+
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem("reviews:locationId");
+    const validSaved = rows.some((r) => r.id === saved);
+    if (validSaved && saved) {
+      defaultId = saved;
+    }
+  }
+
+  if (!defaultId && rows.length > 0) {
+    defaultId = rows[0].id;
+  }
+
+  setSelectedLocationId(defaultId);
+
+  const loc = defaultId ? rows.find((x) => x.id === defaultId) ?? null : null;
+
+  if (defaultId) {
+    onSelectRef.current(defaultId, loc);
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("reviews:locationId");
-      const validSaved = rows.some((r) => r.id === saved);
-      if (validSaved && saved) {
-        defaultId = saved;
-      }
+      localStorage.setItem("reviews:locationId", defaultId);
     }
+  }
 
-    if (!defaultId && rows.length > 0) {
-      defaultId = rows[0].id;
-    }
+  setLoading(false);
+}, [boot]);
 
-    setSelectedLocationId(defaultId);
-
-    const loc =
-      (defaultId ? rows.find((x) => x.id === defaultId) : null) ?? null;
-
-    if (defaultId) {
-      onSelect(defaultId, loc);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("reviews:locationId", defaultId);
-      }
-    }
-
-    setLoading(false);
-  }, [boot, onSelect]);
 
   const selected = useMemo(
     () => locations.find((l) => l.id === selectedLocationId) ?? null,

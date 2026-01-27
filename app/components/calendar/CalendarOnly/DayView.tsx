@@ -1,3 +1,4 @@
+//app/components/calendar/CalendarOnly/DayView.tsx
 "use client";
 
 import AppointmentPill from "@/app/components/calendar/AppointmentPill";
@@ -5,6 +6,8 @@ import CurrentTimeLineFullSpan from "./CurrentTimeLineFullSpan";
 import HourGuides from "./HourGuides";
 import { layoutDayAppts, COL_GAP_PX } from "./layout";
 import type { CalendarAppt } from "./types";
+import { localKeyTZ } from "./tz";
+import type { CellPainter } from "@/hooks/calendar/useCellPainter";
 
 type Props = {
   date: Date;
@@ -14,6 +17,8 @@ type Props = {
   START_HOUR: number;
   HOURS_COUNT: number;
   ROW_PX: number;
+
+  painter: CellPainter;
 };
 
 export default function DayView({
@@ -24,8 +29,12 @@ export default function DayView({
   START_HOUR,
   HOURS_COUNT,
   ROW_PX,
+  painter,
 }: Props) {
   const hours = Array.from({ length: HOURS_COUNT }, (_, i) => START_HOUR + i);
+
+  const dayKey = localKeyTZ(date);
+  const makeCellId = (hourIndex: number) => `${dayKey}|${hourIndex}`;
 
   return (
     <div className="relative h-full">
@@ -41,30 +50,58 @@ export default function DayView({
         {/* Columna de horas */}
         <div className="flex flex-col">
           {hours.map((h) => (
-            <div key={h} className="h-16 text-xs text-muted-foreground flex items-start pt-0.5">
+            <div
+              key={h}
+              className="h-16 text-xs text-muted-foreground flex items-start pt-0.5"
+            >
               {String(h).padStart(2, "0")}:00
             </div>
           ))}
         </div>
 
-        {/* Lienzo del día con layout de solapes */}
+        {/* Lienzo */}
         <div className="relative" style={{ height: HOURS_COUNT * ROW_PX }}>
+          {/* Overlay pintable por celda */}
+          {Array.from({ length: HOURS_COUNT }, (_, hourIndex) => {
+            const cellId = makeCellId(hourIndex);
+            const className = painter.getOverlayClass(cellId);
+            const handlers = painter.getCellHandlers(cellId);
+
+            return (
+              <div
+                key={cellId}
+                className={className}
+                style={{ top: hourIndex * ROW_PX, height: ROW_PX }}
+                {...handlers}
+              />
+            );
+          })}
+
+          {/* Pills (citas) encima */}
           {(() => {
             const layout = layoutDayAppts(appts, START_HOUR, ROW_PX);
             return appts.map((a) => {
               const L = layout.get(a.id)!;
               const widthStyle = `calc(${L.widthPct}% - ${COL_GAP_PX}px)`;
               const leftStyle = `calc(${L.leftPct}% + ${COL_GAP_PX / 2}px)`;
+
               return (
                 <div
                   key={a.id}
                   className="absolute"
-                  style={{ top: L.top, height: L.height, left: leftStyle, width: widthStyle }}
+                  style={{
+                    top: L.top,
+                    height: L.height,
+                    left: leftStyle,
+                    width: widthStyle,
+                  }}
                 >
                   <AppointmentPill
                     startAtISO={a.startAt}
                     title={a.serviceName ?? "Cita"}
-                    subtitle={[a.employeeName, a.resourceName].filter(Boolean).join(" · ")}
+                    subtitle={[a.employeeName, a.resourceName]
+                      .filter(Boolean)
+                      .join(" · ")}
                     color={a.serviceColor ?? undefined}
                     onClick={() => onSelect?.(a.id)}
                     onDoubleClick={() => onEdit?.(a.id)}
