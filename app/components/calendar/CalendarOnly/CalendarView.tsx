@@ -1,358 +1,134 @@
+// app/components/calendar/CalendarOnly/CalendarView.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-
-import CalendarHeader from "@/app/components/calendar/CalendarHeader";
-import CalendarCenter from "@/app/components/calendar/CalendarOnly/CalendarCenter";
-import type { CalendarAppt } from "@/app/components/calendar/CalendarOnly";
-import { usePersistentSelection } from "@/hooks/usePersistentSelection";
+import CalendarOnly from "@/app/components/calendar/CalendarOnly";
 import { useCellPainter } from "@/hooks/calendar/useCellPainter";
+
+import type { HolidayLite } from "@/app/components/calendar/CalendarOnly/types";
 
 type View = "day" | "threeDays" | "workingWeek" | "week" | "month";
 
-type Appointment = {
-  id: string;
-  locationId: string;
-  serviceId: string;
-  startAt: string;
-  endAt: string;
-  status?: "PENDING" | "BOOKED" | "COMPLETED" | "CANCELLED" | "NO_SHOW" | null;
-  employeeId?: string | null;
-  resourceId?: string | null;
+export type Range = { fromISO: string; toISO: string };
+
+function dayBoundsLocalISO(d: Date) {
+  const start = new Date(d);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(d);
+  end.setHours(23, 59, 59, 999);
+  return { fromISO: start.toISOString(), toISO: end.toISOString() };
+}
+
+function startOfWeekMon(d: Date) {
+  const x = new Date(d);
+  const day = x.getDay();
+  const delta = day === 0 ? -6 : 1 - day;
+  x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() + delta);
+  return x;
+}
+
+type PaintedAssignment = {
+  employeeIds: string[];
+  shiftLabel: string;
 };
 
-type ServiceLite = {
-  id: string;
-  name: string;
-  durationMin: number;
-  color?: string | null;
-};
+export default function CalendarView({
+  locationId,
+  holidays = [],
+  onRangeChange,
 
-type EmployeeLite = { id: string; name: string; color?: string | null; active: boolean };
-type ResourceLite = { id: string; name: string; active: boolean };
+  paintedCellIds,
+  onPaintCell,
 
-type CompanyLite = {
-  id: string;
-  name: string;
-  color?: string | null;
-  logoUrl?: string | null;
-  locationsCount?: number;
-};
+  painted,
+  employeeNameById,
+  employeeColorById,
+}: {
+  locationId: string | null;
+  holidays?: HolidayLite[];
+  onRangeChange?: (r: Range) => void;
 
-type LocationRow = { id: string; title: string; city?: string | null };
+  paintedCellIds: Set<string>;
+  onPaintCell: (cellId: string) => void;
 
-export default function CalendarView() {
-  const painter = useCellPainter();
+  painted?: Map<string, PaintedAssignment>;
+  employeeNameById?: (id: string) => string;
+   employeeColorById?: (id: string) => string | null;
+}) {
+  // ✅ CLAVE: painter CONTROLADO -> al pintar llama a onPaintCell (upsertPaint del Shell)
+  const painter = useCellPainter({
+    paintedCellIds,
+    onPaintCell,
+  });
 
   const [selectedView, setSelectedView] = useState<View>("week");
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
 
-  const [savedCompanyId, setSavedCompanyId] =
-    usePersistentSelection<string>("calendar:companyId");
-  const [savedLocationId, setSavedLocationId] =
-    usePersistentSelection<string>("calendar:locationId");
-
-  const [companies, setCompanies] = useState<CompanyLite[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
-
-  const [locations, setLocations] = useState<LocationRow[]>([]);
-  const [locationsLoading, setLocationsLoading] = useState(false);
-  const [locationId, setLocationId] = useState<string>("");
-
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [services, setServices] = useState<ServiceLite[]>([]);
-  const [employees, setEmployees] = useState<EmployeeLite[]>([]);
-  const [resources, setResources] = useState<ResourceLite[]>([]);
-
-  const dayBoundsLocalISO = (d: Date) => {
-    const start = new Date(d);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(d);
-    end.setHours(23, 59, 59, 999);
-    return { fromISO: start.toISOString(), toISO: end.toISOString() };
-  };
-
-  // 1) companies
-  useEffect(() => {
-    const ac = new AbortController();
-    (async () => {
-      try {
-        const res = await fetch("/api/companies", {
-          cache: "no-store",
-          signal: ac.signal,
-        });
-        const json = await res.json();
-        const list: CompanyLite[] = Array.isArray(json?.companies) ? json.companies : [];
-        setCompanies(list);
-      } catch {
-        if (!ac.signal.aborted) setCompanies([]);
-      }
-    })();
-    return () => ac.abort();
-  }, []);
-
-  // 2) pick company
-  useEffect(() => {
-    if (companies.length === 0) return;
-
-    let next: string | null = null;
-
-    if (savedCompanyId) {
-      const ok = companies.some((c) => c.id === savedCompanyId);
-      if (ok) next = savedCompanyId;
+  const range = useMemo<Range>(() => {
+    if (selectedView === "month") {
+      const first = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      const last = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+      first.setHours(0, 0, 0, 0);
+      last.setHours(23, 59, 59, 999);
+      return { fromISO: first.toISOString(), toISO: last.toISOString() };
     }
 
-    if (!next) next = companies[0]?.id ?? null;
-
-    if (next && next !== selectedCompanyId) {
-      setSelectedCompanyId(next);
-      setSavedCompanyId(next);
-    }
-  }, [companies, savedCompanyId, selectedCompanyId, setSavedCompanyId]);
-
-  // 3) locations
-  useEffect(() => {
-    const ac = new AbortController();
-
-    if (!selectedCompanyId) {
-      setLocations([]);
-      setLocationId("");
-      return;
+    if (selectedView === "week" || selectedView === "workingWeek") {
+      const start = startOfWeekMon(selectedDate);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+      return { fromISO: start.toISOString(), toISO: end.toISOString() };
     }
 
-    (async () => {
-      try {
-        setLocationsLoading(true);
-        const res = await fetch(`/api/locations?companyId=${selectedCompanyId}`, {
-          cache: "no-store",
-          signal: ac.signal,
-        });
-        const json = await res.json();
-        if (!res.ok || json?.ok === false) {
-          setLocations([]);
-          return;
-        }
-
-        const rows: LocationRow[] = (Array.isArray(json?.locations) ? json.locations : []).map(
-          (l: any) => ({
-            id: String(l.id),
-            title: String(l.title ?? "Sin nombre"),
-            city: l.city ?? null,
-          })
-        );
-
-        setLocations(rows);
-      } catch {
-        if (!ac.signal.aborted) setLocations([]);
-      } finally {
-        if (!ac.signal.aborted) setLocationsLoading(false);
-      }
-    })();
-
-    return () => ac.abort();
-  }, [selectedCompanyId]);
-
-  // 4) pick location
-  useEffect(() => {
-    if (locations.length === 0) {
-      setLocationId("");
-      return;
+    if (selectedView === "threeDays") {
+      const start = new Date(selectedDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 2);
+      end.setHours(23, 59, 59, 999);
+      return { fromISO: start.toISOString(), toISO: end.toISOString() };
     }
 
-    let next = "";
+    return dayBoundsLocalISO(selectedDate);
+  }, [selectedView, selectedDate]);
 
-    if (savedLocationId) {
-      const ok = locations.some((l) => l.id === savedLocationId);
-      if (ok) next = savedLocationId;
-    }
+  const rangeKey = useMemo(() => `${range.fromISO}|${range.toISO}`, [range.fromISO, range.toISO]);
 
-    if (!next) next = locations[0].id;
-
-    if (next !== locationId) {
-      setLocationId(next);
-      setSavedLocationId(next);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locations]);
-
-  // 5) fetch by location
   useEffect(() => {
     if (!locationId) return;
-    fetchEmployees();
-    fetchResources();
-    fetchServices();
-    fetchAppointmentsForSelectedDay();
+    if (!onRangeChange) return;
+    onRangeChange(range);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locationId]);
+  }, [locationId, rangeKey]);
 
-  // 6) fetch by date
-  useEffect(() => {
-    if (!locationId) return;
-    fetchAppointmentsForSelectedDay();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
-
-  async function fetchAppointmentsForSelectedDay() {
-    if (!locationId || !selectedDate) {
-      setAppointments([]);
-      return;
-    }
-
-    const { fromISO, toISO } = dayBoundsLocalISO(selectedDate);
-
-    try {
-      const res = await fetch(
-        `/api/calendar/appointments?locationId=${encodeURIComponent(
-          locationId
-        )}&from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}`,
-        { cache: "no-store" }
-      );
-      const data = await res.json();
-      if (!res.ok || data?.error) {
-        setAppointments([]);
-        return;
-      }
-      setAppointments(Array.isArray(data.items) ? data.items : []);
-    } catch {
-      setAppointments([]);
-    }
-  }
-
-  async function fetchEmployees() {
-    if (!locationId) {
-      setEmployees([]);
-      return;
-    }
-    try {
-      const res = await fetch(
-        `/api/calendar/employees?locationId=${encodeURIComponent(locationId)}`,
-        { cache: "no-store" }
-      );
-      const data = await res.json();
-      if (!res.ok || data?.error) {
-        setEmployees([]);
-        return;
-      }
-      setEmployees(Array.isArray(data.items) ? data.items : []);
-    } catch {
-      setEmployees([]);
-    }
-  }
-
-  async function fetchResources() {
-    if (!locationId) {
-      setResources([]);
-      return;
-    }
-    try {
-      const res = await fetch(
-        `/api/calendar/resources?locationId=${encodeURIComponent(locationId)}`,
-        { cache: "no-store" }
-      );
-      const data = await res.json();
-      if (!res.ok || data?.error) {
-        setResources([]);
-        return;
-      }
-      setResources(Array.isArray(data.items) ? data.items : []);
-    } catch {
-      setResources([]);
-    }
-  }
-
-  async function fetchServices() {
-    if (!locationId) {
-      setServices([]);
-      return;
-    }
-    try {
-      const res = await fetch(
-        `/api/calendar/services?locationId=${encodeURIComponent(locationId)}`,
-        { cache: "no-store" }
-      );
-      const data = await res.json();
-      setServices(Array.isArray(data.items) ? data.items : []);
-    } catch {
-      setServices([]);
-    }
-  }
-
-  const calendarAppts: CalendarAppt[] = useMemo(() => {
-    const out: CalendarAppt[] = [];
-
-    for (const a of appointments ?? []) {
-      let serviceName: string | undefined;
-      let serviceColor: string | null | undefined;
-      let employeeName: string | undefined;
-      let resourceName: string | undefined;
-
-      const svc = services.find((s) => s.id === a.serviceId);
-      if (svc) {
-        serviceName = svc.name;
-        serviceColor = (svc.color ?? null) as string | null;
-      }
-
-      const emp = employees.find((e) => e.id === a.employeeId);
-      if (emp) employeeName = emp.name;
-
-      const res = resources.find((r) => r.id === a.resourceId);
-      if (res) resourceName = res.name;
-
-      out.push({
-        id: a.id,
-        startAt: String(a.startAt),
-        endAt: String(a.endAt),
-        serviceName,
-        serviceColor,
-        employeeName,
-        resourceName,
-      });
-    }
-
-    return out;
-  }, [appointments, services, employees, resources]);
+  const blocked = !locationId;
 
   return (
-    <div className="flex-1 min-w-0 h-full overflow-hidden flex flex-col">
-      <CalendarHeader
-        companies={companies}
-        selectedCompanyId={selectedCompanyId}
-        onSelectCompany={(id) => {
-          setSavedCompanyId(id);
-          setSavedLocationId(null as any);
-          setSelectedCompanyId(id);
-
-          // reset visual
-          setAppointments([]);
-          setEmployees([]);
-          setResources([]);
-          setServices([]);
-        }}
-        locations={locations}
-        locationsLoading={locationsLoading}
-        locationId={locationId}
-        onChangeLocation={(id) => {
-          setLocationId(id);
-          setSavedLocationId(id);
-        }}
-        onCreateAppointment={() => {
-          // aquí luego lo conecta AppointmentView si quieres
-        }}
-        settingsHref="/dashboard/calendar/settings"
-        disableCreate={!locationId}
-      />
-
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <CalendarCenter
-          selectedView={selectedView}
-          setSelectedView={setSelectedView}
-          selectedDate={selectedDate}
-          setSelectedDate={setSelectedDate}
-          calendarAppts={calendarAppts}
-          onSelectAppointmentId={() => {}}
-          onEditAppointmentId={() => {}}
-          painter={painter}
-        />
+    <div className="flex-1 min-w-0 flex flex-col h-full">
+      <div className="relative flex-1 min-h-0 bg-white border border-border rounded-xl overflow-hidden">
+        <div className="absolute inset-0 overflow-auto">
+          <div className="h-full min-h-0 flex flex-col p-3">
+            {blocked ? (
+              <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
+                Selecciona una ubicación
+              </div>
+            ) : (
+              <CalendarOnly
+                selectedView={selectedView}
+                onChangeView={(v: View) => setSelectedView(v)}
+                selectedDate={selectedDate}
+                onChangeDate={(d: Date) => setSelectedDate(d)}
+                appointments={[]}
+                painter={painter}
+                holidays={holidays}
+                painted={painted}
+                employeeNameById={employeeNameById}
+              />
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

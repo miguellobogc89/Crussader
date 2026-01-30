@@ -19,3 +19,11 @@ export type CalendarAppt = {
 export type Appointment = CalendarAppt;
 
 export type View = "day" | "threeDays" | "workingWeek" | "week" | "month";
+
+
+export type HolidayLite = {
+  id: string;
+  date: string;       // ISO
+  name: string;
+  scope?: string | null;
+};

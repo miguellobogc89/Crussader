@@ -5,12 +5,12 @@ import { useMemo, useState } from "react";
 import { ChevronsLeft } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 
-import EmployeeList, { type Employee } from "@/app/components/calendar/resources/EmployeeList";
-import ResourceList, { type Resource } from "@/app/components/calendar/resources/ResourceList";
+import EmployeeList, { type Employee } from "@/app/components/calendar/resources/employees/EmployeeList";
+import ResourceList, { type Resource } from "@/app/components/calendar/resources/resources/ResourceList";
 import ShiftList, {
   type ShiftTemplateLite,
   type ShiftTypeValue,
-} from "@/app/components/calendar/resources/ShiftList";
+} from "@/app/components/calendar/resources/shift/ShiftList";
 
 type Props = {
   employees: Employee[];

@@ -1,4 +1,4 @@
-// app/components/calendar/CollapsibleSection.tsx
+// app/components/calendar/resources/CollapsibleSection.tsx
 "use client";
 
 import { useState } from "react";
@@ -15,8 +15,12 @@ type Props = {
   /** mockup: si no pasas handler, el botón existe pero no hace nada */
   onAdd?: () => void;
 
-  /** por defecto abierto */
+  /** por defecto abierto (solo aplica si no es controlado) */
   defaultOpen?: boolean;
+
+  /** ✅ modo controlado (opcional) */
+  open?: boolean;
+  onOpenChange?: (v: boolean) => void;
 
   children: React.ReactNode;
 
@@ -31,10 +35,23 @@ export default function CollapsibleSection({
   count,
   onAdd,
   defaultOpen = true,
+  open,
+  onOpenChange,
   children,
   showAdd = true,
 }: Props) {
-  const [open, setOpen] = useState(defaultOpen);
+  const isControlled = typeof open === "boolean" && typeof onOpenChange === "function";
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+
+  const actualOpen = isControlled ? (open as boolean) : uncontrolledOpen;
+
+  function setOpen(next: boolean) {
+    if (isControlled) {
+      onOpenChange!(next);
+      return;
+    }
+    setUncontrolledOpen(next);
+  }
 
   if (collapsedPanel) {
     return (
@@ -82,13 +99,13 @@ export default function CollapsibleSection({
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            title={open ? "Contraer" : "Expandir"}
-            onClick={() => setOpen(!open)}
+            title={actualOpen ? "Contraer" : "Expandir"}
+            onClick={() => setOpen(!actualOpen)}
           >
             <ChevronDown
               className={[
                 "h-4 w-4 transition-transform duration-200",
-                open ? "" : "-rotate-90",
+                actualOpen ? "" : "-rotate-90",
               ].join(" ")}
             />
           </Button>
@@ -98,9 +115,9 @@ export default function CollapsibleSection({
       <div
         className={[
           "mt-2 overflow-hidden transition-[max-height,opacity] duration-200",
-          open ? "opacity-100" : "opacity-0",
+          actualOpen ? "opacity-100" : "opacity-0",
         ].join(" ")}
-        style={{ maxHeight: open ? 520 : 0 }}
+        style={{ maxHeight: actualOpen ? 520 : 0 }}
       >
         {children}
       </div>

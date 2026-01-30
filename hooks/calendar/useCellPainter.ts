@@ -22,31 +22,62 @@ export type CellPainter = {
   };
 };
 
-export function useCellPainter(): CellPainter {
-  const [paintedCellIds, setPaintedCellIds] = useState<Set<string>>(
+type PainterOpts = {
+  paintedCellIds: Set<string>;
+  onPaintCell: (cellId: string) => void;
+  onToggleCell?: (cellId: string) => void;
+};
+
+export function useCellPainter(opts?: PainterOpts): CellPainter {
+  const controlled = Boolean(opts);
+
+  // ===== internal painted (solo si no viene controlado) =====
+  const [internalPainted, setInternalPainted] = useState<Set<string>>(
     () => new Set()
   );
-  const [hoverCellId, setHoverCellId] = useState<string | null>(null);
 
+  const paintedCellIds = opts ? opts.paintedCellIds : internalPainted;
+  const [hoverCellId, setHoverCellId] = useState<string | null>(null);
   const isDownRef = useRef(false);
 
-  const paintCell = useCallback((cellId: string) => {
-    setPaintedCellIds((prev) => {
-      if (prev.has(cellId)) return prev;
-      const next = new Set(prev);
-      next.add(cellId);
-      return next;
-    });
-  }, []);
+  const paintCell = useCallback(
+    (cellId: string) => {
+      if (opts) {
+        opts.onPaintCell(cellId);
+        return;
+      }
 
-  const toggleCell = useCallback((cellId: string) => {
-    setPaintedCellIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(cellId)) next.delete(cellId);
-      else next.add(cellId);
-      return next;
-    });
-  }, []);
+      setInternalPainted((prev) => {
+        if (prev.has(cellId)) return prev;
+        const next = new Set(prev);
+        next.add(cellId);
+        return next;
+      });
+    },
+    [opts]
+  );
+
+  const toggleCell = useCallback(
+    (cellId: string) => {
+      if (opts) {
+        if (opts.onToggleCell) {
+          opts.onToggleCell(cellId);
+          return;
+        }
+        // si no hay toggle en modo controlado, fallback a paint (no rompemos UX)
+        opts.onPaintCell(cellId);
+        return;
+      }
+
+      setInternalPainted((prev) => {
+        const next = new Set(prev);
+        if (next.has(cellId)) next.delete(cellId);
+        else next.add(cellId);
+        return next;
+      });
+    },
+    [opts]
+  );
 
   const isPainted = useCallback(
     (cellId: string) => paintedCellIds.has(cellId),
@@ -74,6 +105,8 @@ export function useCellPainter(): CellPainter {
         "absolute",
         "left-0",
         "right-0",
+        "top-0",
+        "bottom-0",
         "cursor-pointer",
         "select-none",
       ];
@@ -81,13 +114,15 @@ export function useCellPainter(): CellPainter {
       const painted = paintedCellIds.has(cellId);
       const hover = hoverCellId === cellId;
 
-      // sin borde: hover solo “velo” suave
       if (hover) classes.push("bg-primary/5");
       if (painted) classes.push("bg-primary/10");
 
+      // si quieres diferenciar controlado vs interno visualmente, aquí sería el sitio
+      void controlled;
+
       return classes.join(" ");
     },
-    [hoverCellId, paintedCellIds]
+    [hoverCellId, paintedCellIds, controlled]
   );
 
   const getCellHandlers = useCallback(
@@ -102,7 +137,6 @@ export function useCellPainter(): CellPainter {
         onPointerEnter: (e: React.PointerEvent) => {
           setHoverCellId(cellId);
 
-          // si estamos arrastrando con botón izq pulsado, pinta al entrar
           if (!isDownRef.current) return;
           if ((e.buttons & 1) !== 1) return;
           paintCell(cellId);
@@ -126,6 +160,14 @@ export function useCellPainter(): CellPainter {
       getOverlayClass,
       getCellHandlers,
     }),
-    [paintedCellIds, hoverCellId, paintCell, toggleCell, isPainted, getOverlayClass, getCellHandlers]
+    [
+      paintedCellIds,
+      hoverCellId,
+      paintCell,
+      toggleCell,
+      isPainted,
+      getOverlayClass,
+      getCellHandlers,
+    ]
   );
 }

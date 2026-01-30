@@ -23,12 +23,20 @@ export default function CurrentTimeLineFullSpan({
   GAP_PX = 8,
   HEADER_OFFSET_PX = 0,
 }: Props) {
-  const [now, setNow] = useState<Date>(new Date());
+  // ✅ Evita mismatch: SSR + primera hidratación => null
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 60_000);
+    setNow(new Date());
+
+    const id = setInterval(() => {
+      setNow(new Date());
+    }, 60_000);
+
     return () => clearInterval(id);
   }, []);
+
+  if (!now) return null;
 
   const isToday = localKeyTZ(referenceDate) === localKeyTZ(now);
   if (!isToday) return null;
@@ -42,7 +50,10 @@ export default function CurrentTimeLineFullSpan({
   const left = HOURS_COL_PX + GAP_PX;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0" style={{ top: offsetY }}>
+    <div
+      className="pointer-events-none absolute inset-x-0"
+      style={{ top: `${offsetY}px` }}
+    >
       <div
         className="h-[2px]"
         style={{
