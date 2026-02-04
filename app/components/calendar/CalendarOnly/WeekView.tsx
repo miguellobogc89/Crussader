@@ -27,7 +27,6 @@ type Props = {
   painter: CellPainter;
   holidays?: HolidayLite[];
 
-  // ✅ para mostrar “empleado arriba / turno abajo” sin repetir por hora
   painted?: Map<string, PaintedAssignment>;
   employeeNameById?: (id: string) => string;
 };
@@ -65,6 +64,10 @@ export default function WeekView({
 
   return (
     <div className="relative h-full">
+      <div className="pointer-events-none absolute right-2 top-2 z-50 rounded-md bg-black/70 px-2 py-1 text-[11px] text-white">
+        CALENDARONLY WeekView ✅
+      </div>
+
       <CurrentTimeLineFullSpan
         referenceDate={new Date()}
         START_HOUR={START_HOUR}
@@ -108,49 +111,59 @@ export default function WeekView({
           const isHoliday = holidayList.length > 0;
           const holidayTitle = holidayList.map((h) => h.name).join(" · ");
 
-          // ✅ bloques continuos por día (mismo turno+empleados) -> 1 solo render
-          const blocks: Array<{
-            top: number;
-            height: number;
-            employeeLine: string;
-            shiftLine: string;
-          }> = [];
+const blocks: Array<{
+  top: number;
+  height: number;
+  employeeId: string;
+  employeeName: string;
+  shiftLabel: string;
+  columnIndex: number;
+  columnCount: number;
+}> = [];
 
-          if (painted) {
-            let i = 0;
-            while (i < HOURS_COUNT) {
-              const cellId = makeCellId(dayKey, i);
-              const a = painted.get(cellId);
 
-              if (!a) {
-                i += 1;
-                continue;
-              }
+if (painted) {
+  let i = 0;
 
-              const sig = assignmentSig(a);
+  while (i < HOURS_COUNT) {
+    const cellId = makeCellId(dayKey, i);
+    const a = painted.get(cellId);
 
-              let j = i + 1;
-              while (j < HOURS_COUNT) {
-                const next = painted.get(makeCellId(dayKey, j));
-                if (!next) break;
-                if (assignmentSig(next) !== sig) break;
-                j += 1;
-              }
+    if (!a) {
+      i += 1;
+      continue;
+    }
 
-              const names = a.employeeIds.map((id) =>
-                getEmpName(id, employeeNameById)
-              );
+    // buscamos cuánto dura el bloque
+    let j = i + 1;
+    while (j < HOURS_COUNT) {
+      const next = painted.get(makeCellId(dayKey, j));
+      if (!next) break;
+      if (next.shiftLabel !== a.shiftLabel) break;
+      j += 1;
+    }
 
-              blocks.push({
-                top: i * ROW_PX,
-                height: (j - i) * ROW_PX,
-                employeeLine: names.join(", "),
-                shiftLine: a.shiftLabel,
-              });
+    const height = (j - i) * ROW_PX;
+    const top = i * ROW_PX;
 
-              i = j;
-            }
-          }
+    const columnCount = a.employeeIds.length;
+
+    a.employeeIds.forEach((empId, colIndex) => {
+      blocks.push({
+        top,
+        height,
+        employeeId: empId,
+        employeeName: getEmpName(empId, employeeNameById),
+        shiftLabel: a.shiftLabel,
+        columnIndex: colIndex,
+        columnCount,
+      });
+    });
+
+    i = j;
+  }
+}
+
 
           return (
             <div key={dayKey} className="min-w-0">
@@ -177,45 +190,38 @@ export default function WeekView({
                     </div>
                   ) : null}
 
-                  {/* overlays pintables */}
-                  {Array.from({ length: HOURS_COUNT }, (_, hourIndex) => {
-                    const cellId = makeCellId(dayKey, hourIndex);
-                    const className = painter.getOverlayClass(cellId);
-                    const handlers = painter.getCellHandlers(cellId);
 
-                    return (
-                      <div
-                        key={cellId}
-                        className={className}
-                        style={{
-                          top: hourIndex * ROW_PX,
-                          height: ROW_PX,
-                        }}
-                        {...handlers}
-                      />
-                    );
-                  })}
 
-                  {/* ✅ Bloques “Empleado arriba / Turno abajo” */}
-                  {blocks.map((b, idx) => (
-                    <div
-                      key={`${dayKey}|block|${idx}`}
-                      className="pointer-events-none absolute left-1 right-1 rounded-md bg-slate-900/5 ring-1 ring-black/5"
-                      style={{
-                        top: b.top + 6,
-                        height: Math.max(22, b.height - 12),
-                      }}
-                    >
-                      <div className="px-2 py-1">
-                        <div className="truncate text-[11px] font-medium text-slate-800">
-                          {b.employeeLine}
-                        </div>
-                        <div className="truncate text-[11px] text-slate-600">
-                          {b.shiftLine}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                  {/* ✅ Bloques por empleado en columnas */}
+{blocks.map((b, idx) => {
+  const widthPct = 100 / b.columnCount;
+  const leftPct = b.columnIndex * widthPct;
+
+  return (
+    <div
+      key={`${dayKey}|block|${idx}`}
+      className="pointer-events-none absolute rounded-md ring-1 ring-black/5"
+style={{
+  top: b.top + 6,
+  height: Math.max(22, b.height - 12),
+  left: `${leftPct}%`,
+  width: `${widthPct}%`,
+  background: "rgba(15, 23, 42, 0.08)",
+}}
+
+    >
+      <div className="px-2 py-1">
+        <div className="truncate text-[11px] font-medium text-slate-800">
+          {b.employeeName}
+        </div>
+        <div className="truncate text-[11px] text-slate-600">
+          {b.shiftLabel}
+        </div>
+      </div>
+    </div>
+  );
+})}
+
 
                   {/* pills */}
                   {(() => {

@@ -6,26 +6,50 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
 
-    const companyId = searchParams.get("companyId");
     const locationId = searchParams.get("locationId");
     const employeeId = searchParams.get("employeeId");
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
-    if (!companyId || !from || !to) {
+    if (!locationId || !from || !to) {
       return NextResponse.json(
-        { ok: false, error: "companyId, from y to son obligatorios" },
+        { ok: false, error: "locationId, from y to son obligatorios" },
         { status: 400 }
       );
     }
 
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+
+    if (Number.isNaN(+fromDate) || Number.isNaN(+toDate)) {
+      return NextResponse.json(
+        { ok: false, error: "from/to inválidos" },
+        { status: 400 }
+      );
+    }
+
+    // Resolver companyId desde la Location
+    const loc = await prisma.location.findUnique({
+      where: { id: locationId },
+      select: { companyId: true },
+    });
+
+    if (!loc?.companyId) {
+      return NextResponse.json(
+        { ok: false, error: "Location sin companyId" },
+        { status: 400 }
+      );
+    }
+
+    const companyId = loc.companyId;
+
     const events = await prisma.shiftEvent.findMany({
       where: {
         companyId,
-        ...(locationId ? { locationId } : {}),
+        locationId,
         ...(employeeId ? { employeeId } : {}),
-        startAt: { lt: new Date(`${to}T23:59:59.999Z`) },
-        endAt: { gt: new Date(`${from}T00:00:00.000Z`) },
+        startAt: { lt: toDate },
+        endAt: { gt: fromDate },
       },
       select: {
         id: true,
@@ -35,6 +59,7 @@ export async function GET(req: Request) {
         endAt: true,
         kind: true,
         label: true,
+        templateId: true,
       },
       orderBy: { startAt: "asc" },
     });

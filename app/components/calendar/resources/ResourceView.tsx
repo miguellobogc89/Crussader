@@ -1,7 +1,7 @@
 // app/components/calendar/resources/ResourceView.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { ChevronsLeft } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 
@@ -59,6 +59,12 @@ function minsFromHHMM(v: string) {
   return hh * 60 + mm;
 }
 
+function toInt(v: any, fallback = 0) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.trunc(n);
+}
+
 export default function ResourceView({
   listMaxHeight = 340,
   locationId,
@@ -94,16 +100,18 @@ export default function ResourceView({
   const [isSavingEmployee, setIsSavingEmployee] = useState(false);
   const [employeeErr, setEmployeeErr] = useState<string | null>(null);
 
-  // ✅ Emit snapshot “fresco” (evita que Shell se quede con templates = [])
-  function emitSnapshot(next?: Partial<ResourceSnapshot>) {
-    if (!onDataSnapshot) return;
+  const emitSnapshot = useCallback(
+    (next?: Partial<ResourceSnapshot>) => {
+      if (!onDataSnapshot) return;
 
-    onDataSnapshot({
-      employees: next?.employees ?? employees,
-      roles: next?.roles ?? roles,
-      shiftTemplates: next?.shiftTemplates ?? shiftTemplates,
-    });
-  }
+      onDataSnapshot({
+        employees: next?.employees ?? employees,
+        roles: next?.roles ?? roles,
+        shiftTemplates: next?.shiftTemplates ?? shiftTemplates,
+      });
+    },
+    [onDataSnapshot, employees, roles, shiftTemplates]
+  );
 
   async function fetchEmployees(locId: string) {
     setEmpMsg("⏳ Cargando empleados…");
@@ -121,7 +129,13 @@ export default function ResourceView({
         return;
       }
 
-      const list = Array.isArray(data.items) ? data.items : [];
+      const raw = Array.isArray(data.items) ? data.items : [];
+
+      const list: Employee[] = raw.map((e: any) => ({
+        ...e,
+        id: String(e.id),
+      }));
+
       setEmployees(list);
       setEmpMsg("");
       emitSnapshot({ employees: list });
@@ -181,7 +195,16 @@ export default function ResourceView({
         return;
       }
 
-      const items = Array.isArray(json?.items) ? json.items : [];
+      const raw = Array.isArray(json?.items) ? json.items : [];
+
+      const items: ShiftTemplateLite[] = raw.map((t: any) => ({
+        id: String(t.id),
+        name: String(t.name),
+        startMin: toInt(t.startMin, 0),
+        endMin: toInt(t.endMin, 0),
+        color: t?.color ? String(t.color) : null,
+      }));
+
       setShiftTemplates(items);
       emitSnapshot({ shiftTemplates: items });
     } catch {
@@ -199,7 +222,6 @@ export default function ResourceView({
       setEmpMsg("Selecciona una ubicación");
       setRolesMsg("");
 
-      // ✅ sincroniza shell al limpiar
       emitSnapshot({ employees: [], roles: [], shiftTemplates: [] });
       return;
     }
@@ -210,10 +232,9 @@ export default function ResourceView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationId]);
 
-  const anySelectedEmployees = useMemo(
-    () => selectedEmployeeIds.length > 0,
-    [selectedEmployeeIds]
-  );
+  const anySelectedEmployees = useMemo(() => {
+    return selectedEmployeeIds.length > 0;
+  }, [selectedEmployeeIds]);
 
   async function handleCreateTemplate(draft: CreateShiftTemplateDraft) {
     if (!locationId) return;
@@ -263,7 +284,7 @@ export default function ResourceView({
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
         body: JSON.stringify({
-          id: draft.id ?? undefined, // ✅ si viene, update
+          id: draft.id ?? undefined,
           name: draft.name,
           active: true,
           locationIds: [locationId],
@@ -317,7 +338,9 @@ export default function ResourceView({
       setEmployeeInitialData(undefined);
       setEmployeeModalMode("create");
 
-      onChangeSelectedEmployeeIds(selectedEmployeeIds.filter((x) => x !== id));
+      onChangeSelectedEmployeeIds(
+        selectedEmployeeIds.filter((x) => String(x) !== String(id))
+      );
 
       await fetchEmployees(locationId);
       await fetchRoles(locationId);
@@ -371,12 +394,17 @@ export default function ResourceView({
             selectedIds={selectedEmployeeIds}
             statusText={empMsg}
             onToggle={(id) => {
-              const has = selectedEmployeeIds.includes(id);
-              onChangeSelectedEmployeeIds(
-                has
-                  ? selectedEmployeeIds.filter((x) => x !== id)
-                  : [...selectedEmployeeIds, id]
-              );
+              const idStr = String(id);
+              const has = selectedEmployeeIds.some((x) => String(x) === idStr);
+
+              if (has) {
+                onChangeSelectedEmployeeIds(
+                  selectedEmployeeIds.filter((x) => String(x) !== idStr)
+                );
+                return;
+              }
+
+              onChangeSelectedEmployeeIds([...selectedEmployeeIds, idStr]);
             }}
             maxHeight={listMaxHeight}
             onAdd={() => {
@@ -388,7 +416,7 @@ export default function ResourceView({
             onEdit={(emp) => {
               setEmployeeModalMode("edit");
               setEmployeeInitialData({
-                id: emp.id,
+                id: String(emp.id),
                 name: emp.name,
                 roleText: emp.primaryRoleName ?? "",
               });

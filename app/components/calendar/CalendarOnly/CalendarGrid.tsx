@@ -1,159 +1,121 @@
 // app/components/calendar/CalendarOnly/CalendarGrid.tsx
 "use client";
 
-import DayView from "@/app/components/calendar/CalendarOnly/DayView";
+import type { PaintBlock } from "@/app/components/calendar/CalendarOnly/shiftPaintEngine";
 import WeekView from "@/app/components/calendar/CalendarOnly/WeekView";
-import MonthView from "@/app/components/calendar/CalendarOnly/MonthView";
-import { localKeyTZ } from "@/app/components/calendar/CalendarOnly/tz";
-
-import CalendarHeaderRow from "@/app/components/calendar/CalendarOnly/Grid/CalendarHeaderRow";
-
-import type { CalendarAppt } from "@/app/components/calendar/CalendarOnly/types";
-import type { CellPainter } from "@/hooks/calendar/useCellPainter";
-import type { HolidayLite } from "@/app/components/calendar/CalendarOnly/types";
-
-type View = "day" | "threeDays" | "workingWeek" | "week" | "month";
-
-type PaintedAssignment = {
-  employeeIds: string[];
-  shiftLabel: string;
-};
 
 export default function CalendarGrid({
-  view,
-  selectedDate,
-  weekDays,
-  workingWeekDays,
-  threeDays,
-  apptsByDay,
-  appointments,
-  onSelectAppointment,
-  onEditAppointmentId,
+  days,
+  blocks,
+  employeeNameById,
   START_HOUR,
   HOURS_COUNT,
   ROW_PX,
-  painter,
-  holidays,
-
-  daysForHeader,
-  fmtDay,
-  isToday,
-  isHoliday,
-  holidayTitle,
-
-  paintedCellIds,
-  onPaintCell,
-
-  painted,
-  employeeNameById,
-  employeeColorById,
 }: {
-  view: View;
-  selectedDate: Date;
-
-  weekDays: Date[];
-  workingWeekDays: Date[];
-  threeDays: Date[];
-
-  apptsByDay: Map<string, CalendarAppt[]>;
-  appointments: CalendarAppt[];
-
-  onSelectAppointment?: (id: string) => void;
-  onEditAppointmentId?: (id: string) => void;
-
+  days: Date[];
+  blocks: PaintBlock[];
+  employeeNameById?: (id: string) => string;
   START_HOUR: number;
   HOURS_COUNT: number;
   ROW_PX: number;
-
-  painter: CellPainter;
-  holidays?: HolidayLite[];
-
-  daysForHeader: Date[] | null;
-  fmtDay: Intl.DateTimeFormat;
-  isToday: (d: Date) => boolean;
-  isHoliday: (d: Date) => boolean;
-  holidayTitle: (d: Date) => string;
-
-  paintedCellIds?: Set<string>;
-  onPaintCell?: (cellId: string) => void;
-
-  painted?: Map<string, PaintedAssignment>;
-  employeeNameById?: (id: string) => string;
-    employeeColorById?: (id: string) => string | null;
 }) {
-  const daysForWeekLike =
-    view === "week"
-      ? weekDays
-      : view === "workingWeek"
-      ? workingWeekDays
-      : view === "threeDays"
-      ? threeDays
-      : null;
+  function fallbackEmployeeNameById(id: string) {
+    return id;
+  }
 
-  const headerDays = daysForHeader ?? daysForWeekLike;
+  const nameFn = employeeNameById ? employeeNameById : fallbackEmployeeNameById;
+  const WeekViewAny = WeekView as unknown as React.ComponentType<any>;
+
+  const canvasH = HOURS_COUNT * ROW_PX;
+
+  const fmt = new Intl.DateTimeFormat("es-ES", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+  });
+
+  function isToday(d: Date) {
+    const now = new Date();
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  }
 
   return (
-    <div className="cal-grid flex-1 min-h-0 overflow-auto">
-      {headerDays ? (
-        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-border">
-          <CalendarHeaderRow
-            days={headerDays}
-            fmtDay={fmtDay}
-            isToday={isToday}
-            isHoliday={isHoliday}
-            holidayTitle={holidayTitle}
+    <div className="flex-1 min-h-0 overflow-auto">
+      {/* HEADER */}
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-border">
+        <div className="grid grid-cols-[64px_repeat(7,1fr)]">
+          <div className="h-10 border-r border-border" />
+          {days.map((d) => {
+            const key = d.toISOString();
+            const label = fmt.format(d);
+            const today = isToday(d);
+
+            return (
+              <div
+                key={key}
+                className={[
+                  "h-10 px-2 flex items-center border-r border-border text-xs font-medium capitalize",
+                  today ? "text-slate-900" : "text-muted-foreground",
+                ].join(" ")}
+              >
+                <span
+                  className={[
+                    "inline-flex items-center gap-2 truncate",
+                    today ? "font-semibold" : "",
+                  ].join(" ")}
+                >
+                  {today ? (
+                    <span className="inline-block h-2 w-2 rounded-full bg-primary" />
+                  ) : null}
+                  {label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* CANVAS */}
+      <div className="relative min-w-[900px]" style={{ height: canvasH }}>
+        {/* grid visual base */}
+        <div
+          className="absolute inset-0 grid grid-cols-[64px_repeat(7,1fr)]"
+          aria-hidden
+        >
+          <div className="border-r border-border bg-white" />
+
+          {Array.from({ length: 7 }, (_, col) => {
+            return (
+              <div key={col} className="relative border-r border-border">
+                {Array.from({ length: HOURS_COUNT }, (_, r) => {
+                  return (
+                    <div
+                      key={r}
+                      className="absolute left-0 right-0 border-b border-border"
+                      style={{ top: (r + 1) * ROW_PX }}
+                    />
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* WeekView real encima */}
+        <div className="absolute inset-0">
+          <WeekViewAny
+            days={days}
+            blocks={blocks}
+            employeeNameById={nameFn}
+            START_HOUR={START_HOUR}
+            HOURS_COUNT={HOURS_COUNT}
+            ROW_PX={ROW_PX}
           />
         </div>
-      ) : null}
-
-      <div className="px-3 pb-3">
-        {view === "day" && (
-          <DayView
-            date={selectedDate}
-            appts={apptsByDay.get(localKeyTZ(selectedDate)) ?? []}
-            onSelect={onSelectAppointment}
-            onEdit={onEditAppointmentId}
-            START_HOUR={START_HOUR}
-            HOURS_COUNT={HOURS_COUNT}
-            ROW_PX={ROW_PX}
-            painter={painter}
-            holidays={holidays}
-            // ✅ CLAVE: pasar datos para que DayView muestre nombres/turno
-            painted={painted}
-            employeeNameById={employeeNameById}
-          />
-        )}
-
-        {(view === "week" || view === "workingWeek" || view === "threeDays") && (
-          <WeekView
-            days={view === "week" ? weekDays : view === "workingWeek" ? workingWeekDays : threeDays}
-            apptsByDay={apptsByDay}
-            onSelect={onSelectAppointment}
-            onEdit={onEditAppointmentId}
-            START_HOUR={START_HOUR}
-            HOURS_COUNT={HOURS_COUNT}
-            ROW_PX={ROW_PX}
-            painter={painter}
-            holidays={holidays}
-            // ✅ CLAVE: pasar datos para que WeekView muestre nombres/turno
-            painted={painted}
-            employeeNameById={employeeNameById}
-          />
-        )}
-
-        {view === "month" && (
-          <MonthView
-            anchor={selectedDate}
-            appts={appointments}
-            onSelect={onSelectAppointment}
-            onEdit={onEditAppointmentId}
-            painter={painter}
-            holidays={holidays}
-            painted={painted}
-            employeeNameById={employeeNameById}
-            employeeColorById={employeeColorById}
-          />
-        )}
       </div>
     </div>
   );
