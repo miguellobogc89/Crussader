@@ -144,6 +144,7 @@ export default function TabMenu({
                 "px-3 sm:px-4",
                 "py-2",
                 "text-xs sm:text-sm",
+                "focus:outline-none focus:ring-0 focus:ring-offset-0",
                 active
                   ? "text-primary font-medium"
                   : "text-muted-foreground hover:text-foreground",

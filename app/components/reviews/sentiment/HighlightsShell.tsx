@@ -7,16 +7,16 @@ import HighlightsCardsRow, {
 } from "@/app/components/reviews/sentiment/HighlightsCardsRow";
 import RefreshButton from "@/app/components/crussader/UX/RefreshButton";
 import SkeletonCardsGrid from "@/app/components/crussader/UX/SkeletonCardsGrid";
-import { Calendar } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/app/components/ui/select";
+import RangePicklist from "@/app/components/crussader/UX/RangePicklist";
 
 type RangePreset = "1m" | "3m" | "1y" | "all";
+
+const RANGE_ITEMS: Array<{ id: RangePreset; label: string }> = [
+  { id: "1m", label: "Último mes" },
+  { id: "3m", label: "Últimos 3 meses" },
+  { id: "1y", label: "Último año" },
+  { id: "all", label: "Siempre" },
+];
 
 type RawTag = { label: string; mentions: number };
 
@@ -42,7 +42,7 @@ function addMonthsUTC(d: Date, months: number) {
 
 function computeRange(preset: RangePreset) {
   const now = new Date();
-  const to = startOfMonthUTC(now); // [from, to)
+  const to = startOfMonthUTC(now);
   let from = addMonthsUTC(to, -12);
 
   if (preset === "1m") from = addMonthsUTC(to, -1);
@@ -53,63 +53,52 @@ function computeRange(preset: RangePreset) {
   return { from: fmtDate(from), to: fmtDate(to) };
 }
 
-function RangePicker({
-  value,
-  onChange,
-}: {
-  value: RangePreset;
-  onChange: (v: RangePreset) => void;
-}) {
-  const items: Array<{ id: RangePreset; label: string }> = [
-    { id: "1m", label: "Último mes" },
-    { id: "3m", label: "Últimos 3 meses" },
-    { id: "1y", label: "Último año" },
-    { id: "all", label: "Siempre" },
-  ];
-
-  return (
-    <Select value={value} onValueChange={(v) => onChange(v as RangePreset)}>
-      <SelectTrigger
-        className="
-          h-9 sm:h-10
-          rounded-2xl
-          bg-white/80 backdrop-blur-sm
-          border border-slate-200
-          shadow-sm
-          px-3
-          hover:bg-white
-          w-auto
-          min-w-[44px]
-          sm:min-w-[190px]
-          sm:max-w-[220px]
-    outline-none
-    ring-0 ring-offset-0
-    focus:outline-none focus:ring-0 focus:ring-offset-0
-    focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0
-    focus-visible:border-slate-200
-        "
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <Calendar className="h-4 w-4 text-slate-600 shrink-0" />
-          <span className="hidden sm:block text-xs font-semibold text-slate-700 truncate">
-            {items.find((i) => i.id === value)?.label ?? ""}
-          </span>
-        </div>
-
-      </SelectTrigger>
-
-
-      <SelectContent align="start">
-        {items.map((it) => (
-          <SelectItem key={it.id} value={it.id}>
-            {it.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
+/** ===== persist “running” (per location) ===== */
+function runKey(locationId: string | null) {
+  return locationId ? `crs:concepts_run:${locationId}` : `crs:concepts_run:none`;
 }
 
+function readRunning(locationId: string | null) {
+  if (typeof window === "undefined") return false;
+
+  const raw = window.localStorage.getItem(runKey(locationId));
+  if (!raw) return false;
+
+  try {
+    const obj = JSON.parse(raw) as { running?: boolean; expiresAt?: number } | null;
+    const running = Boolean(obj?.running);
+    const expiresAt = typeof obj?.expiresAt === "number" ? obj.expiresAt : 0;
+
+    if (!running) return false;
+
+    // safety: si por lo que sea se quedó pillado, expira
+    if (expiresAt && Date.now() > expiresAt) {
+      window.localStorage.removeItem(runKey(locationId));
+      return false;
+    }
+
+    return true;
+  } catch {
+    window.localStorage.removeItem(runKey(locationId));
+    return false;
+  }
+}
+
+function setRunning(locationId: string | null, running: boolean) {
+  if (typeof window === "undefined") return;
+
+  if (!running) {
+    window.localStorage.removeItem(runKey(locationId));
+    return;
+  }
+
+  // safety 20 min
+  const expiresAt = Date.now() + 20 * 60 * 1000;
+  window.localStorage.setItem(
+    runKey(locationId),
+    JSON.stringify({ running: true, expiresAt }),
+  );
+}
 
 export default function HighlightsShell({
   locationId,
@@ -120,6 +109,9 @@ export default function HighlightsShell({
 }) {
   const [preset, setPreset] = useState<RangePreset>("1m");
   const { from, to } = useMemo(() => computeRange(preset), [preset]);
+
+  const [taskLoading, setTaskLoading] = useState(false);
+  const [showNotice, setShowNotice] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +131,15 @@ export default function HighlightsShell({
     return u.toString();
   }, [locationId, from, to, limit, refreshNonce]);
 
+  // al montar / cambiar location: recuperar “running”
+  useEffect(() => {
+    if (!locationId) {
+      setShowNotice(false);
+      return;
+    }
+    setShowNotice(readRunning(locationId));
+  }, [locationId]);
+
   useEffect(() => {
     async function run() {
       if (!highlightsUrl) {
@@ -155,11 +156,7 @@ export default function HighlightsShell({
         const j1 = (await r1.json().catch(() => null)) as HighlightsRawResponse | null;
 
         if (!r1.ok || !j1 || j1.ok === false) {
-          const msg =
-            (j1 && "error" in j1 && typeof j1.error === "string" && j1.error) ||
-            `HTTP ${r1.status}`;
-          setData(null);
-          setError(msg);
+          setError(`HTTP ${r1.status}`);
           return;
         }
 
@@ -179,21 +176,16 @@ export default function HighlightsShell({
         const j2 = (await r2.json().catch(() => null)) as EnrichResponse | null;
 
         if (!r2.ok || !j2 || j2.ok === false) {
-          const msg =
-            (j2 && "error" in j2 && typeof j2.error === "string" && j2.error) ||
-            `HTTP ${r2.status}`;
-          setData(null);
-          setError(msg);
+          setError(`HTTP ${r2.status}`);
           return;
         }
 
         setData({
-          success: Array.isArray(j2.success) ? (j2.success as any) : [],
-          improve: Array.isArray(j2.improve) ? (j2.improve as any) : [],
-          attention: Array.isArray(j2.attention) ? (j2.attention as any) : [],
+          success: Array.isArray(j2.success) ? j2.success : [],
+          improve: Array.isArray(j2.improve) ? j2.improve : [],
+          attention: Array.isArray(j2.attention) ? j2.attention : [],
         });
       } catch (e) {
-        setData(null);
         setError(e instanceof Error ? e.message : "Error desconocido");
       } finally {
         setLoading(false);
@@ -205,31 +197,73 @@ export default function HighlightsShell({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <RangePicker value={preset} onChange={setPreset} />
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <RangePicklist value={preset} onChange={setPreset} items={RANGE_ITEMS} />
 
-        <RefreshButton
-          onClick={() => setRefreshNonce((n) => n + 1)}
-          loading={loading}
-          disabled={!locationId}
-        />
+          <RefreshButton
+            disabled={!locationId}
+            loading={loading || taskLoading}
+            onClick={async () => {
+              if (!locationId || taskLoading) return;
+
+              try {
+                setTaskLoading(true);
+                setError(null);
+
+                setRunning(locationId, true);
+                setShowNotice(true);
+
+                const u = new URL("/api/reviews/tasks/concepts/run", window.location.origin);
+                u.searchParams.set("locationId", locationId);
+
+                const res = await fetch(u.toString(), { method: "GET" });
+                const json = await res.json().catch(() => null);
+
+                if (!res.ok || !json || json.ok === false) {
+                  setError(`HTTP ${res.status}`);
+                  return;
+                }
+
+                setRefreshNonce((n) => n + 1);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Error desconocido");
+              } finally {
+                setRunning(locationId, false);
+                setShowNotice(false);
+                setTaskLoading(false);
+              }
+            }}
+          />
+        </div>
+
+        {showNotice ? (
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="text-sm 2xl:text-xs font-semibold text-slate-900 leading-snug">
+              Actualizando insights…
+            </div>
+            <div className="mt-0.5 text-xs 2xl:text-[11px] text-slate-600 leading-snug">
+              Esta operación puede tardar unos minutos si hay muchas reseñas pendientes.
+            </div>
+          </div>
+        ) : null}
       </div>
 
-      {!locationId ? (
+      {!locationId && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
           Selecciona una ubicación para ver los highlights.
         </div>
-      ) : null}
+      )}
 
-      {locationId && loading ? <SkeletonCardsGrid cards={3} rows={3} /> : null}
+      {locationId && loading && <SkeletonCardsGrid cards={3} rows={3} />}
 
-      {locationId && !loading && error ? (
+      {locationId && !loading && error && (
         <div className="rounded-2xl border border-rose-200 bg-white p-5 text-sm text-rose-700 shadow-sm">
           No se pudieron cargar los highlights: {error}
         </div>
-      ) : null}
+      )}
 
-      {locationId && !loading && !error && data ? <HighlightsCardsRow data={data} /> : null}
+      {locationId && !loading && !error && data && <HighlightsCardsRow data={data} />}
     </div>
   );
 }

@@ -7,15 +7,22 @@ import { persistEntityNormalization } from "@/app/server/concepts/normalization/
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
+
+  const locationId = searchParams.get("locationId");
   const limit = Math.max(1, Math.min(200, Number(searchParams.get("limit") ?? 20)));
 
   // 1) Conceptos pendientes: structured NO null + sin link entity todavía
-  const pending = await prisma.concept.findMany({
-where: {
-  structured: { not: Prisma.JsonNull },
-  normalized_entity_id: null,
-},
+  const where: any = {
+    structured: { not: Prisma.JsonNull },
+    normalized_entity_id: null,
+  };
 
+  if (locationId) {
+    where.location_id = locationId;
+  }
+
+  const pending = await prisma.concept.findMany({
+    where,
     select: {
       id: true,
       structured: true,
