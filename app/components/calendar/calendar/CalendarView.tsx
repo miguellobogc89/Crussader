@@ -1,10 +1,12 @@
-// app/components/calendar/CalendarOnly/CalendarView.tsx
+// app/components/calendar/calendar/CalendarView.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import CalendarOnly from "@/app/components/calendar/CalendarOnly";
+import CalendarOnly from "@/app/components/calendar/calendar";
 
-import type { HolidayLite } from "@/app/components/calendar/CalendarOnly/types";
+import type { HolidayLite } from "@/app/components/calendar/calendar/types";
+import type { PaintBlock } from "@/app/components/calendar/calendar/shiftPaintEngine";
+import { useCellPainter, type CellPainter } from "@/hooks/calendar/useCellPainter";
 
 export type Range = { fromISO: string; toISO: string };
 
@@ -17,27 +19,36 @@ function startOfWeekMon(d: Date) {
   return x;
 }
 
+type PaintedAssignment = {
+  employeeIds: string[];
+  shiftLabel: string;
+};
+
 type Props = {
   locationId: string | null;
   holidays?: HolidayLite[];
   onRangeChange?: (r: Range) => void;
 
-  // compatibilidad (no se usan ahora)
-  paintedCellIds?: Set<string>;
-  onPaintCell?: (cellId: string) => void;
-  painted?: Map<string, any>;
-
   employeeNameById?: (id: string) => string;
   employeeColorById?: (id: string) => string | null;
 
-  blocks?: any[];
+  blocks?: PaintBlock[];
+
+  // ✅ nuevo (para pintar desde el motor, sin que Shell toque el grid)
+  onPaintCell?: (cellId: string) => void;
+
+  // ✅ opcional: overlays por celda (tu Week/Day ya lo usan)
+  painted?: Map<string, PaintedAssignment>;
 };
 
 export default function CalendarView({
   locationId,
+  holidays,
   onRangeChange,
   employeeNameById,
   blocks,
+  onPaintCell,
+  painted,
 }: Props) {
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
 
@@ -55,9 +66,15 @@ export default function CalendarView({
     if (!locationId) return;
     if (!onRangeChange) return;
     onRangeChange(range);
-  }, [locationId, rangeKey]);
+  }, [locationId, rangeKey, onRangeChange, range]);
 
   const blocked = !locationId;
+
+  // ✅ el painter vive aquí (CalendarView), no en Shell
+  const painter: CellPainter | null = useMemo(() => {
+    if (!onPaintCell) return null;
+    return useCellPainter(onPaintCell);
+  }, [onPaintCell]);
 
   return (
     <div className="flex-1 min-w-0 flex flex-col h-full">
@@ -76,6 +93,9 @@ export default function CalendarView({
                 onChangeDate={(d: Date) => setSelectedDate(d)}
                 blocks={Array.isArray(blocks) ? blocks : []}
                 employeeNameById={employeeNameById}
+                holidays={holidays}
+                painter={painter}
+                painted={painted}
               />
             )}
           </div>

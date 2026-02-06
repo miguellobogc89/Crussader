@@ -1,4 +1,4 @@
-// app/components/calendar/CalendarOnly/CurrentTimeLineFullSpan.tsx
+// app/components/calendar/calendar/CurrentTimeLineFullSpan.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";

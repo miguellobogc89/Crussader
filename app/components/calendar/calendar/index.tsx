@@ -1,12 +1,14 @@
-// app/components/calendar/CalendarOnly/index.tsx
+// app/components/calendar/calendar/index.tsx
 "use client";
 
 import { useMemo } from "react";
 
-import CalendarToolbar from "@/app/components/calendar/CalendarOnly/CalendarToolbar";
-import CalendarGrid from "@/app/components/calendar/CalendarOnly/CalendarGrid";
+import CalendarToolbar from "@/app/components/calendar/calendar/CalendarToolbar";
+import CalendarGrid from "@/app/components/calendar/calendar/CalendarGrid";
 
-import type { PaintBlock } from "@/app/components/calendar/CalendarOnly/shiftPaintEngine";
+import type { PaintBlock } from "@/app/components/calendar/calendar/shiftPaintEngine";
+import type { HolidayLite } from "@/app/components/calendar/calendar/types";
+import type { CellPainter } from "@/hooks/calendar/useCellPainter";
 
 type View = "week";
 type ToolbarView = "day" | "threeDays" | "workingWeek" | "week" | "month";
@@ -37,6 +39,11 @@ export default function CalendarOnly({
   onChangeDate,
   blocks,
   employeeNameById,
+
+  // ✅ nuevos
+  holidays,
+  painter,
+  painted,
 }: {
   selectedView: View;
   onChangeView: (v: View) => void;
@@ -46,6 +53,11 @@ export default function CalendarOnly({
 
   blocks: PaintBlock[];
   employeeNameById?: (id: string) => string;
+
+  // ✅ nuevos
+  holidays?: HolidayLite[];
+  painter: CellPainter | null;
+  painted?: Map<string, any>;
 }) {
   const view: View = "week";
 
@@ -86,7 +98,6 @@ export default function CalendarOnly({
     onChangeDate(d);
   }
 
-  // Toolbar usa union grande: aceptamos eso y forzamos week.
   function handleChangeView(_v: ToolbarView) {
     if (selectedView !== "week") onChangeView("week");
   }
@@ -114,6 +125,9 @@ export default function CalendarOnly({
           START_HOUR={START_HOUR}
           HOURS_COUNT={HOURS_COUNT}
           ROW_PX={ROW_PX}
+          painter={painter}
+          holidays={holidays}
+          painted={painted}
         />
       </div>
     </div>

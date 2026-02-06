@@ -20,11 +20,11 @@ import type { StaffRoleLite } from "@/app/components/calendar/resources/employee
 import ShiftList, {
   type ShiftTemplateLite,
   type ShiftTypeValue,
-} from "@/app/components/calendar/resources/shift/ShiftList";
+} from "@/app/components/calendar/details/shifts/ShiftList";
 
 import CreateShiftTemplateModal, {
   type CreateShiftTemplateDraft,
-} from "@/app/components/calendar/resources/shift/CreateShiftTemplateModal";
+} from "@/app/components/calendar/details/shifts/CreateShiftTemplateModal";
 
 type ResourceSnapshot = {
   employees: Employee[];

@@ -2,7 +2,7 @@
 
 import { Button } from "@/app/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import type { View } from "@/app/components/calendar/CalendarOnly/types";;
+import type { View } from "@/app/components/calendar/calendar/types";;
 
 export default function ViewControls({
   view,

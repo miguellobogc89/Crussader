@@ -1,4 +1,4 @@
-// app/components/calendar/CalendarOnly/paintEngine.ts
+// app/components/calendar/calendar/paintEngine.ts
 
 export type PaintContext = {
   dayKey: string;

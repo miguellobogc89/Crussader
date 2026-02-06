@@ -2,7 +2,7 @@
 "use client";
 
 import React from "react";
-import { fmtParts } from "@/app/components/calendar/CalendarOnly/tz";
+import { fmtParts } from "@/app/components/calendar/calendar/tz";
 
 type PillProps = {
   startAtISO: string;

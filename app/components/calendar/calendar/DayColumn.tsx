@@ -1,6 +1,6 @@
 "use client";
 
-import AppointmentPill from "@/app/components/calendar/AppointmentPill";
+import AppointmentPill from "@/app/components/calendar/details/appointments/AppointmentPill";
 import { COL_GAP_PX, layoutDayAppts } from "./layout";
 import type { CalendarAppt } from "./types";
 

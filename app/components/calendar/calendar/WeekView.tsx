@@ -1,8 +1,8 @@
-// app/components/calendar/CalendarOnly/WeekView.tsx
+// app/components/calendar/Calendar/WeekView.tsx
 "use client";
 
-import AppointmentPill from "@/app/components/calendar/AppointmentPill";
-import BankHolidayCell from "@/app/components/calendar/CalendarOnly/BankHolidayCell";
+import AppointmentPill from "@/app/components/calendar/details/appointments/AppointmentPill";
+import BankHolidayCell from "@/app/components/calendar/calendar/BankHolidayCell";
 import CurrentTimeLineFullSpan from "./CurrentTimeLineFullSpan";
 import HourGuides from "./HourGuides";
 import { layoutDayAppts, COL_GAP_PX } from "./layout";
@@ -17,14 +17,14 @@ type PaintedAssignment = {
 
 type Props = {
   days: Date[];
-  apptsByDay: Map<string, CalendarAppt[]>;
+  apptsByDay?: Map<string, CalendarAppt[]>; // <- opcional
   onSelect?: (id: string) => void;
   onEdit?: (id: string) => void;
   START_HOUR: number;
   HOURS_COUNT: number;
   ROW_PX: number;
 
-  painter: CellPainter;
+  painter: CellPainter | null;
   holidays?: HolidayLite[];
 
   painted?: Map<string, PaintedAssignment>;
@@ -45,7 +45,7 @@ function getEmpName(id: string, employeeNameById?: (id: string) => string) {
 
 export default function WeekView({
   days,
-  apptsByDay,
+  apptsByDay = new Map<string, CalendarAppt[]>(), // <- default seguro
   onSelect,
   onEdit,
   START_HOUR,

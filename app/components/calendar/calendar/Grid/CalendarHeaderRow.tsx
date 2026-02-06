@@ -1,8 +1,8 @@
-// app/components/calendar/CalendarOnly/Grid/CalendarHeaderRow.tsx
+// app/components/calendar/calendar/Grid/CalendarHeaderRow.tsx
 "use client";
 
-import BankHolidayCell from "@/app/components/calendar/CalendarOnly/BankHolidayCell";
-import { localKeyTZ } from "@/app/components/calendar/CalendarOnly/tz";
+import BankHolidayCell from "@/app/components/calendar/calendar/BankHolidayCell";
+import { localKeyTZ } from "@/app/components/calendar/calendar/tz";
 
 type Mode = "date" | "weekday";
 

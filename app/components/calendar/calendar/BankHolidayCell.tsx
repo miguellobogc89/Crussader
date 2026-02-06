@@ -1,4 +1,4 @@
-// app/components/calendar/CalendarOnly/BankHolidayCell.tsx
+// app/components/calendar/calendar/BankHolidayCell.tsx
 "use client";
 
 export default function BankHolidayCell({

@@ -1,8 +1,15 @@
-// app/components/calendar/CalendarOnly/CalendarGrid.tsx
+// app/components/calendar/calendar/CalendarGrid.tsx
 "use client";
 
-import type { PaintBlock } from "@/app/components/calendar/CalendarOnly/shiftPaintEngine";
-import WeekView from "@/app/components/calendar/CalendarOnly/WeekView";
+import type { PaintBlock } from "@/app/components/calendar/calendar/shiftPaintEngine";
+import WeekView from "@/app/components/calendar/calendar/WeekView";
+import type { CellPainter } from "@/hooks/calendar/useCellPainter";
+import type { HolidayLite } from "@/app/components/calendar/calendar/types";
+
+type PaintedAssignment = {
+  employeeIds: string[];
+  shiftLabel: string;
+};
 
 export default function CalendarGrid({
   days,
@@ -11,6 +18,11 @@ export default function CalendarGrid({
   START_HOUR,
   HOURS_COUNT,
   ROW_PX,
+  painter,
+
+  // ✅ nuevos
+  holidays,
+  painted,
 }: {
   days: Date[];
   blocks: PaintBlock[];
@@ -18,6 +30,11 @@ export default function CalendarGrid({
   START_HOUR: number;
   HOURS_COUNT: number;
   ROW_PX: number;
+  painter: CellPainter | null;
+
+  // ✅ nuevos
+  holidays?: HolidayLite[];
+  painted?: Map<string, PaintedAssignment>;
 }) {
   function fallbackEmployeeNameById(id: string) {
     return id;
@@ -109,11 +126,15 @@ export default function CalendarGrid({
         <div className="absolute inset-0">
           <WeekViewAny
             days={days}
+            apptsByDay={new Map()}
             blocks={blocks}
             employeeNameById={nameFn}
             START_HOUR={START_HOUR}
             HOURS_COUNT={HOURS_COUNT}
             ROW_PX={ROW_PX}
+            painter={painter}
+            holidays={holidays}
+            painted={painted}
           />
         </div>
       </div>

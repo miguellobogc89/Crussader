@@ -1,8 +1,8 @@
-// app/components/calendar/CalendarOnly/DayView.tsx
+// app/components/calendar/calendar/DayView.tsx
 "use client";
 
-import AppointmentPill from "@/app/components/calendar/AppointmentPill";
-import BankHolidayCell from "@/app/components/calendar/CalendarOnly/BankHolidayCell";
+import AppointmentPill from "@/app/components/calendar/details/appointments/AppointmentPill";
+import BankHolidayCell from "@/app/components/calendar/calendar/BankHolidayCell";
 import CurrentTimeLineFullSpan from "./CurrentTimeLineFullSpan";
 import HourGuides from "./HourGuides";
 import { layoutDayAppts, COL_GAP_PX } from "./layout";

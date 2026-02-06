@@ -1,11 +1,14 @@
-// app/components/calendar/CalendarOnly/shiftPaintEngine.ts
+// app/components/calendar/calendar/shiftPaintEngine.ts
 
-import type { ShiftTypeValue, ShiftTemplateLite } from "@/app/components/calendar/resources/shift/ShiftList";
+import type {
+  ShiftTypeValue,
+  ShiftTemplateLite,
+} from "@/app/components/calendar/details/shifts/ShiftList";
 
 export type PaintBlock = {
   dayKey: string;
   startIndex: number; // índice relativo al grid
-  endIndex: number;   // exclusivo
+  endIndex: number; // exclusivo
   employeeIds: string[];
   label: string;
 };
@@ -46,18 +49,27 @@ export function applyPaintWeekLike(args: Args): PaintBlock[] {
   let startIndex = hourIndex;
   let endIndex = hourIndex + 1;
 
-  if (shiftType.type === "template") {
-    const t = templates.find((x) => String(x.id) === String(shiftType.templateId));
-    if (!t) return prevBlocks;
+  // ✅ si el templateId corresponde a un template con horas, pintar el rango completo
+  const id = String(shiftType.templateId);
+  const t = templates.find((x) => String(x.id) === id);
 
-    const startHour = Math.floor(t.startMin / 60);
-    const endHour = Math.ceil(t.endMin / 60);
+  if (
+    t &&
+    typeof t.startMin === "number" &&
+    typeof t.endMin === "number"
+  ) {
+    const startMin = t.startMin;
+    const endMin = t.endMin;
+
+    const startHour = Math.floor(startMin / 60);
+    const endHour = Math.ceil(endMin / 60);
 
     startIndex = Math.max(0, startHour - START_HOUR);
     endIndex = Math.min(HOURS_COUNT, endHour - START_HOUR);
 
     if (startIndex >= endIndex) return prevBlocks;
   }
+
 
   const label = resolveLabel();
 

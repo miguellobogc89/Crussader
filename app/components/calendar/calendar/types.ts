@@ -1,4 +1,4 @@
-// app/components/calendar/CalendarOnly/types.ts
+// app/components/calendar/calendar/types.ts
 
 export type CalendarAppt = {
   id: string;

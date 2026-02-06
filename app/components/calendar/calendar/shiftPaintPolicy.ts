@@ -1,4 +1,4 @@
-// app/components/calendar/CalendarOnly/shiftPaintPolicy.ts
+// app/components/calendar/calendar/shiftPaintPolicy.ts
 
 export type PaintedAssignment = {
   employeeIds: string[];

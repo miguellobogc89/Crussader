@@ -1,22 +1,25 @@
 // app/components/calendar/CalendarShell.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import LocationSelector from "@/app/components/crussader/LocationSelector";
+
 import ResourceView from "@/app/components/calendar/resources/ResourceView";
-import CalendarView from "@/app/components/calendar/CalendarOnly/CalendarView";
+import CalendarView from "@/app/components/calendar/calendar/CalendarView";
+
 import {
   applyPaintWeekLike,
   type PaintBlock,
-} from "@/app/components/calendar/CalendarOnly/shiftPaintEngine";
+} from "@/app/components/calendar/calendar/shiftPaintEngine";
 
 import type {
   ShiftTypeValue,
   ShiftTemplateLite,
-} from "@/app/components/calendar/resources/shift/ShiftList";
+} from "@/app/components/calendar/details/shifts/ShiftList";
+
 import type { Employee } from "@/app/components/calendar/resources/employees/EmployeeList";
-import type { HolidayLite } from "@/app/components/calendar/CalendarOnly/types";
-import type { Range } from "@/app/components/calendar/CalendarOnly/CalendarView";
+import type { HolidayLite } from "@/app/components/calendar/calendar/types";
+import type { Range } from "@/app/components/calendar/calendar/CalendarView";
 
 const START_HOUR = 8;
 const HOURS_COUNT = 12;
@@ -37,8 +40,6 @@ export default function CalendarShell() {
     templateId: "standard",
   });
 
-  const [blocks, setBlocks] = useState<PaintBlock[]>([]);
-
   const [holidays] = useState<HolidayLite[]>([]);
   const [range, setRange] = useState<Range | null>(null);
 
@@ -52,8 +53,7 @@ export default function CalendarShell() {
     return null;
   }
 
-  function resolveShiftLabel() {
-    // estándar / ausencias (no vienen de templates API)
+  const resolveShiftLabel = useCallback(() => {
     const id = String(shiftType.templateId);
 
     if (id === "standard") return "Turno estándar";
@@ -65,45 +65,24 @@ export default function CalendarShell() {
     if (t) return t.name;
 
     return "Turno";
-  }
+  }, [shiftType, templates]);
 
-  function upsertPaint(cellId: string) {
-    if (!locationId) return;
-    if (selectedEmployeeIds.length === 0) return;
+  // ✅ motor encapsulado (Shell solo lo instancia y pasa handlers/estado)
+  const paint = useShiftPaintSession({
+    locationId,
+    selectedEmployeeIds,
+    shiftType,
+    templates,
+    START_HOUR,
+    HOURS_COUNT,
+    resolveLabel: resolveShiftLabel,
+  });
 
-    setBlocks((prev) => {
-      return applyPaintWeekLike({
-        prevBlocks: prev,
-        cellId,
-        selectedEmployeeIds,
-        shiftType,
-        templates,
-        START_HOUR,
-        HOURS_COUNT,
-        resolveLabel: resolveShiftLabel,
-      });
-    });
-  }
-
-  const paintedCellIds = useMemo(() => {
-    const s = new Set<string>();
-
-    for (const b of blocks) {
-      const from = Math.max(0, b.startIndex);
-      const to = Math.min(HOURS_COUNT, b.endIndex);
-
-      for (let i = from; i < to; i += 1) {
-        s.add(`${b.dayKey}|${i}`);
-      }
-    }
-
-    return s;
-  }, [blocks]);
-
+  // (Opcional) tu mapa “painted” para overlays por celda (si lo usas en Week/Day)
   const painted = useMemo(() => {
     const m = new Map<string, PaintedAssignment>();
 
-    for (const b of blocks) {
+    for (const b of paint.blocks) {
       const from = Math.max(0, b.startIndex);
       const to = Math.min(HOURS_COUNT, b.endIndex);
 
@@ -116,7 +95,7 @@ export default function CalendarShell() {
     }
 
     return m;
-  }, [blocks]);
+  }, [paint.blocks]);
 
   return (
     <>
@@ -138,16 +117,17 @@ export default function CalendarShell() {
         <CalendarView
           locationId={locationId}
           holidays={holidays}
-          paintedCellIds={paintedCellIds}
-          onPaintCell={upsertPaint}
-          painted={painted}
           employeeNameById={employeeNameById}
           employeeColorById={employeeColorById}
+          blocks={paint.blocks}
+          onPaintCell={paint.paintCell}
+          painted={painted}
           onRangeChange={(next) => {
             setRange((prev) => {
               if (!prev) return next;
-              if (prev.fromISO === next.fromISO && prev.toISO === next.toISO)
+              if (prev.fromISO === next.fromISO && prev.toISO === next.toISO) {
                 return prev;
+              }
               return next;
             });
           }}
@@ -155,4 +135,66 @@ export default function CalendarShell() {
       </div>
     </>
   );
+}
+
+/**
+ * Hook local (mismo archivo) para NO crear ficheros nuevos.
+ * Aquí vive toda la regla de pintado (no en el Shell).
+ */
+function useShiftPaintSession(args: {
+  locationId: string | null;
+  selectedEmployeeIds: string[];
+  shiftType: ShiftTypeValue;
+  templates: ShiftTemplateLite[];
+  START_HOUR: number;
+  HOURS_COUNT: number;
+  resolveLabel: () => string;
+}) {
+  const {
+    locationId,
+    selectedEmployeeIds,
+    shiftType,
+    templates,
+    START_HOUR,
+    HOURS_COUNT,
+    resolveLabel,
+  } = args;
+
+  const [blocks, setBlocks] = useState<PaintBlock[]>([]);
+
+  // refs para evitar closures raros en drag-paint
+  const locRef = useRef<string | null>(locationId);
+  const selRef = useRef<string[]>(selectedEmployeeIds);
+  const shiftRef = useRef<ShiftTypeValue>(shiftType);
+  const tplRef = useRef<ShiftTemplateLite[]>(templates);
+  const labelRef = useRef<() => string>(resolveLabel);
+
+  locRef.current = locationId;
+  selRef.current = selectedEmployeeIds;
+  shiftRef.current = shiftType;
+  tplRef.current = templates;
+  labelRef.current = resolveLabel;
+
+  const paintCell = useCallback((cellId: string) => {
+    const loc = locRef.current;
+    const sel = selRef.current;
+
+    if (!loc) return;
+    if (!sel || sel.length === 0) return;
+
+    setBlocks((prev) => {
+      return applyPaintWeekLike({
+        prevBlocks: prev,
+        cellId,
+        selectedEmployeeIds: sel,
+        shiftType: shiftRef.current,
+        templates: tplRef.current,
+        START_HOUR,
+        HOURS_COUNT,
+        resolveLabel: labelRef.current,
+      });
+    });
+  }, [START_HOUR, HOURS_COUNT]);
+
+  return { blocks, paintCell };
 }
