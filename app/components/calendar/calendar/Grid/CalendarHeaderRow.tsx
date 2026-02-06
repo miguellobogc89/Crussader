@@ -31,28 +31,27 @@ export default function CalendarHeaderRow({
   }
 
   function weekdayLabel(d: Date) {
-    // "lun", "mar", ...
     const raw = new Intl.DateTimeFormat("es-ES", { weekday: "short" }).format(d);
-    // a veces viene con punto "mié." -> lo quitamos
     return raw.replace(".", "");
   }
 
   function DayCell({ d }: { d: Date }) {
     const label = mode === "weekday" ? weekdayLabel(d) : fmtDay.format(d);
 
-    let cls =
-      "h-10 flex items-center justify-center text-xs font-medium px-2 border-b border-border";
+let cls =
+  "h-10 flex items-center justify-center text-xs font-medium px-2 " +
+  "border-r border-border last:border-r-0 " +
+  "bg-slate-50 text-slate-700";
 
-    if (isToday(d)) cls += " text-primary";
-    else cls += " text-slate-600";
 
-    if (isWeekend(d)) cls += " bg-slate-50";
-    else cls += " bg-white";
+    if (isWeekend(d)) cls += " bg-slate-100";
 
-    if (isToday(d)) cls += " bg-primary/5";
+    if (isToday(d)) {
+      cls += " text-primary bg-primary/5";
+    }
 
     return (
-      <div key={localKeyTZ(d)} className={cls} title={label}>
+      <div className={cls} title={label}>
         <div className="flex items-center gap-2 min-w-0">
           {mode === "date" ? (
             <BankHolidayCell visible={isHoliday(d)} title={holidayTitle(d)} />
@@ -71,7 +70,7 @@ export default function CalendarHeaderRow({
     <div className="px-3">
       <div className="grid" style={{ gridTemplateColumns: cols }}>
         {showHourGutter ? (
-          <div className="h-10 border-b border-border bg-white" />
+          <div className="h-10 border-r border-border bg-white" />
         ) : null}
 
         {days.map((d) => (

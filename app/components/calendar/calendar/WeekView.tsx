@@ -1,4 +1,3 @@
-// app/components/calendar/Calendar/WeekView.tsx
 "use client";
 
 import AppointmentPill from "@/app/components/calendar/details/appointments/AppointmentPill";
@@ -8,66 +7,49 @@ import HourGuides from "./HourGuides";
 import { layoutDayAppts, COL_GAP_PX } from "./layout";
 import { localKeyTZ } from "./tz";
 import type { CalendarAppt, HolidayLite } from "./types";
-import type { CellPainter } from "@/hooks/calendar/useCellPainter";
-
-type PaintedAssignment = {
-  employeeIds: string[];
-  shiftLabel: string;
-};
 
 type Props = {
   days: Date[];
-  apptsByDay?: Map<string, CalendarAppt[]>; // <- opcional
+  apptsByDay?: Map<string, CalendarAppt[]>;
   onSelect?: (id: string) => void;
   onEdit?: (id: string) => void;
   START_HOUR: number;
   HOURS_COUNT: number;
   ROW_PX: number;
 
-  painter: CellPainter | null;
   holidays?: HolidayLite[];
-
-  painted?: Map<string, PaintedAssignment>;
   employeeNameById?: (id: string) => string;
+
+  onCellClick?: (cellId: string) => void;
+  selectedCellId?: string | null;
 };
-
-function assignmentSig(a: PaintedAssignment) {
-  const ids = [...a.employeeIds].sort().join(",");
-  return `${a.shiftLabel}|${ids}`;
-}
-
-function getEmpName(id: string, employeeNameById?: (id: string) => string) {
-  if (!employeeNameById) return id;
-  const name = employeeNameById(id);
-  if (!name) return id;
-  return name;
-}
 
 export default function WeekView({
   days,
-  apptsByDay = new Map<string, CalendarAppt[]>(), // <- default seguro
+  apptsByDay = new Map<string, CalendarAppt[]>(),
   onSelect,
   onEdit,
   START_HOUR,
   HOURS_COUNT,
   ROW_PX,
-  painter,
   holidays = [],
-  painted,
-  employeeNameById,
+  onCellClick,
+  selectedCellId,
 }: Props) {
   const hours = Array.from({ length: HOURS_COUNT }, (_, i) => START_HOUR + i);
-  const WEEK_HEADER_PX = 40;
+  const WEEK_HEADER_PX = 0;
 
-  const makeCellId = (dayKey: string, hourIndex: number) =>
-    `${dayKey}|${hourIndex}`;
+  function makeCellId(dayKey: string, hourIndex: number) {
+    return `${dayKey}|${hourIndex}`;
+  }
+  function isWeekend(d: Date) {
+  const day = d.getDay();
+  return day === 0 || day === 6;
+}
+
 
   return (
     <div className="relative h-full">
-      <div className="pointer-events-none absolute right-2 top-2 z-50 rounded-md bg-black/70 px-2 py-1 text-[11px] text-white">
-        CALENDARONLY WeekView ✅
-      </div>
-
       <CurrentTimeLineFullSpan
         referenceDate={new Date()}
         START_HOUR={START_HOUR}
@@ -82,15 +64,15 @@ export default function WeekView({
         headerOffset={WEEK_HEADER_PX}
       />
 
-      <div
-        className="grid h-full gap-2"
-        style={{
-          gridTemplateColumns: `64px repeat(${days.length}, minmax(0,1fr))`,
-        }}
-      >
+<div
+  className="grid h-full"
+  style={{
+    gridTemplateColumns: `64px repeat(${days.length}, minmax(0,1fr))`,
+  }}
+>
+
         {/* Columna horas */}
         <div className="flex flex-col">
-          <div className="h-10" />
           {hours.map((h) => (
             <div
               key={h}
@@ -111,60 +93,6 @@ export default function WeekView({
           const isHoliday = holidayList.length > 0;
           const holidayTitle = holidayList.map((h) => h.name).join(" · ");
 
-const blocks: Array<{
-  top: number;
-  height: number;
-  employeeId: string;
-  employeeName: string;
-  shiftLabel: string;
-  columnIndex: number;
-  columnCount: number;
-}> = [];
-
-
-if (painted) {
-  let i = 0;
-
-  while (i < HOURS_COUNT) {
-    const cellId = makeCellId(dayKey, i);
-    const a = painted.get(cellId);
-
-    if (!a) {
-      i += 1;
-      continue;
-    }
-
-    // buscamos cuánto dura el bloque
-    let j = i + 1;
-    while (j < HOURS_COUNT) {
-      const next = painted.get(makeCellId(dayKey, j));
-      if (!next) break;
-      if (next.shiftLabel !== a.shiftLabel) break;
-      j += 1;
-    }
-
-    const height = (j - i) * ROW_PX;
-    const top = i * ROW_PX;
-
-    const columnCount = a.employeeIds.length;
-
-    a.employeeIds.forEach((empId, colIndex) => {
-      blocks.push({
-        top,
-        height,
-        employeeId: empId,
-        employeeName: getEmpName(empId, employeeNameById),
-        shiftLabel: a.shiftLabel,
-        columnIndex: colIndex,
-        columnCount,
-      });
-    });
-
-    i = j;
-  }
-}
-
-
           return (
             <div key={dayKey} className="min-w-0">
               <div
@@ -180,7 +108,7 @@ if (painted) {
                     height: HOURS_COUNT * ROW_PX,
                   }}
                 >
-                  {/* Festivo (banda sutil por día) */}
+                  {/* Festivo */}
                   {isHoliday ? (
                     <div className="pointer-events-none absolute inset-0">
                       <div className="absolute inset-0 rounded-md bg-amber-50/40" />
@@ -190,48 +118,34 @@ if (painted) {
                     </div>
                   ) : null}
 
+                  {/* Overlay clicable por celda */}
+                  {Array.from({ length: HOURS_COUNT }, (_, hourIndex) => {
+                    const cellId = makeCellId(dayKey, hourIndex);
+                    const isSelected = selectedCellId === cellId;
 
+                    return (
+                      <button
+                        key={cellId}
+                        type="button"
+                        className={[
+                          "absolute left-0 right-0 rounded-md",
+                          "hover:bg-slate-900/5",
+                          isSelected ? "bg-slate-900/10 ring-1 ring-slate-900/10" : "",
+                        ].join(" ")}
+                        style={{ top: hourIndex * ROW_PX, height: ROW_PX }}
+                        onClick={() => onCellClick?.(cellId)}
+                      />
+                    );
+                  })}
 
-                  {/* ✅ Bloques por empleado en columnas */}
-{blocks.map((b, idx) => {
-  const widthPct = 100 / b.columnCount;
-  const leftPct = b.columnIndex * widthPct;
-
-  return (
-    <div
-      key={`${dayKey}|block|${idx}`}
-      className="pointer-events-none absolute rounded-md ring-1 ring-black/5"
-style={{
-  top: b.top + 6,
-  height: Math.max(22, b.height - 12),
-  left: `${leftPct}%`,
-  width: `${widthPct}%`,
-  background: "rgba(15, 23, 42, 0.08)",
-}}
-
-    >
-      <div className="px-2 py-1">
-        <div className="truncate text-[11px] font-medium text-slate-800">
-          {b.employeeName}
-        </div>
-        <div className="truncate text-[11px] text-slate-600">
-          {b.shiftLabel}
-        </div>
-      </div>
-    </div>
-  );
-})}
-
-
-                  {/* pills */}
+                  {/* Pills (citas) encima */}
                   {(() => {
                     const layout = layoutDayAppts(list, START_HOUR, ROW_PX);
+
                     return list.map((a) => {
                       const L = layout.get(a.id)!;
                       const widthStyle = `calc(${L.widthPct}% - ${COL_GAP_PX}px)`;
-                      const leftStyle = `calc(${L.leftPct}% + ${
-                        COL_GAP_PX / 2
-                      }px)`;
+                      const leftStyle = `calc(${L.leftPct}% + ${COL_GAP_PX / 2}px)`;
 
                       return (
                         <div

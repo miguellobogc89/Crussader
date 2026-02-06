@@ -97,11 +97,11 @@ export default function CalendarToolbar({
   }
 
   return (
-    <div className="cal-header sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-border">
+    <div className="cal-header sticky top-0 z-20 bg-white/90 backdrop-blur">
       <div className="px-3 py-3 flex items-center justify-between gap-3">
         {/* left: nav + month */}
         <div className="flex items-center gap-2 min-w-0">
-          <div className="flex items-center rounded-xl border border-border bg-white overflow-hidden">
+          <div className="flex items-center rounded-xl bg-white overflow-hidden">
             <Button
               type="button"
               variant="ghost"
@@ -150,7 +150,7 @@ export default function CalendarToolbar({
               </Button>
             </PopoverTrigger>
 
-            <PopoverContent align="start" className="w-[280px] p-3">
+            <PopoverContent align="start" className="w-[280px] p-2">
               <div className="space-y-3">
                 <div className="text-xs font-medium text-muted-foreground">
                   Ir a…

@@ -1,20 +1,20 @@
 // app/components/calendar/calendar/index.tsx
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import CalendarToolbar from "@/app/components/calendar/calendar/CalendarToolbar";
 import CalendarGrid from "@/app/components/calendar/calendar/CalendarGrid";
+import DayView from "@/app/components/calendar/calendar/DayView";
+import MonthView from "@/app/components/calendar/calendar/MonthView";
 
-import type { PaintBlock } from "@/app/components/calendar/calendar/shiftPaintEngine";
-import type { HolidayLite } from "@/app/components/calendar/calendar/types";
-import type { CellPainter } from "@/hooks/calendar/useCellPainter";
+import type { HolidayLite, CalendarAppt } from "@/app/components/calendar/calendar/types";
 
-type View = "week";
+type View = "day" | "week" | "month";
 type ToolbarView = "day" | "threeDays" | "workingWeek" | "week" | "month";
 
-const START_HOUR = 8;
-const HOURS_COUNT = 12;
+const START_HOUR = 0;
+const HOURS_COUNT = 24;
 const ROW_PX = 64;
 
 function startOfWeekMon(d: Date) {
@@ -32,34 +32,36 @@ function addDays(d: Date, n: number) {
   return x;
 }
 
-export default function CalendarOnly({
-  selectedView,
-  onChangeView,
-  selectedDate,
-  onChangeDate,
-  blocks,
-  employeeNameById,
-
-  // ✅ nuevos
-  holidays,
-  painter,
-  painted,
-}: {
-  selectedView: View;
-  onChangeView: (v: View) => void;
-
+type Props = {
   selectedDate: Date;
   onChangeDate: (d: Date) => void;
 
-  blocks: PaintBlock[];
   employeeNameById?: (id: string) => string;
+  employeeColorById?: (id: string) => string | null;
 
-  // ✅ nuevos
   holidays?: HolidayLite[];
-  painter: CellPainter | null;
-  painted?: Map<string, any>;
-}) {
-  const view: View = "week";
+
+  onCellClick?: (cellId: string) => void;
+  selectedCellId?: string | null;
+
+  apptsByDay?: Map<string, CalendarAppt[]>;
+  apptsForDay?: CalendarAppt[];
+  apptsForMonth?: CalendarAppt[];
+};
+
+export default function CalendarOnly({
+  selectedDate,
+  onChangeDate,
+  employeeNameById,
+  employeeColorById,
+  holidays,
+  onCellClick,
+  selectedCellId,
+  apptsByDay,
+  apptsForDay,
+  apptsForMonth,
+}: Props) {
+  const [view, setView] = useState<View>("week");
 
   const weekStart = useMemo(() => startOfWeekMon(selectedDate), [selectedDate]);
 
@@ -79,10 +81,36 @@ export default function CalendarOnly({
   }, [selectedDate]);
 
   function goPrev() {
+    if (view === "month") {
+      const d = new Date(selectedDate);
+      d.setMonth(d.getMonth() - 1);
+      d.setDate(1);
+      onChangeDate(d);
+      return;
+    }
+
+    if (view === "day") {
+      onChangeDate(addDays(selectedDate, -1));
+      return;
+    }
+
     onChangeDate(addDays(selectedDate, -7));
   }
 
   function goNext() {
+    if (view === "month") {
+      const d = new Date(selectedDate);
+      d.setMonth(d.getMonth() + 1);
+      d.setDate(1);
+      onChangeDate(d);
+      return;
+    }
+
+    if (view === "day") {
+      onChangeDate(addDays(selectedDate, 1));
+      return;
+    }
+
     onChangeDate(addDays(selectedDate, 7));
   }
 
@@ -98,13 +126,30 @@ export default function CalendarOnly({
     onChangeDate(d);
   }
 
-  function handleChangeView(_v: ToolbarView) {
-    if (selectedView !== "week") onChangeView("week");
+  function handleChangeView(v: ToolbarView) {
+    if (v === "day") {
+      setView("day");
+      return;
+    }
+
+    if (v === "month") {
+      setView("month");
+      return;
+    }
+
+    // por ahora: todo lo demás cae en week (incluye threeDays/workingWeek)
+    setView("week");
   }
+
+  void employeeColorById;
+
+  const weekApptsByDay = apptsByDay ? apptsByDay : new Map<string, CalendarAppt[]>();
+  const dayAppts = apptsForDay ? apptsForDay : [];
+  const monthAppts = apptsForMonth ? apptsForMonth : [];
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="shrink-0">
+      <div className="shrink-0 px-3 py-2 border-b border-border bg-white">
         <CalendarToolbar
           view={view as ToolbarView}
           monthTitle={monthTitle}
@@ -117,18 +162,50 @@ export default function CalendarOnly({
         />
       </div>
 
-      <div className="flex-1 min-h-0">
-        <CalendarGrid
-          days={weekDays}
-          blocks={blocks}
-          employeeNameById={employeeNameById}
-          START_HOUR={START_HOUR}
-          HOURS_COUNT={HOURS_COUNT}
-          ROW_PX={ROW_PX}
-          painter={painter}
-          holidays={holidays}
-          painted={painted}
-        />
+      <div className="flex-1 min-h-0 px-3 pb-3 pt-0">
+        {view === "week" ? (
+          <CalendarGrid
+            days={weekDays}
+            employeeNameById={employeeNameById}
+            START_HOUR={START_HOUR}
+            HOURS_COUNT={HOURS_COUNT}
+            ROW_PX={ROW_PX}
+            holidays={holidays}
+            onCellClick={onCellClick}
+            selectedCellId={selectedCellId}
+            onReachEnd={() => {
+              onChangeDate(addDays(selectedDate, 7));
+            }}
+          />
+        ) : null}
+
+        {view === "day" ? (
+          <div className="h-full min-h-0 overflow-auto">
+            <DayView
+              date={selectedDate}
+              appts={dayAppts}
+              START_HOUR={START_HOUR}
+              HOURS_COUNT={HOURS_COUNT}
+              ROW_PX={ROW_PX}
+              holidays={holidays}
+              onCellClick={onCellClick}
+              selectedCellId={selectedCellId}
+            />
+          </div>
+        ) : null}
+
+        {view === "month" ? (
+          <div className="h-full min-h-0 overflow-auto">
+            <MonthView
+              anchor={selectedDate}
+              appts={monthAppts}
+              holidays={holidays}
+              onCellClick={onCellClick}
+              selectedCellId={selectedCellId}
+            />
+          </div>
+        ) : null}
+
       </div>
     </div>
   );
