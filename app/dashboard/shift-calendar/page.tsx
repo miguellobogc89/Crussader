@@ -339,7 +339,6 @@ function ShiftCalendarBody({ ctx }: { ctx: ShiftCalendarCtxLocal }) {
           onSelectDay={setSelectedDay}
           holidaysByDay={holidaysByDay}
           viewMode={viewMode}
-          onChangeViewMode={setViewMode}
           closedDayKeys={undefined}
           paint={paint}
           brushKind={brushKind}
