@@ -12,9 +12,9 @@
       "path": "/api/tasks/sync-reviews",
       "schedule": "0 10 * * *"
     },
-{
-  "path": "/api/reviews/tasks/concepts/run",
-  "schedule": "*/5 * * * *"
-}
+    {
+      "path": "/api/cron/concepts/run",
+      "schedule": "0 * * * *"
+    }
   ]
 }
