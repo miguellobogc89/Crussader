@@ -1,4 +1,4 @@
-// app/api/calendar/route.ts
+// app/api/calendar/appointments/route.ts
 
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -74,22 +74,26 @@ export async function GET(req: Request) {
         endAt: { gt: from },
         status: { in: [AppointmentStatus.PENDING, AppointmentStatus.BOOKED, AppointmentStatus.COMPLETED] },
       },
-      select: {
-        id: true,
-        locationId: true,
-        serviceId: true,
-        startAt: true,
-        endAt: true,
-        status: true,
-        employeeId: true,
-        resourceId: true,
-        customerName: true,
-        customerPhone: true,
-        customerEmail: true,
-        notes: true,
-      },
-      orderBy: [{ startAt: "asc" }],
-    });
+  select: {
+    id: true,
+    locationId: true,
+    serviceId: true,
+    startAt: true,
+    endAt: true,
+    status: true,
+    employeeId: true,
+    resourceId: true,
+    customerName: true,
+    customerPhone: true,
+    customerEmail: true,
+    notes: true,
+
+    service: { select: { name: true, color: true } },
+    employee: { select: { name: true } },
+    resource: { select: { name: true } },
+  },
+  orderBy: [{ startAt: "asc" }],
+});
 
     // Shape plano + fechas en ISO string
     const items = appts.map(a => ({
@@ -105,6 +109,10 @@ export async function GET(req: Request) {
       customerPhone: a.customerPhone ?? null,
       customerEmail: a.customerEmail ?? null,
       notes: a.notes ?? null,
+  serviceName: a.service?.name ?? null,
+  serviceColor: a.service?.color ?? null,
+  employeeName: a.employee?.name ?? null,
+  resourceName: a.resource?.name ?? null,
     }));
 
     return NextResponse.json({ ok: true, items });

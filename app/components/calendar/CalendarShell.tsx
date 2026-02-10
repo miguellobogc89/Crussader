@@ -1,10 +1,12 @@
+// app/components/calendar/CalendarShell.tsx
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import LocationSelector from "@/app/components/crussader/LocationSelector";
 
 import ResourceView from "@/app/components/calendar/resources/ResourceView";
 import CalendarView from "@/app/components/calendar/calendar/CalendarView";
+import DetailsView from "@/app/components/calendar/details/DetailsView";
 
 import type {
   ShiftTypeValue,
@@ -12,20 +14,35 @@ import type {
 } from "@/app/components/calendar/details/shifts/ShiftList";
 import type { Employee } from "@/app/components/calendar/resources/employees/EmployeeList";
 
+function dayKeyFromCellId(cellId: string | null) {
+  if (!cellId) return "";
+  const ix = cellId.indexOf("|");
+  if (ix === -1) return cellId;
+  return cellId.slice(0, ix);
+}
+
+function todayDayKey() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export default function CalendarShell() {
   const [locationId, setLocationId] = useState<string | null>(null);
 
-  // data snapshots (para employeeNameById / labels futuras)
+  // data snapshots
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [templates, setTemplates] = useState<ShiftTemplateLite[]>([]);
 
-  // selección del panel resources
+  // selección resources
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [shiftType, setShiftType] = useState<ShiftTypeValue>({
     templateId: "standard",
   });
 
-  // click de calendario (sin pintar)
+  // click calendario
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
 
   const employeeNameById = useCallback(
@@ -38,6 +55,15 @@ export default function CalendarShell() {
   );
 
   void templates;
+
+  const selectedDayKey = useMemo(() => {
+    const k = dayKeyFromCellId(selectedCellId);
+    if (k) return k;
+    return todayDayKey();
+  }, [selectedCellId]);
+
+  // por ahora vacío: solo layout
+  const painted = useMemo(() => new Map(), []);
 
   return (
     <>
@@ -61,6 +87,13 @@ export default function CalendarShell() {
           employeeNameById={employeeNameById}
           onCellClick={(cellId: string) => setSelectedCellId(cellId)}
           selectedCellId={selectedCellId}
+        />
+
+        <DetailsView
+          locationId={locationId}
+          selectedDayKey={selectedDayKey}
+          painted={painted}
+          employeeNameById={employeeNameById}
         />
       </div>
     </>

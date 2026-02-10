@@ -1,3 +1,4 @@
+// app/components/calendar/calendar/CalendarView.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -13,6 +14,17 @@ function startOfWeekMon(d: Date) {
   x.setDate(x.getDate() + delta);
   return x;
 }
+
+type ShiftEventLite = {
+  id: string;
+  employeeId: string | null;
+  locationId: string | null;
+  startAt: string; // ISO
+  endAt: string; // ISO
+  kind: string;
+  label: string | null;
+  templateId: string | null;
+};
 
 type Props = {
   locationId: string | null;
@@ -34,6 +46,7 @@ export default function CalendarView({
   selectedCellId,
 }: Props) {
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+  const [shiftEvents, setShiftEvents] = useState<ShiftEventLite[]>([]);
 
   const range = useMemo<Range>(() => {
     const start = startOfWeekMon(selectedDate);
@@ -50,6 +63,49 @@ export default function CalendarView({
     if (!onRangeChange) return;
     onRangeChange(range);
   }, [locationId, rangeKey, onRangeChange, range]);
+
+  // ✅ fetch shift-events
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      if (!locationId) {
+        setShiftEvents([]);
+        return;
+      }
+
+      const url =
+        `/api/calendar/shifts/shift-events?locationId=${encodeURIComponent(locationId)}` +
+        `&from=${encodeURIComponent(range.fromISO)}` +
+        `&to=${encodeURIComponent(range.toISO)}`;
+
+      try {
+        const res = await fetch(url, { method: "GET" });
+        const json = await res.json().catch(() => null);
+
+        if (cancelled) return;
+
+        if (!res.ok || !json || json.ok === false) {
+          setShiftEvents([]);
+          return;
+        }
+
+        const items = Array.isArray(json.items) ? (json.items as ShiftEventLite[]) : [];
+        setShiftEvents(items);
+      } catch {
+        if (cancelled) return;
+        setShiftEvents([]);
+      }
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locationId, rangeKey, range.fromISO, range.toISO]);
+
+  void employeeColorById;
 
   const blocked = !locationId;
 
@@ -69,11 +125,11 @@ export default function CalendarView({
                 employeeNameById={employeeNameById}
                 onCellClick={onCellClick}
                 selectedCellId={selectedCellId}
+                shiftEvents={shiftEvents}
               />
             )}
           </div>
         </div>
-
       </div>
     </div>
   );

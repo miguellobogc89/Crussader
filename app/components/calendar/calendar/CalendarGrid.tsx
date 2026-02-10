@@ -3,9 +3,19 @@
 
 import { useEffect, useRef } from "react";
 import WeekView from "@/app/components/calendar/calendar/WeekView";
-import type { HolidayLite } from "@/app/components/calendar/calendar/types";
+import type { HolidayLite, CalendarAppt } from "@/app/components/calendar/calendar/types";
 import { localKeyTZ } from "@/app/components/calendar/calendar/tz";
 
+type ShiftEventLite = {
+  id: string;
+  employeeId: string | null;
+  locationId: string | null;
+  startAt: string;
+  endAt: string;
+  kind: string;
+  label: string | null;
+  templateId: string | null;
+};
 
 type Props = {
   days: Date[];
@@ -21,6 +31,10 @@ type Props = {
 
   // ✅ nuevo: cuando el usuario llega al final del scroll
   onReachEnd?: () => void;
+
+  // ✅ nuevos
+  apptsByDay?: Map<string, CalendarAppt[]>;
+  shiftEvents?: ShiftEventLite[];
 };
 
 export default function CalendarGrid({
@@ -33,6 +47,8 @@ export default function CalendarGrid({
   onCellClick,
   selectedCellId,
   onReachEnd,
+  apptsByDay,
+  shiftEvents,
 }: Props) {
   function fallbackEmployeeNameById(id: string) {
     return id;
@@ -42,7 +58,6 @@ export default function CalendarGrid({
 
   const canvasH = HOURS_COUNT * ROW_PX;
   const scrollerRef = useRef<HTMLDivElement | null>(null);
-
 
   const fmt = new Intl.DateTimeFormat("es-ES", {
     weekday: "short",
@@ -58,11 +73,11 @@ export default function CalendarGrid({
       d.getDate() === now.getDate()
     );
   }
-  function isWeekend(d: Date) {
-  const day = d.getDay(); // 0 dom, 6 sáb
-  return day === 0 || day === 6;
-}
 
+  function isWeekend(d: Date) {
+    const day = d.getDay(); // 0 dom, 6 sáb
+    return day === 0 || day === 6;
+  }
 
   // evita disparar muchas veces mientras estás pegado abajo
   const reachEndLockRef = useRef(false);
@@ -89,13 +104,16 @@ export default function CalendarGrid({
   }
 
   useEffect(() => {
-  const el = scrollerRef.current;
-  if (!el) return;
+    const el = scrollerRef.current;
+    if (!el) return;
 
-  const targetHour = 8;
-  const top = (targetHour - START_HOUR) * ROW_PX;
-  el.scrollTop = Math.max(0, top);
-}, [START_HOUR, ROW_PX]);
+    const targetHour = 8;
+    const top = (targetHour - START_HOUR) * ROW_PX;
+    el.scrollTop = Math.max(0, top);
+  }, [START_HOUR, ROW_PX]);
+
+  const safeApptsByDay = apptsByDay ? apptsByDay : new Map<string, CalendarAppt[]>();
+  const safeShiftEvents = shiftEvents ? shiftEvents : [];
 
   return (
     <div ref={scrollerRef} className="flex-1 min-h-0 overflow-auto" onScroll={handleScroll}>
@@ -109,23 +127,24 @@ export default function CalendarGrid({
               const label = fmt.format(d);
               const today = isToday(d);
 
-              return (
-                <div
-                  className={[
-                    "h-10 px-2 flex items-center border-r border-border text-xs font-medium capitalize",
-                    isWeekend(d) ? "bg-slate-100" : "bg-transparent",
-                    today ? "text-slate-900" : "text-muted-foreground",
-                  ].join(" ")}
-                >
+
+return (
+  <div
+    key={key}
+    className={[
+      "h-10 px-2 flex items-center border-r border-border text-xs font-medium capitalize",
+      isWeekend(d) ? "bg-slate-100" : "bg-transparent",
+      today ? "text-slate-900" : "text-muted-foreground",
+    ].join(" ")}
+  >
+
                   <span
                     className={[
                       "inline-flex items-center gap-2 truncate",
                       today ? "font-semibold" : "",
                     ].join(" ")}
                   >
-                    {today ? (
-                      <span className="inline-block h-2 w-2 rounded-full bg-primary" />
-                    ) : null}
+                    {today ? <span className="inline-block h-2 w-2 rounded-full bg-primary" /> : null}
                     {label}
                   </span>
                 </div>
@@ -137,13 +156,10 @@ export default function CalendarGrid({
         {/* CANVAS */}
         <div className="relative min-w-[900px]" style={{ height: canvasH }}>
           {/* grid visual base */}
-          <div
-            className="absolute inset-0 grid grid-cols-[64px_repeat(7,1fr)]"
-            aria-hidden
-          >
+          <div className="absolute inset-0 grid grid-cols-[64px_repeat(7,1fr)]" aria-hidden>
             <div className="border-r border-border bg-white" />
             {Array.from({ length: 7 }, (_, col) => {
-              const isWeekendCol = col === 5 || col === 6; // sábado, domingo (siempre 7 días)
+              const isWeekendCol = col === 5 || col === 6; // sábado, domingo
               return (
                 <div
                   key={col}
@@ -152,7 +168,6 @@ export default function CalendarGrid({
                     isWeekendCol ? "bg-slate-50" : "bg-white",
                   ].join(" ")}
                 >
-
                   {Array.from({ length: HOURS_COUNT }, (_, r) => {
                     return (
                       <div
@@ -171,7 +186,7 @@ export default function CalendarGrid({
           <div className="absolute inset-0">
             <WeekView
               days={days}
-              apptsByDay={new Map()}
+              apptsByDay={safeApptsByDay}
               START_HOUR={START_HOUR}
               HOURS_COUNT={HOURS_COUNT}
               ROW_PX={ROW_PX}
@@ -179,6 +194,7 @@ export default function CalendarGrid({
               employeeNameById={nameFn}
               onCellClick={onCellClick}
               selectedCellId={selectedCellId}
+              shiftEvents={safeShiftEvents}
             />
           </div>
         </div>

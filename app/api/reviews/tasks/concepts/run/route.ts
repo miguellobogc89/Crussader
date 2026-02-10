@@ -24,36 +24,71 @@ function clampInt(v: string | null, def: number, min: number, max: number) {
 }
 
 async function callJSON(url: URL) {
-  const res = await fetch(url.toString(), { method: "GET" });
-  const json = await res.json().catch(() => null);
-  return { res, json };
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+    redirect: "manual",
+  });
+
+  const contentType = res.headers.get("content-type") || "";
+  const text = await res.text();
+
+  let json: any = null;
+  if (contentType.includes("application/json")) {
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = null;
+    }
+  }
+
+  return {
+    res,
+    json,
+    debug: {
+      url: url.toString(),
+      status: res.status,
+      contentType,
+      redirectedTo: res.headers.get("location") || null,
+      bodyPreview: text.slice(0, 300),
+    },
+  };
 }
 
-async function runForLocation(origin: string, locationId: string, opts: {
-  conceptLimit: number;
-  normalizeEntityLimit: number;
-  normalizeAspectLimit: number;
-  maxConceptBatches: number;
-  maxEntityBatches: number;
-  maxAspectBatches: number;
-}) {
+async function runForLocation(
+  origin: string,
+  locationId: string,
+  opts: {
+    conceptLimit: number;
+    normalizeEntityLimit: number;
+    normalizeAspectLimit: number;
+    maxConceptBatches: number;
+    maxEntityBatches: number;
+    maxAspectBatches: number;
+  },
+) {
   let extracted_reviews = 0;
   let inserted_concepts = 0;
   let normalized_entities = 0;
   let normalized_aspects = 0;
 
-  // 1) Extract concepts (batch loop)
+  // 1) Extract concepts
   for (let i = 0; i < opts.maxConceptBatches; i++) {
     const u = new URL("/api/reviews/tasks/concepts/process", origin);
     u.searchParams.set("locationId", locationId);
     u.searchParams.set("limit", String(opts.conceptLimit));
 
-    const { res, json } = await callJSON(u);
+    const { res, json, debug } = await callJSON(u);
 
     if (!res.ok || !json || json.ok === false) {
-      const msg =
-        (json && typeof json.error === "string" && json.error) || `HTTP ${res.status}`;
-      throw new Error(`concepts/process failed: ${msg}`);
+      let msg = `HTTP ${debug.status}`;
+      if (json && typeof json.error === "string") msg = json.error;
+
+      throw new Error(
+        `concepts/process failed: ${msg} | debug=${JSON.stringify(debug)}`,
+      );
     }
 
     const processed = Number(json.processed ?? 0);
@@ -65,18 +100,24 @@ async function runForLocation(origin: string, locationId: string, opts: {
     if (processed === 0) break;
   }
 
-  // 2) Normalize entities (batch loop) — filtered by locationId
+  // 2) Normalize entities
   for (let i = 0; i < opts.maxEntityBatches; i++) {
-    const u = new URL("/api/reviews/tasks/concepts/normalization/entity", origin);
+    const u = new URL(
+      "/api/reviews/tasks/concepts/normalization/entity",
+      origin,
+    );
     u.searchParams.set("locationId", locationId);
     u.searchParams.set("limit", String(opts.normalizeEntityLimit));
 
-    const { res, json } = await callJSON(u);
+    const { res, json, debug } = await callJSON(u);
 
     if (!res.ok || !json || json.ok === false) {
-      const msg =
-        (json && typeof json.error === "string" && json.error) || `HTTP ${res.status}`;
-      throw new Error(`normalization/entity failed: ${msg}`);
+      let msg = `HTTP ${debug.status}`;
+      if (json && typeof json.error === "string") msg = json.error;
+
+      throw new Error(
+        `normalization/entity failed: ${msg} | debug=${JSON.stringify(debug)}`,
+      );
     }
 
     const processed = Number(json.processed ?? 0);
@@ -85,18 +126,24 @@ async function runForLocation(origin: string, locationId: string, opts: {
     if (processed === 0) break;
   }
 
-  // 3) Normalize aspects (batch loop) — filtered by locationId
+  // 3) Normalize aspects
   for (let i = 0; i < opts.maxAspectBatches; i++) {
-    const u = new URL("/api/reviews/tasks/concepts/normalization/aspect", origin);
+    const u = new URL(
+      "/api/reviews/tasks/concepts/normalization/aspect",
+      origin,
+    );
     u.searchParams.set("locationId", locationId);
     u.searchParams.set("limit", String(opts.normalizeAspectLimit));
 
-    const { res, json } = await callJSON(u);
+    const { res, json, debug } = await callJSON(u);
 
     if (!res.ok || !json || json.ok === false) {
-      const msg =
-        (json && typeof json.error === "string" && json.error) || `HTTP ${res.status}`;
-      throw new Error(`normalization/aspect failed: ${msg}`);
+      let msg = `HTTP ${debug.status}`;
+      if (json && typeof json.error === "string") msg = json.error;
+
+      throw new Error(
+        `normalization/aspect failed: ${msg} | debug=${JSON.stringify(debug)}`,
+      );
     }
 
     const processed = Number(json.processed ?? 0);
@@ -120,14 +167,43 @@ export async function GET(req: Request) {
 
     const locationId = url.searchParams.get("locationId");
 
-    // límites razonables (puedes tunear luego)
-    const conceptLimit = clampInt(url.searchParams.get("conceptLimit"), 200, 10, 200);
-    const normalizeEntityLimit = clampInt(url.searchParams.get("entityLimit"), 50, 10, 200);
-    const normalizeAspectLimit = clampInt(url.searchParams.get("aspectLimit"), 200, 10, 500);
+    const conceptLimit = clampInt(
+      url.searchParams.get("conceptLimit"),
+      200,
+      10,
+      200,
+    );
+    const normalizeEntityLimit = clampInt(
+      url.searchParams.get("entityLimit"),
+      50,
+      10,
+      200,
+    );
+    const normalizeAspectLimit = clampInt(
+      url.searchParams.get("aspectLimit"),
+      200,
+      10,
+      500,
+    );
 
-    const maxConceptBatches = clampInt(url.searchParams.get("maxConceptBatches"), 10, 1, 50);
-    const maxEntityBatches = clampInt(url.searchParams.get("maxEntityBatches"), 10, 1, 50);
-    const maxAspectBatches = clampInt(url.searchParams.get("maxAspectBatches"), 10, 1, 50);
+    const maxConceptBatches = clampInt(
+      url.searchParams.get("maxConceptBatches"),
+      10,
+      1,
+      50,
+    );
+    const maxEntityBatches = clampInt(
+      url.searchParams.get("maxEntityBatches"),
+      10,
+      1,
+      50,
+    );
+    const maxAspectBatches = clampInt(
+      url.searchParams.get("maxAspectBatches"),
+      10,
+      1,
+      50,
+    );
 
     const opts = {
       conceptLimit,
@@ -138,7 +214,7 @@ export async function GET(req: Request) {
       maxAspectBatches,
     };
 
-    // ===== Local run =====
+    // ===== Local =====
     if (locationId) {
       const r = await runForLocation(origin, locationId, opts);
 
@@ -155,12 +231,11 @@ export async function GET(req: Request) {
       return NextResponse.json(out);
     }
 
-    // ===== Global run =====
-    // Extraer requiere locationId → iteramos locations activas
+    // ===== Global =====
     const locations = await prisma.location.findMany({
       select: { id: true },
       orderBy: { createdAt: "asc" },
-      take: 200, // safety cap
+      take: 200,
     });
 
     let extracted_reviews = 0;

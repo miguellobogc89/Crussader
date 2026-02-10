@@ -52,7 +52,7 @@ const MYBUSINESS: NavItem = {
 
 const SHIFT_CALENDAR: NavItem = {
   title: "Turnos de empleados",
-  href: "/dashboard/shift-calendar",
+  href: "/dashboard/calendar",
   icon: "📅",
   description: "Calendario de turnos del equipo",
 };

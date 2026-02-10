@@ -1,4 +1,7 @@
+// app/components/calendar/calendar/WeekView.tsx
 "use client";
+
+import { useState } from "react";
 
 import AppointmentPill from "@/app/components/calendar/details/appointments/AppointmentPill";
 import BankHolidayCell from "@/app/components/calendar/calendar/BankHolidayCell";
@@ -7,6 +10,20 @@ import HourGuides from "./HourGuides";
 import { layoutDayAppts, COL_GAP_PX } from "./layout";
 import { localKeyTZ } from "./tz";
 import type { CalendarAppt, HolidayLite } from "./types";
+
+import WeekShiftsByEmployee from "@/app/components/calendar/calendar/WeekShiftsByEmployee";
+import WeekShiftsByRole from "@/app/components/calendar/calendar/WeekShiftsByRole";
+
+type ShiftEventLite = {
+  id: string;
+  employeeId: string | null;
+  locationId: string | null;
+  startAt: string;
+  endAt: string;
+  kind: string;
+  label: string | null;
+  templateId: string | null;
+};
 
 type Props = {
   days: Date[];
@@ -22,6 +39,8 @@ type Props = {
 
   onCellClick?: (cellId: string) => void;
   selectedCellId?: string | null;
+
+  shiftEvents?: ShiftEventLite[];
 };
 
 export default function WeekView({
@@ -33,23 +52,53 @@ export default function WeekView({
   HOURS_COUNT,
   ROW_PX,
   holidays = [],
+  employeeNameById,
   onCellClick,
   selectedCellId,
+  shiftEvents,
 }: Props) {
+  const [shiftView, setShiftView] = useState<"role" | "employee">("role");
+
   const hours = Array.from({ length: HOURS_COUNT }, (_, i) => START_HOUR + i);
   const WEEK_HEADER_PX = 0;
+
+  const safeShiftEvents = shiftEvents ? shiftEvents : [];
 
   function makeCellId(dayKey: string, hourIndex: number) {
     return `${dayKey}|${hourIndex}`;
   }
-  function isWeekend(d: Date) {
-  const day = d.getDay();
-  return day === 0 || day === 6;
-}
-
 
   return (
     <div className="relative h-full">
+      {/* Toggle vista turnos */}
+      <div className="absolute right-2 top-2 z-40 flex items-center gap-2">
+        <button
+          type="button"
+          className={[
+            "px-2 py-1 text-xs rounded-md border",
+            shiftView === "role"
+              ? "bg-slate-900 text-white border-slate-900"
+              : "bg-white border-border",
+          ].join(" ")}
+          onClick={() => setShiftView("role")}
+        >
+          Por rol
+        </button>
+
+        <button
+          type="button"
+          className={[
+            "px-2 py-1 text-xs rounded-md border",
+            shiftView === "employee"
+              ? "bg-slate-900 text-white border-slate-900"
+              : "bg-white border-border",
+          ].join(" ")}
+          onClick={() => setShiftView("employee")}
+        >
+          Por empleado
+        </button>
+      </div>
+
       <CurrentTimeLineFullSpan
         referenceDate={new Date()}
         START_HOUR={START_HOUR}
@@ -58,19 +107,14 @@ export default function WeekView({
         HEADER_OFFSET_PX={WEEK_HEADER_PX}
       />
 
-      <HourGuides
-        count={HOURS_COUNT}
-        rowPx={ROW_PX}
-        headerOffset={WEEK_HEADER_PX}
-      />
+      <HourGuides count={HOURS_COUNT} rowPx={ROW_PX} headerOffset={WEEK_HEADER_PX} />
 
-<div
-  className="grid h-full"
-  style={{
-    gridTemplateColumns: `64px repeat(${days.length}, minmax(0,1fr))`,
-  }}
->
-
+      <div
+        className="grid h-full"
+        style={{
+          gridTemplateColumns: `64px repeat(${days.length}, minmax(0,1fr))`,
+        }}
+      >
         {/* Columna horas */}
         <div className="flex flex-col">
           {hours.map((h) => (
@@ -118,6 +162,26 @@ export default function WeekView({
                     </div>
                   ) : null}
 
+                  {/* Turnos: por rol (default) o por empleado */}
+                  {shiftView === "role" ? (
+                    <WeekShiftsByRole
+                      dayKey={dayKey}
+                      START_HOUR={START_HOUR}
+                      HOURS_COUNT={HOURS_COUNT}
+                      ROW_PX={ROW_PX}
+                      shiftEvents={safeShiftEvents}
+                    />
+                  ) : (
+                    <WeekShiftsByEmployee
+                      dayKey={dayKey}
+                      START_HOUR={START_HOUR}
+                      HOURS_COUNT={HOURS_COUNT}
+                      ROW_PX={ROW_PX}
+                      employeeNameById={employeeNameById}
+                      shiftEvents={safeShiftEvents}
+                    />
+                  )}
+
                   {/* Overlay clicable por celda */}
                   {Array.from({ length: HOURS_COUNT }, (_, hourIndex) => {
                     const cellId = makeCellId(dayKey, hourIndex);
@@ -133,7 +197,9 @@ export default function WeekView({
                           isSelected ? "bg-slate-900/10 ring-1 ring-slate-900/10" : "",
                         ].join(" ")}
                         style={{ top: hourIndex * ROW_PX, height: ROW_PX }}
-                        onClick={() => onCellClick?.(cellId)}
+                        onClick={() => {
+                          if (onCellClick) onCellClick(cellId);
+                        }}
                       />
                     );
                   })}
@@ -143,7 +209,9 @@ export default function WeekView({
                     const layout = layoutDayAppts(list, START_HOUR, ROW_PX);
 
                     return list.map((a) => {
-                      const L = layout.get(a.id)!;
+                      const L = layout.get(a.id);
+                      if (!L) return null;
+
                       const widthStyle = `calc(${L.widthPct}% - ${COL_GAP_PX}px)`;
                       const leftStyle = `calc(${L.leftPct}% + ${COL_GAP_PX / 2}px)`;
 
@@ -165,8 +233,12 @@ export default function WeekView({
                               .filter(Boolean)
                               .join(" · ")}
                             color={a.serviceColor ?? undefined}
-                            onClick={() => onSelect?.(a.id)}
-                            onDoubleClick={() => onEdit?.(a.id)}
+                            onClick={() => {
+                              if (onSelect) onSelect(a.id);
+                            }}
+                            onDoubleClick={() => {
+                              if (onEdit) onEdit(a.id);
+                            }}
                           />
                         </div>
                       );

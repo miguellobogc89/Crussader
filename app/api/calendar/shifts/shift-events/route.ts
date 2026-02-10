@@ -1,4 +1,4 @@
-// app/api/calendar/shift-events/route.ts
+// app/api/calendar/shifts/shift-events/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/server/db";
 
@@ -51,18 +51,59 @@ export async function GET(req: Request) {
         startAt: { lt: toDate },
         endAt: { gt: fromDate },
       },
-      select: {
-        id: true,
-        employeeId: true,
-        locationId: true,
-        startAt: true,
-        endAt: true,
-        kind: true,
-        label: true,
-        templateId: true,
+select: {
+  id: true,
+  employeeId: true,
+  locationId: true,
+  startAt: true,
+  endAt: true,
+  kind: true,
+  label: true,
+  templateId: true,
+
+  Employee: {
+    select: {
+      roles: {
+        where: { isPrimary: true },
+        select: {
+          role: {
+            select: {
+              id: true,
+              name: true,
+              color: true,
+            },
+          },
+        },
+        take: 1,
       },
+    },
+  },
+},
+
       orderBy: { startAt: "asc" },
     });
+
+    const items = events.map((e) => {
+  const primary = e.Employee?.roles?.[0]?.role ?? null;
+
+  return {
+    id: e.id,
+    employeeId: e.employeeId,
+    locationId: e.locationId,
+    startAt: e.startAt,
+    endAt: e.endAt,
+    kind: e.kind,
+    label: e.label,
+    templateId: e.templateId,
+
+    roleId: primary ? primary.id : null,
+    roleName: primary ? primary.name : null,
+    roleColor: primary ? primary.color : null,
+  };
+});
+
+return NextResponse.json({ ok: true, items });
+
 
     return NextResponse.json({ ok: true, items: events });
   } catch (e: any) {

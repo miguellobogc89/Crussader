@@ -8,7 +8,10 @@ import CalendarGrid from "@/app/components/calendar/calendar/CalendarGrid";
 import DayView from "@/app/components/calendar/calendar/DayView";
 import MonthView from "@/app/components/calendar/calendar/MonthView";
 
-import type { HolidayLite, CalendarAppt } from "@/app/components/calendar/calendar/types";
+import type {
+  HolidayLite,
+  CalendarAppt,
+} from "@/app/components/calendar/calendar/types";
 
 type View = "day" | "week" | "month";
 type ToolbarView = "day" | "threeDays" | "workingWeek" | "week" | "month";
@@ -32,6 +35,17 @@ function addDays(d: Date, n: number) {
   return x;
 }
 
+type ShiftEventLite = {
+  id: string;
+  employeeId: string | null;
+  locationId: string | null;
+  startAt: string; // ISO
+  endAt: string; // ISO
+  kind: string;
+  label: string | null;
+  templateId: string | null;
+};
+
 type Props = {
   selectedDate: Date;
   onChangeDate: (d: Date) => void;
@@ -47,6 +61,9 @@ type Props = {
   apptsByDay?: Map<string, CalendarAppt[]>;
   apptsForDay?: CalendarAppt[];
   apptsForMonth?: CalendarAppt[];
+
+  // ✅ nuevo
+  shiftEvents?: ShiftEventLite[];
 };
 
 export default function CalendarOnly({
@@ -60,6 +77,7 @@ export default function CalendarOnly({
   apptsByDay,
   apptsForDay,
   apptsForMonth,
+  shiftEvents,
 }: Props) {
   const [view, setView] = useState<View>("week");
 
@@ -146,6 +164,7 @@ export default function CalendarOnly({
   const weekApptsByDay = apptsByDay ? apptsByDay : new Map<string, CalendarAppt[]>();
   const dayAppts = apptsForDay ? apptsForDay : [];
   const monthAppts = apptsForMonth ? apptsForMonth : [];
+  const safeShiftEvents = shiftEvents ? shiftEvents : [];
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -162,7 +181,7 @@ export default function CalendarOnly({
         />
       </div>
 
-      <div className="flex-1 min-h-0 px-3 pb-3 pt-0">
+      <div className="flex-1 min-h-0 px-3 pb-3 pt-0 flex flex-col">
         {view === "week" ? (
           <CalendarGrid
             days={weekDays}
@@ -176,6 +195,8 @@ export default function CalendarOnly({
             onReachEnd={() => {
               onChangeDate(addDays(selectedDate, 7));
             }}
+            apptsByDay={weekApptsByDay}
+            shiftEvents={safeShiftEvents}
           />
         ) : null}
 
@@ -205,7 +226,6 @@ export default function CalendarOnly({
             />
           </div>
         ) : null}
-
       </div>
     </div>
   );
