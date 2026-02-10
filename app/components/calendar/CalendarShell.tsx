@@ -89,12 +89,7 @@ export default function CalendarShell() {
           selectedCellId={selectedCellId}
         />
 
-        <DetailsView
-          locationId={locationId}
-          selectedDayKey={selectedDayKey}
-          painted={painted}
-          employeeNameById={employeeNameById}
-        />
+
       </div>
     </>
   );

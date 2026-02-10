@@ -11,8 +11,8 @@ type Props = {
   leftPct: number; // 0..100
   widthPct: number; // 0..100
 
-  title: string; // texto del tag (rol)
-  subtitle?: string | null; // ej: "4"
+  title: string; // texto del tag (rol o empleado)
+  subtitle?: string | null; // SOLO número o texto corto (sin emojis)
 
   color?: string | null; // "#RRGGBB"
   onClick?: () => void;
@@ -56,6 +56,8 @@ export default function ShiftEventBlock({
       ? `${safeColor}55`
       : "rgba(15,23,42,0.10)";
 
+  const subtitleText = subtitle && String(subtitle).trim().length > 0 ? String(subtitle).trim() : null;
+
   return (
     <button
       type="button"
@@ -67,10 +69,7 @@ export default function ShiftEventBlock({
         width: `calc(${widthPct}% - ${GAP_PX}px)`,
 
         backgroundColor: safeColor ? `${safeColor}22` : "rgba(15,23,42,0.05)",
-
-        // ✅ SOLO shorthand (evita el warning)
         border: `1px solid ${borderColor}`,
-
         boxShadow: isHover ? "0 0 0 2px rgba(15,23,42,0.08)" : undefined,
       }}
       onMouseEnter={(e) => {
@@ -103,11 +102,11 @@ export default function ShiftEventBlock({
         </div>
       </div>
 
-      {/* Contenido inferior derecho */}
-      {subtitle ? (
-        <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[11px] font-semibold text-slate-900/80">
+      {/* Icono + número justo debajo del tag */}
+      {subtitleText ? (
+        <div className="absolute left-2 top-9 flex items-center gap-1 text-[11px] font-semibold text-slate-900/80">
           <User size={12} />
-          <span>{subtitle}</span>
+          <span className="leading-none">{subtitleText}</span>
         </div>
       ) : null}
     </button>

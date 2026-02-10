@@ -154,7 +154,7 @@ export default function WeekShiftsByRole({
               leftPct={0}
               widthPct={100}
               title={`+${roleCount} roles`}
-              subtitle={`👥 ${totalEmployees}`}
+              subtitle={String(totalEmployees)}
               color={null}
               onClick={() => {}}
             />
@@ -172,7 +172,7 @@ export default function WeekShiftsByRole({
             leftPct={col * widthPct}
             widthPct={widthPct}
             title={v.name}
-            subtitle={`👥 ${v.count}`}
+            subtitle={String(v.count)}
             color={v.color}
             onClick={() => {}}
           />
