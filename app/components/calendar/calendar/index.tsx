@@ -1,19 +1,14 @@
-// app/components/calendar/calendar/index.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import CalendarToolbar from "@/app/components/calendar/calendar/CalendarToolbar";
 import CalendarGrid from "@/app/components/calendar/calendar/CalendarGrid";
 import DayView from "@/app/components/calendar/calendar/DayView";
 import MonthView from "@/app/components/calendar/calendar/MonthView";
 
-import type {
-  HolidayLite,
-  CalendarAppt,
-} from "@/app/components/calendar/calendar/types";
+import type { HolidayLite, CalendarAppt } from "@/app/components/calendar/calendar/types";
 
-type View = "day" | "week" | "month";
 type ToolbarView = "day" | "threeDays" | "workingWeek" | "week" | "month";
 
 const START_HOUR = 0;
@@ -47,6 +42,10 @@ type ShiftEventLite = {
 };
 
 type Props = {
+  // ✅ ahora controlado desde CalendarView
+  view: ToolbarView;
+  onChangeView: (v: ToolbarView) => void;
+
   selectedDate: Date;
   onChangeDate: (d: Date) => void;
 
@@ -62,11 +61,12 @@ type Props = {
   apptsForDay?: CalendarAppt[];
   apptsForMonth?: CalendarAppt[];
 
-  // ✅ nuevo
   shiftEvents?: ShiftEventLite[];
 };
 
 export default function CalendarOnly({
+  view,
+  onChangeView,
   selectedDate,
   onChangeDate,
   employeeNameById,
@@ -79,21 +79,28 @@ export default function CalendarOnly({
   apptsForMonth,
   shiftEvents,
 }: Props) {
-  const [view, setView] = useState<View>("week");
-
   const weekStart = useMemo(() => startOfWeekMon(selectedDate), [selectedDate]);
 
-  const weekDays = useMemo(() => {
-    const out: Date[] = [];
-    for (let i = 0; i < 7; i += 1) out.push(addDays(weekStart, i));
-    return out;
-  }, [weekStart]);
+  const days = useMemo(() => {
+    if (view === "day") return [new Date(selectedDate)];
+    if (view === "threeDays") return [addDays(selectedDate, 0), addDays(selectedDate, 1), addDays(selectedDate, 2)];
+    if (view === "workingWeek") {
+      const out: Date[] = [];
+      for (let i = 0; i < 5; i += 1) out.push(addDays(weekStart, i));
+      return out;
+    }
+    if (view === "week") {
+      const out: Date[] = [];
+      for (let i = 0; i < 7; i += 1) out.push(addDays(weekStart, i));
+      return out;
+    }
+
+    // month -> grid lo maneja MonthView (no usamos days)
+    return [];
+  }, [view, selectedDate, weekStart]);
 
   const monthTitle = useMemo(() => {
-    const fmt = new Intl.DateTimeFormat("es-ES", {
-      month: "long",
-      year: "numeric",
-    });
+    const fmt = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" });
     const s = fmt.format(selectedDate);
     return s.charAt(0).toUpperCase() + s.slice(1);
   }, [selectedDate]);
@@ -109,6 +116,16 @@ export default function CalendarOnly({
 
     if (view === "day") {
       onChangeDate(addDays(selectedDate, -1));
+      return;
+    }
+
+    if (view === "threeDays") {
+      onChangeDate(addDays(selectedDate, -3));
+      return;
+    }
+
+    if (view === "workingWeek") {
+      onChangeDate(addDays(selectedDate, -7));
       return;
     }
 
@@ -129,6 +146,16 @@ export default function CalendarOnly({
       return;
     }
 
+    if (view === "threeDays") {
+      onChangeDate(addDays(selectedDate, 3));
+      return;
+    }
+
+    if (view === "workingWeek") {
+      onChangeDate(addDays(selectedDate, 7));
+      return;
+    }
+
     onChangeDate(addDays(selectedDate, 7));
   }
 
@@ -144,21 +171,6 @@ export default function CalendarOnly({
     onChangeDate(d);
   }
 
-  function handleChangeView(v: ToolbarView) {
-    if (v === "day") {
-      setView("day");
-      return;
-    }
-
-    if (v === "month") {
-      setView("month");
-      return;
-    }
-
-    // por ahora: todo lo demás cae en week (incluye threeDays/workingWeek)
-    setView("week");
-  }
-
   void employeeColorById;
 
   const weekApptsByDay = apptsByDay ? apptsByDay : new Map<string, CalendarAppt[]>();
@@ -170,21 +182,21 @@ export default function CalendarOnly({
     <div className="flex flex-col h-full min-h-0">
       <div className="shrink-0 px-3 py-2 border-b border-border bg-white">
         <CalendarToolbar
-          view={view as ToolbarView}
+          view={view}
           monthTitle={monthTitle}
           selectedDate={selectedDate}
           onPrev={goPrev}
           onNext={goNext}
           onToday={goToday}
-          onChangeView={handleChangeView}
+          onChangeView={onChangeView}
           onJumpToMonth={jumpToMonth}
         />
       </div>
 
       <div className="flex-1 min-h-0 px-3 pb-3 pt-0 flex flex-col">
-        {view === "week" ? (
+        {view === "week" || view === "workingWeek" || view === "threeDays" ? (
           <CalendarGrid
-            days={weekDays}
+            days={days}
             employeeNameById={employeeNameById}
             START_HOUR={START_HOUR}
             HOURS_COUNT={HOURS_COUNT}
@@ -193,7 +205,10 @@ export default function CalendarOnly({
             onCellClick={onCellClick}
             selectedCellId={selectedCellId}
             onReachEnd={() => {
-              onChangeDate(addDays(selectedDate, 7));
+              // en estas vistas, avanzar “bloque”
+              if (view === "threeDays") onChangeDate(addDays(selectedDate, 3));
+              if (view === "workingWeek") onChangeDate(addDays(selectedDate, 7));
+              if (view === "week") onChangeDate(addDays(selectedDate, 7));
             }}
             apptsByDay={weekApptsByDay}
             shiftEvents={safeShiftEvents}

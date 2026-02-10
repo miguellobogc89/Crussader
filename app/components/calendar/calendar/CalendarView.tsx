@@ -1,4 +1,3 @@
-// app/components/calendar/calendar/CalendarView.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -6,12 +5,20 @@ import CalendarOnly from "@/app/components/calendar/calendar/index";
 
 export type Range = { fromISO: string; toISO: string };
 
+type ToolbarView = "day" | "threeDays" | "workingWeek" | "week" | "month";
+
 function startOfWeekMon(d: Date) {
   const x = new Date(d);
   const day = x.getDay();
   const delta = day === 0 ? -6 : 1 - day;
   x.setHours(0, 0, 0, 0);
   x.setDate(x.getDate() + delta);
+  return x;
+}
+
+function addDays(d: Date, n: number) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
   return x;
 }
 
@@ -46,15 +53,43 @@ export default function CalendarView({
   selectedCellId,
 }: Props) {
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+  const [view, setView] = useState<ToolbarView>("week");
   const [shiftEvents, setShiftEvents] = useState<ShiftEventLite[]>([]);
 
   const range = useMemo<Range>(() => {
-    const start = startOfWeekMon(selectedDate);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 6);
+    // por defecto semana completa
+    let start = startOfWeekMon(selectedDate);
+    let end = addDays(start, 6);
     end.setHours(23, 59, 59, 999);
+
+    if (view === "day") {
+      start = new Date(selectedDate);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(selectedDate);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    if (view === "threeDays") {
+      start = new Date(selectedDate);
+      start.setHours(0, 0, 0, 0);
+      end = addDays(start, 2);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    if (view === "workingWeek") {
+      start = startOfWeekMon(selectedDate);
+      end = addDays(start, 4);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    if (view === "week") {
+      start = startOfWeekMon(selectedDate);
+      end = addDays(start, 6);
+      end.setHours(23, 59, 59, 999);
+    }
+
     return { fromISO: start.toISOString(), toISO: end.toISOString() };
-  }, [selectedDate]);
+  }, [selectedDate, view]);
 
   const rangeKey = useMemo(() => `${range.fromISO}|${range.toISO}`, [range]);
 
@@ -120,6 +155,8 @@ export default function CalendarView({
               </div>
             ) : (
               <CalendarOnly
+                view={view}
+                onChangeView={(v: ToolbarView) => setView(v)}
                 selectedDate={selectedDate}
                 onChangeDate={(d: Date) => setSelectedDate(d)}
                 employeeNameById={employeeNameById}
