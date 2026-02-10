@@ -3,7 +3,10 @@
 
 import { useEffect, useRef } from "react";
 import WeekView from "@/app/components/calendar/calendar/WeekView";
-import type { HolidayLite, CalendarAppt } from "@/app/components/calendar/calendar/types";
+import type {
+  HolidayLite,
+  CalendarAppt,
+} from "@/app/components/calendar/calendar/types";
 import { localKeyTZ } from "@/app/components/calendar/calendar/tz";
 
 type ShiftEventLite = {
@@ -115,36 +118,46 @@ export default function CalendarGrid({
   const safeApptsByDay = apptsByDay ? apptsByDay : new Map<string, CalendarAppt[]>();
   const safeShiftEvents = shiftEvents ? shiftEvents : [];
 
+  const cols = days.length;
+  const headerGridCols = `64px repeat(${cols}, minmax(0,1fr))`;
+
   return (
-    <div ref={scrollerRef} className="flex-1 min-h-0 overflow-auto" onScroll={handleScroll}>
+    <div
+      ref={scrollerRef}
+      className="flex-1 min-h-0 overflow-auto"
+      onScroll={handleScroll}
+    >
       <div className="min-w-[900px]">
         {/* HEADER */}
         <div className="sticky top-0 z-30 bg-slate-50 border-b border-border">
-          <div className="grid grid-cols-[64px_repeat(7,1fr)]">
+          <div
+            className="grid"
+            style={{ gridTemplateColumns: headerGridCols }}
+          >
             <div className="h-10 border-r border-border bg-white" />
             {days.map((d) => {
               const key = localKeyTZ(d);
               const label = fmt.format(d);
               const today = isToday(d);
 
-
-return (
-  <div
-    key={key}
-    className={[
-      "h-10 px-2 flex items-center border-r border-border text-xs font-medium capitalize",
-      isWeekend(d) ? "bg-slate-100" : "bg-transparent",
-      today ? "text-slate-900" : "text-muted-foreground",
-    ].join(" ")}
-  >
-
+              return (
+                <div
+                  key={key}
+                  className={[
+                    "h-10 px-2 flex items-center border-r border-border text-xs font-medium capitalize",
+                    isWeekend(d) ? "bg-slate-100" : "bg-transparent",
+                    today ? "text-slate-900" : "text-muted-foreground",
+                  ].join(" ")}
+                >
                   <span
                     className={[
                       "inline-flex items-center gap-2 truncate",
                       today ? "font-semibold" : "",
                     ].join(" ")}
                   >
-                    {today ? <span className="inline-block h-2 w-2 rounded-full bg-primary" /> : null}
+                    {today ? (
+                      <span className="inline-block h-2 w-2 rounded-full bg-primary" />
+                    ) : null}
                     {label}
                   </span>
                 </div>
@@ -156,16 +169,20 @@ return (
         {/* CANVAS */}
         <div className="relative min-w-[900px]" style={{ height: canvasH }}>
           {/* grid visual base */}
-          <div className="absolute inset-0 grid grid-cols-[64px_repeat(7,1fr)]" aria-hidden>
+          <div
+            className="absolute inset-0 grid"
+            style={{ gridTemplateColumns: headerGridCols }}
+            aria-hidden
+          >
             <div className="border-r border-border bg-white" />
-            {Array.from({ length: 7 }, (_, col) => {
-              const isWeekendCol = col === 5 || col === 6; // sábado, domingo
+            {days.map((d) => {
+              const colKey = localKeyTZ(d);
               return (
                 <div
-                  key={col}
+                  key={colKey}
                   className={[
                     "relative border-r border-border",
-                    isWeekendCol ? "bg-slate-50" : "bg-white",
+                    isWeekend(d) ? "bg-slate-50" : "bg-white",
                   ].join(" ")}
                 >
                   {Array.from({ length: HOURS_COUNT }, (_, r) => {
