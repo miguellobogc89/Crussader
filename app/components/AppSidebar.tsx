@@ -57,6 +57,13 @@ const SHIFT_CALENDAR: NavItem = {
   description: "Calendario de turnos del equipo",
 };
 
+const LEADS: NavItem = {
+  title: "Leads",
+  href: "/dashboard/crm/lead",
+  icon: "🎯",
+  description: "Gestión de leads",
+};
+
 
 const INTEGRATIONS: NavItem = {
   title: "Labs",
@@ -126,6 +133,9 @@ export function AppSidebar() {
   };
 
   const isAdmin = Object.values(adminFlags).some(Boolean);
+
+  // ✅ permiso leads (global)
+  const canManageLeads = (user as any)?.canManageLeads === true || isAdmin;
 
   const ADMIN: NavItem | null = isAdmin
     ? {
@@ -235,6 +245,12 @@ export function AppSidebar() {
     ? pendingHref === SHIFT_CALENDAR.href
     : isActivePath(pathname, SHIFT_CALENDAR.href);
 
+    const leadsActive =
+  isAdmin &&
+  (hasPending
+    ? pendingHref === LEADS.href
+    : isActivePath(pathname, LEADS.href));
+
 
   const integrationsActive = hasPending
     ? pendingHref === INTEGRATIONS.href
@@ -244,82 +260,89 @@ export function AppSidebar() {
     ADMIN && (hasPending ? pendingHref === ADMIN.href : isActivePath(pathname, ADMIN.href));
 
   return (
-  <>
-    {isOverlay && (
-      <button
-        type="button"
-        aria-label="Cerrar menú"
-        onClick={() => setCollapsed(true)}
-        className="fixed inset-0 z-40 bg-slate-900/70"
-      />
-    )}
-
-    <aside
-      style={{ width }}
-      className={[
-        "h-svh shrink-0 border-r border-slate-800 bg-slate-900 text-slate-200 shadow-lg flex flex-col transition-[width] duration-300 ease-in-out",
-        isOverlay ? "fixed left-0 top-0 bottom-0 z-50" : "",
-      ].join(" ")}
-    >
-      <Brand collapsed={collapsed} setCollapsed={setCollapsed} />
-
-      <nav className="flex-1 overflow-y-auto px-2 py-2">
-        <SidebarItem
-          item={HOME}
-          active={homeActive}
-          collapsed={collapsed}
-          onNavigate={makeItemNavigate(HOME.href)}
+    <>
+      {isOverlay && (
+        <button
+          type="button"
+          aria-label="Cerrar menú"
+          onClick={() => setCollapsed(true)}
+          className="fixed inset-0 z-40 bg-slate-900/70"
         />
+      )}
 
-        <SidebarItem
-          item={REVIEWS}
-          active={reviewsActive}
-          collapsed={collapsed}
-          onNavigate={makeItemNavigate(REVIEWS.href)}
-        />
+      <aside
+        style={{ width }}
+        className={[
+          "h-svh shrink-0 border-r border-slate-800 bg-slate-900 text-slate-200 shadow-lg flex flex-col transition-[width] duration-300 ease-in-out",
+          isOverlay ? "fixed left-0 top-0 bottom-0 z-50" : "",
+        ].join(" ")}
+      >
+        <Brand collapsed={collapsed} setCollapsed={setCollapsed} />
 
-        <SidebarItem
-          item={MYBUSINESS}
-          active={myBusinessActive}
-          collapsed={collapsed}
-          onNavigate={makeItemNavigate(MYBUSINESS.href)}
-        />
-
-        <SidebarItem
-          item={SHIFT_CALENDAR}
-          active={shiftCalendarActive}
-          collapsed={collapsed}
-          onNavigate={makeItemNavigate(SHIFT_CALENDAR.href)}
-        />
-
-
-        <SidebarItem
-          item={INTEGRATIONS}
-          active={integrationsActive}
-          collapsed={collapsed}
-          onNavigate={makeItemNavigate(INTEGRATIONS.href)}
-        />
-
-        {ADMIN && (
+        <nav className="flex-1 overflow-y-auto px-2 py-2">
           <SidebarItem
-            item={ADMIN}
-            active={!!adminActive}
+            item={HOME}
+            active={homeActive}
             collapsed={collapsed}
-            onNavigate={makeItemNavigate(ADMIN.href)}
+            onNavigate={makeItemNavigate(HOME.href)}
           />
-        )}
-      </nav>
 
-      {/* Cajetín de estado (beta ahora, plan después) */}
-      <BetaPlanCard collapsed={collapsed} variant="beta" />
+          <SidebarItem
+            item={REVIEWS}
+            active={reviewsActive}
+            collapsed={collapsed}
+            onNavigate={makeItemNavigate(REVIEWS.href)}
+          />
 
-      <UserFooter
-        collapsed={collapsed}
-        userMenuOpen={userMenuOpen}
-        setUserMenuOpen={setUserMenuOpen}
-        onItemNavigate={onItemNavigate}
-      />
-    </aside>
-      </>
+          <SidebarItem
+            item={MYBUSINESS}
+            active={myBusinessActive}
+            collapsed={collapsed}
+            onNavigate={makeItemNavigate(MYBUSINESS.href)}
+          />
+
+          <SidebarItem
+            item={SHIFT_CALENDAR}
+            active={shiftCalendarActive}
+            collapsed={collapsed}
+            onNavigate={makeItemNavigate(SHIFT_CALENDAR.href)}
+          />
+
+          <SidebarItem
+            item={INTEGRATIONS}
+            active={integrationsActive}
+            collapsed={collapsed}
+            onNavigate={makeItemNavigate(INTEGRATIONS.href)}
+          />
+          {ADMIN && (
+            <SidebarItem
+              item={LEADS}
+              active={!!leadsActive}
+              collapsed={collapsed}
+              onNavigate={makeItemNavigate(LEADS.href)}
+            />
+          )}
+
+          {ADMIN && (
+            <SidebarItem
+              item={ADMIN}
+              active={!!adminActive}
+              collapsed={collapsed}
+              onNavigate={makeItemNavigate(ADMIN.href)}
+            />
+          )}
+        </nav>
+
+        {/* Cajetín de estado (beta ahora, plan después) */}
+        <BetaPlanCard collapsed={collapsed} variant="beta" />
+
+        <UserFooter
+          collapsed={collapsed}
+          userMenuOpen={userMenuOpen}
+          setUserMenuOpen={setUserMenuOpen}
+          onItemNavigate={onItemNavigate}
+        />
+      </aside>
+    </>
   );
 }

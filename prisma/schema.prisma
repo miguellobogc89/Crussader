@@ -181,24 +181,39 @@ model Job {
 }
 
 model Lead {
-  id        String     @id @default(cuid())
-  companyId String
-  ownerId   String?
-  name      String
-  email     String?
-  phone     String?
-  source    LeadSource @default(UNKNOWN)
-  status    LeadStatus @default(NEW)
-  notes     String?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @default(now()) @updatedAt
-  type      LeadType   @default(TEST_USER)
-  Invite    Invite[]
-  company   Company    @relation(fields: [companyId], references: [id])
+  id               String             @id @default(cuid())
+  companyId        String
+  ownerId          String?
+  name             String
+  email            String?
+  phone            String?
+  source           LeadSource         @default(UNKNOWN)
+  status           LeadStatus         @default(NEW)
+  notes            String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @default(now()) @updatedAt
+  type             LeadType           @default(TEST_USER)
+  rating           Decimal?           @db.Decimal(3, 2)
+  reviewCount      Int?
+  placeId          String?
+  mapsUrl          String?
+  website          String?
+  city             String?
+  category         String?
+  contactName      String?
+  contactRole      String?
+  lastContactAt    DateTime?          @db.Timestamptz(6)
+  nextFollowUpAt   DateTime?          @db.Timestamptz(6)
+  Invite           Invite[]
+  company          Company            @relation(fields: [companyId], references: [id])
+  lead_interaction lead_interaction[]
 
   @@index([companyId])
   @@index([ownerId])
   @@index([status])
+  @@index([companyId, nextFollowUpAt], map: "Lead_company_nextFollowUp_idx")
+  @@index([companyId, status], map: "Lead_company_status_idx")
+  @@index([placeId])
 }
 
 model WebchatSite {
@@ -1490,6 +1505,7 @@ model Company {
   google_gbp_location         google_gbp_location[]
   google_gbp_reviews          google_gbp_reviews[]
   invoice                     invoice[]
+  lead_interaction            lead_interaction[]
   subscription                subscription[]
   theme_candidate             theme_candidate[]
   themes                      themes[]
@@ -1501,17 +1517,19 @@ model Company {
 }
 
 model UserCompany {
-  id        String      @id @default(cuid())
-  userId    String
-  companyId String
-  role      CompanyRole @default(MEMBER)
-  createdAt DateTime    @default(now())
-  Company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  User      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String      @id @default(cuid())
+  userId         String
+  companyId      String
+  role           CompanyRole @default(MEMBER)
+  createdAt      DateTime    @default(now())
+  canManageLeads Boolean     @default(false)
+  Company        Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  User           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, companyId])
   @@index([userId])
   @@index([companyId])
+  @@index([companyId, canManageLeads], map: "UserCompany_canManageLeads_idx")
 }
 
 model User {
@@ -1550,6 +1568,7 @@ model User {
   invited_via_id                      String?
   first_name                          String?
   last_name                           String?
+  canManageLeads                      Boolean              @default(false)
   AuthAccount                         AuthAccount[]
   ExternalConnection                  ExternalConnection[]
   Invite_Invite_invited_by_idToUser   Invite[]             @relation("Invite_invited_by_idToUser")
@@ -1565,12 +1584,14 @@ model User {
   UserLogin                           UserLogin[]
   UserStatusEvent                     UserStatusEvent[]
   account_account_owner_user_idToUser account[]            @relation("account_owner_user_idToUser")
+  lead_interaction                    lead_interaction[]
 
   @@index([role])
   @@index([isActive, isSuspended])
   @@index([lastLoginAt])
   @@index([account_id], map: "idx_user_account")
   @@index([invited_via_id], map: "idx_user_invited_via")
+  @@index([canManageLeads])
 }
 
 model Location {
@@ -2174,6 +2195,30 @@ model LocationShiftTemplate {
   @@index([locationId], map: "LocationShiftTemplate_location_idx")
 }
 
+model lead_interaction {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lead_id            String
+  company_id         String
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  created_by_user_id String?
+  channel            lead_contact_channel @default(call)
+  interest           lead_interest_level?
+  next_step          lead_next_step?
+  process_owner      lead_process_owner?
+  current_tool       lead_current_tool?
+  pains              lead_pain[]          @default([])
+  objections         lead_objection[]     @default([])
+  follow_up_at       DateTime?            @db.Timestamptz(6)
+  meta               Json                 @default("{}")
+  Company            Company              @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "lead_interaction_company_fk")
+  User               User?                @relation(fields: [created_by_user_id], references: [id], onUpdate: NoAction, map: "lead_interaction_created_by_fk")
+  Lead               Lead                 @relation(fields: [lead_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "lead_interaction_lead_fk")
+
+  @@index([company_id, created_at(sort: Desc)], map: "lead_interaction_company_created_idx")
+  @@index([company_id, follow_up_at], map: "lead_interaction_company_followup_idx")
+  @@index([lead_id, created_at(sort: Desc)], map: "lead_interaction_lead_created_idx")
+}
+
 /// *
 /// * =========================
 /// * Enums
@@ -2536,4 +2581,61 @@ enum holiday_scope {
   PROVINCIAL
   MUNICIPAL
   COMPANY
+}
+
+enum lead_contact_channel {
+  call
+  whatsapp
+  email
+  visit
+  other
+}
+
+enum lead_current_tool {
+  manual
+  templates
+  agency
+  other_app
+  unknown
+}
+
+enum lead_interest_level {
+  none
+  curious
+  wants_demo
+  ready_to_buy
+}
+
+enum lead_next_step {
+  send_web
+  schedule_demo
+  follow_up
+  no_follow_up
+}
+
+enum lead_objection {
+  price
+  already_do_it
+  not_priority
+  ai_distrust
+  no_time
+  need_partner_approval
+  other
+}
+
+enum lead_pain {
+  no_replies
+  lack_time
+  inconsistent_tone
+  bad_reputation_1star
+  dont_know_what_to_say
+  no_metrics
+}
+
+enum lead_process_owner {
+  nobody
+  reception
+  manager
+  agency
+  other
 }
