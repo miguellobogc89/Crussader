@@ -182,7 +182,7 @@ model Job {
 
 model Lead {
   id               String             @id @default(cuid())
-  companyId        String
+  companyId        String?
   ownerId          String?
   name             String
   email            String?
@@ -204,8 +204,8 @@ model Lead {
   contactRole      String?
   lastContactAt    DateTime?          @db.Timestamptz(6)
   nextFollowUpAt   DateTime?          @db.Timestamptz(6)
+  priority         lead_priority      @default(medium)
   Invite           Invite[]
-  company          Company            @relation(fields: [companyId], references: [id])
   lead_interaction lead_interaction[]
 
   @@index([companyId])
@@ -214,6 +214,7 @@ model Lead {
   @@index([companyId, nextFollowUpAt], map: "Lead_company_nextFollowUp_idx")
   @@index([companyId, status], map: "Lead_company_status_idx")
   @@index([placeId])
+  @@index([priority])
 }
 
 model WebchatSite {
@@ -1416,24 +1417,25 @@ model account {
 }
 
 model ExternalConnection {
-  id                  String                @id @default(cuid())
-  userId              String
-  provider            String
-  accountEmail        String?
-  access_token        String
-  refresh_token       String?
-  expires_at          Int?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  companyId           String?
-  accountName         String?
-  providerUserId      String?
-  scope               String?
-  status              String                @default("active")
-  User                User                  @relation(fields: [userId], references: [id])
-  Location            Location[]
-  google_gbp_account  google_gbp_account[]
-  google_gbp_location google_gbp_location[]
+  id                       String                     @id @default(cuid())
+  userId                   String
+  provider                 String
+  accountEmail             String?
+  access_token             String
+  refresh_token            String?
+  expires_at               Int?
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+  companyId                String?
+  accountName              String?
+  providerUserId           String?
+  scope                    String?
+  status                   String                     @default("active")
+  User                     User                       @relation(fields: [userId], references: [id])
+  Location                 Location[]
+  google_gbp_account       google_gbp_account[]
+  google_gbp_location      google_gbp_location[]
+  integration_installation integration_installation[]
 
   @@unique([userId, provider])
   @@index([companyId])
@@ -1488,7 +1490,6 @@ model Company {
   knowledgeItems              KnowledgeItem[]
   knowledgeSections           KnowledgeSection[]
   knowledgeSpaces             KnowledgeSpace[]
-  Lead                        Lead[]
   Location                    Location[]
   LocationKpiDaily            LocationKpiDaily[]            @relation("CompanyToKpiDaily")
   LocationReviewHourlyMonthly LocationReviewHourlyMonthly[]
@@ -1504,6 +1505,7 @@ model Company {
   google_gbp_account          google_gbp_account[]
   google_gbp_location         google_gbp_location[]
   google_gbp_reviews          google_gbp_reviews[]
+  integration_installation    integration_installation[]
   invoice                     invoice[]
   lead_interaction            lead_interaction[]
   subscription                subscription[]
@@ -1573,6 +1575,7 @@ model User {
   ExternalConnection                  ExternalConnection[]
   Invite_Invite_invited_by_idToUser   Invite[]             @relation("Invite_invited_by_idToUser")
   Notification                        Notification[]
+  NotificationUser                    NotificationUser[]
   phasesCreated                       Phase[]              @relation("UserPhasesCreated")
   responsesCreated                    Response[]           @relation("ResponseCreatedBy")
   responsesEdited                     Response[]           @relation("ResponseEditedBy")
@@ -1657,6 +1660,7 @@ model Location {
   WebchatSites                WebchatSite[]                 @relation("LocationToWebchatSite")
   google_gbp_location         google_gbp_location[]
   google_gbp_reviews          google_gbp_reviews[]
+  integration_installation    integration_installation[]
   theme_candidate             theme_candidate[]
   themes                      themes[]
   topic                       topic[]
@@ -1718,8 +1722,8 @@ model google_gbp_location {
   is_active              Boolean              @default(false)
   google_gbp_account     google_gbp_account   @relation(fields: [account_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_loc_account")
   Company                Company              @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_gbp_loc_company")
-  Location               Location?            @relation(fields: [location_id], references: [id], onUpdate: NoAction, map: "fk_gbp_loc_location")
   ExternalConnection     ExternalConnection?  @relation(fields: [external_connection_id], references: [id], onUpdate: NoAction, map: "fk_gbp_loc_extconn")
+  Location               Location?            @relation(fields: [location_id], references: [id], onUpdate: NoAction, map: "fk_gbp_loc_location")
   google_gbp_reviews     google_gbp_reviews[]
 
   @@unique([company_id, google_location_id], map: "ux_gbp_location_company_google")
@@ -1855,31 +1859,33 @@ model Response {
 }
 
 model Notification {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   type             String
   object_id        String
   comment          String?
-  notified_at      DateTime  @default(now()) @db.Timestamptz(6)
-  status           String    @default("unread")
-  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+  notified_at      DateTime           @default(now()) @db.Timestamptz(6)
+  status           String             @default("unread")
+  created_at       DateTime           @default(now()) @db.Timestamptz(6)
   metadata         Json?
   locationId       String?
   userId           String?
   reviewId         String?
-  accountId        String?   @db.Uuid
+  accountId        String             @db.Uuid
   subject          String?
   body             String?
   reviewerName     String?
-  createdAtG       DateTime? @db.Timestamptz(6)
+  createdAtG       DateTime?          @db.Timestamptz(6)
   rating           Int?
-  reviewCreatedAtG DateTime? @db.Timestamptz(6)
-  account          account?  @relation(fields: [accountId], references: [id], onUpdate: NoAction, map: "fk_notification_account")
-  Review           Review?   @relation(fields: [reviewId], references: [id], onUpdate: NoAction, map: "fk_notification_review")
-  User             User?     @relation(fields: [userId], references: [id], onUpdate: NoAction, map: "fk_notification_user")
+  reviewCreatedAtG DateTime?          @db.Timestamptz(6)
+  account          account            @relation(fields: [accountId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_notification_account")
+  Review           Review?            @relation(fields: [reviewId], references: [id], onUpdate: NoAction, map: "fk_notification_review")
+  User             User?              @relation(fields: [userId], references: [id], onUpdate: NoAction, map: "fk_notification_user")
+  NotificationUser NotificationUser[]
 
   @@index([notified_at(sort: Desc)], map: "idx_notification_notified")
   @@index([object_id], map: "idx_notification_object_id")
   @@index([status], map: "idx_notification_status")
+  @@index([accountId, notified_at(sort: Desc)], map: "Notification_account_notified_idx")
 }
 
 model integration_platforms {
@@ -2217,6 +2223,81 @@ model lead_interaction {
   @@index([company_id, created_at(sort: Desc)], map: "lead_interaction_company_created_idx")
   @@index([company_id, follow_up_at], map: "lead_interaction_company_followup_idx")
   @@index([lead_id, created_at(sort: Desc)], map: "lead_interaction_lead_created_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model NotificationUser {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  notification_id String       @db.Uuid
+  user_id         String
+  status          String       @default("unread")
+  read_at         DateTime?    @db.Timestamptz(6)
+  created_at      DateTime     @default(now()) @db.Timestamptz(6)
+  Notification    Notification @relation(fields: [notification_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "NotificationUser_notification_fk")
+  User            User         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "NotificationUser_user_fk")
+
+  @@unique([notification_id, user_id], map: "NotificationUser_unique")
+  @@index([notification_id], map: "NotificationUser_notification_idx")
+  @@index([user_id, status, created_at(sort: Desc)], map: "NotificationUser_user_status_idx")
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model integration_installation {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id             String
+  location_id            String?
+  provider               integration_provider
+  external_connection_id String?
+  status                 String                   @default("active")
+  config                 Json                     @default("{}")
+  created_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                 @default(now()) @db.Timestamptz(6)
+  Company                Company                  @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_integration_installation_company")
+  ExternalConnection     ExternalConnection?      @relation(fields: [external_connection_id], references: [id], onUpdate: NoAction, map: "fk_integration_installation_extconn")
+  Location               Location?                @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_integration_installation_location")
+  messaging_conversation messaging_conversation[]
+
+  @@index([company_id], map: "idx_integration_installation_company")
+  @@index([external_connection_id], map: "idx_integration_installation_extconn")
+  @@index([location_id], map: "idx_integration_installation_location")
+  @@index([provider], map: "idx_integration_installation_provider")
+}
+
+model messaging_conversation {
+  id                       String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  installation_id          String                   @db.Uuid
+  provider_thread_id       String?
+  contact_external_id      String
+  contact_phone_e164       String?
+  contact_name             String?
+  status                   String                   @default("open")
+  last_message_at          DateTime?                @db.Timestamptz(6)
+  created_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  integration_installation integration_installation @relation(fields: [installation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_msg_conv_installation")
+  messaging_message        messaging_message[]
+
+  @@unique([installation_id, contact_external_id], map: "ux_msg_conv_installation_contact")
+  @@index([installation_id, last_message_at(sort: Desc)], map: "idx_msg_conv_installation_last")
+  @@index([status], map: "idx_msg_conv_status")
+}
+
+model messaging_message {
+  id                     String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id        String                 @db.Uuid
+  provider_message_id    String?
+  direction              String
+  kind                   String
+  text                   String?
+  status                 String?
+  provider_ts            DateTime?              @db.Timestamptz(6)
+  payload                Json                   @default("{}")
+  created_at             DateTime               @default(now()) @db.Timestamptz(6)
+  messaging_conversation messaging_conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_msg_message_conversation")
+
+  @@index([conversation_id, created_at(sort: Desc)], map: "idx_msg_message_conversation_created")
+  @@index([direction], map: "idx_msg_message_direction")
+  @@index([kind], map: "idx_msg_message_kind")
 }
 
 /// *
@@ -2638,4 +2719,10 @@ enum lead_process_owner {
   manager
   agency
   other
+}
+
+enum lead_priority {
+  low
+  medium
+  high
 }

@@ -8,13 +8,17 @@ export async function renderReviewCreatedTemplate(review: Partial<Review>) {
   const comment = review.comment ?? "(sin comentario)";
 
   let locationName = "una de tus ubicaciones";
+
   if (review.locationId) {
     try {
       const location = await prismaRaw.location.findUnique({
         where: { id: review.locationId },
         select: { title: true },
       });
-      if (location?.title) locationName = location.title;
+
+      if (location?.title) {
+        locationName = location.title;
+      }
     } catch (e) {
       console.warn("[template] No se pudo obtener la ubicación:", e);
     }
