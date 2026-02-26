@@ -25,7 +25,7 @@ export default function MainPannel({
 
     // 🔹 DESKTOP: panel premium
     "sm:rounded-2xl",
-    "sm:border sm:border-slate-200/70",
+    "",
     "sm:shadow-[0_22px_60px_rgba(37,99,235,0.16)]",
 
     // comportamiento

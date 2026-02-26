@@ -1,4 +1,4 @@
-//app/components/knowledge/sections-actions.tsx
+// app/dashboard/knowledge/sections-actions.tsx
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -8,14 +8,12 @@ import type { KnowledgeVisibility } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-/** Session obligatoria */
 async function requireSessionEmail() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) redirect("/login");
   return session.user.email!;
 }
 
-/** Devuelve los companyId del usuario (permisos) */
 export async function getUserCompanyIds(): Promise<string[]> {
   const email = await requireSessionEmail();
   const user = await prisma.user.findUnique({
@@ -25,27 +23,48 @@ export async function getUserCompanyIds(): Promise<string[]> {
   return (user?.UserCompany ?? []).map((uc) => uc.companyId);
 }
 
-/** Valida que companyId ∈ empresas del usuario */
 export async function assertCompanyOwnership(companyId: string) {
-  const allowed = await getUserCompanyIds();
-  if (!allowed.includes(companyId)) throw new Error("Forbidden");
+  const email = await requireSessionEmail();
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: {
+      UserCompany: {
+        select: { companyId: true },
+      },
+    },
+  });
+
+  const list = user?.UserCompany ?? [];
+  for (const uc of list) {
+    if (uc.companyId === companyId) return;
+  }
+
+  throw new Error("Forbidden");
 }
 
-/** Crear sección en una empresa concreta (validada) */
-export async function createSection(formData: FormData) {
+export async function createSection(formData: FormData): Promise<string> {
   const companyId = String(formData.get("companyId") || "");
+  if (!companyId) throw new Error("companyId required");
+
   await assertCompanyOwnership(companyId);
 
-  const title = ((formData.get("title") as string) || "Nueva sección").trim();
-  const visibility = (formData.get("visibility") as KnowledgeVisibility) || "PUBLIC";
+  const title = String(formData.get("title") || "").trim();
+  if (!title) throw new Error("title required");
 
-  const max = await prisma.knowledgeSection.aggregate({
-    _max: { position: true },
-    where: { companyId },
+  const visibility =
+    (formData.get("visibility") as KnowledgeVisibility) || "PUBLIC";
+
+  // Queremos que la nueva sección salga arriba:
+  // usamos la posición mínima actual y restamos 1.
+  const min = await prisma.knowledgeSection.aggregate({
+    _min: { position: true },
+    where: { companyId, isActive: true },
   });
-  const position = (max._max.position ?? -1) + 1;
 
-  await prisma.knowledgeSection.create({
+  const position = (min._min.position ?? 0) - 1;
+
+  const created = await prisma.knowledgeSection.create({
     data: {
       companyId,
       title,
@@ -55,57 +74,47 @@ export async function createSection(formData: FormData) {
       position,
       isActive: true,
     },
+    select: { id: true },
   });
 
   revalidatePath("/dashboard/knowledge");
+  return created.id;
 }
 
-/** Borrar sección (verifica que la sección pertenece a una empresa del usuario) */
 export async function deleteSection(formData: FormData) {
   const id = String(formData.get("id") || "");
   if (!id) return;
 
   const sec = await prisma.knowledgeSection.findUnique({
     where: { id },
-    select: { id: true, companyId: true },
+    select: { companyId: true },
   });
+
   if (!sec) return;
 
   await assertCompanyOwnership(sec.companyId);
-
   await prisma.knowledgeSection.delete({ where: { id } });
-
-  // Compactar positions
-  const siblings = await prisma.knowledgeSection.findMany({
-    where: { companyId: sec.companyId },
-    orderBy: { position: "asc" },
-    select: { id: true },
-  });
-  await Promise.all(
-    siblings.map((s, i) =>
-      prisma.knowledgeSection.update({ where: { id: s.id }, data: { position: i } })
-    )
-  );
 
   revalidatePath("/dashboard/knowledge");
 }
 
-/** Guardar edición (valida pertenencia) */
 export async function saveSection(formData: FormData) {
   const id = String(formData.get("id") || "");
   if (!id) return;
 
   const sec = await prisma.knowledgeSection.findUnique({
     where: { id },
-    select: { id: true, companyId: true },
+    select: { companyId: true },
   });
+
   if (!sec) throw new Error("Not found");
 
   await assertCompanyOwnership(sec.companyId);
 
-  const title = ((formData.get("title") as string) || "").trim();
-  const visibility = (formData.get("visibility") as KnowledgeVisibility) || "PUBLIC";
-  const content = ((formData.get("content") as string) || "").trim();
+  const title = String(formData.get("title") || "").trim();
+  const visibility =
+    (formData.get("visibility") as KnowledgeVisibility) || "PUBLIC";
+  const content = String(formData.get("content") || "").trim();
 
   await prisma.knowledgeSection.update({
     where: { id },
