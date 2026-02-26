@@ -14,7 +14,6 @@ import {
 } from "@/app/components/mybusiness/CompanyModal";
 
 // Cards de cabecera de Company
-import CompanyKpiRow from "@/app/components/mybusiness/cards/CompanyKpiRow";
 import { useCompanySummary } from "@/hooks/useCompanySummary";
 import { CompanyEstablishments } from "@/app/components/mybusiness/CompanyEstablishments";
 

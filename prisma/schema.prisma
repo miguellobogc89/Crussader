@@ -491,19 +491,20 @@ model ResourceTimeOff {
 }
 
 model Customer {
-  id                 String            @id @default(cuid())
-  firstName          String
-  lastName           String
-  phone              String
-  email              String?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  createdByAgentId   String?
-  createdInSessionId String?
-  appointments       Appointment[]
-  companies          CompanyCustomer[]
-  createdByAgent     Agent?            @relation("CustomerCreatedByAgent", fields: [createdByAgentId], references: [id])
-  createdInSession   AgentSession?     @relation("CustomerCreatedInSession", fields: [createdInSessionId], references: [id])
+  id                     String                   @id @default(cuid())
+  firstName              String
+  lastName               String
+  phone                  String
+  email                  String?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  createdByAgentId       String?
+  createdInSessionId     String?
+  appointments           Appointment[]
+  companies              CompanyCustomer[]
+  createdByAgent         Agent?                   @relation("CustomerCreatedByAgent", fields: [createdByAgentId], references: [id])
+  createdInSession       AgentSession?            @relation("CustomerCreatedInSession", fields: [createdInSessionId], references: [id])
+  messaging_conversation messaging_conversation[]
 
   @@index([phone])
   @@index([createdInSessionId])
@@ -1511,6 +1512,7 @@ model Company {
   subscription                subscription[]
   theme_candidate             theme_candidate[]
   themes                      themes[]
+  whatsapp_template           whatsapp_template[]
 
   @@index([name])
   @@index([activity])
@@ -2274,12 +2276,17 @@ model messaging_conversation {
   last_message_at          DateTime?                @db.Timestamptz(6)
   created_at               DateTime                 @default(now()) @db.Timestamptz(6)
   updated_at               DateTime                 @default(now()) @db.Timestamptz(6)
+  last_read_at             DateTime?                @db.Timestamptz(6)
+  customer_id              String?
+  Customer                 Customer?                @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_msg_conv_customer")
   integration_installation integration_installation @relation(fields: [installation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_msg_conv_installation")
   messaging_message        messaging_message[]
 
   @@unique([installation_id, contact_external_id], map: "ux_msg_conv_installation_contact")
   @@index([installation_id, last_message_at(sort: Desc)], map: "idx_msg_conv_installation_last")
   @@index([status], map: "idx_msg_conv_status")
+  @@index([last_read_at], map: "idx_msg_conv_last_read_at")
+  @@index([customer_id], map: "idx_msg_conv_customer")
 }
 
 model messaging_message {
@@ -2298,6 +2305,28 @@ model messaging_message {
   @@index([conversation_id, created_at(sort: Desc)], map: "idx_msg_message_conversation_created")
   @@index([direction], map: "idx_msg_message_direction")
   @@index([kind], map: "idx_msg_message_kind")
+}
+
+model whatsapp_template {
+  id            String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id    String
+  template_name String
+  title         String
+  status        whatsapp_template_status   @default(pending)
+  category      whatsapp_template_category @default(marketing)
+  language      String                     @default("es")
+  use_type      whatsapp_template_use_type @default(start_conversation)
+  body_preview  String?
+  created_at    DateTime                   @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime                   @default(now()) @db.Timestamptz(6)
+  is_favorite   Boolean                    @default(false)
+  favorite_at   DateTime?                  @db.Timestamptz(6)
+  Company       Company                    @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_whatsapp_template_company")
+
+  @@unique([company_id, template_name], map: "ux_whatsapp_template_company_name")
+  @@index([company_id, status], map: "idx_whatsapp_template_company_status")
+  @@index([company_id, updated_at(sort: Desc)], map: "idx_whatsapp_template_company_updated")
+  @@index([company_id, is_favorite, updated_at(sort: Desc)], map: "idx_whatsapp_template_company_fav_updated")
 }
 
 /// *
@@ -2725,4 +2754,21 @@ enum lead_priority {
   low
   medium
   high
+}
+
+enum whatsapp_template_category {
+  marketing
+  utility
+  authentication
+}
+
+enum whatsapp_template_status {
+  approved
+  pending
+  rejected
+}
+
+enum whatsapp_template_use_type {
+  start_conversation
+  within_24h
 }

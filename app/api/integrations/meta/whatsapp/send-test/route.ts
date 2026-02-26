@@ -5,31 +5,8 @@ import { prisma } from "@/lib/prisma";
 const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
-async function pushOutToDevBuffer(req: Request, args: {
-  to: string;
-  text: string | null;
-  providerMessageId: string | null;
-  status: string;
-}) {
-  try {
-    // IMPORTANT: no dependemos de NEXT_PUBLIC_APP_URL.
-    // Usamos el origin real del request (vale en local y en prod).
-    const origin = new URL(req.url).origin;
-
-    await fetch(`${origin}/api/webhooks/whatsapp?debug_push=1`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        to: args.to,
-        text: args.text ?? "",
-        id: args.providerMessageId ?? undefined,
-        status: args.status,
-      }),
-      cache: "no-store",
-    });
-  } catch {
-    // DEV only: si falla no rompemos el envío
-  }
+function normalizePhone(p: string) {
+  return p.replace(/[^\d]/g, "");
 }
 
 export async function POST(req: Request) {
@@ -51,25 +28,14 @@ export async function POST(req: Request) {
     );
   }
 
-  const to = String(toRaw);
+  const to = normalizePhone(String(toRaw));
 
-  const payload =
-    body.length > 0
-      ? {
-          messaging_product: "whatsapp",
-          to,
-          type: "text",
-          text: { body },
-        }
-      : {
-          messaging_product: "whatsapp",
-          to,
-          type: "template",
-          template: {
-            name: "hello_world",
-            language: { code: "en_US" },
-          },
-        };
+  const payload = {
+    messaging_product: "whatsapp",
+    to,
+    type: "text",
+    text: { body },
+  };
 
   try {
     const res = await fetch(
@@ -94,27 +60,9 @@ export async function POST(req: Request) {
     }
 
     const providerMessageId =
-      data &&
-      data.messages &&
-      data.messages[0] &&
-      data.messages[0].id
-        ? String(data.messages[0].id)
-        : null;
+      data?.messages?.[0]?.id ? String(data.messages[0].id) : null;
 
-    // ===============================
-    // DEV: push al buffer en memoria
-    // ===============================
-    await pushOutToDevBuffer(req, {
-      to,
-      text: body.length > 0 ? body : "(template: hello_world)",
-      providerMessageId,
-      status: "sent",
-    });
-
-    // ===============================
-    // Persistencia en DB (mensaje OUT)
-    // ===============================
-
+    // 🔥 BUSCAR CONVERSACIÓN EXISTENTE SIN DEPENDER DEL UNIQUE EXACTO
     const installation = await prisma.integration_installation.findFirst({
       where: {
         provider: "whatsapp",
@@ -126,15 +74,28 @@ export async function POST(req: Request) {
       },
     });
 
-    if (installation) {
-      const conversation = await prisma.messaging_conversation.upsert({
-        where: {
-          installation_id_contact_external_id: {
-            installation_id: installation.id,
-            contact_external_id: to,
-          },
-        },
-        create: {
+    if (!installation) {
+      return NextResponse.json({
+        ok: true,
+        data,
+        debug: { warning: "No installation found" },
+      });
+    }
+
+    // Buscar conversación existente por teléfono normalizado
+    let conversation = await prisma.messaging_conversation.findFirst({
+      where: {
+        installation_id: installation.id,
+        OR: [
+          { contact_external_id: to },
+          { contact_phone_e164: to },
+        ],
+      },
+    });
+
+    if (!conversation) {
+      conversation = await prisma.messaging_conversation.create({
+        data: {
           installation_id: installation.id,
           contact_external_id: to,
           contact_phone_e164: to,
@@ -142,29 +103,43 @@ export async function POST(req: Request) {
           status: "open",
           last_message_at: new Date(),
         },
-        update: {
+      });
+    } else {
+      await prisma.messaging_conversation.update({
+        where: { id: conversation.id },
+        data: {
           last_message_at: new Date(),
           updated_at: new Date(),
         },
       });
-
-      await prisma.messaging_message.create({
-        data: {
-          conversation_id: conversation.id,
-          provider_message_id: providerMessageId,
-          direction: "out",
-          kind: payload.type,
-          text: body.length > 0 ? body : null,
-          status: "sent",
-          provider_ts: new Date(),
-          payload: data ?? {},
-        },
-      });
     }
 
-    return NextResponse.json({ ok: true, data });
+    await prisma.messaging_message.create({
+      data: {
+        conversation_id: conversation.id,
+        provider_message_id: providerMessageId,
+        direction: "out",
+        kind: "text",
+        text: body,
+        status: "sent",
+        provider_ts: new Date(),
+        payload: data ?? {},
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      data,
+      debug: {
+        providerMessageId,
+        conversationId: conversation.id,
+      },
+    });
   } catch (err) {
     console.error("[WA send-test] error:", err);
-    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "Request failed" },
+      { status: 500 }
+    );
   }
 }

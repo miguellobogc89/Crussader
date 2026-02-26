@@ -1,3 +1,4 @@
+//app/components/knowledge/sections-actions.tsx
 "use server";
 
 import { prisma } from "@/lib/prisma";

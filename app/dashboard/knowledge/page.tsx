@@ -1,6 +1,8 @@
+// app/dashboard/knowledge/page.tsx
+import PageShell from "@/app/components/layouts/PageShell";
 import SectionsSidebar from "@/app/components/knowledge/SectionsSidebar";
 import SectionEditor from "@/app/components/knowledge/SectionEditor";
-import CompanySelector from "@/app/components/knowledge/CompanySelector";
+import { getBootstrapData } from "@/lib/bootstrap";
 import { getUserCompanyIds } from "@/app/components/knowledge/sections-actions";
 
 export const dynamic = "force-dynamic";
@@ -10,42 +12,51 @@ export default async function KnowledgePage({
 }: {
   searchParams?: { sectionId?: string; companyId?: string };
 }) {
-  const userCompanies = await getUserCompanyIds();
-  if (userCompanies.length === 0) {
-    return (
-      <div className="p-8 text-sm text-muted-foreground">
-        No tienes empresas asignadas.
-      </div>
-    );
-  }
+  const initialData = await getBootstrapData();
+  const activeCompanyId =
+    initialData &&
+    initialData.activeCompany &&
+    typeof initialData.activeCompany.id === "string"
+      ? initialData.activeCompany.id
+      : null;
 
-  const selectedCompanyId =
-    searchParams?.companyId && userCompanies.includes(searchParams.companyId)
-      ? searchParams.companyId
-      : userCompanies[0];
+  const userCompanies = await getUserCompanyIds();
+
+  const qpCompanyId = searchParams?.companyId ?? null;
+
+  let selectedCompanyId = userCompanies[0] ?? "";
+  if (qpCompanyId && userCompanies.includes(qpCompanyId)) {
+    selectedCompanyId = qpCompanyId;
+  } else if (activeCompanyId && userCompanies.includes(activeCompanyId)) {
+    selectedCompanyId = activeCompanyId;
+  }
 
   const selectedId = searchParams?.sectionId;
 
   return (
-    <div className="flex min-h-[calc(100vh-80px)]">
-      <SectionsSidebar
-        basePath="/dashboard/knowledge"
-        selectedId={selectedId}
-        companyId={selectedCompanyId}
-      />
-      <main className="flex-1 p-6 bg-muted/20">
-        <div className="mx-auto w-full max-w-5xl space-y-6">
-          <CompanySelector
-            selectedCompanyId={selectedCompanyId}
-            basePath="/dashboard/knowledge"
-          />
-          <SectionEditor
+    <PageShell
+      title="Knowledge"
+      description="Contenido público/privado para alimentar el asistente."
+      titleIconName="BookOpen"
+      variant="full"
+    >
+      {/* IMPORTANTÍSIMO: min-h-0 + overflow-hidden para que el scroll NO se vaya al body */}
+      <div className="h-[calc(100svh-180px)] min-h-0">
+        <div className="h-full min-h-0 overflow-hidden rounded-2xl border bg-background flex">
+          <SectionsSidebar
             basePath="/dashboard/knowledge"
             selectedId={selectedId}
             companyId={selectedCompanyId}
           />
+          <div className="flex-1 min-w-0 min-h-0">
+            <SectionEditor
+              basePath="/dashboard/knowledge"
+              selectedId={selectedId}
+              companyId={selectedCompanyId}
+            />
+          </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </PageShell>
   );
 }

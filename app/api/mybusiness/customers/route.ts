@@ -5,6 +5,9 @@ import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * GET /api/mybusiness/customers?companyId=...&q=...&limit=20&cursor=customerId
+ */
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

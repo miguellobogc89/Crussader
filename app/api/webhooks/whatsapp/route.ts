@@ -157,6 +157,33 @@ where: {
   });
 }
 
+async function autoLinkConversationToCustomer(args: {
+  conversationId: string;
+  phoneE164: string | null | undefined;
+}) {
+  const { conversationId, phoneE164 } = args;
+
+  if (!phoneE164) return;
+
+  const matches = await prisma.customer.findMany({
+    where: { phone: phoneE164 },
+    select: { id: true },
+    take: 2,
+  });
+
+  if (matches.length !== 1) return;
+
+  await prisma.messaging_conversation.updateMany({
+    where: {
+      id: conversationId,
+      customer_id: null,
+    },
+    data: {
+      customer_id: matches[0].id,
+    },
+  });
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
 
@@ -341,6 +368,10 @@ export async function POST(req: Request) {
       });
 
       conversationId = conv.id;
+      await autoLinkConversationToCustomer({
+        conversationId: conv.id,
+        phoneE164: contactExternalIdRaw,
+      });
 
       // Inserta mensajes entrantes
       await prisma.$transaction(async (tx) => {

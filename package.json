@@ -16,7 +16,8 @@
     "build": "cross-env NODE_OPTIONS=--max_old_space_size=4096 next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node prisma/seed.ts",
+    "dev:https": "next dev --turbo --hostname localhost --port 3000 --experimental-https"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",

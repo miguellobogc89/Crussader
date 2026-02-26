@@ -4,23 +4,39 @@
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/app/components/ui/input";
 import { Separator } from "@/app/components/ui/separator";
-import { Search, User } from "lucide-react";
+import { Search, User, ChevronDown, Clock, Star, MessageCircle, Users } from "lucide-react";
+import ScrollBar from "@/app/components/crussader/UX/ScrollBar";
 
-type CustomerItem = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  phone: string;
-  email: string | null;
-  createdAt: string;
+export type ContactMeta = {
+  name: string;
+  avatarUrl?: string | null;
+  conversationId?: string;
 };
 
-type ContactItem = {
-  id: string;
+type WaConversationListItem = {
+  id: string; // conversationId
+  contact: {
+    name: string | null;
+    phone_e164: string | null;
+    external_id: string;
+  };
+  unread_count: number;
+  last_message: null | {
+    direction: string;
+    text: string | null;
+    kind: string;
+    status: string | null;
+    at: string; // ISO
+  };
+  last_message_at: string | null; // ISO
+};
+
+type ContactRow = {
+  conversationId: string;
   name: string;
   phoneE164: string;
-  lastMessagePreview: string;
-  lastAt: number;
+  lastAtMs: number;
+  lastPreview: string;
   unread: number;
 };
 
@@ -33,135 +49,312 @@ function fmtTime(ms: number) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-async function fetchCustomers(args: {
-  companyId: string;
-  q: string;
-  limit: number;
-  cursor?: string | null;
-}): Promise<{ ok: boolean; items: CustomerItem[]; nextCursor: string | null }> {
-  const params = new URLSearchParams();
-  params.set("companyId", args.companyId);
-  if (args.q) params.set("q", args.q);
-  params.set("limit", String(args.limit));
-  if (args.cursor) params.set("cursor", args.cursor);
+function safeParseMs(iso: string | null | undefined) {
+  if (!iso) return 0;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return 0;
+  return t;
+}
 
-  const res = await fetch(`/api/mybusiness/customers?${params.toString()}`, {
+async function fetchWaConversations(companyId: string, q: string) {
+  const params = new URLSearchParams();
+  params.set("companyId", companyId);
+  params.set("limit", "50");
+
+  let res: Response;
+
+  try {
+    res = await fetch(`/api/whatsapp/messaging/conversations?${params.toString()}`, {
+      cache: "no-store",
+    });
+  } catch (err) {
+    console.error("[WA] fetch conversations network error:", err);
+    return { ok: false, items: [] as WaConversationListItem[] };
+  }
+
+  const contentType = res.headers.get("content-type") || "";
+  const raw = await res.text().catch(() => "");
+
+  if (!res.ok) {
+    console.error("[WA] conversations API not ok:", {
+      status: res.status,
+      statusText: res.statusText,
+      contentType,
+      rawPreview: raw.slice(0, 300),
+    });
+    return { ok: false, items: [] as WaConversationListItem[] };
+  }
+
+  let data: any = null;
+  if (contentType.includes("application/json")) {
+    try {
+      data = JSON.parse(raw);
+    } catch (e) {
+      console.error("[WA] conversations JSON parse error:", e, raw.slice(0, 300));
+      return { ok: false, items: [] as WaConversationListItem[] };
+    }
+  } else {
+    console.error("[WA] conversations expected JSON but got:", {
+      contentType,
+      rawPreview: raw.slice(0, 300),
+    });
+    return { ok: false, items: [] as WaConversationListItem[] };
+  }
+
+  const items: WaConversationListItem[] =
+    data && data.ok && Array.isArray(data.items) ? (data.items as WaConversationListItem[]) : [];
+
+  const qq = q.trim().toLowerCase();
+  if (!qq) return { ok: true, items };
+
+  const filtered = items.filter((c) => {
+    const phoneRaw = c.contact.phone_e164 ? c.contact.phone_e164 : c.contact.external_id;
+    const phone = normalizePhone(String(phoneRaw || ""));
+    const name = (c.contact.name || "").toLowerCase();
+    return phone.includes(qq) || name.includes(qq);
+  });
+
+  return { ok: true, items: filtered };
+}
+
+async function markConversationRead(args: { companyId: string; conversationId: string }) {
+  const res = await fetch("/api/whatsapp/messaging/conversations/read", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+  });
+
+  const data = await res.json().catch(() => null);
+  return { ok: res.ok, data };
+}
+
+type CustomerListItem = {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+async function fetchCustomers(companyId: string, q: string) {
+  const params = new URLSearchParams();
+  params.set("companyId", companyId);
+  params.set("limit", "200");
+
+  const res = await fetch(`/api/whatsapp/messaging/customers?${params.toString()}`, {
     cache: "no-store",
   });
 
-  if (!res.ok) return { ok: false, items: [], nextCursor: null };
+  const data = await res.json().catch(() => null);
 
-  const data = (await res.json()) as {
-    ok: boolean;
-    items: CustomerItem[];
-    nextCursor: string | null;
-  };
+  const items: CustomerListItem[] =
+    data && data.ok && Array.isArray(data.items) ? (data.items as CustomerListItem[]) : [];
 
-  return data;
+  const qq = q.trim().toLowerCase();
+  if (!qq) return { ok: true, items };
+
+  const filtered = items.filter((c) => {
+    const name = (c.name || "").toLowerCase();
+    const phone = normalizePhone(String(c.phone || ""));
+    return name.includes(qq) || phone.includes(qq);
+  });
+
+  return { ok: true, items: filtered };
+}
+
+function GroupHeader({
+  title,
+  count,
+  icon,
+  open,
+  onToggle,
+}: {
+  title: string;
+  count: number;
+  icon: React.ReactNode;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="w-full flex items-center gap-2 px-3 py-3 text-left hover:bg-muted/40 transition-colors"
+    >
+      {/* chevron primero */}
+      <ChevronDown
+        className={[
+          "h-4 w-4 text-muted-foreground transition-transform",
+          open ? "rotate-0" : "-rotate-90",
+        ].join(" ")}
+      />
+
+      {/* icono */}
+      <span className="flex h-5 w-5 items-center justify-center text-muted-foreground">
+        {icon}
+      </span>
+
+      {/* titulo */}
+      <span className="flex-1 text-[13px] font-semibold tracking-wide">
+        {title}
+      </span>
+
+      {/* bolita naranja al final */}
+      {count > 0 ? (
+        <span className="ml-2 inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-amber-500 px-2 text-xs font-semibold text-white">
+          {String(count)}
+        </span>
+      ) : (
+        <span className="ml-2 inline-flex h-6 min-w-[24px]" />
+      )}
+    </button>
+  );
 }
 
 export default function CustomersListPanel({
   companyId,
   selectedPhone,
   onSelectPhone,
-  initialMockWhenEmpty = true,
 }: {
   companyId: string | null;
   selectedPhone: string;
-  onSelectPhone: (phoneE164: string) => void;
-  initialMockWhenEmpty?: boolean;
+  onSelectPhone: (phoneE164: string, meta?: ContactMeta) => void;
 }) {
   const [search, setSearch] = useState("");
+  const [convs, setConvs] = useState<WaConversationListItem[]>([]);
+  const [customers, setCustomers] = useState<CustomerListItem[]>([]);
+const [customersLoadedOnce, setCustomersLoadedOnce] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState<CustomerItem[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
-  // Fetch (debounce suave)
+  // independientes (no accordion)
+  const [openPending, setOpenPending] = useState(false);
+  const [openNoReview, setOpenNoReview] = useState(true);
+  const [openOpen, setOpenOpen] = useState(false);
+  const [openAll, setOpenAll] = useState(false);
+
   useEffect(() => {
-    if (!companyId) {
-      setItems([]);
-      setNextCursor(null);
-      return;
-    }
+    if (!companyId) return;
 
+    const cid = companyId;
     let alive = true;
-    const q = search.trim();
 
-    const t = window.setTimeout(async () => {
-      setLoading(true);
+    async function loadOnce() {
+      if (!hasLoadedOnce) setLoading(true);
+
       try {
-        const data = await fetchCustomers({
-          companyId,
-          q,
-          limit: 30,
-          cursor: null,
-        });
-
+        const data = await fetchWaConversations(cid, search);
         if (!alive) return;
 
-        if (data.ok) {
-          setItems(data.items);
-          setNextCursor(data.nextCursor);
-        } else {
-          setItems([]);
-          setNextCursor(null);
-        }
+        if (data.ok) setConvs(data.items);
+        else setConvs([]);
       } finally {
-        if (alive) setLoading(false);
+        if (!hasLoadedOnce) {
+          setLoading(false);
+          setHasLoadedOnce(true);
+        }
       }
-    }, 250);
+    }
+
+    loadOnce();
+    const t = window.setInterval(loadOnce, 2500);
 
     return () => {
       alive = false;
-      window.clearTimeout(t);
+      window.clearInterval(t);
     };
   }, [companyId, search]);
 
-  const contacts = useMemo<ContactItem[]>(() => {
-    const mapped = items
+useEffect(() => {
+  if (!companyId) return;
+  if (!openAll) return;
+
+  const cid: string = companyId; // 👈 esto fuerza a string
+  let alive = true;
+
+  async function loadCustomersOnce() {
+    const data = await fetchCustomers(cid, search);
+    if (!alive) return;
+
+    if (data.ok) setCustomers(data.items);
+    else setCustomers([]);
+
+    setCustomersLoadedOnce(true);
+  }
+
+  loadCustomersOnce();
+
+  return () => {
+    alive = false;
+  };
+}, [companyId, openAll, search]);
+
+  const contacts = useMemo<ContactRow[]>(() => {
+    return convs
       .map((c) => {
-        const phone = normalizePhone(c.phone || "");
-        const nameRaw = `${c.firstName || ""} ${c.lastName || ""}`.trim();
-        const name = nameRaw.length > 0 ? nameRaw : `Contacto ${phone.slice(-4)}`;
-        const lastAt = c.createdAt ? new Date(c.createdAt).getTime() : Date.now();
+        const phoneRaw = c.contact.phone_e164 ? c.contact.phone_e164 : c.contact.external_id;
+        const phone = normalizePhone(String(phoneRaw || ""));
+
+        const nameFromWa = c.contact.name ? c.contact.name.trim() : "";
+        const name = nameFromWa.length > 0 ? nameFromWa : `Contacto ${phone.slice(-4)}`;
+
+        const lastAtMs =
+          c.last_message && typeof c.last_message.at === "string" && c.last_message.at.length > 0
+            ? safeParseMs(c.last_message.at)
+            : safeParseMs(c.last_message_at);
+
+        const lastPreview =
+          c.last_message && typeof c.last_message.text === "string" && c.last_message.text
+            ? c.last_message.text
+            : "—";
+
+        const unread = Number(c.unread_count || 0);
 
         return {
-          id: c.id,
+          conversationId: c.id,
           name,
           phoneE164: phone,
-          lastMessagePreview: c.email ? c.email : c.phone,
-          lastAt,
-          unread: 0,
+          lastAtMs: lastAtMs > 0 ? lastAtMs : Date.now(),
+          lastPreview,
+          unread,
         };
       })
-      .filter((x) => x.phoneE164.length > 0);
+      .filter((x) => x.phoneE164.length > 0)
+      .sort((a, b) => b.lastAtMs - a.lastAtMs);
+  }, [convs]);
 
-    if (mapped.length === 0 && initialMockWhenEmpty) {
-      const now = Date.now();
-      return [
-        {
-          id: "mock-0001",
-          name: "Mock 0001",
-          phoneE164: "34600000001",
-          lastMessagePreview: "Hola 👋 (mock)",
-          lastAt: now - 1000 * 60 * 12,
-          unread: 1,
-        },
-      ];
-    }
+  async function handleSelect(c: ContactRow) {
+    onSelectPhone(c.phoneE164, { name: c.name, avatarUrl: null, conversationId: c.conversationId });
 
-    return mapped.sort((a, b) => b.lastAt - a.lastAt);
-  }, [items, initialMockWhenEmpty]);
+    if (!companyId) return;
+    if (c.unread <= 0) return;
+
+    setConvs((prev) =>
+      prev.map((x) => {
+        if (x.id !== c.conversationId) return x;
+        return { ...x, unread_count: 0 };
+      })
+    );
+
+    await markConversationRead({ companyId, conversationId: c.conversationId });
+  }
+
+  // contadores (de momento: sin reseña = todos)
+  const countPending = 0; // luego lo alimentas con datos reales
+  const countNoReview = contacts.length;
+  const countOpen = contacts.filter((c) => c.unread > 0).length;
+  const countAll = customersLoadedOnce ? customers.length : 0;
 
   return (
-    <div className="h-full border-b lg:border-b-0 lg:border-r">
+    <div className="flex h-full min-h-0 flex-col border-b lg:border-b-0 lg:border-r">
       <div className="p-3">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar contacto..."
+            placeholder={hasLoadedOnce ? "Buscar por nombre o número..." : "Cargando..."}
             className="pl-9"
           />
         </div>
@@ -169,62 +362,154 @@ export default function CustomersListPanel({
 
       <Separator />
 
-      <div className="h-[calc(100%-57px-1px)] overflow-auto">
-        {!companyId ? (
-          <div className="p-4 text-sm text-muted-foreground">
-            Falta <span className="font-mono">companyId</span> en la URL.
-          </div>
-        ) : loading && contacts.length === 0 ? (
-          <div className="p-4 text-sm text-muted-foreground">Cargando...</div>
-        ) : contacts.length === 0 ? (
-          <div className="p-4 text-sm text-muted-foreground">Sin contactos todavía.</div>
-        ) : (
-          <div className="divide-y">
-            {contacts.map((c) => {
-              const active = normalizePhone(selectedPhone) === c.phoneE164;
+      <ScrollBar className="flex-1 min-h-0">
+        <div className="divide-y">
+          <GroupHeader
+            title="CITAS PENDIENTES DE CONFIRMAR"
+            count={countPending}
+            icon={<Clock className="h-4 w-4" />}
+            open={openPending}
+            onToggle={() => setOpenPending((v) => !v)}
+          />
+          {openPending ? (
+            <div className="px-3 pb-3 text-sm text-muted-foreground">—</div>
+          ) : null}
 
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => onSelectPhone(c.phoneE164)}
-                  className={[
-                    "w-full text-left",
-                    "px-3 py-3",
-                    "hover:bg-muted/40",
-                    active ? "bg-muted/50" : "bg-transparent",
-                  ].join(" ")}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full border bg-background">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                    </div>
+          <GroupHeader
+            title="CLIENTE SIN RESEÑA"
+            count={countNoReview}
+            icon={<Star className="h-4 w-4" />}
+            open={openNoReview}
+            onToggle={() => setOpenNoReview((v) => !v)}
+          />
+          {openNoReview ? (
+            <div className="divide-y">
+              {contacts.map((c) => {
+                const active = normalizePhone(selectedPhone) === c.phoneE164;
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="truncate text-sm font-semibold">{c.name}</div>
-                        <div className="shrink-0 text-xs text-muted-foreground">
-                          {fmtTime(c.lastAt)}
+                return (
+                  <button
+                    key={c.conversationId}
+                    type="button"
+                    onClick={() => handleSelect(c)}
+                    className={[
+                      "w-full text-left",
+                      "px-3 py-3",
+                      "hover:bg-muted/40",
+                      active ? "bg-muted/50" : "bg-transparent",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full border bg-background">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="truncate text-sm font-semibold">{c.name}</div>
+                          <div className="shrink-0 text-xs text-muted-foreground">
+                            {fmtTime(c.lastAtMs)}
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="mt-0.5 flex items-center justify-between gap-2">
-                        <div className="truncate text-xs text-muted-foreground">
-                          {c.lastMessagePreview}
+                        <div className="mt-0.5 flex items-center justify-between gap-2">
+                          <div className="truncate text-xs text-muted-foreground">{c.lastPreview}</div>
+
+                          {c.unread > 0 ? (
+                            <div className="ml-2 shrink-0 rounded-full bg-foreground px-2 py-0.5 text-[10px] font-semibold text-background">
+                              {c.unread > 99 ? "99+" : String(c.unread)}
+                            </div>
+                          ) : null}
                         </div>
-                      </div>
 
-                      <div className="mt-1 text-[11px] text-muted-foreground">
-                        {c.phoneE164}
+                        <div className="mt-1 text-[11px] text-muted-foreground">{c.phoneE164}</div>
                       </div>
                     </div>
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+
+              {contacts.length === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground">No hay conversaciones todavía.</div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <GroupHeader
+            title="RECORDATORIO PENDIENTE"
+            count={countOpen}
+            icon={<MessageCircle className="h-4 w-4" />}
+            open={openOpen}
+            onToggle={() => setOpenOpen((v) => !v)}
+          />
+          {openOpen ? (
+            <div className="px-3 pb-3 text-sm text-muted-foreground">—</div>
+          ) : null}
+
+          <GroupHeader
+            title="TODOS"
+            count={countAll}
+            icon={<Users className="h-4 w-4" />}
+            open={openAll}
+            onToggle={() => setOpenAll((v) => !v)}
+          />
+{openAll ? (
+  <div className="divide-y">
+    {customers.map((cu) => {
+      const phoneDigits = normalizePhone(cu.phone);
+      const active = normalizePhone(selectedPhone) === phoneDigits;
+
+      return (
+        <button
+          key={cu.id}
+          type="button"
+          onClick={() =>
+            onSelectPhone(phoneDigits, {
+              name: cu.name,
+              avatarUrl: null,
+              conversationId: undefined,
+            })
+          }
+          className={[
+            "w-full text-left",
+            "px-3 py-3",
+            "hover:bg-muted/40",
+            active ? "bg-muted/50" : "bg-transparent",
+          ].join(" ")}
+        >
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full border bg-background">
+              <User className="h-4 w-4 text-muted-foreground" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <div className="truncate text-sm font-semibold">{cu.name}</div>
+              </div>
+
+              {/*<div className="mt-0.5 truncate text-xs text-muted-foreground">
+                {cu.email ? cu.email : "—"}
+              </div>*/}
+
+              <div className="mt-1 text-[11px] text-muted-foreground">{phoneDigits}</div>
+            </div>
           </div>
-        )}
-      </div>
+        </button>
+      );
+    })}
+
+    {customersLoadedOnce && customers.length === 0 ? (
+      <div className="p-4 text-sm text-muted-foreground">No hay clientes todavía.</div>
+    ) : null}
+
+    {!customersLoadedOnce ? (
+      <div className="p-4 text-sm text-muted-foreground">Cargando clientes…</div>
+    ) : null}
+  </div>
+) : null}
+
+        </div>
+      </ScrollBar>
     </div>
   );
 }

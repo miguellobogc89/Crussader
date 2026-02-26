@@ -1,3 +1,4 @@
+// app/api/webchat/site/route.ts
 import { NextResponse } from "next/server";
 import { prismaRaw } from "@/lib/prisma"; // 👈 usamos el cliente limpio
 

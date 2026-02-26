@@ -1,4 +1,4 @@
-// app/components/admin/integrations/whatsapp/ChatScreen.tsx
+// app/components/admin/integrations/whatsapp/ChatPanel.tsx
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
@@ -6,32 +6,9 @@ import IncomingMessageBubble from "@/app/components/admin/integrations/whatsapp/
 import OutgoingMessageBubble from "@/app/components/admin/integrations/whatsapp/OutgoingMessageBubble";
 
 type WaDebugEvent =
-  | {
-      kind: "status";
-      at: number;
-      status: string;
-      id?: string; // provider_message_id
-      to?: string;
-      ts?: string;
-    }
-  | {
-      kind: "message";
-      at: number;
-      from: string;
-      id?: string;
-      type?: string;
-      text?: string;
-      ts?: string;
-    }
-  | {
-      kind: "out";
-      at: number;
-      to: string;
-      id?: string; // provider_message_id (o local)
-      text?: string;
-      ts?: string;
-      status?: string; // sent/delivered/read
-    };
+  | { kind: "status"; at: number; status: string; id?: string; to?: string; ts?: string }
+  | { kind: "message"; at: number; from: string; id?: string; type?: string; text?: string; ts?: string }
+  | { kind: "out"; at: number; to: string; id?: string; text?: string; ts?: string; status?: string };
 
 type MsgStatus = "sent" | "delivered" | "read" | null;
 
@@ -86,7 +63,6 @@ function asStatus(v: string | undefined): MsgStatus {
   return null;
 }
 
-// Orden de prioridad: sent < delivered < read
 function pickBestStatus(a: MsgStatus, b: MsgStatus): MsgStatus {
   const rank = (x: MsgStatus) => {
     if (x === "sent") return 1;
@@ -98,20 +74,21 @@ function pickBestStatus(a: MsgStatus, b: MsgStatus): MsgStatus {
   return rank(b) >= rank(a) ? b : a;
 }
 
-export default function ChatScreen({
+export default function ChatPanel({
   events,
   className = "",
 }: {
-  events: WaDebugEvent[];
+  events?: WaDebugEvent[] | null | unknown;
   className?: string;
 }) {
+  const safeEvents: WaDebugEvent[] = Array.isArray(events) ? (events as WaDebugEvent[]) : [];
+
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const chatBuckets = useMemo(() => {
-    // 1) Construimos un map: provider_message_id -> status más “alto”
     const statusById = new Map<string, MsgStatus>();
 
-    for (const e of events) {
+    for (const e of safeEvents) {
       if (e.kind !== "status") continue;
       const id = e.id ? String(e.id) : "";
       if (!id) continue;
@@ -123,7 +100,6 @@ export default function ChatScreen({
       statusById.set(id, pickBestStatus(prev, st));
     }
 
-    // 2) Convertimos eventos a mensajes “chat”
     const msgs: ChatMessage[] = [];
 
     function makeUniqueId(prefix: string, baseId: string, at: number, idx: number) {
@@ -132,7 +108,7 @@ export default function ChatScreen({
 
     let idx = 0;
 
-    for (const e of events) {
+    for (const e of safeEvents) {
       idx += 1;
 
       if (e.kind === "message") {
@@ -153,7 +129,6 @@ export default function ChatScreen({
         const text = safeString(e.text);
         const base = e.id ? String(e.id) : `noid-out-${safeString(e.to)}`;
 
-        // status final: si hay status event con el mismo id, manda ese
         const stFromStatusEvent =
           e.id && statusById.has(String(e.id)) ? statusById.get(String(e.id)) ?? null : null;
 
@@ -169,13 +144,10 @@ export default function ChatScreen({
         });
         continue;
       }
-
-      // status no se renderiza como mensaje
     }
 
     msgs.sort((a, b) => a.at - b.at);
 
-    // 3) Buckets por día
     const buckets: ChatBucket[] = [];
     let currentBucket: ChatBucket | null = null;
     let currentKey: string | null = null;
@@ -199,21 +171,18 @@ export default function ChatScreen({
     }
 
     return buckets;
-  }, [events]);
+  }, [safeEvents]);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [chatBuckets.length, events.length]);
+  }, [chatBuckets.length, safeEvents.length]);
 
   return (
     <div
       ref={scrollRef}
-      className={[
-        "h-full w-full overflow-auto px-3 py-3 md:px-4 md:py-4",
-        className,
-      ].join(" ")}
+      className={["h-full w-full overflow-auto px-3 py-3 md:px-4 md:py-4", className].join(" ")}
     >
       {chatBuckets.length === 0 ? (
         <div className="text-sm text-muted-foreground">Sin mensajes todavía.</div>
@@ -231,15 +200,9 @@ export default function ChatScreen({
                 {b.items.map((m) => {
                   if (m.direction === "out") {
                     return (
-                      <OutgoingMessageBubble
-                        key={m.id}
-                        text={m.text}
-                        time={m.time}
-                        status={m.status ?? null}
-                      />
+                      <OutgoingMessageBubble key={m.id} text={m.text} time={m.time} status={m.status ?? null} />
                     );
                   }
-
                   return <IncomingMessageBubble key={m.id} text={m.text} time={m.time} />;
                 })}
               </div>

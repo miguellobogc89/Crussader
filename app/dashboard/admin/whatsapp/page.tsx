@@ -1,5 +1,4 @@
 // app/dashboard/admin/whatsapp/page.tsx
-// app/dashboard/admin/whatsapp/page.tsx
 import PageShell from "@/app/components/layouts/PageShell";
 import WhatsAppAdminShell from "@/app/components/admin/integrations/whatsapp/WhatsAppAdminShell";
 
@@ -47,8 +46,6 @@ export default async function AdminWhatsAppPage() {
   const data = await getDebugEvents();
 
   return (
-    <PageShell title="Admin · WhatsApp">
       <WhatsAppAdminShell initialEvents={data.events} />
-    </PageShell>
   );
 }
