@@ -146,6 +146,8 @@ export default function WhatsAppAdminShell({
 
   const [tplDefaults, setTplDefaults] = useState<Record<string, DefaultTemplate | null>>({});
 
+  const [debugOpen, setDebugOpen] = useState(false);
+
   const safeEvents = Array.isArray(events) ? events : [];
 
   async function refresh() {
@@ -367,6 +369,87 @@ export default function WhatsAppAdminShell({
     });
   }, [safeEvents, selectedPhone]);
 
+const debugLine = useMemo(() => {
+  // Prioridad: conversación seleccionada (DB) -> último evento global debug -> estado
+  const lastChat = chatEvents.length > 0 ? chatEvents[chatEvents.length - 1] : null;
+  const lastGlobal = safeEvents.length > 0 ? safeEvents[safeEvents.length - 1] : null;
+
+  const fmtTs = (ts?: string) => {
+    if (!ts) return "";
+    const n = Number(ts);
+    if (Number.isFinite(n) && n > 0) {
+      return new Date(n * 1000).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+    return "";
+  };
+
+  if (lastChat) {
+    if (lastChat.kind === "message") {
+      const tail = (lastChat.text ?? "").trim().slice(0, 90);
+      return `DB · IN · ${fmtTs(lastChat.ts)} · from ${String(lastChat.from ?? "").slice(-10)} · ${tail}`;
+    }
+    if (lastChat.kind === "out") {
+      const tail = (lastChat.text ?? "").trim().slice(0, 90);
+      const st = lastChat.status ? ` · ${lastChat.status}` : "";
+      return `DB · OUT · ${fmtTs(lastChat.ts)} · to ${String(lastChat.to ?? "").slice(-10)}${st} · ${tail}`;
+    }
+    if (lastChat.kind === "status") {
+      return `DB · STATUS · ${fmtTs(lastChat.ts)} · ${lastChat.status}`;
+    }
+  }
+
+  if (lastGlobal) {
+    if (lastGlobal.kind === "message") {
+      const tail = (lastGlobal.text ?? "").trim().slice(0, 90);
+      return `WEBHOOK · IN · ${fmtTs(lastGlobal.ts)} · from ${String(lastGlobal.from ?? "").slice(-10)} · ${tail}`;
+    }
+    if (lastGlobal.kind === "out") {
+      const tail = (lastGlobal.text ?? "").trim().slice(0, 90);
+      const st = lastGlobal.status ? ` · ${lastGlobal.status}` : "";
+      return `WEBHOOK · OUT · ${fmtTs(lastGlobal.ts)} · to ${String(lastGlobal.to ?? "").slice(-10)}${st} · ${tail}`;
+    }
+    if (lastGlobal.kind === "status") {
+      return `WEBHOOK · STATUS · ${fmtTs(lastGlobal.ts)} · ${lastGlobal.status}`;
+    }
+  }
+
+  if (loading || chatLoading) return "Actualizando…";
+  return "Debug: sin eventos todavía.";
+}, [chatEvents, safeEvents, loading, chatLoading]);
+  
+const debugRows = useMemo(() => {
+  const src: WaDebugEvent[] =
+    chatEvents.length > 0 ? chatEvents : safeEvents;
+
+  const last = src.slice(-12);
+
+  const fmtTs = (ts?: string) => {
+    if (!ts) return "";
+    const n = Number(ts);
+    if (Number.isFinite(n) && n > 0) {
+      return new Date(n * 1000).toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+    }
+    return "";
+  };
+
+  return last.map((e, i) => {
+    if (e.kind === "status") {
+      return `${fmtTs(e.ts)} · STATUS · ${e.status}`;
+    }
+    if (e.kind === "message") {
+      const tail = (e.text ?? "").trim().slice(0, 140);
+      return `${fmtTs(e.ts)} · IN · …${String(e.from ?? "").slice(-6)} · ${tail}`;
+    }
+    const tail = (e.text ?? "").trim().slice(0, 140);
+    const st = e.status ? ` · ${e.status}` : "";
+    return `${fmtTs(e.ts)} · OUT · …${String(e.to ?? "").slice(-6)}${st} · ${tail}`;
+  });
+}, [chatEvents, safeEvents]);
+
   return (
     <div className="h-[calc(100vh-180px)] min-h-[720px]">
       <Card className="h-full overflow-hidden">
@@ -425,6 +508,66 @@ export default function WhatsAppAdminShell({
 
             {/* Right */}
             <div className="flex h-full min-h-0 flex-col">
+<Card className="mx-4 mt-4 mb-3">
+  <CardContent className="py-3">
+    <div className="flex items-center gap-3">
+      <button
+        type="button"
+        onClick={() => setDebugOpen((v) => !v)}
+        className="text-[11px] font-medium text-muted-foreground hover:text-slate-700"
+      >
+        DEBUG {debugOpen ? "▾" : "▸"}
+      </button>
+
+      <div className="min-w-0 flex-1 truncate text-xs text-slate-700">
+        {debugLine}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={refresh}
+          disabled={loading}
+          className="h-8 rounded-lg"
+        >
+          {loading ? "…" : "Refrescar"}
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setEvents([]);
+            setChatEvents([]);
+            setToast("Debug limpiado.");
+          }}
+          className="h-8 rounded-lg"
+        >
+          Limpiar
+        </Button>
+      </div>
+    </div>
+
+    {debugOpen ? (
+      <div className="mt-3 rounded-xl border bg-slate-50/60 px-3 py-2">
+        {debugRows.length === 0 ? (
+          <div className="text-xs text-muted-foreground">Sin eventos.</div>
+        ) : (
+          <div className="space-y-1">
+            {debugRows.map((line, idx) => (
+              <div key={idx} className="truncate font-mono text-[11px] text-slate-700">
+                {line}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    ) : null}
+  </CardContent>
+</Card>
               <ConversationHeader contact={selectedContact} />
 
               {/* Quick actions (auto-send) */}

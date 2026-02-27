@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { buildWhatsappAssistantReply } from "@/lib/ai/whatsappAssistant";
 import { executeAgentAction } from "@/lib/agents/executor";
 import { AgentActionSchema } from "@/lib/agents/contract";
+import { z } from "zod";
 
 function normalizePhone(p: string) {
   return p.replace(/[^\d]/g, "");
@@ -20,10 +21,12 @@ function resolveToNumber(conversation: {
   return normalizePhone(conversation.contact_external_id);
 }
 
-type Body = {
-  conversationId: string;
-  text: string;
-};
+const BodySchema = z.object({
+  conversationId: z.string().min(1),
+  text: z.string().min(1),
+});
+
+const UuidSchema = z.string().uuid();
 
 export async function POST(req: Request) {
   try {
@@ -41,15 +44,22 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = (await req.json().catch(() => null)) as Body | null;
+    const bodyRaw = await req.json().catch(() => null);
+    const bodyParsed = BodySchema.safeParse(bodyRaw);
 
-    const conversationId =
-      body && typeof body.conversationId === "string" ? body.conversationId : "";
-    const text = body && typeof body.text === "string" ? body.text.trim() : "";
-
-    if (!conversationId || !text) {
+    if (!bodyParsed.success) {
       return NextResponse.json(
         { ok: false, error: "Missing conversationId or text" },
+        { status: 400 }
+      );
+    }
+
+    const conversationId = bodyParsed.data.conversationId.trim();
+    const text = bodyParsed.data.text.trim();
+
+    if (!UuidSchema.safeParse(conversationId).success) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid conversationId (expected UUID)" },
         { status: 400 }
       );
     }
@@ -73,6 +83,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // 1) Planner (IA): devuelve botText provisional + actions[] + needs[]
     const built = await buildWhatsappAssistantReply({
       installationId: conversation.installation_id,
       text,
@@ -80,21 +91,36 @@ export async function POST(req: Request) {
       lastConversationAt: conversation.last_message_at,
     });
 
-    let actionExecResult: any = null;
+    // 2) Ejecuta plan (backend) si hay acciones válidas
+    const companyId = built?.debug?.companyId ?? null;
 
-    const maybeAction = (built as any)?.action;
-    const parsedAction = AgentActionSchema.safeParse(maybeAction);
+    const execResults: any[] = [];
+    const actionsRaw = Array.isArray((built as any)?.actions) ? (built as any).actions : [];
 
-    if (parsedAction.success) {
-      actionExecResult = await executeAgentAction({
-        agentKey: "whatsapp",
-        companyId: (built as any)?.debug?.companyId,
-        conversationId: conversation.id,
-        customerPhoneE164: conversation.contact_phone_e164 ?? undefined,
-        action: parsedAction.data,
-      });
+    for (const a of actionsRaw) {
+      const parsed = AgentActionSchema.safeParse(a);
+      if (!parsed.success) continue;
+
+      const res = await executeAgentAction(
+        {
+          agentKey: "whatsapp",
+          companyId: companyId ?? "",
+          conversationId: conversation.id,
+          customerPhoneE164: conversation.contact_phone_e164 ?? undefined,
+          action: parsed.data,
+        },
+        { debug: debugEnabled, requestId: conversation.id }
+      );
+
+      execResults.push(res);
     }
 
+    // Compat: si solo hay 1, devolvemos objeto; si no, array; si none, null
+    const actionExecResult: any =
+      execResults.length === 0 ? null : execResults.length === 1 ? execResults[0] : execResults;
+
+    // 3) Por ahora seguimos enviando el botText provisional del planner.
+    // (En el siguiente paso haremos "respond()" usando execResults.)
     const botText = built.botText;
     const to = resolveToNumber(conversation);
 
@@ -120,7 +146,6 @@ export async function POST(req: Request) {
     const data = await res.json().catch(() => null);
 
     if (!res.ok) {
-      // Guardamos intento fallido para debug
       await prisma.messaging_message.create({
         data: {
           conversation_id: conversation.id,
@@ -176,15 +201,17 @@ export async function POST(req: Request) {
             providerMessageId,
             companyId: built.debug.companyId,
             knowledgeUsed: built.debug.knowledgeUsed,
+            needs: (built as any)?.needs ?? [],
+            plannedActionsCount: actionsRaw.length,
             actionExecResult,
+            understanding: (built as any)?.understanding ?? null,
+            plannedActions: Array.isArray((built as any)?.actions) ? (built as any).actions : [],
+            rawNeeds: Array.isArray((built as any)?.needs) ? (built as any).needs : [],
           }
         : undefined,
     });
   } catch (e) {
     console.error("[WA ai-reply] error:", e);
-    return NextResponse.json(
-      { ok: false, error: "Internal error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: "Internal error" }, { status: 500 });
   }
 }

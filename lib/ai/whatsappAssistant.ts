@@ -1,6 +1,10 @@
 // lib/ai/whatsappAssistant.ts
 import { prismaRaw } from "@/lib/prisma";
 import { openai } from "@/lib/ai";
+import {
+  AgentActionSchema,
+  AgentUnderstandingSchema,
+} from "@/lib/agents/contract";
 
 type BuildWaReplyArgs = {
   installationId: string;
@@ -10,11 +14,14 @@ type BuildWaReplyArgs = {
 };
 
 type BuildWaReplyResult = {
-  botText: string;
-  action?: unknown;
+  botText: string; // provisional o pregunta si faltan datos
+  understanding: unknown | null; // AgentUnderstanding validado (guardamos como unknown por compat)
+  actions: unknown[]; // acciones validadas
+  needs: string[]; // faltantes (máx 2). Si hay needs => actions=[]
   debug: {
     companyId: string | null;
     knowledgeUsed: number;
+    mode: string;
   };
 };
 
@@ -47,8 +54,7 @@ function buildKnowledgeContextFromSections(
       `### Section ${idx}\nTitle: ${title || "(sin título)"}\nContent:\n${content}`
     );
     idx += 1;
-
-    if (idx > 10) break; // hard cap
+    if (idx > 10) break;
   }
 
   return parts.join("\n\n").slice(0, 5000);
@@ -78,23 +84,16 @@ export async function buildWhatsappAssistantReply(
   }
 
   let shouldGreet = false;
-
   if (args.lastConversationAt) {
     const hours =
-      (Date.now() - args.lastConversationAt.getTime()) /
-      (1000 * 60 * 60);
-
-    if (hours >= 24) {
-      shouldGreet = true;
-    }
+      (Date.now() - args.lastConversationAt.getTime()) / (1000 * 60 * 60);
+    if (hours >= 24) shouldGreet = true;
   } else {
     shouldGreet = true;
   }
 
   const mode = readAssistantMode(installation.config);
 
-  // ✅ SOURCE OF TRUTH: KnowledgeSections (lo que editas en /dashboard/knowledge)
-  // WhatsApp = canal público → solo PUBLIC
   const sections = await prismaRaw.knowledgeSection.findMany({
     where: {
       companyId: installation.company_id,
@@ -108,36 +107,74 @@ export async function buildWhatsappAssistantReply(
 
   const knowledgeContext = buildKnowledgeContextFromSections(sections);
 
-  let contactLine = "";
   const name = args.contactName ? args.contactName.trim() : "";
-  if (name) {
-    contactLine = `El contacto se llama "${name}".`;
-  }
+  const contactLine = name ? `El contacto se llama "${name}".` : "";
 
-const greetRule = shouldGreet
-  ? `Puedes saludar UNA sola vez al inicio (máximo una frase). Si conoces el nombre del contacto, úsalo.`
-  : `NO saludes. Entra directo al punto (no "hola", no "buenas", no "¿en qué puedo ayudarte?").`;
+  //const greetRule = shouldGreet
+    //? `Puedes saludar UNA sola vez al inicio (máximo una frase). Si conoces el nombre del contacto, úsalo.`
+    //: `NO saludes. Entra directo al punto (no "hola", no "buenas", no "¿en qué puedo ayudarte?").`;
 
 const systemPrompt = [
-  `Eres el asistente por WhatsApp de esta empresa. Estilo: profesional, cercano y eficiente.`,
-  greetRule,
-  `No uses nombres propios del usuario a menos que estén en el contexto del contacto o el usuario se haya presentado.`,
-  `Responde en español, frases cortas, sin relleno.`,
-  `Nunca inventes datos. Si no estás seguro, dilo con naturalidad: "No dispongo de esa información ahora mismo."`,
-  `Si el usuario pide información sensible o privada (datos personales, historiales, pagos, detalles internos), responde: "Por privacidad, no puedo facilitar esa información por WhatsApp." y ofrece una alternativa segura (llamada, recepción, email, o venir a la clínica).`,
-  `Si detectas bromas, insultos, spam o peticiones malintencionadas, corta educadamente y redirige: "Puedo ayudarte con consultas reales sobre la clínica y citas." Si insiste, termina con una frase y no escales el conflicto.`,
-  `Cuando falten datos para ayudar, pide SOLO el dato mínimo imprescindible (uno o dos como máximo).`,
-  `No menciones herramientas internas, paneles, bases de datos ni procesos internos.`,
-  `Tu objetivo es: resolver dudas habituales y guiar al usuario para reservar/confirmar/cancelar una cita de forma simple.`,
-  `Devuelve SIEMPRE una única salida en JSON válido (sin markdown, sin texto extra).`,
-  `Formato exacto: {"botText":"...","action":{...} }`,
-  `Si NO hay acción que ejecutar, devuelve: {"botText":"...","action":null}`,
-  `Si el usuario habla de cita/reserva/disponibilidad/cancelar/confirmar/reprogramar, rellena action con un intent adecuado.`,
-  `Intents permitidos: faq_query, lookup_entity, list_options, create_record, update_record, handoff_human.`,
+  `Eres el asistente de WhatsApp de esta empresa. Compórtate como un agente humano excelente (recepción/atención al cliente).`,
+  //greetRule,
+
+  `Contexto operativo:
+   - Estás atendiendo a un cliente por chat.
+   - Trabajas para la companyId actual (multi-tenant). Todo lo que consultes o ejecutes debe estar filtrado por companyId.
+   - La empresa puede tener una o varias sedes (locations). Si la petición depende de la sede y no está clara, pregunta por la sede SOLO cuando sea necesario.`,
+  
+  `Tienes acceso a información mediante acciones backend (herramientas) que ejecutará el servidor por ti.
+   Piensa y decide tú qué consultar, en qué orden y por qué, como lo haría un agente humano eficiente.`,
+  
+  `Objetivo:
+   - Resolver la intención del cliente (información, reservar, modificar/cancelar, consultar cita, queja, hablar con alguien, etc.)
+   - Minimizar fricción: pide SOLO lo imprescindible y solo cuando haga falta.
+   - Si puedes ayudar con la información disponible, no hagas preguntas innecesarias.`,
+  
+  `Fuentes disponibles (elige tú):
+   - knowledge: información pública (horarios, dirección, políticas, precios si existen, etc.).
+   - service: catálogo de servicios/tratamientos por sede.
+   - appointment: citas (próxima cita del cliente, disponibilidad/slots, etc.).
+   - location: sedes/centros.
+   - customer: cliente si hay identidad.`,
+  
+  `Criterio humano (muy importante):
+   - No pidas fecha/hora/ubicación “por defecto”. Primero entiende qué quiere y resuelve lo resoluble.
+   - Si el cliente menciona un servicio (ej: "endodoncia"), primero identifica el servicio en la base de datos (lookup service). Luego ya decides si hace falta sede/fecha.
+   - Solo pregunta por sede si: (a) la empresa tiene varias sedes y (b) la respuesta o la disponibilidad cambia por sede o hay ambigüedad real.
+   - Solo pregunta por fecha/hora cuando ya estés en modo reserva/disponibilidad con un servicio claro.
+   - Para quejas: escucha, reconoce, pide el mínimo para registrar/derivar (nombre + detalle) y ofrece pasar a humano.`,
+  
+  `Privacidad y seguridad:
+   - Nunca reveles datos personales ni información sensible (historiales, pagos, datos internos).
+   - Si falta identificación para consultar una cita, pide el mínimo (teléfono / nombre) o deriva a canal seguro.
+   - No inventes datos. Si no hay info, dilo y propone alternativa.`,
+  
+  `Salida estricta (obligatoria):
+   Devuelve SIEMPRE un único JSON válido, sin markdown ni texto extra, con esta forma:
+   {
+     "botText": "...",
+     "understanding": {
+       "need": { "type": "info|booking|modify|status|complaint|human|other|unknown", "summary": "...", "confidence": 0.0-1.0 },
+       "entities": { "service_name"?: "...", "location_hint"?: "...", "time_hint"?: "...", "customer_name"?: "...", "customer_phone"?: "..." },
+       "missing": ["..."]   // máximo 2, solo imprescindibles
+     },
+     "actions": [ { "intent": "...", "args": { ... } } ],
+     "needs": ["..."]
+   }`,
+  
+  `Reglas del JSON:
+   - "needs" debe ser igual a "understanding.missing".
+   - Si "needs" NO está vacío, entonces "actions" debe ser [] y botText debe preguntar directamente por esos datos.
+   - Si "actions" NO está vacío, botText debe ser provisional breve (ej: "Un momento, lo reviso.") y NO debe inventar resultados.`,
+  
+  `Acciones permitidas: faq_query, lookup_entity, list_options, create_record, update_record, handoff_human.`,
+  `Convenciones:
+   - Para buscar servicio: {"intent":"lookup_entity","args":{"entity":"service","query":"<texto>"}} (query obligatorio).
+   - Para próxima cita: {"intent":"lookup_entity","args":{"entity":"appointment","scope":"next"}}.`,
+  
   `Modo asistente: ${mode}.`,
-]
-  .filter((s) => Boolean(s))
-  .join(" ");
+].join(" ");
 
   const messages: Array<{ role: "system" | "user"; content: string }> = [
     { role: "system", content: systemPrompt },
@@ -154,23 +191,24 @@ const systemPrompt = [
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
-    temperature: 0.3,
-    max_tokens: 350,
+    temperature: 0.2,
+    max_tokens: 450,
     messages,
   });
 
-  let botText = "";
-  let action: unknown = null;
-
-  const choice =
-    completion.choices && completion.choices[0] ? completion.choices[0] : null;
+  const choice = completion.choices?.[0] ?? null;
 
   let raw = "";
-  if (choice && choice.message && choice.message.content) {
+  if (choice && choice.message && typeof choice.message.content === "string") {
     raw = choice.message.content.trim();
   }
 
-  // Intentamos parsear JSON (modo contrato)
+  // defaults safe
+  let botText = "Un momento, lo reviso.";
+  let understanding: unknown | null = null;
+  let actions: unknown[] = [];
+  let needs: string[] = [];
+
   if (raw) {
     try {
       const parsed = JSON.parse(raw) as any;
@@ -179,27 +217,70 @@ const systemPrompt = [
         botText = parsed.botText.trim();
       }
 
-      if (parsed && Object.prototype.hasOwnProperty.call(parsed, "action")) {
-        action = parsed.action;
+      const uParsed = AgentUnderstandingSchema.safeParse(parsed?.understanding);
+      if (uParsed.success) {
+        understanding = uParsed.data;
+      } else {
+        understanding = null;
+      }
+
+      if (parsed && Array.isArray(parsed.actions)) {
+        actions = parsed.actions;
+      }
+
+      if (parsed && Array.isArray(parsed.needs)) {
+        needs = parsed.needs
+          .filter((x: any) => typeof x === "string")
+          .slice(0, 2);
       }
     } catch {
-      // Fallback: si el modelo no devuelve JSON, tratamos raw como texto normal
+      // no JSON => degradamos a texto
       botText = raw;
-      action = null;
+      understanding = null;
+      actions = [];
+      needs = [];
     }
   }
 
-  if (!botText) {
-    botText =
-      "Ahora mismo no tengo suficiente información para ayudarte. ¿Me das un poco más de detalle?";
+  // Si tenemos understanding.missing, lo imponemos como needs
+  if (understanding && typeof understanding === "object") {
+    const anyU = understanding as any;
+    if (Array.isArray(anyU.missing)) {
+      needs = anyU.missing
+        .filter((x: any) => typeof x === "string")
+        .slice(0, 2);
+    }
+  }
+
+  // Si hay needs, actions deben ser []
+  if (needs.length > 0) {
+    actions = [];
+    if (!botText || botText === "Un momento, lo reviso.") {
+      botText = "¿Me indicas un poco más de información para ayudarte?";
+    }
+  }
+
+  // Valida acciones (filtra inválidas)
+  const validActions: unknown[] = [];
+  for (const a of actions) {
+    const p = AgentActionSchema.safeParse(a);
+    if (p.success) validActions.push(p.data);
+  }
+
+  // Si el modelo intentó acciones pero todas inválidas -> no ejecutamos nada
+  if (actions.length > 0 && validActions.length === 0) {
+    validActions.length = 0;
   }
 
   return {
     botText,
-    action,
+    understanding,
+    actions: validActions,
+    needs,
     debug: {
       companyId: installation.company_id ?? null,
       knowledgeUsed: sections.length,
+      mode,
     },
   };
 }
