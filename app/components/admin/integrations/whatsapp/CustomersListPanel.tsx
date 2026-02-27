@@ -2,10 +2,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Input } from "@/app/components/ui/input";
 import { Separator } from "@/app/components/ui/separator";
-import { Search, User, ChevronDown, Clock, Star, MessageCircle, Users } from "lucide-react";
 import ScrollBar from "@/app/components/crussader/UX/ScrollBar";
+
+import SearchBar from "@/app/components/admin/integrations/whatsapp/ContactsPanel/SearchBar";
+import GroupHeader from "@/app/components/admin/integrations/whatsapp/ContactsPanel/GroupHeader";
+import ConversationRowItem from "@/app/components/admin/integrations/whatsapp/ContactsPanel/ConversationRowItem";
+import CustomerRowItem from "@/app/components/admin/integrations/whatsapp/ContactsPanel/CustomerRowItem";
+
+import { Clock, Star, MessageCircle, Users } from "lucide-react";
 
 export type ContactMeta = {
   name: string;
@@ -31,7 +36,7 @@ type WaConversationListItem = {
   last_message_at: string | null; // ISO
 };
 
-type ContactRow = {
+export type ContactRow = {
   conversationId: string;
   name: string;
   phoneE164: string;
@@ -40,13 +45,17 @@ type ContactRow = {
   unread: number;
 };
 
+export type CustomerListItem = {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 function normalizePhone(p: string) {
   return p.replace(/[^\d]/g, "");
-}
-
-function fmtTime(ms: number) {
-  const d = new Date(ms);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function safeParseMs(iso: string | null | undefined) {
@@ -128,15 +137,6 @@ async function markConversationRead(args: { companyId: string; conversationId: s
   return { ok: res.ok, data };
 }
 
-type CustomerListItem = {
-  id: string;
-  name: string;
-  phone: string;
-  email?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
 async function fetchCustomers(companyId: string, q: string) {
   const params = new URLSearchParams();
   params.set("companyId", companyId);
@@ -163,55 +163,6 @@ async function fetchCustomers(companyId: string, q: string) {
   return { ok: true, items: filtered };
 }
 
-function GroupHeader({
-  title,
-  count,
-  icon,
-  open,
-  onToggle,
-}: {
-  title: string;
-  count: number;
-  icon: React.ReactNode;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="w-full flex items-center gap-2 px-3 py-3 text-left hover:bg-muted/40 transition-colors"
-    >
-      {/* chevron primero */}
-      <ChevronDown
-        className={[
-          "h-4 w-4 text-muted-foreground transition-transform",
-          open ? "rotate-0" : "-rotate-90",
-        ].join(" ")}
-      />
-
-      {/* icono */}
-      <span className="flex h-5 w-5 items-center justify-center text-muted-foreground">
-        {icon}
-      </span>
-
-      {/* titulo */}
-      <span className="flex-1 text-[13px] font-semibold tracking-wide">
-        {title}
-      </span>
-
-      {/* bolita naranja al final */}
-      {count > 0 ? (
-        <span className="ml-2 inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-amber-500 px-2 text-xs font-semibold text-white">
-          {String(count)}
-        </span>
-      ) : (
-        <span className="ml-2 inline-flex h-6 min-w-[24px]" />
-      )}
-    </button>
-  );
-}
-
 export default function CustomersListPanel({
   companyId,
   selectedPhone,
@@ -224,11 +175,9 @@ export default function CustomersListPanel({
   const [search, setSearch] = useState("");
   const [convs, setConvs] = useState<WaConversationListItem[]>([]);
   const [customers, setCustomers] = useState<CustomerListItem[]>([]);
-const [customersLoadedOnce, setCustomersLoadedOnce] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [customersLoadedOnce, setCustomersLoadedOnce] = useState(false);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
-  // independientes (no accordion)
   const [openPending, setOpenPending] = useState(false);
   const [openNoReview, setOpenNoReview] = useState(true);
   const [openOpen, setOpenOpen] = useState(false);
@@ -241,19 +190,16 @@ const [customersLoadedOnce, setCustomersLoadedOnce] = useState(false);
     let alive = true;
 
     async function loadOnce() {
-      if (!hasLoadedOnce) setLoading(true);
-
       try {
         const data = await fetchWaConversations(cid, search);
         if (!alive) return;
 
         if (data.ok) setConvs(data.items);
         else setConvs([]);
-      } finally {
-        if (!hasLoadedOnce) {
-          setLoading(false);
-          setHasLoadedOnce(true);
-        }
+
+        if (!hasLoadedOnce) setHasLoadedOnce(true);
+      } catch {
+        // noop
       }
     }
 
@@ -264,31 +210,31 @@ const [customersLoadedOnce, setCustomersLoadedOnce] = useState(false);
       alive = false;
       window.clearInterval(t);
     };
-  }, [companyId, search]);
+  }, [companyId, search, hasLoadedOnce]);
 
-useEffect(() => {
-  if (!companyId) return;
-  if (!openAll) return;
+  useEffect(() => {
+    if (!companyId) return;
+    if (!openAll) return;
 
-  const cid: string = companyId; // 👈 esto fuerza a string
-  let alive = true;
+    const cid = companyId;
+    let alive = true;
 
-  async function loadCustomersOnce() {
-    const data = await fetchCustomers(cid, search);
-    if (!alive) return;
+    async function loadCustomersOnce() {
+      const data = await fetchCustomers(cid, search);
+      if (!alive) return;
 
-    if (data.ok) setCustomers(data.items);
-    else setCustomers([]);
+      if (data.ok) setCustomers(data.items);
+      else setCustomers([]);
 
-    setCustomersLoadedOnce(true);
-  }
+      setCustomersLoadedOnce(true);
+    }
 
-  loadCustomersOnce();
+    loadCustomersOnce();
 
-  return () => {
-    alive = false;
-  };
-}, [companyId, openAll, search]);
+    return () => {
+      alive = false;
+    };
+  }, [companyId, openAll, search]);
 
   const contacts = useMemo<ContactRow[]>(() => {
     return convs
@@ -324,41 +270,39 @@ useEffect(() => {
       .sort((a, b) => b.lastAtMs - a.lastAtMs);
   }, [convs]);
 
-  async function handleSelect(c: ContactRow) {
-    onSelectPhone(c.phoneE164, { name: c.name, avatarUrl: null, conversationId: c.conversationId });
+  async function handleSelect(row: ContactRow) {
+    onSelectPhone(row.phoneE164, {
+      name: row.name,
+      avatarUrl: null,
+      conversationId: row.conversationId,
+    });
 
     if (!companyId) return;
-    if (c.unread <= 0) return;
+    if (row.unread <= 0) return;
 
     setConvs((prev) =>
       prev.map((x) => {
-        if (x.id !== c.conversationId) return x;
+        if (x.id !== row.conversationId) return x;
         return { ...x, unread_count: 0 };
       })
     );
 
-    await markConversationRead({ companyId, conversationId: c.conversationId });
+    await markConversationRead({ companyId, conversationId: row.conversationId });
   }
 
-  // contadores (de momento: sin reseña = todos)
-  const countPending = 0; // luego lo alimentas con datos reales
+  const countPending = 0;
   const countNoReview = contacts.length;
   const countOpen = contacts.filter((c) => c.unread > 0).length;
   const countAll = customersLoadedOnce ? customers.length : 0;
 
   return (
     <div className="flex h-full min-h-0 flex-col border-b lg:border-b-0 lg:border-r">
-      <div className="p-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={hasLoadedOnce ? "Buscar por nombre o número..." : "Cargando..."}
-            className="pl-9"
-          />
-        </div>
-      </div>
+      <SearchBar
+        value={search}
+        onChange={setSearch}
+        onClear={() => setSearch("")}
+        placeholder={hasLoadedOnce ? "Buscar por nombre o número..." : "Cargando..."}
+      />
 
       <Separator />
 
@@ -371,9 +315,7 @@ useEffect(() => {
             open={openPending}
             onToggle={() => setOpenPending((v) => !v)}
           />
-          {openPending ? (
-            <div className="px-3 pb-3 text-sm text-muted-foreground">—</div>
-          ) : null}
+          {openPending ? <div className="px-3 pb-3 text-sm text-muted-foreground">—</div> : null}
 
           <GroupHeader
             title="CLIENTE SIN RESEÑA"
@@ -384,50 +326,14 @@ useEffect(() => {
           />
           {openNoReview ? (
             <div className="divide-y">
-              {contacts.map((c) => {
-                const active = normalizePhone(selectedPhone) === c.phoneE164;
-
-                return (
-                  <button
-                    key={c.conversationId}
-                    type="button"
-                    onClick={() => handleSelect(c)}
-                    className={[
-                      "w-full text-left",
-                      "px-3 py-3",
-                      "hover:bg-muted/40",
-                      active ? "bg-muted/50" : "bg-transparent",
-                    ].join(" ")}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full border bg-background">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="truncate text-sm font-semibold">{c.name}</div>
-                          <div className="shrink-0 text-xs text-muted-foreground">
-                            {fmtTime(c.lastAtMs)}
-                          </div>
-                        </div>
-
-                        <div className="mt-0.5 flex items-center justify-between gap-2">
-                          <div className="truncate text-xs text-muted-foreground">{c.lastPreview}</div>
-
-                          {c.unread > 0 ? (
-                            <div className="ml-2 shrink-0 rounded-full bg-foreground px-2 py-0.5 text-[10px] font-semibold text-background">
-                              {c.unread > 99 ? "99+" : String(c.unread)}
-                            </div>
-                          ) : null}
-                        </div>
-
-                        <div className="mt-1 text-[11px] text-muted-foreground">{c.phoneE164}</div>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+              {contacts.map((row) => (
+                <ConversationRowItem
+                  key={row.conversationId}
+                  row={row}
+                  active={normalizePhone(selectedPhone) === row.phoneE164}
+                  onClick={() => handleSelect(row)}
+                />
+              ))}
 
               {contacts.length === 0 ? (
                 <div className="p-4 text-sm text-muted-foreground">No hay conversaciones todavía.</div>
@@ -442,9 +348,7 @@ useEffect(() => {
             open={openOpen}
             onToggle={() => setOpenOpen((v) => !v)}
           />
-          {openOpen ? (
-            <div className="px-3 pb-3 text-sm text-muted-foreground">—</div>
-          ) : null}
+          {openOpen ? <div className="px-3 pb-3 text-sm text-muted-foreground">—</div> : null}
 
           <GroupHeader
             title="TODOS"
@@ -453,61 +357,36 @@ useEffect(() => {
             open={openAll}
             onToggle={() => setOpenAll((v) => !v)}
           />
-{openAll ? (
-  <div className="divide-y">
-    {customers.map((cu) => {
-      const phoneDigits = normalizePhone(cu.phone);
-      const active = normalizePhone(selectedPhone) === phoneDigits;
 
-      return (
-        <button
-          key={cu.id}
-          type="button"
-          onClick={() =>
-            onSelectPhone(phoneDigits, {
-              name: cu.name,
-              avatarUrl: null,
-              conversationId: undefined,
-            })
-          }
-          className={[
-            "w-full text-left",
-            "px-3 py-3",
-            "hover:bg-muted/40",
-            active ? "bg-muted/50" : "bg-transparent",
-          ].join(" ")}
-        >
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full border bg-background">
-              <User className="h-4 w-4 text-muted-foreground" />
+          {openAll ? (
+            <div className="divide-y">
+              {customers.map((cu) => {
+                const phoneDigits = normalizePhone(cu.phone);
+                return (
+                  <CustomerRowItem
+                    key={cu.id}
+                    customer={cu}
+                    active={normalizePhone(selectedPhone) === phoneDigits}
+                    onClick={() =>
+                      onSelectPhone(phoneDigits, {
+                        name: cu.name,
+                        avatarUrl: null,
+                        conversationId: undefined,
+                      })
+                    }
+                  />
+                );
+              })}
+
+              {customersLoadedOnce && customers.length === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground">No hay clientes todavía.</div>
+              ) : null}
+
+              {!customersLoadedOnce ? (
+                <div className="p-4 text-sm text-muted-foreground">Cargando clientes…</div>
+              ) : null}
             </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <div className="truncate text-sm font-semibold">{cu.name}</div>
-              </div>
-
-              {/*<div className="mt-0.5 truncate text-xs text-muted-foreground">
-                {cu.email ? cu.email : "—"}
-              </div>*/}
-
-              <div className="mt-1 text-[11px] text-muted-foreground">{phoneDigits}</div>
-            </div>
-          </div>
-        </button>
-      );
-    })}
-
-    {customersLoadedOnce && customers.length === 0 ? (
-      <div className="p-4 text-sm text-muted-foreground">No hay clientes todavía.</div>
-    ) : null}
-
-    {!customersLoadedOnce ? (
-      <div className="p-4 text-sm text-muted-foreground">Cargando clientes…</div>
-    ) : null}
-  </div>
-) : null}
-
+          ) : null}
         </div>
       </ScrollBar>
     </div>

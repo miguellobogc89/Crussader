@@ -256,6 +256,17 @@ export default function WhatsAppAdminShell({
     }
   }
 
+  async function markConversationRead(args: { companyId: string; conversationId: string }) {
+  const res = await fetch("/api/whatsapp/messaging/conversations/read", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+  });
+
+  const data = await res.json().catch(() => null);
+  return { ok: res.ok, data };
+}
+
   useEffect(() => {
     let alive = true;
 
@@ -297,6 +308,51 @@ export default function WhatsAppAdminShell({
       window.clearTimeout(t);
     };
   }, [toast]);
+
+  useEffect(() => {
+    if (!companyId) return;
+    if (!selectedConversationId) return;
+
+    const cid: string = companyId;
+    const convId: string = selectedConversationId;
+
+    let alive = true;
+
+    async function tick() {
+      const r = await fetchConversationEvents({
+        companyId: cid,
+        conversationId: convId,
+      });
+
+      if (!alive) return;
+      if (r.ok) setChatEvents(r.events);
+    }
+
+    tick();
+
+    const t = window.setInterval(() => {
+      tick();
+    }, 2000);
+
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, [companyId, selectedConversationId]);
+
+  useEffect(() => {
+    if (!companyId) return;
+    if (!selectedConversationId) return;
+    if (chatEvents.length === 0) return;
+
+    const cid: string = companyId;
+    const convId: string = selectedConversationId;
+
+    const hasIncoming = chatEvents.some((e) => e.kind === "message");
+    if (!hasIncoming) return;
+
+    markConversationRead({ companyId: cid, conversationId: convId });
+  }, [chatEvents, companyId, selectedConversationId]);
 
   // Mantengo esto por si quieres ver debug filtrado por teléfono en algún momento
   const visibleEvents = useMemo(() => {

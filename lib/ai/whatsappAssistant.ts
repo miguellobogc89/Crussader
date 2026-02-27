@@ -6,10 +6,12 @@ type BuildWaReplyArgs = {
   installationId: string;
   text: string;
   contactName?: string | null;
+  lastConversationAt?: Date | null;
 };
 
 type BuildWaReplyResult = {
   botText: string;
+  action?: unknown;
   debug: {
     companyId: string | null;
     knowledgeUsed: number;
@@ -75,6 +77,20 @@ export async function buildWhatsappAssistantReply(
     throw new Error("Installation not found");
   }
 
+  let shouldGreet = false;
+
+  if (args.lastConversationAt) {
+    const hours =
+      (Date.now() - args.lastConversationAt.getTime()) /
+      (1000 * 60 * 60);
+
+    if (hours >= 24) {
+      shouldGreet = true;
+    }
+  } else {
+    shouldGreet = true;
+  }
+
   const mode = readAssistantMode(installation.config);
 
   // ✅ SOURCE OF TRUTH: KnowledgeSections (lo que editas en /dashboard/knowledge)
@@ -98,15 +114,26 @@ export async function buildWhatsappAssistantReply(
     contactLine = `El contacto se llama "${name}".`;
   }
 
+const greetRule = shouldGreet
+  ? `Puedes saludar UNA sola vez al inicio (máximo una frase). Si conoces el nombre del contacto, úsalo.`
+  : `NO saludes. Entra directo al punto (no "hola", no "buenas", no "¿en qué puedo ayudarte?").`;
+
 const systemPrompt = [
-  `Eres el asistente por WhatsApp de esta empresa.`,
-  contactLine,
-  `Si contact_name existe, puedes saludar UNA vez al inicio usando exactamente ese nombre.`,
-  `No uses nombres propios del usuario a menos que estén en el CONTEXTO (contact_name) o el usuario se haya presentado.`,
-  `Sé breve, claro y directo.`,
-  `REGLA CRÍTICA: No inventes datos. Si una respuesta requiere información que no está explícitamente en CONTEXTO, di: "No lo tengo en el knowledge." y pide el dato mínimo.`,
-  `REGLA: Cuando el usuario pregunte por horarios, dirección, servicios, precios, políticas, etc., busca primero en el CONTEXTO y responde citando el contenido (parafraseado) del knowledge.`,
-  `No menciones paneles internos ni rutas del dashboard.`,
+  `Eres el asistente por WhatsApp de esta empresa. Estilo: profesional, cercano y eficiente.`,
+  greetRule,
+  `No uses nombres propios del usuario a menos que estén en el contexto del contacto o el usuario se haya presentado.`,
+  `Responde en español, frases cortas, sin relleno.`,
+  `Nunca inventes datos. Si no estás seguro, dilo con naturalidad: "No dispongo de esa información ahora mismo."`,
+  `Si el usuario pide información sensible o privada (datos personales, historiales, pagos, detalles internos), responde: "Por privacidad, no puedo facilitar esa información por WhatsApp." y ofrece una alternativa segura (llamada, recepción, email, o venir a la clínica).`,
+  `Si detectas bromas, insultos, spam o peticiones malintencionadas, corta educadamente y redirige: "Puedo ayudarte con consultas reales sobre la clínica y citas." Si insiste, termina con una frase y no escales el conflicto.`,
+  `Cuando falten datos para ayudar, pide SOLO el dato mínimo imprescindible (uno o dos como máximo).`,
+  `No menciones herramientas internas, paneles, bases de datos ni procesos internos.`,
+  `Tu objetivo es: resolver dudas habituales y guiar al usuario para reservar/confirmar/cancelar una cita de forma simple.`,
+  `Devuelve SIEMPRE una única salida en JSON válido (sin markdown, sin texto extra).`,
+  `Formato exacto: {"botText":"...","action":{...} }`,
+  `Si NO hay acción que ejecutar, devuelve: {"botText":"...","action":null}`,
+  `Si el usuario habla de cita/reserva/disponibilidad/cancelar/confirmar/reprogramar, rellena action con un intent adecuado.`,
+  `Intents permitidos: faq_query, lookup_entity, list_options, create_record, update_record, handoff_human.`,
   `Modo asistente: ${mode}.`,
 ]
   .filter((s) => Boolean(s))
@@ -133,10 +160,33 @@ const systemPrompt = [
   });
 
   let botText = "";
+  let action: unknown = null;
+
   const choice =
     completion.choices && completion.choices[0] ? completion.choices[0] : null;
+
+  let raw = "";
   if (choice && choice.message && choice.message.content) {
-    botText = choice.message.content.trim();
+    raw = choice.message.content.trim();
+  }
+
+  // Intentamos parsear JSON (modo contrato)
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as any;
+
+      if (parsed && typeof parsed.botText === "string") {
+        botText = parsed.botText.trim();
+      }
+
+      if (parsed && Object.prototype.hasOwnProperty.call(parsed, "action")) {
+        action = parsed.action;
+      }
+    } catch {
+      // Fallback: si el modelo no devuelve JSON, tratamos raw como texto normal
+      botText = raw;
+      action = null;
+    }
   }
 
   if (!botText) {
@@ -146,6 +196,7 @@ const systemPrompt = [
 
   return {
     botText,
+    action,
     debug: {
       companyId: installation.company_id ?? null,
       knowledgeUsed: sections.length,

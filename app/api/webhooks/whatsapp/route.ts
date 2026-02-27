@@ -402,79 +402,137 @@ export async function POST(req: Request) {
       const lastIncoming = value.messages?.length
         ? value.messages[value.messages.length - 1]
         : null;
-      const lastIncomingTs = lastIncoming ? tsToDate(lastIncoming.timestamp) : null;
+
+      const lastIncomingTs = lastIncoming
+        ? tsToDate(lastIncoming.timestamp)
+        : null;
+
       if (lastIncomingTs) {
         await prisma.messaging_conversation.update({
           where: { id: conv.id },
           data: { last_message_at: lastIncomingTs, updated_at: new Date() },
         });
       }
-    }
 
-    // Status updates
-    if (Array.isArray(value.statuses) && value.statuses.length > 0) {
-      await prisma.$transaction(async (tx) => {
-        for (const s of value.statuses || []) {
-          const msgId = s.id ? String(s.id) : null;
-          const st = s.status ? String(s.status) : null;
-          const providerTs = tsToDate(s.timestamp);
+      // ==========================
+      // AUTO-REPLY IA (MVP)
+      // ==========================
+if (process.env.WHATSAPP_AUTOREPLY === "1") {
+  if (lastIncoming) {
+    const isText =
+      typeof lastIncoming.type === "string" &&
+      lastIncoming.type === "text";
 
-          // 1) Si existe el mensaje, actualiza su status
-          if (msgId) {
-            const updated = await tx.messaging_message.updateMany({
-              where: { provider_message_id: msgId },
-              data: { status: st },
-            });
+    if (isText) {
+      let incomingText = "";
 
-            if (updated.count > 0) {
-              continue;
-            }
+      if (
+        lastIncoming.text &&
+        typeof lastIncoming.text.body === "string"
+      ) {
+        incomingText = lastIncoming.text.body;
+      }
+
+      const hasText = incomingText.trim().length > 0;
+
+      if (conversationId && hasText) {
+        try {
+          let baseUrl = "http://localhost:3000";
+
+          if (
+            process.env.NEXTAUTH_URL &&
+            process.env.NEXTAUTH_URL.length > 0
+          ) {
+            baseUrl = process.env.NEXTAUTH_URL;
           }
 
-          // 2) Si no existe el mensaje, intentamos resolver conversación
-          if (!conversationId) {
+          const r = await fetch(
+            `${baseUrl}/api/integrations/meta/whatsapp/ai-reply`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                conversationId: conversationId,
+                text: incomingText,
+              }),
+            }
+          );
+
+          const j = await r.json().catch(() => null);
+          console.log("[WA webhook] ai-reply status:", r.status, j);
+        } catch (e) {
+          console.log("[WA webhook] ai-reply error:", e);
+        }
+      }
+    }
+  }
+}
+
+      // Status updates
+      if (Array.isArray(value.statuses) && value.statuses.length > 0) {
+        await prisma.$transaction(async (tx) => {
+          for (const s of value.statuses || []) {
+            const msgId = s.id ? String(s.id) : null;
+            const st = s.status ? String(s.status) : null;
+            const providerTs = tsToDate(s.timestamp);
+
+            // 1) Si existe el mensaje, actualiza su status
             if (msgId) {
-              const existing = await tx.messaging_message.findFirst({
+              const updated = await tx.messaging_message.updateMany({
                 where: { provider_message_id: msgId },
-                select: { conversation_id: true },
+                data: { status: st },
               });
-              if (existing) {
-                conversationId = existing.conversation_id;
+
+              if (updated.count > 0) {
+                continue;
               }
             }
-          }
 
-          if (!conversationId) {
-            continue;
-          }
+            // 2) Si no existe el mensaje, intentamos resolver conversación
+            if (!conversationId) {
+              if (msgId) {
+                const existing = await tx.messaging_message.findFirst({
+                  where: { provider_message_id: msgId },
+                  select: { conversation_id: true },
+                });
+                if (existing) {
+                  conversationId = existing.conversation_id;
+                }
+              }
+            }
 
-          await tx.messaging_message.create({
-            data: {
-              conversation_id: conversationId,
-              provider_message_id: msgId,
-              direction: "system",
-              kind: "status",
-              text: null,
-              status: st,
-              provider_ts: providerTs,
-              payload: s as any,
-            },
-          });
+            if (!conversationId) {
+              continue;
+            }
 
-          if (providerTs) {
-            await tx.messaging_conversation.update({
-              where: { id: conversationId },
-              data: { last_message_at: providerTs, updated_at: new Date() },
+            await tx.messaging_message.create({
+              data: {
+                conversation_id: conversationId,
+                provider_message_id: msgId,
+                direction: "system",
+                kind: "status",
+                text: null,
+                status: st,
+                provider_ts: providerTs,
+                payload: s as any,
+              },
             });
+
+            if (providerTs) {
+              await tx.messaging_conversation.update({
+                where: { id: conversationId },
+                data: { last_message_at: providerTs, updated_at: new Date() },
+              });
+            }
           }
-        }
-      });
-    }
-
-    console.log("[WA webhook] stored events:", WA_DEBUG_EVENTS.length);
-  } catch (err) {
-    console.log("[WA webhook] parse error", err);
+        });
+      }
+    
   }
+    return NextResponse.json({ ok: true });
 
-  return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[WA webhook] error:", err);
+    return NextResponse.json({ ok: true });
+  }
 }

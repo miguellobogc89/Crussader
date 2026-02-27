@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { buildWhatsappAssistantReply } from "@/lib/ai/whatsappAssistant";
+import { executeAgentAction } from "@/lib/agents/executor";
+import { AgentActionSchema } from "@/lib/agents/contract";
 
 function normalizePhone(p: string) {
   return p.replace(/[^\d]/g, "");
@@ -60,6 +62,7 @@ export async function POST(req: Request) {
         contact_external_id: true,
         contact_phone_e164: true,
         contact_name: true,
+        last_message_at: true,
       },
     });
 
@@ -74,7 +77,23 @@ export async function POST(req: Request) {
       installationId: conversation.installation_id,
       text,
       contactName: conversation.contact_name,
+      lastConversationAt: conversation.last_message_at,
     });
+
+    let actionExecResult: any = null;
+
+    const maybeAction = (built as any)?.action;
+    const parsedAction = AgentActionSchema.safeParse(maybeAction);
+
+    if (parsedAction.success) {
+      actionExecResult = await executeAgentAction({
+        agentKey: "whatsapp",
+        companyId: (built as any)?.debug?.companyId,
+        conversationId: conversation.id,
+        customerPhoneE164: conversation.contact_phone_e164 ?? undefined,
+        action: parsedAction.data,
+      });
+    }
 
     const botText = built.botText;
     const to = resolveToNumber(conversation);
@@ -157,6 +176,7 @@ export async function POST(req: Request) {
             providerMessageId,
             companyId: built.debug.companyId,
             knowledgeUsed: built.debug.knowledgeUsed,
+            actionExecResult,
           }
         : undefined,
     });

@@ -8,6 +8,7 @@ import {
   Target,
   FlaskConical,
   Shield,
+  MessagesSquare,
 } from "lucide-react";
 
 export type SidebarNavItem = NavItem & {
@@ -19,31 +20,26 @@ export const NAV_ITEMS: SidebarNavItem[] = [
     title: "Inicio",
     href: "/dashboard/home",
     icon: Home,
-    description: "Página principal",
   },
   {
     title: "Reseñas",
     href: "/dashboard/reviews",
     icon: MessageSquareText,
-    description: "Automatización de reseñas",
   },
   {
     title: "Mi negocio",
     href: "/dashboard/mybusiness",
     icon: Building2,
-    description: "Gestión de mis establecimientos",
   },
   {
     title: "Turnos de empleados",
     href: "/dashboard/calendar",
     icon: CalendarDays,
-    description: "Calendario de turnos del equipo",
   },
   {
     title: "Labs",
     href: "/dashboard/labs",
     icon: FlaskConical,
-    description: "Próximas funcionalidades en Crussader",
   },
 
   // Admin-only
@@ -51,14 +47,18 @@ export const NAV_ITEMS: SidebarNavItem[] = [
     title: "Leads",
     href: "/dashboard/crm/lead",
     icon: Target,
-    description: "Gestión de leads",
+    requiresAdmin: true,
+  },
+  {
+    title: "Mensajes",
+    href: "/dashboard/messages",
+    icon: MessagesSquare,
     requiresAdmin: true,
   },
   {
     title: "Admin",
     href: "/dashboard/admin",
     icon: Shield,
-    description: "Panel de administración",
     requiresAdmin: true,
   },
 ];
