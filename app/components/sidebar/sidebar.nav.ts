@@ -28,7 +28,7 @@ export const NAV_ITEMS: SidebarNavItem[] = [
   },
   {
     title: "Mi negocio",
-    href: "/dashboard/mybusiness",
+    href: "/dashboard/mybusiness_old",
     icon: Building2,
   },
   {
