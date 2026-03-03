@@ -16,6 +16,11 @@ export type ContactMeta = {
   name: string;
   avatarUrl?: string | null;
   conversationId?: string;
+
+  // ✅ nuevos (para panel SYSTEM turns)
+  agentId?: string | null;
+  phoneNumberId?: string | null; // callee
+  environment?: "TEST" | "PROD";
 };
 
 type WaConversationListItem = {
@@ -25,6 +30,12 @@ type WaConversationListItem = {
     phone_e164: string | null;
     external_id: string;
   };
+
+  // ✅ nuevos (si los devuelve la API)
+  agentId?: string | null;
+  phoneNumberId?: string | null;
+  environment?: "TEST" | "PROD";
+
   unread_count: number;
   last_message: null | {
     direction: string;
@@ -43,6 +54,11 @@ export type ContactRow = {
   lastAtMs: number;
   lastPreview: string;
   unread: number;
+
+  // ✅ nuevos
+  agentId: string | null;
+  phoneNumberId: string | null;
+  environment: "TEST" | "PROD";
 };
 
 export type CustomerListItem = {
@@ -55,7 +71,7 @@ export type CustomerListItem = {
 };
 
 function normalizePhone(p: string) {
-  return p.replace(/[^\d]/g, "");
+  return String(p || "").replace(/[^\d]/g, "");
 }
 
 function safeParseMs(iso: string | null | undefined) {
@@ -257,6 +273,9 @@ export default function CustomersListPanel({
 
         const unread = Number(c.unread_count || 0);
 
+        const env: "TEST" | "PROD" =
+          c.environment === "PROD" ? "PROD" : "TEST";
+
         return {
           conversationId: c.id,
           name,
@@ -264,6 +283,10 @@ export default function CustomersListPanel({
           lastAtMs: lastAtMs > 0 ? lastAtMs : Date.now(),
           lastPreview,
           unread,
+
+          agentId: typeof c.agentId === "string" ? c.agentId : null,
+          phoneNumberId: typeof c.phoneNumberId === "string" ? c.phoneNumberId : null,
+          environment: env,
         };
       })
       .filter((x) => x.phoneE164.length > 0)
@@ -275,6 +298,10 @@ export default function CustomersListPanel({
       name: row.name,
       avatarUrl: null,
       conversationId: row.conversationId,
+
+      agentId: row.agentId,
+      phoneNumberId: row.phoneNumberId,
+      environment: row.environment,
     });
 
     if (!companyId) return;
@@ -372,6 +399,10 @@ export default function CustomersListPanel({
                         name: cu.name,
                         avatarUrl: null,
                         conversationId: undefined,
+
+                        agentId: null,
+                        phoneNumberId: null,
+                        environment: "TEST",
                       })
                     }
                   />

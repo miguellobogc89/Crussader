@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN ?? "";
+const WA_DEBUG = process.env.WA_DEBUG === "1";
 
 // Buffer simple en memoria (DEV). Guarda los últimos 50 eventos.
 type WaDebugEvent =
@@ -43,6 +44,16 @@ function pushEvent(e: WaDebugEvent) {
   }
 }
 
+
+function logWA(tag: string, data?: any) {
+  if (!WA_DEBUG) return;
+  if (data !== undefined) {
+    console.log(tag, data);
+  } else {
+    console.log(tag);
+  }
+}
+
 function tsToDate(ts?: unknown): Date | null {
   if (typeof ts !== "string" && typeof ts !== "number") return null;
   const n = Number(ts);
@@ -78,9 +89,6 @@ async function resolveInstallation(value: WaValue) {
   const phoneNumberId = value?.metadata?.phone_number_id;
   const displayPhone = value?.metadata?.display_phone_number;
 
-  // Buscamos por config.phone_number_id primero (lo normal),
-  // y como fallback por config.display_phone_number si lo guardas así.
-  // (Asumimos que config guarda strings en JSON)
   if (phoneNumberId) {
     const inst = await prisma.integration_installation.findFirst({
       where: {
@@ -109,7 +117,6 @@ async function resolveInstallation(value: WaValue) {
     if (inst) return inst;
   }
 
-  // Último fallback: si aún no tienes la instalación guardada, no rompemos el webhook.
   return null;
 }
 
@@ -130,14 +137,13 @@ async function upsertConversation(args: {
     lastMessageAt,
   } = args;
 
-  // Unique: (installation_id, contact_external_id)
   return prisma.messaging_conversation.upsert({
-where: {
-  installation_id_contact_external_id: {
-    installation_id: installationId,
-    contact_external_id: contactExternalId,
-  },
-},
+    where: {
+      installation_id_contact_external_id: {
+        installation_id: installationId,
+        contact_external_id: contactExternalId,
+      },
+    },
     create: {
       installation_id: installationId,
       contact_external_id: contactExternalId,
@@ -160,13 +166,20 @@ where: {
 async function autoLinkConversationToCustomer(args: {
   conversationId: string;
   phoneE164: string | null | undefined;
+  companyId: string;
 }) {
-  const { conversationId, phoneE164 } = args;
-
+  const { conversationId, phoneE164, companyId } = args;
   if (!phoneE164) return;
 
   const matches = await prisma.customer.findMany({
-    where: { phone: phoneE164 },
+    where: {
+      phone: phoneE164,
+      companies: {
+        some: {
+          companyId: companyId,
+        },
+      },
+    },
     select: { id: true },
     take: 2,
   });
@@ -211,10 +224,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
-
-  if (!body) {
-    return NextResponse.json({ ok: true });
-  }
+  if (!body) return NextResponse.json({ ok: true });
 
   // =========================
   // DEV: push outgoing al buffer
@@ -247,47 +257,25 @@ export async function POST(req: Request) {
       status,
     });
 
+    logWA("[WA][OUT][DEV_PUSH]", { to, id, status });
+
     return NextResponse.json({ ok: true });
   }
 
   try {
     const entry = body.entry && body.entry[0] ? body.entry[0] : null;
-    const change =
-      entry && entry.changes && entry.changes[0] ? entry.changes[0] : null;
+    const change = entry && entry.changes && entry.changes[0] ? entry.changes[0] : null;
     const value: WaValue | null = change ? change.value : null;
 
-    console.log("[WA webhook] metadata:", value?.metadata);
-    console.log("[WA webhook] contacts:", value?.contacts);
-    console.log(
-      "[WA webhook] messages count:",
-      Array.isArray(value?.messages) ? value.messages.length : 0
-    );
-    console.log(
-      "[WA webhook] statuses count:",
-      Array.isArray(value?.statuses) ? value.statuses.length : 0
-    );
-
-    const phoneNumberId =
-      value && value.metadata && typeof value.metadata.phone_number_id === "string"
-        ? value.metadata.phone_number_id
-        : null;
-
-    console.log("[WA webhook] phone_number_id:", phoneNumberId);
-
-    let waId: string | null = null;
-    if (Array.isArray(value?.contacts) && value.contacts.length > 0) {
-      const c0 = value.contacts[0];
-      if (c0 && c0.wa_id) {
-        waId = String(c0.wa_id);
-      }
+    if (!value) {
+      logWA("[WA][SKIP] no value payload");
+      return NextResponse.json({ ok: true });
     }
-
-    console.log("[WA webhook] contact wa_id:", waId);
 
     const now = Date.now();
 
-    // 1) Guarda debug en memoria (como ya tenías)
-    const statuses = value && value.statuses ? value.statuses : null;
+    // Guardamos SIEMPRE en buffer (DEV) para inspección, pero NO spameamos la consola.
+    const statuses = value.statuses;
     if (Array.isArray(statuses)) {
       for (const s of statuses) {
         pushEvent({
@@ -301,7 +289,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const messages = value && value.messages ? value.messages : null;
+    const messages = value.messages;
     if (Array.isArray(messages)) {
       for (const m of messages) {
         const text =
@@ -319,218 +307,219 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2) Persistencia en DB (si podemos resolver instalación)
-    if (!value) {
-      console.log("[WA webhook] no value payload");
-      return NextResponse.json({ ok: true });
-    }
-
-    const installation = await resolveInstallation(value);
-
-    // Si aún no has guardado la installation/config, no rompemos el webhook
-    if (!installation) {
-      console.log("[WA webhook] no installation matched (skip DB persist)");
-      return NextResponse.json({ ok: true });
-    }
-
-    // Contact info (solo viene en algunos payloads)
-    const contact =
-      Array.isArray(value.contacts) && value.contacts[0] ? value.contacts[0] : null;
-    const contactExternalIdRaw =
-      Array.isArray(value.messages) && value.messages[0] && value.messages[0].from
-        ? String(value.messages[0].from)
-        : contact && contact.wa_id
-          ? String(contact.wa_id)
-          : null;
-
     const hasIncomingMessages = Array.isArray(value.messages) && value.messages.length > 0;
 
-    let conversationId: string | null = null;
+    // LOG 1: solo cuando hay mensaje real
+    if (hasIncomingMessages) {
+      const m0 = value.messages && value.messages[0] ? value.messages[0] : null;
+      const from = m0 && m0.from ? String(m0.from) : null;
+      const txt =
+        m0 && m0.text && typeof m0.text.body === "string" ? m0.text.body : "";
+      logWA("[WA][IN]", { from, text: txt });
+    }
 
-    if (hasIncomingMessages && contactExternalIdRaw) {
-      const contactName =
-        contact && contact.profile && typeof contact.profile.name === "string"
-          ? contact.profile.name
-          : null;
+    // Resolve installation
+    const installation = await resolveInstallation(value);
+    if (!installation) {
+      logWA("[WA][SKIP] no installation matched");
+      return NextResponse.json({ ok: true });
+    }
 
-      const lastTs =
-        value.messages && value.messages[0]
-          ? tsToDate(value.messages[0].timestamp)
-          : null;
+    // Si es SOLO status update, no hacemos más (evita ruido y trabajo)
+    if (!hasIncomingMessages) {
+      // Opcional: persistir status en DB (si lo quieres). Por defecto lo dejamos silencioso.
+      // Si en algún momento quieres persistir statuses aquí también, lo hacemos con WA_DEBUG o flag.
+      return NextResponse.json({ ok: true });
+    }
 
-      const conv = await upsertConversation({
-        installationId: installation.id,
-        contactExternalId: contactExternalIdRaw,
-        contactPhoneE164: contactExternalIdRaw,
-        contactName,
-        providerThreadId: null,
-        lastMessageAt: lastTs,
-      });
+    // Contact info
+    const contact =
+      Array.isArray(value.contacts) && value.contacts[0] ? value.contacts[0] : null;
 
-      conversationId = conv.id;
-      await autoLinkConversationToCustomer({
-        conversationId: conv.id,
-        phoneE164: contactExternalIdRaw,
-      });
+    let contactExternalIdRaw: string | null = null;
 
-      // Inserta mensajes entrantes
-      await prisma.$transaction(async (tx) => {
-        for (const m of value.messages || []) {
-          const providerMessageId = m.id ? String(m.id) : null;
+    if (Array.isArray(value.messages) && value.messages[0] && value.messages[0].from) {
+      contactExternalIdRaw = String(value.messages[0].from);
+    } else if (contact && contact.wa_id) {
+      contactExternalIdRaw = String(contact.wa_id);
+    }
 
-          const text =
-            m && m.text && typeof m.text.body === "string" ? m.text.body : null;
+    if (!contactExternalIdRaw) {
+      logWA("[WA][SKIP] missing contactExternalIdRaw");
+      return NextResponse.json({ ok: true });
+    }
 
-          const providerTs = tsToDate(m.timestamp);
-
-          await tx.messaging_message.create({
-            data: {
-              conversation_id: conv.id,
-              provider_message_id: providerMessageId,
-              direction: "in",
-              kind: m.type ? String(m.type) : "unknown",
-              text,
-              status: null,
-              provider_ts: providerTs,
-              payload: m as any,
-            },
-          });
-        }
-      });
-
-      // Recalcula last_message_at con el último mensaje entrante
-      const lastIncoming = value.messages?.length
-        ? value.messages[value.messages.length - 1]
+    const contactName =
+      contact && contact.profile && typeof contact.profile.name === "string"
+        ? contact.profile.name
         : null;
 
-      const lastIncomingTs = lastIncoming
-        ? tsToDate(lastIncoming.timestamp)
-        : null;
+    const lastTs =
+      value.messages && value.messages[0] ? tsToDate(value.messages[0].timestamp) : null;
 
-      if (lastIncomingTs) {
-        await prisma.messaging_conversation.update({
-          where: { id: conv.id },
-          data: { last_message_at: lastIncomingTs, updated_at: new Date() },
+    const conv = await upsertConversation({
+      installationId: installation.id,
+      contactExternalId: contactExternalIdRaw,
+      contactPhoneE164: contactExternalIdRaw,
+      contactName,
+      providerThreadId: null,
+      lastMessageAt: lastTs,
+    });
+
+    async function resolveCustomerScope(args: { phoneE164: string; companyId: string }) {
+  const { phoneE164, companyId } = args;
+
+  const customer = await prisma.customer.findFirst({
+    where: { phone: phoneE164 },
+    select: { id: true, firstName: true, lastName: true },
+  });
+
+  if (!customer) {
+    return { scope: "NONE" as const, customer: null, companyLink: null };
+  }
+
+  const link = await prisma.companyCustomer.findUnique({
+    where: {
+      companyId_customerId: {
+        companyId,
+        customerId: customer.id,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (!link) {
+    return { scope: "EXISTS_OTHER_COMPANY" as const, customer, companyLink: null };
+  }
+
+  return { scope: "KNOWN_THIS_COMPANY" as const, customer, companyLink: link };
+}
+
+const scopeInfo = await resolveCustomerScope({
+  phoneE164: contactExternalIdRaw,
+  companyId: installation.company_id,
+});
+
+logWA("[WA][CUSTOMER_SCOPE]", {
+  conversationId: conv.id,
+  scope: scopeInfo.scope,
+  customerId: scopeInfo.customer ? scopeInfo.customer.id : null,
+});
+
+    await autoLinkConversationToCustomer({
+      conversationId: conv.id,
+      phoneE164: contactExternalIdRaw,
+      companyId: installation.company_id,
+    });
+
+    // LOG 2: customer state (resumen)
+    if (WA_DEBUG) {
+      const c = await prisma.messaging_conversation.findUnique({
+        where: { id: conv.id },
+        select: { customer_id: true, contact_phone_e164: true, contact_name: true },
+      });
+
+      if (c && c.customer_id) {
+        logWA("[WA][CUSTOMER]", {
+          conversationId: conv.id,
+          status: "KNOWN",
+          customerId: c.customer_id,
+        });
+      } else {
+        logWA("[WA][CUSTOMER]", { conversationId: conv.id, status: "NEW" });
+      }
+    }
+
+    // Insert incoming messages
+    await prisma.$transaction(async (tx) => {
+      for (const m of value.messages || []) {
+        const providerMessageId = m.id ? String(m.id) : null;
+        const text =
+          m && m.text && typeof m.text.body === "string" ? m.text.body : null;
+        const providerTs = tsToDate(m.timestamp);
+
+        await tx.messaging_message.create({
+          data: {
+            conversation_id: conv.id,
+            provider_message_id: providerMessageId,
+            direction: "in",
+            kind: m.type ? String(m.type) : "unknown",
+            text,
+            status: null,
+            provider_ts: providerTs,
+            payload: m as any,
+          },
         });
       }
+    });
 
-      // ==========================
-      // AUTO-REPLY IA (MVP)
-      // ==========================
-if (process.env.WHATSAPP_AUTOREPLY === "1") {
-  if (lastIncoming) {
-    const isText =
-      typeof lastIncoming.type === "string" &&
-      lastIncoming.type === "text";
+    // Update last_message_at with last incoming timestamp
+    const lastIncoming = value.messages && value.messages.length > 0
+      ? value.messages[value.messages.length - 1]
+      : null;
 
-    if (isText) {
+    const lastIncomingTs = lastIncoming ? tsToDate(lastIncoming.timestamp) : null;
+
+    if (lastIncomingTs) {
+      await prisma.messaging_conversation.update({
+        where: { id: conv.id },
+        data: { last_message_at: lastIncomingTs, updated_at: new Date() },
+      });
+    }
+
+    // ==========================
+    // AUTO-REPLY IA (MVP)
+    // ==========================
+    if (process.env.WHATSAPP_AUTOREPLY === "1" && lastIncoming) {
+      const isText = typeof lastIncoming.type === "string" && lastIncoming.type === "text";
+
       let incomingText = "";
-
-      if (
-        lastIncoming.text &&
-        typeof lastIncoming.text.body === "string"
-      ) {
+      if (lastIncoming.text && typeof lastIncoming.text.body === "string") {
         incomingText = lastIncoming.text.body;
       }
 
       const hasText = incomingText.trim().length > 0;
 
-      if (conversationId && hasText) {
+      if (isText && hasText) {
         try {
           let baseUrl = "http://localhost:3000";
-
-          if (
-            process.env.NEXTAUTH_URL &&
-            process.env.NEXTAUTH_URL.length > 0
-          ) {
+          if (process.env.NEXTAUTH_URL && process.env.NEXTAUTH_URL.length > 0) {
             baseUrl = process.env.NEXTAUTH_URL;
           }
 
           const r = await fetch(
-            `${baseUrl}/api/integrations/meta/whatsapp/ai-reply`,
+            `${baseUrl}/api/integrations/meta/whatsapp/ai-reply?debug=1`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                conversationId: conversationId,
+                conversationId: conv.id,
                 text: incomingText,
               }),
             }
           );
 
           const j = await r.json().catch(() => null);
-          console.log("[WA webhook] ai-reply status:", r.status, j);
+
+          
+
+          // LOG 6: salida del ai-reply (resumen)
+          logWA("[WA][AI_REPLY]", {
+            conversationId: conv.id,
+            status: r.status,
+            ok: Boolean(j && j.ok),
+            botTextPreview: j && typeof j.botText === "string" ? j.botText.slice(0, 80) : null,
+          });
         } catch (e) {
-          console.log("[WA webhook] ai-reply error:", e);
+          logWA("[WA][AI_REPLY][ERROR]", e);
         }
       }
     }
-  }
-}
 
-      // Status updates
-      if (Array.isArray(value.statuses) && value.statuses.length > 0) {
-        await prisma.$transaction(async (tx) => {
-          for (const s of value.statuses || []) {
-            const msgId = s.id ? String(s.id) : null;
-            const st = s.status ? String(s.status) : null;
-            const providerTs = tsToDate(s.timestamp);
+    // Nota: statuses se siguen guardando en buffer (dev) pero ya no ensucian consola.
+    // Si quieres persistir statuses en DB, lo hacemos en un siguiente paso con una flag.
 
-            // 1) Si existe el mensaje, actualiza su status
-            if (msgId) {
-              const updated = await tx.messaging_message.updateMany({
-                where: { provider_message_id: msgId },
-                data: { status: st },
-              });
-
-              if (updated.count > 0) {
-                continue;
-              }
-            }
-
-            // 2) Si no existe el mensaje, intentamos resolver conversación
-            if (!conversationId) {
-              if (msgId) {
-                const existing = await tx.messaging_message.findFirst({
-                  where: { provider_message_id: msgId },
-                  select: { conversation_id: true },
-                });
-                if (existing) {
-                  conversationId = existing.conversation_id;
-                }
-              }
-            }
-
-            if (!conversationId) {
-              continue;
-            }
-
-            await tx.messaging_message.create({
-              data: {
-                conversation_id: conversationId,
-                provider_message_id: msgId,
-                direction: "system",
-                kind: "status",
-                text: null,
-                status: st,
-                provider_ts: providerTs,
-                payload: s as any,
-              },
-            });
-
-            if (providerTs) {
-              await tx.messaging_conversation.update({
-                where: { id: conversationId },
-                data: { last_message_at: providerTs, updated_at: new Date() },
-              });
-            }
-          }
-        });
-      }
-    
-  }
     return NextResponse.json({ ok: true });
-
   } catch (err) {
     console.error("[WA webhook] error:", err);
     return NextResponse.json({ ok: true });

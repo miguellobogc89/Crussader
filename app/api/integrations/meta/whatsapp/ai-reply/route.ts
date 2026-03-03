@@ -1,10 +1,8 @@
 // app/api/integrations/meta/whatsapp/ai-reply/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { buildWhatsappAssistantReply } from "@/lib/ai/whatsappAssistant";
-import { executeAgentAction } from "@/lib/agents/executor";
-import { AgentActionSchema } from "@/lib/agents/contract";
 import { z } from "zod";
+import { whatsappPipeline } from "@/lib/agents/orchestrator/whatsappPipeline";
 
 function normalizePhone(p: string) {
   return p.replace(/[^\d]/g, "");
@@ -15,9 +13,7 @@ function resolveToNumber(conversation: {
   contact_external_id: string;
 }) {
   const phone = conversation.contact_phone_e164;
-  if (phone && phone.trim()) {
-    return normalizePhone(phone);
-  }
+  if (phone && phone.trim()) return normalizePhone(phone);
   return normalizePhone(conversation.contact_external_id);
 }
 
@@ -28,12 +24,51 @@ const BodySchema = z.object({
 
 const UuidSchema = z.string().uuid();
 
+async function sendWhatsappText(args: {
+  accessToken: string;
+  phoneNumberId: string;
+  to: string;
+  body: string;
+}) {
+  const { accessToken, phoneNumberId, to, body } = args;
+
+  const payloadToMeta = {
+    messaging_product: "whatsapp",
+    to,
+    type: "text",
+    text: { body },
+  };
+
+  const res = await fetch(
+    `https://graph.facebook.com/v22.0/${phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payloadToMeta),
+    }
+  );
+
+  const data = await res.json().catch(() => null);
+  return { ok: res.ok, status: res.status, data };
+}
+
+function extractProviderMessageId(metaData: any): string | null {
+  if (!metaData) return null;
+  const id = metaData?.messages?.[0]?.id;
+  if (typeof id !== "string") return null;
+  const s = id.trim();
+  if (!s) return null;
+  return s;
+}
+
 export async function POST(req: Request) {
   try {
     const url = new URL(req.url);
     const debugEnabled = url.searchParams.get("debug") === "1";
 
-    // Env vars en runtime
     const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
@@ -46,7 +81,6 @@ export async function POST(req: Request) {
 
     const bodyRaw = await req.json().catch(() => null);
     const bodyParsed = BodySchema.safeParse(bodyRaw);
-
     if (!bodyParsed.success) {
       return NextResponse.json(
         { ok: false, error: "Missing conversationId or text" },
@@ -55,7 +89,7 @@ export async function POST(req: Request) {
     }
 
     const conversationId = bodyParsed.data.conversationId.trim();
-    const text = bodyParsed.data.text.trim();
+    const incomingText = bodyParsed.data.text.trim();
 
     if (!UuidSchema.safeParse(conversationId).success) {
       return NextResponse.json(
@@ -73,6 +107,7 @@ export async function POST(req: Request) {
         contact_phone_e164: true,
         contact_name: true,
         last_message_at: true,
+        customer_id: true,
       },
     });
 
@@ -83,132 +118,98 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1) Planner (IA): devuelve botText provisional + actions[] + needs[]
-    const built = await buildWhatsappAssistantReply({
-      installationId: conversation.installation_id,
-      text,
-      contactName: conversation.contact_name,
-      lastConversationAt: conversation.last_message_at,
-    });
-
-    // 2) Ejecuta plan (backend) si hay acciones válidas
-    const companyId = built?.debug?.companyId ?? null;
-
-    const execResults: any[] = [];
-    const actionsRaw = Array.isArray((built as any)?.actions) ? (built as any).actions : [];
-
-    for (const a of actionsRaw) {
-      const parsed = AgentActionSchema.safeParse(a);
-      if (!parsed.success) continue;
-
-      const res = await executeAgentAction(
-        {
-          agentKey: "whatsapp",
-          companyId: companyId ?? "",
-          conversationId: conversation.id,
-          customerPhoneE164: conversation.contact_phone_e164 ?? undefined,
-          action: parsed.data,
-        },
-        { debug: debugEnabled, requestId: conversation.id }
-      );
-
-      execResults.push(res);
-    }
-
-    // Compat: si solo hay 1, devolvemos objeto; si no, array; si none, null
-    const actionExecResult: any =
-      execResults.length === 0 ? null : execResults.length === 1 ? execResults[0] : execResults;
-
-    // 3) Por ahora seguimos enviando el botText provisional del planner.
-    // (En el siguiente paso haremos "respond()" usando execResults.)
-    const botText = built.botText;
     const to = resolveToNumber(conversation);
 
-    const payloadToMeta = {
-      messaging_product: "whatsapp",
-      to,
-      type: "text",
-      text: { body: botText },
-    };
+    const installation = await prisma.integration_installation.findUnique({
+      where: { id: conversation.installation_id },
+      select: { company_id: true },
+    });
 
-    const res = await fetch(
-      `https://graph.facebook.com/v22.0/${phoneNumberId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payloadToMeta),
-      }
-    );
-
-    const data = await res.json().catch(() => null);
-
-    if (!res.ok) {
-      await prisma.messaging_message.create({
-        data: {
-          conversation_id: conversation.id,
-          provider_message_id: null,
-          direction: "out",
-          kind: "text",
-          text: botText,
-          status: "failed",
-          provider_ts: new Date(),
-          payload: (data ?? {}) as any,
-        },
-      });
-
+    const companyId = installation?.company_id;
+    if (!companyId) {
       return NextResponse.json(
-        { ok: false, error: "Meta rejected the request", meta_error: data },
-        { status: 400 }
+        { ok: false, error: "Missing companyId for installation" },
+        { status: 500 }
       );
     }
 
-    let providerMessageId: string | null = null;
-    if (data && data.messages && data.messages[0] && data.messages[0].id) {
-      providerMessageId = String(data.messages[0].id);
+    // Agent activo
+    const agent = await prisma.agent.findFirst({
+      where: { companyId, channel: "WHATSAPP", status: "ACTIVE" },
+      select: { id: true },
+    });
+
+    if (!agent) {
+      return NextResponse.json(
+        { ok: false, error: "No ACTIVE WHATSAPP agent for this company" },
+        { status: 500 }
+      );
     }
+
+    // Orchestrator (toda la lógica de negocio va dentro)
+    const result = await whatsappPipeline({
+      companyId,
+      agentId: agent.id,
+      conversationId: conversation.id,
+      toPhoneE164: to,
+      phoneNumberId,
+      incomingText,
+      environment: "TEST",
+      language: "es",
+      contactName: conversation.contact_name ?? null,
+      installationId: conversation.installation_id,
+    });
+
+    const botText = result.botText;
+
+    // Send WhatsApp + persist OUT
+    const metaSend = await sendWhatsappText({
+      accessToken,
+      phoneNumberId,
+      to,
+      body: botText,
+    });
 
     await prisma.messaging_conversation.update({
       where: { id: conversation.id },
-      data: {
-        last_message_at: new Date(),
-        updated_at: new Date(),
-      },
+      data: { last_message_at: new Date(), updated_at: new Date() },
     });
 
     await prisma.messaging_message.create({
       data: {
         conversation_id: conversation.id,
-        provider_message_id: providerMessageId,
+        provider_message_id: extractProviderMessageId(metaSend.data),
         direction: "out",
         kind: "text",
         text: botText,
-        status: "sent",
+        status: metaSend.ok ? "sent" : "failed",
         provider_ts: new Date(),
-        payload: (data ?? {}) as any,
+        payload: (metaSend.data ?? {}) as any,
       },
     });
+
+    if (!metaSend.ok) {
+      return NextResponse.json(
+        { ok: false, error: "Meta rejected the request", meta_error: metaSend.data },
+        { status: 400 }
+      );
+    }
 
     return NextResponse.json({
       ok: true,
       botText,
-      meta: data,
+      meta: metaSend.data,
       debug: debugEnabled
         ? {
             conversationId: conversation.id,
-            providerMessageId,
-            companyId: built.debug.companyId,
-            knowledgeUsed: built.debug.knowledgeUsed,
-            needs: (built as any)?.needs ?? [],
-            plannedActionsCount: actionsRaw.length,
-            actionExecResult,
-            understanding: (built as any)?.understanding ?? null,
-            plannedActions: Array.isArray((built as any)?.actions) ? (built as any).actions : [],
-            rawNeeds: Array.isArray((built as any)?.needs) ? (built as any).needs : [],
+            companyId,
+            agentId: agent.id,
+            sessionId: result.sessionId,
+            stage: result.stage,
+            runtime: result.runtime,
+            debug: result.debug,
           }
-        : undefined,
+  : undefined,
     });
   } catch (e) {
     console.error("[WA ai-reply] error:", e);

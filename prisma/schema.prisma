@@ -500,6 +500,9 @@ model Customer {
   updatedAt              DateTime                 @updatedAt
   createdByAgentId       String?
   createdInSessionId     String?
+  secondary_phone        String?
+  country_code           String?
+  secondary_country_code String?
   appointments           Appointment[]
   companies              CompanyCustomer[]
   createdByAgent         Agent?                   @relation("CustomerCreatedByAgent", fields: [createdByAgentId], references: [id])
@@ -509,6 +512,8 @@ model Customer {
   @@index([phone])
   @@index([createdInSessionId])
   @@index([createdByAgentId])
+  @@index([secondary_phone])
+  @@index([country_code])
 }
 
 model CompanyCustomer {
@@ -2278,6 +2283,9 @@ model messaging_conversation {
   updated_at               DateTime                 @default(now()) @db.Timestamptz(6)
   last_read_at             DateTime?                @db.Timestamptz(6)
   customer_id              String?
+  awaiting_name            Boolean                  @default(false)
+  awaiting_need            Boolean                  @default(false)
+  perceived_need           String?
   Customer                 Customer?                @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_msg_conv_customer")
   integration_installation integration_installation @relation(fields: [installation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_msg_conv_installation")
   messaging_message        messaging_message[]
@@ -2480,6 +2488,7 @@ enum TimeOffType {
 enum AgentChannel {
   VOICE
   CHAT
+  WHATSAPP
 }
 
 enum AgentStatus {
@@ -2493,6 +2502,7 @@ enum AgentSessionStatus {
   LIVE
   ENDED
   ERROR
+  ACTIVE
 }
 
 enum AgentTurnRole {
@@ -2500,6 +2510,7 @@ enum AgentTurnRole {
   AGENT
   SYSTEM
   TOOL
+  ASSISTANT
 }
 
 enum AgentLogLevel {

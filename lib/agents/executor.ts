@@ -279,7 +279,43 @@ async function handleLookupEntity(req: AgentRequest, trace: AgentTrace | null): 
       },
     };
   }
+// =========================
+// 3) Lookup: CUSTOMER
+// args: { entity:"customer", query:"346..." }
+// =========================
+if (entity === "customer") {
+  const queryRaw =
+    req.action.args && typeof req.action.args.query === "string"
+      ? req.action.args.query
+      : "";
 
+  const query = queryRaw.trim();
+  if (!query) {
+    pushTrace(trace, { kind: "decision", summary: "Missing query for customer lookup" });
+    return { ok: false, error: "Missing query for customer lookup" };
+  }
+
+  pushTrace(trace, {
+    kind: "action",
+    summary: "DB lookup: customer by phone (exact)",
+    data: { companyId: req.companyId, phone: query },
+  });
+
+  // customer existe globalmente, pero debe estar linkado a la company por CompanyCustomer
+  const customer = await prisma.customer.findFirst({
+    where: {
+      phone: query,
+      companies: { some: { companyId: req.companyId } },
+    },
+    select: { id: true, firstName: true, lastName: true, phone: true, email: true },
+  });
+
+  if (!customer) {
+    return { ok: true, data: { entity: "customer", found: false, phone: query } };
+  }
+
+  return { ok: true, data: { entity: "customer", found: true, customer } };
+}
   // =========================
   // 2) Lookup: NEXT APPOINTMENT
   // args: { entity:"appointment", scope:"next" }
@@ -359,9 +395,126 @@ async function handleListOptions(_req: AgentRequest, trace: AgentTrace | null): 
   return { ok: true, data: { note: "list_options stub" } };
 }
 
-async function handleCreateRecord(_req: AgentRequest, trace: AgentTrace | null): Promise<AgentResult> {
-  pushTrace(trace, { kind: "action", summary: "create_record stub", data: {} });
-  return { ok: true, data: { note: "create_record stub" } };
+async function handleCreateRecord(req: AgentRequest, trace: AgentTrace | null): Promise<AgentResult> {
+  if (!req.companyId) {
+    pushTrace(trace, { kind: "decision", summary: "Missing companyId" });
+    return { ok: false, error: "Missing companyId" };
+  }
+
+  const entityRaw =
+    req.action.args && typeof req.action.args.entity === "string"
+      ? req.action.args.entity
+      : "";
+
+  const entity = entityRaw.trim();
+
+  if (entity !== "customer") {
+    pushTrace(trace, {
+      kind: "decision",
+      summary: "create_record unsupported entity",
+      data: { entity, args: req.action.args ?? {} },
+    });
+    return { ok: false, error: "create_record unsupported entity" };
+  }
+
+  const phoneRaw =
+    req.action.args && typeof req.action.args.phone === "string"
+      ? req.action.args.phone
+      : req.customerPhoneE164 && typeof req.customerPhoneE164 === "string"
+        ? req.customerPhoneE164
+        : "";
+
+  const phone = phoneRaw.trim();
+  if (!phone) {
+    pushTrace(trace, { kind: "decision", summary: "Missing phone for create customer" });
+    return { ok: false, error: "Missing phone for create customer" };
+  }
+
+  const firstNameRaw =
+    req.action.args && typeof req.action.args.firstName === "string"
+      ? req.action.args.firstName
+      : "";
+
+  const lastNameRaw =
+    req.action.args && typeof req.action.args.lastName === "string"
+      ? req.action.args.lastName
+      : "";
+
+  const emailRaw =
+    req.action.args && typeof req.action.args.email === "string"
+      ? req.action.args.email
+      : "";
+
+  const firstName = firstNameRaw.trim();
+  const lastName = lastNameRaw.trim();
+  const email = emailRaw.trim() || null;
+
+  if (!firstName || !lastName) {
+    pushTrace(trace, {
+      kind: "decision",
+      summary: "Missing firstName/lastName for create customer",
+      data: { phone, firstNamePresent: Boolean(firstName), lastNamePresent: Boolean(lastName) },
+    });
+    return { ok: false, error: "Missing firstName and lastName for create customer" };
+  }
+
+  pushTrace(trace, {
+    kind: "action",
+    summary: "DB: find customer by phone",
+    data: { companyId: req.companyId, phone },
+  });
+
+  const existing = await prisma.customer.findFirst({
+    where: { phone },
+    select: { id: true, firstName: true, lastName: true, phone: true, email: true },
+  });
+
+  if (existing) {
+    // asegurar vínculo empresa<->cliente
+    await prisma.companyCustomer.create({
+      data: { companyId: req.companyId, customerId: existing.id },
+    }).catch(() => null);
+
+    pushTrace(trace, {
+      kind: "action",
+      summary: "Customer exists (linked to company if needed)",
+      data: { customerId: existing.id },
+    });
+
+    return { ok: true, data: { entity: "customer", created: false, customer: existing } };
+  }
+
+  pushTrace(trace, {
+    kind: "action",
+    summary: "DB: create customer + link company",
+    data: { companyId: req.companyId, phone },
+  });
+
+  const created = await prisma.$transaction(async (tx) => {
+    const c = await tx.customer.create({
+      data: {
+        phone,
+        firstName,
+        lastName,
+        ...(email ? { email } : {}),
+      },
+      select: { id: true, firstName: true, lastName: true, phone: true, email: true },
+    });
+
+    await tx.companyCustomer.create({
+      data: { companyId: req.companyId, customerId: c.id },
+    });
+
+    return c;
+  });
+
+  pushTrace(trace, {
+    kind: "action",
+    summary: "Customer created",
+    data: { customerId: created.id },
+  });
+
+  return { ok: true, data: { entity: "customer", created: true, customer: created } };
 }
 
 async function handleUpdateRecord(_req: AgentRequest, trace: AgentTrace | null): Promise<AgentResult> {
