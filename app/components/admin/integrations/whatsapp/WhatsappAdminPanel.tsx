@@ -103,7 +103,12 @@ return (
           <div className="grid h-full grid-cols-1 lg:grid-cols-[360px_1fr]">
             {/* Left */}
             <CustomersListPanel
-              companyId={companyId}
+              loading={false}
+              search={""}
+              setSearch={() => {}}
+              contacts={[]}
+              customers={[]}
+              customersLoadedOnce={false}
               selectedPhone={selectedPhone}
               onSelectPhone={onSelectPhone}
             />

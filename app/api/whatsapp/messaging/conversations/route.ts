@@ -1,9 +1,16 @@
 // app/api/whatsapp/messaging/conversations/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resolvePhoneNumber } from "@/lib/whatsapp/phoneNumbers/resolvePhoneNumber";
 
 export const dynamic = "force-dynamic";
 
+<<<<<<< HEAD
+=======
+/**
+ * GET /api/whatsapp/messaging/conversations?companyId=...&limit=30&cursor=<conversationId>&phoneNumberId=...
+ */
+>>>>>>> 16eafa1 (update)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -16,6 +23,7 @@ export async function GET(req: NextRequest) {
     const take = Math.min(Number(searchParams.get("limit") || 30), 100);
     const cursor = searchParams.get("cursor");
 
+<<<<<<< HEAD
     // 1) instalaciones WhatsApp de la company
     const installs = await prisma.integration_installation.findMany({
       where: { company_id: companyId, provider: "whatsapp" },
@@ -30,6 +38,28 @@ export async function GET(req: NextRequest) {
     // 2) conversaciones de esas instalaciones
     const conversations = await prisma.messaging_conversation.findMany({
       where: { installation_id: { in: installIds } },
+=======
+    const phoneNumberId = searchParams.get("phoneNumberId"); // opcional
+
+    let companyPhoneNumberId: string | null = null;
+
+    if (phoneNumberId) {
+      const resolved = await resolvePhoneNumber(phoneNumberId);
+      if (!resolved || resolved.companyId !== companyId) {
+        return NextResponse.json({ ok: true, items: [], nextCursor: null });
+      }
+      companyPhoneNumberId = resolved.phone.id;
+    }
+
+    const conversations = await prisma.messaging_conversation.findMany({
+      where: {
+        integration_installation: {
+          company_id: companyId,
+          provider: "whatsapp",
+        },
+        ...(companyPhoneNumberId ? { company_phone_number_id: companyPhoneNumberId } : {}),
+      },
+>>>>>>> 16eafa1 (update)
       orderBy: [{ last_message_at: "desc" }, { created_at: "desc" }],
       take: take + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
