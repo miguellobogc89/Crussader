@@ -98,17 +98,12 @@ return (
   <div className="h-[calc(100vh-180px)] min-h-[720px]">
     <div className="grid h-full grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
       {/* Card principal (WhatsApp) */}
-      <Card className="h-full overflow-hidden">
+      <Card className="h-full overflow-hidden border-0 bg-transparent shadow-none">
         <CardContent className="h-full p-0">
           <div className="grid h-full grid-cols-1 lg:grid-cols-[360px_1fr]">
             {/* Left */}
             <CustomersListPanel
-              loading={false}
-              search={""}
-              setSearch={() => {}}
-              contacts={[]}
-              customers={[]}
-              customersLoadedOnce={false}
+              companyId={companyId}
               selectedPhone={selectedPhone}
               onSelectPhone={onSelectPhone}
             />

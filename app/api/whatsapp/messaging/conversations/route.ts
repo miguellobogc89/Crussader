@@ -1,13 +1,9 @@
 // app/api/whatsapp/messaging/conversations/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { resolvePhoneNumber } from "@/lib/whatsapp/phoneNumbers/resolvePhoneNumber";
 
 export const dynamic = "force-dynamic";
 
-/**
- * GET /api/whatsapp/messaging/conversations?companyId=...&limit=30&cursor=<conversationId>&phoneNumberId=...
- */
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -20,26 +16,20 @@ export async function GET(req: NextRequest) {
     const take = Math.min(Number(searchParams.get("limit") || 30), 100);
     const cursor = searchParams.get("cursor");
 
-    const phoneNumberId = searchParams.get("phoneNumberId"); // opcional
+    // 1) instalaciones WhatsApp de la company
+    const installs = await prisma.integration_installation.findMany({
+      where: { company_id: companyId, provider: "whatsapp" },
+      select: { id: true },
+    });
 
-    let companyPhoneNumberId: string | null = null;
-
-    if (phoneNumberId) {
-      const resolved = await resolvePhoneNumber(phoneNumberId);
-      if (!resolved || resolved.companyId !== companyId) {
-        return NextResponse.json({ ok: true, items: [], nextCursor: null });
-      }
-      companyPhoneNumberId = resolved.phone.id;
+    const installIds = installs.map((x) => x.id);
+    if (installIds.length === 0) {
+      return NextResponse.json({ ok: true, items: [], nextCursor: null });
     }
 
+    // 2) conversaciones de esas instalaciones
     const conversations = await prisma.messaging_conversation.findMany({
-      where: {
-        integration_installation: {
-          company_id: companyId,
-          provider: "whatsapp",
-        },
-        ...(companyPhoneNumberId ? { company_phone_number_id: companyPhoneNumberId } : {}),
-      },
+      where: { installation_id: { in: installIds } },
       orderBy: [{ last_message_at: "desc" }, { created_at: "desc" }],
       take: take + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
