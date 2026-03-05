@@ -2,7 +2,7 @@
 "use client";
 
 import { User } from "lucide-react";
-import type { CustomerListItem } from "@/app/components/admin/integrations/whatsapp/CustomersListPanel";
+import type { CustomerListItem } from "@/app/components/admin/integrations/whatsapp/ContactsPanel/CustomersListPanel";
 
 function normalizePhone(p: string) {
   return p.replace(/[^\d]/g, "");

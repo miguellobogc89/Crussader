@@ -7,7 +7,7 @@ import { Button } from "@/app/components/ui/button";
 import { SendHorizonal } from "lucide-react";
 
 import ChatPanel from "@/app/components/admin/integrations/whatsapp/ChatPanel";
-import CustomersListPanel from "@/app/components/admin/integrations/whatsapp/CustomersListPanel";
+import CustomersListPanel from "@/app/components/admin/integrations/whatsapp/ContactsPanel/CustomersListPanel";
 import ConversationHeader, {
   type ConversationContact,
 } from "@/app/components/admin/integrations/whatsapp/ConversationHeader";
@@ -103,7 +103,12 @@ return (
           <div className="grid h-full grid-cols-1 lg:grid-cols-[360px_1fr]">
             {/* Left */}
             <CustomersListPanel
-              companyId={companyId}
+              loading={false}
+              search={""}
+              setSearch={() => {}}
+              contacts={[]}
+              customers={[]}
+              customersLoadedOnce={false}
               selectedPhone={selectedPhone}
               onSelectPhone={onSelectPhone}
             />

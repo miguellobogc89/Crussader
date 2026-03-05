@@ -1,6 +1,7 @@
 // app/api/webhooks/whatsapp/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resolvePhoneNumber } from "@/lib/whatsapp/phoneNumbers/resolvePhoneNumber";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN ?? "";
 const WA_DEBUG = process.env.WA_DEBUG === "1";
@@ -85,22 +86,39 @@ type WaValue = {
   }>;
 };
 
-async function resolveInstallation(value: WaValue) {
+async function resolveInstallation(value: WaValue): Promise<{
+  installation: any | null;
+  companyPhoneNumberId: string | null;
+}> {
   const phoneNumberId = value?.metadata?.phone_number_id;
   const displayPhone = value?.metadata?.display_phone_number;
 
+  if (phoneNumberId) {
+    const resolved = await resolvePhoneNumber(String(phoneNumberId));
+    if (resolved) {
+      const inst = await prisma.integration_installation.findFirst({
+        where: {
+          provider: "whatsapp",
+          status: "active",
+          company_id: resolved.companyId,
+        },
+      });
+      if (inst) {
+        return { installation: inst, companyPhoneNumberId: resolved.phone.id };
+      }
+    }
+  }
+
+  // fallback temporal legacy
   if (phoneNumberId) {
     const inst = await prisma.integration_installation.findFirst({
       where: {
         provider: "whatsapp",
         status: "active",
-        config: {
-          path: ["phone_number_id"],
-          equals: phoneNumberId,
-        },
+        config: { path: ["phone_number_id"], equals: phoneNumberId },
       },
     });
-    if (inst) return inst;
+    if (inst) return { installation: inst, companyPhoneNumberId: null };
   }
 
   if (displayPhone) {
@@ -108,16 +126,13 @@ async function resolveInstallation(value: WaValue) {
       where: {
         provider: "whatsapp",
         status: "active",
-        config: {
-          path: ["display_phone_number"],
-          equals: displayPhone,
-        },
+        config: { path: ["display_phone_number"], equals: displayPhone },
       },
     });
-    if (inst) return inst;
+    if (inst) return { installation: inst, companyPhoneNumberId: null };
   }
 
-  return null;
+  return { installation: null, companyPhoneNumberId: null };
 }
 
 async function upsertConversation(args: {
@@ -127,6 +142,7 @@ async function upsertConversation(args: {
   contactName?: string | null;
   providerThreadId?: string | null;
   lastMessageAt?: Date | null;
+  companyPhoneNumberId?: string | null;
 }) {
   const {
     installationId,
@@ -135,6 +151,7 @@ async function upsertConversation(args: {
     contactName,
     providerThreadId,
     lastMessageAt,
+    companyPhoneNumberId,
   } = args;
 
   return prisma.messaging_conversation.upsert({
@@ -152,6 +169,7 @@ async function upsertConversation(args: {
       provider_thread_id: providerThreadId ?? null,
       status: "open",
       last_message_at: lastMessageAt ?? null,
+      company_phone_number_id: companyPhoneNumberId ?? null,
     },
     update: {
       contact_phone_e164: contactPhoneE164 ?? null,
@@ -159,6 +177,7 @@ async function upsertConversation(args: {
       provider_thread_id: providerThreadId ?? null,
       last_message_at: lastMessageAt ?? undefined,
       updated_at: new Date(),
+      company_phone_number_id: companyPhoneNumberId ?? undefined,
     },
   });
 }
@@ -200,16 +219,20 @@ async function autoLinkConversationToCustomer(args: {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
 
-  // 1) Verificación de Meta (cuando viene hub.*)
   const mode = searchParams.get("hub.mode");
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
+
+  console.log("[WA][VERIFY]", {
+    mode,
+    token,
+    challenge,
+  });
 
   if (mode === "subscribe" && token === VERIFY_TOKEN && challenge) {
     return new NextResponse(challenge, { status: 200 });
   }
 
-  // 2) Debug interno: /api/webhooks/whatsapp?debug=1
   const debug = searchParams.get("debug");
   if (debug === "1") {
     return NextResponse.json({
@@ -319,11 +342,14 @@ export async function POST(req: Request) {
     }
 
     // Resolve installation
-    const installation = await resolveInstallation(value);
-    if (!installation) {
-      logWA("[WA][SKIP] no installation matched");
-      return NextResponse.json({ ok: true });
-    }
+const resolvedInst = await resolveInstallation(value);
+const installation = resolvedInst.installation;
+
+if (!installation) {
+  logWA("[WA][SKIP] no installation matched");
+  return NextResponse.json({ ok: true });
+}
+
 
     // Si es SOLO status update, no hacemos más (evita ruido y trabajo)
     if (!hasIncomingMessages) {
@@ -357,14 +383,15 @@ export async function POST(req: Request) {
     const lastTs =
       value.messages && value.messages[0] ? tsToDate(value.messages[0].timestamp) : null;
 
-    const conv = await upsertConversation({
-      installationId: installation.id,
-      contactExternalId: contactExternalIdRaw,
-      contactPhoneE164: contactExternalIdRaw,
-      contactName,
-      providerThreadId: null,
-      lastMessageAt: lastTs,
-    });
+const conv = await upsertConversation({
+  installationId: installation.id,
+  contactExternalId: contactExternalIdRaw,
+  contactPhoneE164: contactExternalIdRaw,
+  contactName,
+  providerThreadId: null,
+  lastMessageAt: lastTs,
+  companyPhoneNumberId: resolvedInst.companyPhoneNumberId,
+});
 
     async function resolveCustomerScope(args: { phoneE164: string; companyId: string }) {
   const { phoneE164, companyId } = args;
@@ -430,28 +457,35 @@ logWA("[WA][CUSTOMER_SCOPE]", {
       }
     }
 
-    // Insert incoming messages
-    await prisma.$transaction(async (tx) => {
-      for (const m of value.messages || []) {
-        const providerMessageId = m.id ? String(m.id) : null;
-        const text =
-          m && m.text && typeof m.text.body === "string" ? m.text.body : null;
-        const providerTs = tsToDate(m.timestamp);
+// Insert incoming messages (dedupe-safe)
+const rows = (value.messages || []).map((m) => {
+  const providerMessageId = m.id ? String(m.id) : null;
 
-        await tx.messaging_message.create({
-          data: {
-            conversation_id: conv.id,
-            provider_message_id: providerMessageId,
-            direction: "in",
-            kind: m.type ? String(m.type) : "unknown",
-            text,
-            status: null,
-            provider_ts: providerTs,
-            payload: m as any,
-          },
-        });
-      }
-    });
+  const text =
+    m && m.text && typeof m.text.body === "string"
+      ? m.text.body
+      : null;
+
+  const providerTs = tsToDate(m.timestamp);
+
+  return {
+    conversation_id: conv.id,
+    provider_message_id: providerMessageId,
+    direction: "in",
+    kind: m.type ? String(m.type) : "unknown",
+    text,
+    status: null,
+    provider_ts: providerTs,
+    payload: m as any,
+  };
+});
+
+if (rows.length > 0) {
+  await prisma.messaging_message.createMany({
+    data: rows,
+    skipDuplicates: true,
+  });
+}
 
     // Update last_message_at with last incoming timestamp
     const lastIncoming = value.messages && value.messages.length > 0

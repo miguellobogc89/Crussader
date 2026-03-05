@@ -1,11 +1,12 @@
 // app/api/whatsapp/messaging/conversations/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resolvePhoneNumber } from "@/lib/whatsapp/phoneNumbers/resolvePhoneNumber";
 
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/whatsapp/messaging/conversations?companyId=...&limit=30&cursor=<conversationId>
+ * GET /api/whatsapp/messaging/conversations?companyId=...&limit=30&cursor=<conversationId>&phoneNumberId=...
  */
 export async function GET(req: NextRequest) {
   try {
@@ -13,27 +14,33 @@ export async function GET(req: NextRequest) {
 
     const companyId = searchParams.get("companyId");
     if (!companyId) {
-      return NextResponse.json(
-        { ok: false, error: "companyId requerido" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "companyId requerido" }, { status: 400 });
     }
 
     const take = Math.min(Number(searchParams.get("limit") || 30), 100);
     const cursor = searchParams.get("cursor");
 
-    // 1) Conversaciones de WhatsApp activas para esa company
+    const phoneNumberId = searchParams.get("phoneNumberId"); // opcional
+
+    let companyPhoneNumberId: string | null = null;
+
+    if (phoneNumberId) {
+      const resolved = await resolvePhoneNumber(phoneNumberId);
+      if (!resolved || resolved.companyId !== companyId) {
+        return NextResponse.json({ ok: true, items: [], nextCursor: null });
+      }
+      companyPhoneNumberId = resolved.phone.id;
+    }
+
     const conversations = await prisma.messaging_conversation.findMany({
       where: {
         integration_installation: {
           company_id: companyId,
           provider: "whatsapp",
         },
+        ...(companyPhoneNumberId ? { company_phone_number_id: companyPhoneNumberId } : {}),
       },
-      orderBy: [
-        { last_message_at: "desc" },
-        { created_at: "desc" },
-      ],
+      orderBy: [{ last_message_at: "desc" }, { created_at: "desc" }],
       take: take + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       select: {
@@ -54,15 +61,11 @@ export async function GET(req: NextRequest) {
       if (last) nextCursor = last.id;
     }
 
-    // 2) Último mensaje + unread_count (MVP N+1)
     const items = await Promise.all(
       conversations.map(async (c) => {
         const lastMsg = await prisma.messaging_message.findFirst({
           where: { conversation_id: c.id },
-          orderBy: [
-            { provider_ts: "desc" },
-            { created_at: "desc" },
-          ],
+          orderBy: [{ provider_ts: "desc" }, { created_at: "desc" }],
           select: {
             direction: true,
             kind: true,
@@ -77,9 +80,7 @@ export async function GET(req: NextRequest) {
           where: {
             conversation_id: c.id,
             direction: "in",
-            provider_ts: c.last_read_at
-              ? { gt: c.last_read_at }
-              : undefined,
+            provider_ts: c.last_read_at ? { gt: c.last_read_at } : undefined,
           },
         });
 
@@ -107,11 +108,7 @@ export async function GET(req: NextRequest) {
       })
     );
 
-    return NextResponse.json({
-      ok: true,
-      items,
-      nextCursor,
-    });
+    return NextResponse.json({ ok: true, items, nextCursor });
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: e.message || "Error al listar conversaciones" },

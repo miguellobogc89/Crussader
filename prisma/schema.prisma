@@ -1507,6 +1507,7 @@ model Company {
   UserCompany                 UserCompany[]
   WebchatSites                WebchatSite[]                 @relation("CompanyToWebchatSite")
   billing_account             billing_account?
+  company_phone_number        company_phone_number[]
   discount_redemption         discount_redemption[]
   google_gbp_account          google_gbp_account[]
   google_gbp_location         google_gbp_location[]
@@ -1665,6 +1666,7 @@ model Location {
   ShiftEvent                  ShiftEvent[]
   UserLocation                UserLocation[]
   WebchatSites                WebchatSite[]                 @relation("LocationToWebchatSite")
+  company_phone_number        company_phone_number[]
   google_gbp_location         google_gbp_location[]
   google_gbp_reviews          google_gbp_reviews[]
   integration_installation    integration_installation[]
@@ -2286,6 +2288,8 @@ model messaging_conversation {
   awaiting_name            Boolean                  @default(false)
   awaiting_need            Boolean                  @default(false)
   perceived_need           String?
+  company_phone_number_id  String?                  @db.Uuid
+  company_phone_number     company_phone_number?    @relation(fields: [company_phone_number_id], references: [id], onUpdate: NoAction, map: "fk_messaging_conversation_company_phone_number")
   Customer                 Customer?                @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_msg_conv_customer")
   integration_installation integration_installation @relation(fields: [installation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_msg_conv_installation")
   messaging_message        messaging_message[]
@@ -2295,6 +2299,7 @@ model messaging_conversation {
   @@index([status], map: "idx_msg_conv_status")
   @@index([customer_id], map: "idx_msg_conv_customer")
   @@index([last_read_at], map: "idx_msg_conv_last_read_at")
+  @@index([company_phone_number_id], map: "ix_messaging_conversation_company_phone_number_id")
 }
 
 model messaging_message {
@@ -2335,6 +2340,27 @@ model whatsapp_template {
   @@index([company_id, is_favorite, updated_at(sort: Desc)], map: "idx_whatsapp_template_company_fav_updated")
   @@index([company_id, status], map: "idx_whatsapp_template_company_status")
   @@index([company_id, updated_at(sort: Desc)], map: "idx_whatsapp_template_company_updated")
+}
+
+model company_phone_number {
+  id                     String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id             String
+  location_id            String?
+  phone_number_e164      String
+  phone_number_digits    String
+  phone_number_id        String                      @unique(map: "ux_company_phone_number_phone_number_id")
+  waba_id                String
+  display_phone_number   String?
+  status                 company_phone_number_status @default(pending)
+  created_at             DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                    @default(now()) @db.Timestamptz(6)
+  Company                Company                     @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_company_phone_company")
+  Location               Location?                   @relation(fields: [location_id], references: [id], onUpdate: NoAction, map: "fk_company_phone_location")
+  messaging_conversation messaging_conversation[]
+
+  @@unique([company_id, phone_number_e164], map: "ux_company_phone_number_company_e164")
+  @@index([company_id, status], map: "ix_company_phone_number_company_status")
+  @@index([location_id], map: "ix_company_phone_number_location")
 }
 
 /// *
@@ -2782,4 +2808,10 @@ enum whatsapp_template_status {
 enum whatsapp_template_use_type {
   start_conversation
   within_24h
+}
+
+enum company_phone_number_status {
+  active
+  pending
+  disabled
 }

@@ -1,4 +1,4 @@
-// app/components/admin/integrations/whatsapp/CustomersListPanel.tsx
+// app/components/admin/integrations/whatsapp/ContactsPanel/CustomersListPanel.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -16,11 +16,8 @@ export type ContactMeta = {
   name: string;
   avatarUrl?: string | null;
   conversationId?: string;
-
-  // ✅ nuevos (para panel SYSTEM turns)
   agentId?: string | null;
   phoneNumberId?: string | null; // callee
-  environment?: "TEST" | "PROD";
 };
 
 type WaConversationListItem = {
@@ -30,12 +27,6 @@ type WaConversationListItem = {
     phone_e164: string | null;
     external_id: string;
   };
-
-  // ✅ nuevos (si los devuelve la API)
-  agentId?: string | null;
-  phoneNumberId?: string | null;
-  environment?: "TEST" | "PROD";
-
   unread_count: number;
   last_message: null | {
     direction: string;
@@ -55,10 +46,8 @@ export type ContactRow = {
   lastPreview: string;
   unread: number;
 
-  // ✅ nuevos
   agentId: string | null;
   phoneNumberId: string | null;
-  environment: "TEST" | "PROD";
 };
 
 export type CustomerListItem = {
@@ -81,10 +70,14 @@ function safeParseMs(iso: string | null | undefined) {
   return t;
 }
 
+// ✅ tu número real (callee) en Cloud API
+const PROD_PHONE_NUMBER_ID = "968380903015928";
+
 async function fetchWaConversations(companyId: string, q: string) {
   const params = new URLSearchParams();
   params.set("companyId", companyId);
   params.set("limit", "50");
+  params.set("phoneNumberId", PROD_PHONE_NUMBER_ID);
 
   let res: Response;
 
@@ -183,12 +176,40 @@ export default function CustomersListPanel({
   companyId,
   selectedPhone,
   onSelectPhone,
+
+  // ✅ modo controlado (si vienen, NO hacemos fetch aquí)
+  search: searchProp,
+  onChangeSearch,
+  contacts: contactsProp,
+  customers: customersProp,
+  customersLoadedOnce: customersLoadedOnceProp,
+  loading: loadingProp,
 }: {
   companyId: string | null;
   selectedPhone: string;
   onSelectPhone: (phoneE164: string, meta?: ContactMeta) => void;
+
+  search?: string;
+  onChangeSearch?: (v: string) => void;
+  contacts?: ContactRow[];
+  customers?: CustomerListItem[];
+  customersLoadedOnce?: boolean;
+  loading?: boolean;
 }) {
-  const [search, setSearch] = useState("");
+  const [searchLocal, setSearchLocal] = useState("");
+  const search = typeof searchProp === "string" ? searchProp : searchLocal;
+
+  function setSearch(v: string) {
+    if (onChangeSearch) onChangeSearch(v);
+    else setSearchLocal(v);
+  }
+
+  const isControlled =
+    Array.isArray(contactsProp) &&
+    Array.isArray(customersProp) &&
+    typeof searchProp === "string" &&
+    typeof onChangeSearch === "function";
+
   const [convs, setConvs] = useState<WaConversationListItem[]>([]);
   const [customers, setCustomers] = useState<CustomerListItem[]>([]);
   const [customersLoadedOnce, setCustomersLoadedOnce] = useState(false);
@@ -199,24 +220,22 @@ export default function CustomersListPanel({
   const [openOpen, setOpenOpen] = useState(false);
   const [openAll, setOpenAll] = useState(false);
 
+  // Conversaciones (poll) - SOLO si no está controlado
   useEffect(() => {
+    if (isControlled) return;
     if (!companyId) return;
 
     const cid = companyId;
     let alive = true;
 
     async function loadOnce() {
-      try {
-        const data = await fetchWaConversations(cid, search);
-        if (!alive) return;
+      const data = await fetchWaConversations(cid, search);
+      if (!alive) return;
 
-        if (data.ok) setConvs(data.items);
-        else setConvs([]);
+      if (data.ok) setConvs(data.items);
+      else setConvs([]);
 
-        if (!hasLoadedOnce) setHasLoadedOnce(true);
-      } catch {
-        // noop
-      }
+      if (!hasLoadedOnce) setHasLoadedOnce(true);
     }
 
     loadOnce();
@@ -226,9 +245,11 @@ export default function CustomersListPanel({
       alive = false;
       window.clearInterval(t);
     };
-  }, [companyId, search, hasLoadedOnce]);
+  }, [companyId, search, hasLoadedOnce, isControlled]);
 
+  // Customers - SOLO si no está controlado (y solo al abrir "TODOS")
   useEffect(() => {
+    if (isControlled) return;
     if (!companyId) return;
     if (!openAll) return;
 
@@ -250,9 +271,11 @@ export default function CustomersListPanel({
     return () => {
       alive = false;
     };
-  }, [companyId, openAll, search]);
+  }, [companyId, openAll, search, isControlled]);
 
   const contacts = useMemo<ContactRow[]>(() => {
+    if (Array.isArray(contactsProp)) return contactsProp;
+
     return convs
       .map((c) => {
         const phoneRaw = c.contact.phone_e164 ? c.contact.phone_e164 : c.contact.external_id;
@@ -273,9 +296,6 @@ export default function CustomersListPanel({
 
         const unread = Number(c.unread_count || 0);
 
-        const env: "TEST" | "PROD" =
-          c.environment === "PROD" ? "PROD" : "TEST";
-
         return {
           conversationId: c.id,
           name,
@@ -284,35 +304,42 @@ export default function CustomersListPanel({
           lastPreview,
           unread,
 
-          agentId: typeof c.agentId === "string" ? c.agentId : null,
-          phoneNumberId: typeof c.phoneNumberId === "string" ? c.phoneNumberId : null,
-          environment: env,
+          agentId: null,
+          phoneNumberId: PROD_PHONE_NUMBER_ID,
         };
       })
       .filter((x) => x.phoneE164.length > 0)
       .sort((a, b) => b.lastAtMs - a.lastAtMs);
-  }, [convs]);
+  }, [contactsProp, convs]);
+
+  const customersToShow = Array.isArray(customersProp) ? customersProp : customers;
+
+  const customersLoadedOnceUi =
+    typeof customersLoadedOnceProp === "boolean" ? customersLoadedOnceProp : customersLoadedOnce;
+
+  const hasLoadedOnceUi = isControlled ? true : hasLoadedOnce;
 
   async function handleSelect(row: ContactRow) {
     onSelectPhone(row.phoneE164, {
       name: row.name,
       avatarUrl: null,
       conversationId: row.conversationId,
-
       agentId: row.agentId,
       phoneNumberId: row.phoneNumberId,
-      environment: row.environment,
     });
 
     if (!companyId) return;
     if (row.unread <= 0) return;
 
-    setConvs((prev) =>
-      prev.map((x) => {
-        if (x.id !== row.conversationId) return x;
-        return { ...x, unread_count: 0 };
-      })
-    );
+    // optimista
+    if (!isControlled) {
+      setConvs((prev) =>
+        prev.map((x) => {
+          if (x.id !== row.conversationId) return x;
+          return { ...x, unread_count: 0 };
+        })
+      );
+    }
 
     await markConversationRead({ companyId, conversationId: row.conversationId });
   }
@@ -320,7 +347,9 @@ export default function CustomersListPanel({
   const countPending = 0;
   const countNoReview = contacts.length;
   const countOpen = contacts.filter((c) => c.unread > 0).length;
-  const countAll = customersLoadedOnce ? customers.length : 0;
+  const countAll = customersLoadedOnceUi ? customersToShow.length : 0;
+
+  const loadingUi = typeof loadingProp === "boolean" ? loadingProp : false;
 
   return (
     <div className="flex h-full min-h-0 flex-col border-b lg:border-b-0 lg:border-r">
@@ -328,7 +357,7 @@ export default function CustomersListPanel({
         value={search}
         onChange={setSearch}
         onClear={() => setSearch("")}
-        placeholder={hasLoadedOnce ? "Buscar por nombre o número..." : "Cargando..."}
+        placeholder={hasLoadedOnceUi ? "Buscar por nombre o número..." : "Cargando..."}
       />
 
       <Separator />
@@ -363,7 +392,9 @@ export default function CustomersListPanel({
               ))}
 
               {contacts.length === 0 ? (
-                <div className="p-4 text-sm text-muted-foreground">No hay conversaciones todavía.</div>
+                <div className="p-4 text-sm text-muted-foreground">
+                  {loadingUi ? "Cargando conversaciones…" : "No hay conversaciones todavía."}
+                </div>
               ) : null}
             </div>
           ) : null}
@@ -387,7 +418,7 @@ export default function CustomersListPanel({
 
           {openAll ? (
             <div className="divide-y">
-              {customers.map((cu) => {
+              {customersToShow.map((cu) => {
                 const phoneDigits = normalizePhone(cu.phone);
                 return (
                   <CustomerRowItem
@@ -399,21 +430,19 @@ export default function CustomersListPanel({
                         name: cu.name,
                         avatarUrl: null,
                         conversationId: undefined,
-
                         agentId: null,
-                        phoneNumberId: null,
-                        environment: "TEST",
+                        phoneNumberId: PROD_PHONE_NUMBER_ID,
                       })
                     }
                   />
                 );
               })}
 
-              {customersLoadedOnce && customers.length === 0 ? (
+              {customersLoadedOnceUi && customersToShow.length === 0 ? (
                 <div className="p-4 text-sm text-muted-foreground">No hay clientes todavía.</div>
               ) : null}
 
-              {!customersLoadedOnce ? (
+              {!customersLoadedOnceUi ? (
                 <div className="p-4 text-sm text-muted-foreground">Cargando clientes…</div>
               ) : null}
             </div>

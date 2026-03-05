@@ -51,7 +51,7 @@ export const NAV_ITEMS: SidebarNavItem[] = [
   },
   {
     title: "Mensajes",
-    href: "/dashboard/admin/whatsapp",
+    href: "/dashboard/whatsapp",
     icon: MessagesSquare,
     requiresAdmin: true,
   },

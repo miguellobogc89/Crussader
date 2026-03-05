@@ -1,4 +1,4 @@
-// app/dashboard/admin/whatsapp/templates/page.tsx
+// app/dashboard/whatsapp/templates/page.tsx
 "use client";
 
 import { useBootstrapStore } from "@/app/providers/bootstrap-store";

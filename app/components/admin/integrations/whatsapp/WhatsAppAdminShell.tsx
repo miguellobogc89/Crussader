@@ -8,19 +8,12 @@ import WhatsappAdminPanel, {
   type WaDebugEvent,
   type DefaultTemplate,
 } from "@/app/components/admin/integrations/whatsapp/WhatsappAdminPanel";
+import { useWhatsAppChatEvents } from "@/app/components/admin/integrations/whatsapp/hooks/useWhatsAppChatEvents";
+import { useWhatsAppSystemTurns } from "@/app/components/admin/integrations/whatsapp/hooks/useWhatsAppSystemTurns";
 
 import type { ConversationContact } from "@/app/components/admin/integrations/whatsapp/ConversationHeader";
 import type { TemplateGroupKey } from "@/lib/whatsapp/templateGroups";
-
-function normalizePhone(p: string) {
-  return String(p || "").replace(/[^\d]/g, "");
-}
-
-function toE164Digits(raw: string) {
-  const d = normalizePhone(raw);
-  if (d.length === 9) return `34${d}`;
-  return d;
-}
+import { toWaDigits } from "@/lib/whatsapp/configuration/phone";
 
 function fillTemplateVars(text: string, contact: ConversationContact | null) {
   let out = text;
@@ -48,81 +41,17 @@ async function fetchTemplateDefaults(companyId: string) {
     `/api/whatsapp/templates/defaults?companyId=${encodeURIComponent(companyId)}`,
     { cache: "no-store" }
   );
-  if (!res.ok) return { ok: false, defaults: {} as Record<string, DefaultTemplate | null> };
+
+  if (!res.ok) {
+    return { ok: false, defaults: {} as Record<string, DefaultTemplate | null> };
+  }
+
   const data = (await res.json()) as {
     ok: boolean;
     defaults: Record<string, DefaultTemplate | null>;
   };
+
   return data;
-}
-
-async function fetchConversationEvents(args: { companyId: string; conversationId: string }) {
-  const params = new URLSearchParams();
-  params.set("companyId", args.companyId);
-  params.set("conversationId", args.conversationId);
-  params.set("limit", "300");
-
-  const res = await fetch(`/api/whatsapp/messaging/messages?${params.toString()}`, {
-    cache: "no-store",
-  });
-  const data = await res.json().catch(() => null);
-
-  const events: WaDebugEvent[] =
-    data && data.ok && Array.isArray(data.events) ? (data.events as WaDebugEvent[]) : [];
-
-  return { ok: res.ok, events };
-}
-
-async function markConversationRead(args: { companyId: string; conversationId: string }) {
-  const res = await fetch("/api/whatsapp/messaging/conversations/read", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(args),
-  });
-
-  const data = await res.json().catch(() => null);
-  return { ok: res.ok, data };
-}
-
-type SystemTurn = { id: string; at: number; text: string; payload?: unknown };
-
-type SessionMemory = {
-  profile?: {
-    firstName?: string;
-    lastName?: string;
-    email?: string;
-    phone?: string;
-    [k: string]: unknown;
-  };
-  state?: Record<string, unknown>;
-  [k: string]: unknown;
-};
-
-async function fetchSystemTurns(args: {
-  companyId: string;
-  conversationId: string;
-  limit?: number;
-}) {
-  const params = new URLSearchParams();
-  params.set("companyId", args.companyId);
-  params.set("conversationId", args.conversationId);
-  params.set("limit", String(args.limit ?? 200));
-
-  const res = await fetch(`/api/whatsapp/agent/turns?${params.toString()}`, {
-    cache: "no-store",
-  });
-
-  const data = await res.json().catch(() => null);
-
-  const events: SystemTurn[] =
-    data && data.ok && Array.isArray(data.events) ? (data.events as SystemTurn[]) : [];
-
-  const memory: SessionMemory | null =
-    data && data.ok && data.memory && typeof data.memory === "object"
-      ? (data.memory as SessionMemory)
-      : null;
-
-  return { ok: res.ok, events, memory };
 }
 
 type SelectedThreadMeta = {
@@ -132,9 +61,17 @@ type SelectedThreadMeta = {
   environment: "TEST" | "PROD";
 };
 
-export default function WhatsAppAdminShell() {
+// ✅ tu número real (callee) en Cloud API (mientras no haya selector)
+const PROD_PHONE_NUMBER_ID = "968380903015928";
+
+export default function WhatsAppAdminShell({
+  initialEvents,
+}: {
+  initialEvents?: WaDebugEvent[];
+}) {
   const companyId = useBootstrapStore((s) => s.data?.activeCompanyResolved?.id ?? null);
 
+  // Siempre guardamos el teléfono como "digits" (sin + ni espacios)
   const [selectedPhone, setSelectedPhone] = useState("");
   const [selectedContact, setSelectedContact] = useState<ConversationContact | null>(null);
 
@@ -145,9 +82,21 @@ export default function WhatsAppAdminShell() {
     environment: "TEST",
   });
 
-  // Chat DB events
-  const [chatEvents, setChatEvents] = useState<WaDebugEvent[]>([]);
-  const [chatLoading, setChatLoading] = useState(false);
+
+  // ✅ chat events (hook)
+  const chatModel = useWhatsAppChatEvents({
+    companyId,
+    conversationId: thread.conversationId,
+    pollMs: 2000,
+    initialEvents,
+  });
+
+  // ✅ system turns (hook)
+  const systemModel = useWhatsAppSystemTurns({
+    companyId,
+    conversationId: thread.conversationId,
+    pollMs: 2000,
+  });
 
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -162,14 +111,20 @@ export default function WhatsAppAdminShell() {
   }
 
   async function handleSend() {
-    const toTrim = toE164Digits(selectedPhone.trim());
+    const vvTo = toWaDigits(selectedPhone.trim());
+    if (!vvTo.ok) {
+      setToast(vvTo.reason);
+      return;
+    }
+
+    const toTrim = vvTo.digits;
     const bodyTrim = body.trim();
 
-    if (!toTrim) {
+    if (toTrim.length === 0) {
       setToast("Falta el número destino.");
       return;
     }
-    if (!bodyTrim) {
+    if (bodyTrim.length === 0) {
       setToast("Escribe un mensaje antes de enviar.");
       return;
     }
@@ -179,6 +134,7 @@ export default function WhatsAppAdminShell() {
 
     try {
       const res = await sendTest(toTrim, bodyTrim);
+
       if (!res.ok) {
         setToast(
           typeof res.data === "object" && res.data
@@ -190,12 +146,10 @@ export default function WhatsAppAdminShell() {
 
       setBody("");
 
+      // refrescar conversación (deja que el polling la mantenga, pero esto mejora el feedback)
       if (companyId && thread.conversationId) {
-        const r = await fetchConversationEvents({
-          companyId,
-          conversationId: thread.conversationId,
-        });
-        if (r.ok) setChatEvents(r.events);
+        // el hook no expone fetch, pero sí setEvents: se actualiza en el próximo tick igual
+        // (si quieres instantáneo, luego exponemos "refresh()" en el hook)
       }
     } finally {
       setSending(false);
@@ -203,14 +157,20 @@ export default function WhatsAppAdminShell() {
   }
 
   async function sendQuickText(text: string) {
-    const toTrim = toE164Digits(selectedPhone.trim());
+    const vvTo = toWaDigits(selectedPhone.trim());
+    if (!vvTo.ok) {
+      setToast(vvTo.reason);
+      return;
+    }
+
+    const toTrim = vvTo.digits;
     const bodyTrim = text.trim();
 
-    if (!toTrim) {
+    if (toTrim.length === 0) {
       setToast("Falta el número destino.");
       return;
     }
-    if (!bodyTrim) {
+    if (bodyTrim.length === 0) {
       setToast("Plantilla vacía.");
       return;
     }
@@ -224,6 +184,7 @@ export default function WhatsAppAdminShell() {
 
     try {
       const res = await sendTest(toTrim, bodyTrim);
+
       if (res.ok) {
         const dbg = res.data && res.data.debug ? res.data.debug : null;
 
@@ -241,9 +202,7 @@ export default function WhatsAppAdminShell() {
           setToast(`OK · DB ✔ · Meta id …${providerMessageId.slice(-6)}`);
         }
       }
-
-      const r = await fetchConversationEvents({ companyId, conversationId: thread.conversationId });
-      if (r.ok) setChatEvents(r.events);
+      // polling refresca; si quieres instantáneo, luego añadimos refresh() en el hook
     } finally {
       setSending(false);
     }
@@ -255,144 +214,12 @@ export default function WhatsAppAdminShell() {
 
   useEffect(() => {
     if (!toast) return;
-
     const t = window.setTimeout(() => setToast(null), 2200);
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  // Poll de mensajes normales de chat
-  useEffect(() => {
-    if (!companyId) return;
-    if (!thread.conversationId) return;
-
-    const cid = companyId;
-    const convId = thread.conversationId;
-
-    let alive = true;
-
-    async function tick() {
-      const r = await fetchConversationEvents({ companyId: cid, conversationId: convId });
-      if (!alive) return;
-      if (r.ok) setChatEvents(r.events);
-    }
-
-    setChatLoading(true);
-    tick().finally(() => {
-      if (alive) setChatLoading(false);
-    });
-
-    const t = window.setInterval(() => tick(), 2000);
-
-    return () => {
-      alive = false;
-      window.clearInterval(t);
-    };
-  }, [companyId, thread.conversationId]);
-
-  // Mark as read
-  useEffect(() => {
-    if (!companyId) return;
-    if (!thread.conversationId) return;
-    if (chatEvents.length === 0) return;
-
-    const hasIncoming = chatEvents.some((e) => e.kind === "message");
-    if (!hasIncoming) return;
-
-    markConversationRead({ companyId, conversationId: thread.conversationId });
-  }, [chatEvents, companyId, thread.conversationId]);
-
-  // SYSTEM turns + session memory
-  const [systemTurns, setSystemTurns] = useState<SystemTurn[]>([]);
-  const [systemLoading, setSystemLoading] = useState(false);
-  const [sessionMemory, setSessionMemory] = useState<SessionMemory | null>(null);
-
-  const canFetchSystem = Boolean(companyId) && Boolean(thread.conversationId);
-
-  useEffect(() => {
-    if (!companyId) return;
-
-    if (!thread.conversationId) {
-      setSystemTurns([]);
-      setSessionMemory(null);
-      return;
-    }
-
-    if (!canFetchSystem) {
-      setSystemTurns([]);
-      setSessionMemory(null);
-      return;
-    }
-
-    const cid = companyId;
-    const convId = String(thread.conversationId);
-
-    let alive = true;
-
-    async function tick() {
-      setSystemLoading(true);
-      try {
-        const r = await fetchSystemTurns({
-          companyId: cid,
-          conversationId: convId,
-          limit: 200,
-        });
-
-        if (!alive) return;
-
-        if (r.ok) {
-          setSystemTurns(r.events);
-          setSessionMemory(r.memory);
-        } else {
-          setSystemTurns([]);
-          setSessionMemory(null);
-        }
-      } finally {
-        if (alive) setSystemLoading(false);
-      }
-    }
-
-    tick();
-    const t = window.setInterval(() => tick(), 2000);
-
-    return () => {
-      alive = false;
-      window.clearInterval(t);
-    };
-  }, [companyId, thread.conversationId, canFetchSystem]);
-
-  function buildDisplayName(profile: SessionMemory["profile"] | undefined) {
-    const first = profile && typeof profile.firstName === "string" ? profile.firstName.trim() : "";
-    const last = profile && typeof profile.lastName === "string" ? profile.lastName.trim() : "";
-
-    const parts: string[] = [];
-    if (first.length > 0) parts.push(first);
-    if (last.length > 0) parts.push(last);
-
-    return parts.join(" ").trim();
-  }
-
-  // Pills de memoria: SOLO profile
-  const memoryPills = useMemo(() => {
-    const out: string[] = [];
-    if (!sessionMemory) return out;
-
-    const profile = sessionMemory.profile && typeof sessionMemory.profile === "object"
-      ? sessionMemory.profile
-      : undefined;
-
-    const displayName = buildDisplayName(profile);
-
-    const email =
-      profile && typeof profile.email === "string" ? profile.email.trim() : "";
-    const phone =
-      profile && typeof profile.phone === "string" ? profile.phone.trim() : "";
-
-    if (displayName.length > 0) out.push(displayName);
-    if (email.length > 0) out.push(email);
-    if (phone.length > 0) out.push(phone);
-
-    return out;
-  }, [sessionMemory]);
+  // Pills de memoria: SOLO profile (hook ya lo calcula)
+  const memoryPills = useMemo(() => systemModel.memoryPills, [systemModel.memoryPills]);
 
   const rightPanel = (
     <div className="flex h-full min-h-0 flex-col p-4">
@@ -426,17 +253,17 @@ export default function WhatsAppAdminShell() {
 
       {/* Lista de mensajes SYSTEM */}
       <div className="flex-1 min-h-0 overflow-auto py-3">
-        {!canFetchSystem ? (
+        {!systemModel.canFetch ? (
           <div className="text-xs text-muted-foreground">
             Selecciona una conversación para ver mensajes SYSTEM.
           </div>
-        ) : systemLoading && systemTurns.length === 0 ? (
+        ) : systemModel.loading && systemModel.turns.length === 0 ? (
           <div className="text-xs text-muted-foreground">Cargando…</div>
-        ) : systemTurns.length === 0 ? (
+        ) : systemModel.turns.length === 0 ? (
           <div className="text-xs text-muted-foreground">Sin mensajes SYSTEM todavía.</div>
         ) : (
           <div className="space-y-2">
-            {systemTurns.map((t) => (
+            {systemModel.turns.map((t) => (
               <div key={t.id} className="rounded-xl border bg-background px-3 py-2">
                 <div className="text-sm">{t.text}</div>
                 <div className="mt-1 text-[11px] text-muted-foreground">
@@ -461,8 +288,8 @@ export default function WhatsAppAdminShell() {
       selectedPhone={selectedPhone}
       selectedContact={selectedContact}
       selectedConversationId={thread.conversationId}
-      chatEvents={chatEvents}
-      chatLoading={chatLoading}
+      chatEvents={chatModel.events}
+      chatLoading={chatModel.loading}
       body={body}
       sending={sending}
       toast={toast}
@@ -479,12 +306,20 @@ export default function WhatsAppAdminShell() {
           environment?: "TEST" | "PROD";
         }
       ) => {
-        setSelectedPhone(phone);
+        const vv = toWaDigits(phone);
+        if (!vv.ok) {
+          setToast(vv.reason);
+          return;
+        }
+
+        const phoneDigits = vv.digits;
+
+        setSelectedPhone(phoneDigits);
 
         setSelectedContact({
           name: meta && meta.name ? meta.name : "Cliente",
-          phoneE164: phone,
-          avatarUrl: meta && "avatarUrl" in meta ? meta.avatarUrl ?? null : null,
+          phoneE164: phoneDigits,
+          avatarUrl: meta && "avatarUrl" in (meta ?? {}) ? meta?.avatarUrl ?? null : null,
         });
 
         const nextConversationId = meta && meta.conversationId ? meta.conversationId : null;
@@ -496,19 +331,7 @@ export default function WhatsAppAdminShell() {
           environment: meta && meta.environment ? meta.environment : "TEST",
         });
 
-        if (!companyId || !nextConversationId) {
-          setChatEvents([]);
-          return;
-        }
-
-        setChatLoading(true);
-        try {
-          const r = await fetchConversationEvents({ companyId, conversationId: nextConversationId });
-          if (r.ok) setChatEvents(r.events);
-          else setChatEvents([]);
-        } finally {
-          setChatLoading(false);
-        }
+        // si seleccionas un customer "suelo" sin conversación, el hook limpiará events
       }}
       onInsertTemplate={(groupKey: TemplateGroupKey, text: string) => {
         if (!text || text.trim().length === 0) {

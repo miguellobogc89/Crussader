@@ -2,7 +2,7 @@
 "use client";
 
 import { User } from "lucide-react";
-import type { ContactRow } from "@/app/components/admin/integrations/whatsapp/CustomersListPanel";
+import type { ContactRow } from "@/app/components/admin/integrations/whatsapp/ContactsPanel/CustomersListPanel";
 
 function fmtTime(ms: number) {
   const d = new Date(ms);
