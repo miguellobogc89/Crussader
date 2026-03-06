@@ -1,11 +1,56 @@
+// lib/agents/orchestator/whatsappPipeline.tsx
+import { prisma } from "@/lib/prisma";
 import {
   ensureWhatsappAgentSession,
   createAgentTurn,
 } from "@/lib/agents/chat/agentSessionStore";
 import { hydrateSessionBoard } from "@/lib/agents/chat/sessionBoardHydrator";
 import { buildFreeChatReply } from "@/lib/agents/chat/freeChatReply";
+import { classifySimpleMessage } from "@/lib/agents/chat/simpleMessageClassifier";
+import { conversationRouter } from "@/lib/agents/chat/conversationRouter";
 
 import { ACTIONS } from "@/lib/agents/actions";
+
+function asObject(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+async function updateSessionMemoryState(args: {
+  sessionId: string;
+  patch: Record<string, unknown>;
+}) {
+  const session = await prisma.agentSession.findUnique({
+    where: { id: args.sessionId },
+    select: { settings: true },
+  });
+
+  const settings = asObject(session?.settings);
+  const memory = asObject(settings.memory);
+  const profile = asObject(memory.profile);
+  const state = asObject(memory.state);
+
+  const nextSettings = {
+    ...settings,
+    memory: {
+      profile,
+      state: {
+        ...state,
+        ...args.patch,
+      },
+    },
+  };
+
+  await prisma.agentSession.update({
+    where: { id: args.sessionId },
+    data: {
+      settings: nextSettings,
+    },
+  });
+}
 
 export async function whatsappPipeline(args: {
   companyId: string;
@@ -28,10 +73,8 @@ export async function whatsappPipeline(args: {
     incomingText,
     environment,
     language,
-    installationId,
   } = args;
 
-  // 1) Sesión + board base
   const ensured = await ensureWhatsappAgentSession({
     agentId,
     companyId,
@@ -44,20 +87,17 @@ export async function whatsappPipeline(args: {
 
   await hydrateSessionBoard({ sessionId: ensured.sessionId, companyId });
 
-  // 2) Turno USER
   await createAgentTurn({
     sessionId: ensured.sessionId,
     role: "USER",
     text: incomingText,
   });
 
-  // 3) Identify (solo lectura)
   const idRes = await ACTIONS.identify_customer({
     companyId,
     phone: toPhoneE164,
   });
 
-  // 4) Mensaje interno (panel/log), NO se envía al cliente
   let panelMessage = "Se ha llamado bien a la función identificar cliente: ";
   let assureResult: any = null;
 
@@ -78,7 +118,6 @@ export async function whatsappPipeline(args: {
       "cliente conocido (existe y esta relacionado con la company).";
   }
 
-  // Evento interno para panel (NO visible al cliente)
   await createAgentTurn({
     sessionId: ensured.sessionId,
     role: "SYSTEM",
@@ -90,59 +129,302 @@ export async function whatsappPipeline(args: {
     },
   });
 
-  // 7) Respuesta al cliente (IA conversacional / tool-calling)
-  const built = await buildFreeChatReply({
+  const route = await conversationRouter({
     sessionId: ensured.sessionId,
     userText: incomingText,
-    phone: toPhoneE164,
-    companyId,
   });
 
-  const botText = String(built.botText || "").trim();
+  const sessionAfterRoute = await prisma.agentSession.findUnique({
+    where: { id: ensured.sessionId },
+    select: { settings: true },
+  });
 
-  // ✅ Nuevo: evento interno si hubo upsert de datos (via tools)
-  if (built.internal && built.internal.kind === "CUSTOMER_UPSERT") {
-    await createAgentTurn({
+  const sessionAfterRouteSettings = asObject(sessionAfterRoute?.settings);
+  const sessionAfterRouteMemory = asObject(sessionAfterRouteSettings.memory);
+  const sessionAfterRouteState = asObject(sessionAfterRouteMemory.state);
+
+  let activeFlow = "";
+  const activeFlowRaw = sessionAfterRouteState.flow;
+
+  if (typeof activeFlowRaw === "string") {
+    activeFlow = activeFlowRaw.trim();
+  }
+
+  let effectiveIntent = String(route.intent || "");
+
+  if (effectiveIntent.length === 0) {
+    if (activeFlow === "appointment_management") {
+      effectiveIntent = "appointment_management";
+    }
+  }
+
+  if (effectiveIntent !== "appointment_management") {
+    if (activeFlow === "appointment_management") {
+      const currentStepRaw = sessionAfterRouteState.step;
+      let currentStep = "";
+
+      if (typeof currentStepRaw === "string") {
+        currentStep = currentStepRaw.trim();
+      }
+
+      if (
+        currentStep === "awaiting_service" ||
+        currentStep === "awaiting_service_confirmation" ||
+        currentStep === "awaiting_location" ||
+        currentStep === "awaiting_datetime"
+      ) {
+        effectiveIntent = "appointment_management";
+      }
+    }
+  }
+
+    if (effectiveIntent === "appointment_management") {
+    await updateSessionMemoryState({
       sessionId: ensured.sessionId,
-      role: "SYSTEM",
-      text: "customer_data_upsert → " + String(built.internal.message || ""),
-      payload: {
-        type: "INTERNAL_CUSTOMER_UPSERT_EVENT",
-        changes: Array.isArray(built.internal.changes)
-          ? built.internal.changes
-          : [],
-        customerId: String(built.internal.customerId || ""),
+      patch: {
+        reason: "appointment_management",
+        flow: "appointment_management",
       },
     });
   }
 
-  // 8) Turno ASSISTANT (lo que ve el cliente)
+  await createAgentTurn({
+    sessionId: ensured.sessionId,
+    role: "SYSTEM",
+    text:
+      "router → " +
+      String(route.intent || "null") +
+      " · effective=" +
+      String(effectiveIntent || "null") +
+      " · confidence=" +
+      String(route.confidence) +
+      " · clarify=" +
+      String(route.needsClarification),
+    payload: {
+      type: "INTERNAL_ROUTER_EVENT",
+      intent: route.intent,
+      effectiveIntent,
+      confidence: route.confidence,
+      needsClarification: route.needsClarification,
+      clarificationQuestion: route.clarificationQuestion,
+    },
+  });
+
+  const simple = classifySimpleMessage(incomingText);
+
+  let botText = "";
+  let stage = "ROUTED_CHAT";
+
+  if (route.needsClarification && route.clarificationQuestion) {
+    if (effectiveIntent === "appointment_management") {
+      const built = await buildFreeChatReply({
+        sessionId: ensured.sessionId,
+        userText: incomingText,
+        phone: toPhoneE164,
+        companyId,
+      });
+
+      botText = String(built.botText || "").trim();
+
+      if (built.internal && built.internal.kind === "CUSTOMER_UPSERT") {
+        await createAgentTurn({
+          sessionId: ensured.sessionId,
+          role: "SYSTEM",
+          text: "customer_data_upsert → " + String(built.internal.message || ""),
+          payload: {
+            type: "INTERNAL_CUSTOMER_UPSERT_EVENT",
+            changes: Array.isArray(built.internal.changes)
+              ? built.internal.changes
+              : [],
+            customerId: String(built.internal.customerId || ""),
+          },
+        });
+      }
+
+      stage = "APPOINTMENT_FLOW";
+    } else {
+      botText = route.clarificationQuestion;
+      stage = "ROUTER_CLARIFICATION";
+    }
+  } else if (effectiveIntent === "human_handoff") {
+    botText =
+      "De acuerdo. Voy a dejar anotado que quieres hablar con una persona del centro.";
+    stage = "HUMAN_HANDOFF_MOCK";
+  } else if (effectiveIntent === "complaint_intake") {
+    botText =
+      "Entiendo. Voy a dejar registrada tu incidencia para que el centro pueda revisarla.";
+    stage = "COMPLAINT_MOCK";
+  } else if (effectiveIntent === "out_of_scope") {
+    botText =
+      "Lo siento, no puedo ayudarte con eso. Puedo ayudarte con información del centro, gestión de citas, pasar tu caso a una persona o registrar una incidencia.";
+    stage = "OUT_OF_SCOPE";
+  } else if (simple.kind === "ACK" || simple.kind === "GREETING") {
+    if (effectiveIntent === "appointment_management") {
+      const built = await buildFreeChatReply({
+        sessionId: ensured.sessionId,
+        userText: incomingText,
+        phone: toPhoneE164,
+        companyId,
+      });
+
+      botText = String(built.botText || "").trim();
+
+      if (built.internal && built.internal.kind === "CUSTOMER_UPSERT") {
+        await createAgentTurn({
+          sessionId: ensured.sessionId,
+          role: "SYSTEM",
+          text: "customer_data_upsert → " + String(built.internal.message || ""),
+          payload: {
+            type: "INTERNAL_CUSTOMER_UPSERT_EVENT",
+            changes: Array.isArray(built.internal.changes)
+              ? built.internal.changes
+              : [],
+            customerId: String(built.internal.customerId || ""),
+          },
+        });
+      }
+
+      stage = "APPOINTMENT_FLOW";
+    } else {
+      botText = simple.reply;
+      stage = "SIMPLE_MESSAGE";
+    }
+  } else if (effectiveIntent === "appointment_management") {
+    const session = await prisma.agentSession.findUnique({
+      where: { id: ensured.sessionId },
+      select: { settings: true },
+    });
+
+    const settings = asObject(session?.settings);
+    const memory = asObject(settings.memory);
+    const state = asObject(memory.state);
+
+    let currentFlow = "";
+    const currentFlowRaw = state.flow;
+
+    if (typeof currentFlowRaw === "string") {
+      currentFlow = currentFlowRaw.trim();
+    }
+
+    let currentStep = "";
+    const currentStepRaw = state.step;
+
+    if (typeof currentStepRaw === "string") {
+      currentStep = currentStepRaw.trim();
+    }
+
+    if (currentFlow !== "appointment_management") {
+      await updateSessionMemoryState({
+        sessionId: ensured.sessionId,
+        patch: {
+          flow: "appointment_management",
+          step: "awaiting_service",
+          selectedServiceId: null,
+          selectedLocationId: null,
+          requestedServiceText: null,
+        },
+      });
+
+      currentStep = "awaiting_service";
+    }
+
+    await createAgentTurn({
+      sessionId: ensured.sessionId,
+      role: "SYSTEM",
+      text:
+        "appointment_state → flow=appointment_management · step=" +
+        String(currentStep || "null"),
+      payload: {
+        type: "INTERNAL_APPOINTMENT_STATE_EVENT",
+        flow: "appointment_management",
+        step: currentStep || null,
+      },
+    });
+
+    const built = await buildFreeChatReply({
+      sessionId: ensured.sessionId,
+      userText: incomingText,
+      phone: toPhoneE164,
+      companyId,
+    });
+
+    botText = String(built.botText || "").trim();
+
+    if (built.internal && built.internal.kind === "CUSTOMER_UPSERT") {
+      await createAgentTurn({
+        sessionId: ensured.sessionId,
+        role: "SYSTEM",
+        text: "customer_data_upsert → " + String(built.internal.message || ""),
+        payload: {
+          type: "INTERNAL_CUSTOMER_UPSERT_EVENT",
+          changes: Array.isArray(built.internal.changes)
+            ? built.internal.changes
+            : [],
+          customerId: String(built.internal.customerId || ""),
+        },
+      });
+    }
+
+    stage = "APPOINTMENT_FLOW";
+  } else {
+    const built = await buildFreeChatReply({
+      sessionId: ensured.sessionId,
+      userText: incomingText,
+      phone: toPhoneE164,
+      companyId,
+    });
+
+    botText = String(built.botText || "").trim();
+
+    if (built.internal && built.internal.kind === "CUSTOMER_UPSERT") {
+      await createAgentTurn({
+        sessionId: ensured.sessionId,
+        role: "SYSTEM",
+        text: "customer_data_upsert → " + String(built.internal.message || ""),
+        payload: {
+          type: "INTERNAL_CUSTOMER_UPSERT_EVENT",
+          changes: Array.isArray(built.internal.changes)
+            ? built.internal.changes
+            : [],
+          customerId: String(built.internal.customerId || ""),
+        },
+      });
+    }
+
+    if (effectiveIntent === "information_request") {
+      stage = "INFORMATION_REQUEST_MOCK";
+    }
+  }
+
   await createAgentTurn({
     sessionId: ensured.sessionId,
     role: "ASSISTANT",
     text: botText,
     payload: {
-      stage: "CHAT_ONLY",
+      stage,
       identifyKind: idRes.kind,
       assureKind: assureResult && assureResult.kind ? assureResult.kind : null,
+      rootIntent: effectiveIntent,
+      rootIntentConfidence: route.confidence,
     },
   });
 
-  // 9) Return al route
   return {
     botText,
     sessionId: ensured.sessionId,
-    stage: "CHAT_ONLY",
+    stage,
     runtime: {
       model: "gpt-4o-mini",
       temperature: 0.2,
       settingsId: null,
-      stage: "CHAT_ONLY",
+      stage,
     },
     debug: {
       panelMessage,
       identify: idRes,
       assure: assureResult,
+      route,
+      effectiveIntent,
     },
   };
 }

@@ -11,19 +11,19 @@ function safeTrim(s: unknown): string {
 
 export type IdentifyCustomerResult =
   | {
-      kind: "COMPANY"; // cliente conocido (existe y está relacionado con la company)
+      kind: "COMPANY";
       customerId: string;
       customerName: string | null;
       phone: string;
     }
   | {
-      kind: "GLOBAL_ONLY"; // existe en BBDD pero NO está relacionado con la company
+      kind: "GLOBAL_ONLY";
       customerId: string;
       customerName: string | null;
       phone: string;
     }
   | {
-      kind: "NONE"; // no existe en BBDD
+      kind: "NONE";
       customerId: null;
       customerName: null;
       phone: string;
@@ -31,7 +31,7 @@ export type IdentifyCustomerResult =
 
 export async function identifyCustomer(args: {
   companyId: string;
-  phone: string; // digits ok
+  phone: string;
 }): Promise<IdentifyCustomerResult> {
   const companyId = safeTrim(args.companyId);
   const phone = normalizePhone(args.phone);
@@ -40,7 +40,12 @@ export async function identifyCustomer(args: {
   if (!phone) throw new Error("Missing phone");
 
   const customer = await prisma.customer.findFirst({
-    where: { phone },
+    where: {
+      OR: [
+        { phone },
+        { secondary_phone: phone },
+      ],
+    },
     select: {
       id: true,
       firstName: true,

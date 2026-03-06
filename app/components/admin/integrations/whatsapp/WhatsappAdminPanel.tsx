@@ -48,7 +48,6 @@ function Toast({ text, onClose }: { text: string; onClose: () => void }) {
 }
 
 export default function WhatsappAdminPanel(props: {
-  // Data
   companyId: string | null;
 
   tplDefaults: Record<string, DefaultTemplate | null>;
@@ -63,16 +62,24 @@ export default function WhatsappAdminPanel(props: {
   sending: boolean;
   toast: string | null;
 
-  // Actions
   setBody: (v: string) => void;
   setToast: (v: string | null) => void;
 
-  onSelectPhone: (phone: string, meta?: { name?: string; avatarUrl?: string | null; conversationId?: string | null }) => void;
+  onSelectPhone: (
+    phone: string,
+    meta?: {
+      name?: string;
+      avatarUrl?: string | null;
+      conversationId?: string | null;
+      agentId?: string | null;
+      phoneNumberId?: string | null;
+      environment?: "TEST" | "PROD";
+    }
+  ) => void;
 
   onInsertTemplate: (groupKey: TemplateGroupKey, text: string) => void;
   onSend: () => void;
 
-  // Layout: para el paso 2 añadiremos aquí el panel derecho vacío
   rightPanel?: React.ReactNode;
 }) {
   const {
@@ -94,87 +101,77 @@ export default function WhatsappAdminPanel(props: {
     rightPanel,
   } = props;
 
-return (
-  <div className="h-[calc(100vh-180px)] min-h-[720px]">
-    <div className="grid h-full grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
-      {/* Card principal (WhatsApp) */}
-      <Card className="h-full overflow-hidden border-0 bg-transparent shadow-none">
-        <CardContent className="h-full p-0">
-          <div className="grid h-full grid-cols-1 lg:grid-cols-[360px_1fr]">
-            {/* Left */}
-            <CustomersListPanel
-              loading={false}
-              search={""}
-              setSearch={() => {}}
-              contacts={[]}
-              customers={[]}
-              customersLoadedOnce={false}
-              selectedPhone={selectedPhone}
-              onSelectPhone={onSelectPhone}
-            />
-
-            {/* Right */}
-            <div className="flex h-full min-h-0 flex-col">
-              <ConversationHeader contact={selectedContact} />
-
-              <ChatQuickActions
-                defaults={tplDefaults}
-                disabled={!selectedContact || sending || chatLoading || !selectedConversationId}
-                onInsertTemplate={onInsertTemplate}
+  return (
+    <div className="h-[calc(100vh-180px)] min-h-[720px]">
+      <div className="grid h-full grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
+        <Card className="h-full overflow-hidden border-0 bg-transparent shadow-none">
+          <CardContent className="h-full p-0">
+            <div className="grid h-full grid-cols-1 lg:grid-cols-[360px_1fr]">
+              <CustomersListPanel
+                companyId={companyId}
+                selectedPhone={selectedPhone}
+                onSelectPhone={onSelectPhone}
               />
 
-              <div className="relative flex-1 min-h-0">
-                {chatLoading ? (
-                  <div className="h-full w-full p-4 text-sm text-muted-foreground">
-                    Cargando conversación...
+              <div className="flex h-full min-h-0 flex-col">
+                <ConversationHeader contact={selectedContact} />
+
+                <ChatQuickActions
+                  defaults={tplDefaults}
+                  disabled={!selectedContact || sending || chatLoading || !selectedConversationId}
+                  onInsertTemplate={onInsertTemplate}
+                />
+
+                <div className="relative flex-1 min-h-0">
+                  {chatLoading ? (
+                    <div className="h-full w-full p-4 text-sm text-muted-foreground">
+                      Cargando conversación...
+                    </div>
+                  ) : (
+                    <ChatPanel events={chatEvents} className="h-full" />
+                  )}
+
+                  <div className="pointer-events-none absolute bottom-4 left-0 right-0 flex justify-center px-4">
+                    {toast ? <Toast text={toast} onClose={() => setToast(null)} /> : null}
                   </div>
-                ) : (
-                  <ChatPanel events={chatEvents} className="h-full" />
-                )}
-
-                <div className="pointer-events-none absolute bottom-4 left-0 right-0 flex justify-center px-4">
-                  {toast ? <Toast text={toast} onClose={() => setToast(null)} /> : null}
                 </div>
-              </div>
 
-              <div className="border-t bg-white px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <Input
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
-                    placeholder="Escribe un mensaje..."
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        if (!sending) onSend();
-                      }
-                    }}
-                    className="h-11 flex-1 rounded-xl border-0 bg-gray-100 px-4 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                  />
+                <div className="border-t bg-white px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <Input
+                      value={body}
+                      onChange={(e) => setBody(e.target.value)}
+                      placeholder="Escribe un mensaje..."
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (!sending) onSend();
+                        }
+                      }}
+                      className="h-11 flex-1 rounded-xl border-0 bg-gray-100 px-4 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    />
 
-                  <Button
-                    onClick={onSend}
-                    disabled={sending}
-                    className="h-11 rounded-xl bg-emerald-500 px-5 text-white hover:bg-emerald-600 disabled:opacity-60"
-                  >
-                    <SendHorizonal className="mr-2 h-4 w-4" />
-                    Enviar
-                  </Button>
+                    <Button
+                      onClick={onSend}
+                      disabled={sending}
+                      className="h-11 rounded-xl bg-emerald-500 px-5 text-white hover:bg-emerald-600 disabled:opacity-60"
+                    >
+                      <SendHorizonal className="mr-2 h-4 w-4" />
+                      Enviar
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
-            {/* /Right */}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Card secundario (Pensamiento IA / Debug) */}
-      <Card className="h-full overflow-hidden">
-        <CardContent className="h-full p-4">
-          {rightPanel ? rightPanel : <div className="text-sm text-muted-foreground">Pensamiento IA</div>}
-        </CardContent>
-      </Card>
+        <Card className="h-full overflow-hidden">
+          <CardContent className="h-full p-0">
+            {rightPanel ? rightPanel : <div className="p-4 text-sm text-muted-foreground">Panel derecho</div>}
+          </CardContent>
+        </Card>
+      </div>
     </div>
-  </div>
-);
+  );
 }

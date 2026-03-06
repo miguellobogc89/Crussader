@@ -11,9 +11,13 @@ export type SessionMemory = {
     lastName?: string;
     email?: string;
     phone?: string;
+    reason?: string;
     [k: string]: unknown;
   };
-  state?: Record<string, unknown>;
+  state?: {
+    reason?: string;
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 };
 
@@ -26,24 +30,104 @@ async function fetchSystemTurns(args: { companyId: string; conversationId: strin
   const res = await fetch(`/api/whatsapp/agent/turns?${params.toString()}`, { cache: "no-store" });
   const data = await res.json().catch(() => null);
 
-  const events: SystemTurn[] =
-    data && data.ok && Array.isArray(data.events) ? (data.events as SystemTurn[]) : [];
+  let events: SystemTurn[] = [];
+  if (data && data.ok && Array.isArray(data.events)) {
+    events = data.events as SystemTurn[];
+  }
 
-  const memory: SessionMemory | null =
-    data && data.ok && data.memory && typeof data.memory === "object" ? (data.memory as SessionMemory) : null;
+  let memory: SessionMemory | null = null;
+  if (data && data.ok && data.memory && typeof data.memory === "object") {
+    memory = data.memory as SessionMemory;
+  }
 
   return { ok: res.ok, events, memory };
 }
 
 function buildDisplayName(profile: SessionMemory["profile"] | undefined) {
-  const first = profile && typeof profile.firstName === "string" ? profile.firstName.trim() : "";
-  const last = profile && typeof profile.lastName === "string" ? profile.lastName.trim() : "";
+  let first = "";
+  let last = "";
+
+  if (profile && typeof profile.firstName === "string") {
+    first = profile.firstName.trim();
+  }
+
+  if (profile && typeof profile.lastName === "string") {
+    last = profile.lastName.trim();
+  }
 
   const parts: string[] = [];
   if (first.length > 0) parts.push(first);
   if (last.length > 0) parts.push(last);
 
   return parts.join(" ").trim();
+}
+
+function buildReasonPill(memory: SessionMemory | null): string {
+  if (!memory || typeof memory !== "object") {
+    return "";
+  }
+
+  const profile =
+    memory.profile && typeof memory.profile === "object"
+      ? memory.profile
+      : undefined;
+
+  const state =
+    memory.state && typeof memory.state === "object"
+      ? memory.state
+      : undefined;
+
+  let reason = "";
+
+  if (profile && typeof profile.reason === "string") {
+    reason = profile.reason.trim();
+  }
+
+  if (reason.length === 0 && state && typeof state.reason === "string") {
+    reason = state.reason.trim();
+  }
+
+  if (reason.length === 0) {
+    return "";
+  }
+
+  return "reason: " + reason;
+}
+
+function buildMemoryPills(memory: SessionMemory | null): string[] {
+  const out: string[] = [];
+
+  if (!memory || typeof memory !== "object") {
+    return out;
+  }
+
+  const profile =
+    memory.profile && typeof memory.profile === "object"
+      ? memory.profile
+      : undefined;
+
+  const displayName = buildDisplayName(profile);
+  const email = typeof profile?.email === "string" ? profile.email.trim() : "";
+  const phone = typeof profile?.phone === "string" ? profile.phone.trim() : "";
+  const reasonPill = buildReasonPill(memory);
+
+  const raw: string[] = [];
+
+  if (displayName.length > 0) raw.push(displayName);
+  if (email.length > 0) raw.push(email);
+  if (phone.length > 0) raw.push(phone);
+  if (reasonPill.length > 0) raw.push(reasonPill);
+
+  const unique: string[] = [];
+
+  for (const value of raw) {
+    if (value.length === 0) continue;
+    if (value === "Unknown") continue;
+    if (unique.includes(value)) continue;
+    unique.push(value);
+  }
+
+  return unique;
 }
 
 export function useWhatsAppSystemTurns(args: {
@@ -74,8 +158,14 @@ export function useWhatsAppSystemTurns(args: {
 
     async function tick(first: boolean) {
       if (first) setLoading(true);
+
       try {
-        const r = await fetchSystemTurns({ companyId: cid, conversationId: convId, limit: 200 });
+        const r = await fetchSystemTurns({
+          companyId: cid,
+          conversationId: convId,
+          limit: 200,
+        });
+
         if (!alive) return;
 
         if (r.ok) {
@@ -86,7 +176,9 @@ export function useWhatsAppSystemTurns(args: {
           setMemory(null);
         }
       } finally {
-        if (first && alive) setLoading(false);
+        if (first && alive) {
+          setLoading(false);
+        }
       }
     }
 
@@ -100,20 +192,7 @@ export function useWhatsAppSystemTurns(args: {
   }, [companyId, conversationId, pollMs]);
 
   const memoryPills = useMemo(() => {
-    const out: string[] = [];
-    if (!memory) return out;
-
-    const profile = memory.profile && typeof memory.profile === "object" ? memory.profile : undefined;
-
-    const displayName = buildDisplayName(profile);
-    const email = profile && typeof profile.email === "string" ? profile.email.trim() : "";
-    const phone = profile && typeof profile.phone === "string" ? profile.phone.trim() : "";
-
-    if (displayName.length > 0) out.push(displayName);
-    if (email.length > 0) out.push(email);
-    if (phone.length > 0) out.push(phone);
-
-    return out;
+    return buildMemoryPills(memory);
   }, [memory]);
 
   return { canFetch, turns, memory, memoryPills, loading };

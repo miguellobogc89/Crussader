@@ -246,7 +246,12 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  console.log("[WA][POST] HIT");
+
   const body = await req.json().catch(() => null);
+
+
+
   if (!body) return NextResponse.json({ ok: true });
 
   // =========================
@@ -344,6 +349,14 @@ export async function POST(req: Request) {
     // Resolve installation
 const resolvedInst = await resolveInstallation(value);
 const installation = resolvedInst.installation;
+
+console.log("[WA][RESOLVE_INSTALLATION]", {
+  phoneNumberId: value?.metadata?.phone_number_id ?? null,
+  displayPhone: value?.metadata?.display_phone_number ?? null,
+  installationId: installation ? installation.id : null,
+  companyId: installation ? installation.company_id : null,
+  companyPhoneNumberId: resolvedInst.companyPhoneNumberId,
+});
 
 if (!installation) {
   logWA("[WA][SKIP] no installation matched");

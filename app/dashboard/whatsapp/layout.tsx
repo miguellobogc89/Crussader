@@ -1,6 +1,7 @@
 // app/dashboard/whatsapp/layout.tsx
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import PageShell from "@/app/components/layouts/PageShell";
 import TabMenu, { type TabItem } from "@/app/components/crussader/navigation/TabMenu";
@@ -38,9 +39,21 @@ const PAGE_META: Record<string, { title: string; description: string; icon: Luci
 
 export default function WhatsAppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
 
-  const activeTab =
-    Object.keys(PAGE_META).find((key) => pathname?.includes(`/dashboard/whatsapp/${key}`)) ?? "chat";
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const activeTab = useMemo(() => {
+    if (!mounted) return "chat";
+
+    return (
+      Object.keys(PAGE_META).find((key) =>
+        pathname?.includes(`/dashboard/whatsapp/${key}`)
+      ) ?? "chat"
+    );
+  }, [mounted, pathname]);
 
   const { title, description, icon } = PAGE_META[activeTab];
 
@@ -50,7 +63,7 @@ export default function WhatsAppLayout({ children }: { children: React.ReactNode
       description={description}
       titleIconName={icon}
       headerBand={
-        <div key={pathname}>
+        <div key={mounted ? pathname : "initial"}>
           <TabMenu items={TABS} />
         </div>
       }

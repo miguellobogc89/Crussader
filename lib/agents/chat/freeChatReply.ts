@@ -1,10 +1,11 @@
 import { openai } from "@/lib/ai";
 import { ACTIONS } from "@/lib/agents/actions";
+import { getSessionMemory } from "@/lib/agents/memory/getSessionMemory";
 
 type BuildFreeChatReplyArgs = {
   sessionId: string;
   userText: string;
-  phone: string; // digits (from WA)
+  phone: string;
   companyId: string;
 };
 
@@ -22,6 +23,63 @@ function safeTrim(v: unknown): string {
   return String(v || "").trim();
 }
 
+function memoryValueToText(v: unknown): string {
+  const t = safeTrim(v);
+
+  if (!t) {
+    return "desconocido";
+  }
+
+  return t;
+}
+
+function buildMemoryBlock(
+  memory: {
+    profile: Record<string, unknown>;
+    state: Record<string, unknown>;
+  },
+  phone: string
+): string {
+  const profile = memory.profile || {};
+  const state = memory.state || {};
+
+  const firstName = memoryValueToText(profile.firstName);
+  const lastName = memoryValueToText(profile.lastName);
+  const email = memoryValueToText(profile.email);
+  const profilePhone = memoryValueToText(profile.phone);
+
+  let effectivePhone = phone;
+  if (profilePhone !== "desconocido") {
+    effectivePhone = profilePhone;
+  }
+
+  const flow = memoryValueToText(state.flow);
+  const step = memoryValueToText(state.step);
+  const requestedServiceText = memoryValueToText(state.requestedServiceText);
+  const selectedLocationId = memoryValueToText(state.selectedLocationId);
+  const selectedServiceId = memoryValueToText(state.selectedServiceId);
+
+  return [
+    "Memoria disponible de la sesión:",
+    "- profile.firstName: " + firstName,
+    "- profile.lastName: " + lastName,
+    "- profile.email: " + email,
+    "- profile.phone: " + memoryValueToText(effectivePhone),
+    "- state.flow: " + flow,
+    "- state.step: " + step,
+    "- state.requestedServiceText: " + requestedServiceText,
+    "- state.selectedLocationId: " + selectedLocationId,
+    "- state.selectedServiceId: " + selectedServiceId,
+    "",
+    "Instrucciones importantes:",
+    "- Si ya conoces algún dato por esta memoria, no lo vuelvas a pedir.",
+    "- Pide solo los datos que falten para continuar.",
+    "- Si state.flow es appointment_management, mantén el contexto de cita.",
+    "- Si state.step es awaiting_service y el usuario responde con un posible nombre de servicio, intenta resolverlo usando la tool appointment_service_lookup.",
+    "- No trates una respuesta corta dentro de un flujo de cita como una consulta informativa genérica, salvo que el usuario cambie claramente de tema.",
+  ].join("\n");
+}
+
 export async function buildFreeChatReply(
   args: BuildFreeChatReplyArgs
 ): Promise<BuildFreeChatReplyResult> {
@@ -35,16 +93,56 @@ export async function buildFreeChatReply(
   if (!phone) throw new Error("Missing phone");
   if (!companyId) throw new Error("Missing companyId");
 
+  const memory = await getSessionMemory(sessionId);
+  const memoryBlock = buildMemoryBlock(memory, phone);
+
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.2,
     messages: [
       {
         role: "system",
-content:
-  "Eres la recepcionista virtual por WhatsApp de una clínica. Tu trabajo incluye pedir y guardar datos de contacto del cliente para gestionar su cita (nombre, apellidos, email, teléfono, DNI o cualquier tipo de dato que te de el cliente que sea habitual recoger en clínicas). Cuando el cliente proporcione cualquiera de esos datos, llama a customer_data_upsert. Los datos pueden venir sueltos o en conjunto. Después de guardar, responde de forma natural y continúa la conversación.",
-     },
-      { role: "user", content: userText },
+        content: `
+          Eres la recepcionista virtual por WhatsApp de una clínica.
+
+          Tienes acceso a una memoria de sesión con datos conocidos del cliente y con el estado actual del flujo conversacional.
+
+          Reglas obligatorias:
+          - Si un dato ya está en la memoria, no lo pidas otra vez.
+          - Solo pide los datos que falten de verdad para continuar.
+          - Si el cliente repite un dato que ya tienes, confírmalo brevemente y sigue con la conversación.
+          - No vuelvas a pedir nombre, apellidos, email o teléfono si ya están en la memoria.
+          - No pidas datos "por completar ficha" si no son necesarios en ese momento.
+          - Tu prioridad es ayudar al cliente con lo que pide, no recopilar datos innecesariamente.
+          - Debes respetar el flujo conversacional guardado en memoria.state.
+          - Si memory.state.flow = appointment_management, mantén el contexto de gestión de cita.
+
+          Regla crítica para citas:
+
+          Si memory.state.flow = appointment_management:
+          - Nunca interpretes el mensaje del usuario como una pregunta informativa.
+          - El usuario está intentando reservar una cita.
+
+          Si memory.state.step = awaiting_service:
+          - Debes intentar resolver el servicio usando la tool appointment_service_lookup.
+          - Incluso si el mensaje es corto como "higiene", "limpieza", "revisión", "implantes", etc.
+          - No respondas con una explicación general del servicio.
+          - Primero llama a appointment_service_lookup para intentar identificar el servicio real.
+
+          - Si una tool devuelve información estructurada útil, utilízala para continuar sin inventar datos.
+          - No menciones herramientas internas, memoria interna ni procesos internos.
+
+          Cuando el cliente proporcione un dato nuevo o una corrección de nombre, apellido, email o teléfono, llama a customer_data_upsert para guardarlo.
+          `,
+      },
+      {
+        role: "system",
+        content: memoryBlock,
+      },
+      {
+        role: "user",
+        content: userText,
+      },
     ],
     tools: [
       {
@@ -52,26 +150,50 @@ content:
         function: {
           name: "customer_data_upsert",
           description:
-            "Guarda/actualiza datos del cliente (email, nombre/apellido si era Unknown, o cambio de teléfono). Devuelve un mensaje corto tipo: 'email actualizado'.",
+            "Guarda o actualiza datos del cliente (email, nombre, apellido o cambio de teléfono).",
           parameters: {
             type: "object",
             properties: {
               companyId: { type: "string", description: "Company id actual" },
               phone: {
                 type: "string",
-                description:
-                  "Teléfono actual desde el que escribe el cliente (digits).",
+                description: "Teléfono actual desde el que escribe el cliente",
               },
               email: { type: "string", description: "Email del cliente" },
               firstName: { type: "string", description: "Nombre" },
               lastName: { type: "string", description: "Apellido" },
               newPrimaryPhone: {
                 type: "string",
-                description:
-                  "Si el cliente dice que su número correcto es otro, aquí va el nuevo (digits).",
+                description: "Nuevo teléfono correcto si el cliente indica otro",
               },
             },
             required: ["companyId", "phone"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "appointment_service_lookup",
+          description:
+            "Resuelve el servicio solicitado por el cliente contra los servicios reales disponibles de la empresa y detecta si existe, si es ambiguo o en qué sedes está.",
+          parameters: {
+            type: "object",
+            properties: {
+              sessionId: {
+                type: "string",
+                description: "Sesión actual",
+              },
+              companyId: {
+                type: "string",
+                description: "Company id actual",
+              },
+              userText: {
+                type: "string",
+                description: "Texto libre del usuario con el servicio que pide",
+              },
+            },
+            required: ["sessionId", "companyId", "userText"],
           },
         },
       },
@@ -82,10 +204,9 @@ content:
 
   const choice = completion.choices?.[0];
 
-  // 1) Tool calling (si viene)
   if (choice && choice.finish_reason === "tool_calls") {
-    const toolCallsAny: any =
-      choice && choice.message ? (choice.message as any).tool_calls : null;
+    const toolCallsAny =
+      choice.message ? (choice.message as any).tool_calls : null;
 
     const toolCall = Array.isArray(toolCallsAny) ? toolCallsAny[0] : null;
 
@@ -94,14 +215,15 @@ content:
     const fnArgsRaw =
       fn && typeof fn.arguments === "string" ? fn.arguments : "{}";
 
-    if (fnName === "customer_data_upsert") {
-      let parsedArgs: any = {};
-      try {
-        parsedArgs = JSON.parse(fnArgsRaw);
-      } catch {
-        parsedArgs = {};
-      }
+    let parsedArgs: Record<string, unknown> = {};
 
+    try {
+      parsedArgs = JSON.parse(fnArgsRaw);
+    } catch {
+      parsedArgs = {};
+    }
+
+    if (fnName === "customer_data_upsert") {
       const res = await ACTIONS.customer_data_upsert({
         sessionId,
         companyId,
@@ -117,20 +239,33 @@ content:
             : null,
       });
 
-      const changes = Array.isArray((res as any).changes)
-        ? (res as any).changes
+      const changesRaw = (res as any).changes;
+      const changes: string[] = Array.isArray(changesRaw)
+        ? changesRaw.map((c) => String(c))
         : [];
 
-      // Si no hubo cambios, NO “se lo comas” al usuario: responde normal (sin tools)
-      if (changes.length === 0 || (changes.length === 1 && changes[0] === "NO_CHANGES")) {
+      if (
+        changes.length === 0 ||
+        (changes.length === 1 && changes[0] === "NO_CHANGES")
+      ) {
         const retry = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           temperature: 0.2,
           messages: [
             {
               role: "system",
-              content:
-                "Eres un asistente conversacional de WhatsApp. No llames herramientas. Responde normal y útil.",
+              content: `
+              Eres un asistente conversacional de WhatsApp.
+
+              Reglas obligatorias:
+              - No pidas datos que ya estén en la memoria.
+              - Si el usuario repite un dato ya conocido, no lo vuelvas a solicitar.
+              - Responde útil, breve y natural.
+              `,
+            },
+            {
+              role: "system",
+              content: memoryBlock,
             },
             { role: "user", content: userText },
           ],
@@ -150,39 +285,114 @@ content:
         };
       }
 
-// Si sí hubo cambios, NO devolvemos res.message al usuario.
-// Generamos una respuesta normal (sin tools) y guardamos el upsert en internal.
-const follow = await openai.chat.completions.create({
-  model: "gpt-4o-mini",
-  temperature: 0.2,
-  messages: [
-    {
-      role: "system",
-      content:
-        "Eres un asistente conversacional de WhatsApp. Responde normal y útil. No menciones actualizaciones internas de datos.",
-    },
-    { role: "user", content: userText },
-  ],
-  max_tokens: 180,
-});
+      const updatedMemory = await getSessionMemory(sessionId);
+      const updatedMemoryBlock = buildMemoryBlock(updatedMemory, phone);
 
-const followText = safeTrim(follow.choices?.[0]?.message?.content);
+      const follow = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        messages: [
+          {
+            role: "system",
+            content: `
+            Eres un asistente conversacional de WhatsApp.
 
-return {
-  botText: followText || "OK",
-  internal: {
-    kind: "CUSTOMER_UPSERT",
-    message: safeTrim((res as any).message) || "datos actualizados",
-    changes: changes.map((c: any) => String(c)),
-    customerId: String((res as any).customerId || ""),
-  },
-};
+            Reglas obligatorias:
+            - No pidas datos que ya estén en la memoria.
+            - No menciones actualizaciones internas ni procesos internos.
+            - Responde natural, útil y continúa la conversación.
+            `,
+          },
+          {
+            role: "system",
+            content: updatedMemoryBlock,
+          },
+          { role: "user", content: userText },
+        ],
+        max_tokens: 180,
+      });
+
+      const followText = safeTrim(follow.choices?.[0]?.message?.content);
+
+      return {
+        botText: followText || "OK",
+        internal: {
+          kind: "CUSTOMER_UPSERT",
+          message: safeTrim((res as any).message) || "datos actualizados",
+          changes,
+          customerId: String((res as any).customerId || ""),
+        },
+      };
+    }
+
+    if (fnName === "appointment_service_lookup") {
+      const res = await ACTIONS.appointment_service_lookup({
+        sessionId,
+        companyId,
+        userText,
+      });
+
+      const updatedMemory = await getSessionMemory(sessionId);
+      const updatedMemoryBlock = buildMemoryBlock(updatedMemory, phone);
+
+      const toolResultBlock = [
+        "Resultado interno de appointment_service_lookup:",
+        "- status: " + String(res.status),
+        "- requestedText: " + String(res.requestedText),
+        "- selectedServiceId: " + String(res.selectedServiceId),
+        "- selectedLocationId: " + String(res.selectedLocationId),
+        "- candidates:",
+        JSON.stringify(res.candidates),
+        "",
+        "Cómo responder:",
+        "- Si status = NOT_FOUND, di con naturalidad que no encuentras ese servicio y pide que indique cuál necesita.",
+        "- Si status = AMBIGUOUS, pide aclaración mencionando las opciones de forma natural.",
+        "- Si status = RESOLVED y selectedLocationId existe, confirma brevemente el servicio entendido y continúa pidiendo el siguiente dato que falte para la cita.",
+        "- Si status = RESOLVED y selectedLocationId no existe, confirma brevemente el servicio y pregunta en cuál de las sedes disponibles lo quiere.",
+        "- No inventes disponibilidad todavía.",
+      ].join("\n");
+
+      const follow = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        messages: [
+          {
+            role: "system",
+            content: `
+            Eres un asistente conversacional de WhatsApp.
+
+            Reglas obligatorias:
+            - Mantén el contexto de cita.
+            - Usa el resultado de la tool para responder.
+            - No menciones herramientas internas ni ids internos.
+            - No inventes disponibilidad real todavía.
+            - Responde breve, natural y orientado a avanzar la reserva.
+            `,
+          },
+          {
+            role: "system",
+            content: updatedMemoryBlock,
+          },
+          {
+            role: "system",
+            content: toolResultBlock,
+          },
+          { role: "user", content: userText },
+        ],
+        max_tokens: 180,
+      });
+
+      const followText = safeTrim(follow.choices?.[0]?.message?.content);
+
+      return {
+        botText: followText || "OK",
+      };
     }
   }
 
-  // 2) Respuesta normal si no llamó tool
   const text = safeTrim(
     choice && choice.message ? (choice.message as any).content : ""
   );
+
   return { botText: text || "OK" };
 }

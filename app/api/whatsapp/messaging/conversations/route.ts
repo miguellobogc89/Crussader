@@ -1,65 +1,71 @@
 // app/api/whatsapp/messaging/conversations/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { resolvePhoneNumber } from "@/lib/whatsapp/phoneNumbers/resolvePhoneNumber";
 
 export const dynamic = "force-dynamic";
 
-<<<<<<< HEAD
-=======
-/**
- * GET /api/whatsapp/messaging/conversations?companyId=...&limit=30&cursor=<conversationId>&phoneNumberId=...
- */
->>>>>>> 16eafa1 (update)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
 
-    const companyId = searchParams.get("companyId");
+    const companyId = String(searchParams.get("companyId") || "").trim();
     if (!companyId) {
-      return NextResponse.json({ ok: false, error: "companyId requerido" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "companyId requerido" },
+        { status: 400 }
+      );
     }
 
+    const metaPhoneNumberId = String(searchParams.get("phoneNumberId") || "").trim();
     const take = Math.min(Number(searchParams.get("limit") || 30), 100);
-    const cursor = searchParams.get("cursor");
+    const cursor = String(searchParams.get("cursor") || "").trim();
 
-<<<<<<< HEAD
-    // 1) instalaciones WhatsApp de la company
     const installs = await prisma.integration_installation.findMany({
-      where: { company_id: companyId, provider: "whatsapp" },
+      where: {
+        company_id: companyId,
+        provider: "whatsapp",
+        status: "active",
+      },
       select: { id: true },
     });
 
     const installIds = installs.map((x) => x.id);
+
     if (installIds.length === 0) {
       return NextResponse.json({ ok: true, items: [], nextCursor: null });
     }
 
-    // 2) conversaciones de esas instalaciones
-    const conversations = await prisma.messaging_conversation.findMany({
-      where: { installation_id: { in: installIds } },
-=======
-    const phoneNumberId = searchParams.get("phoneNumberId"); // opcional
+    let companyPhoneNumberUuid: string | null = null;
 
-    let companyPhoneNumberId: string | null = null;
+    if (metaPhoneNumberId) {
+      const phoneRow = await prisma.company_phone_number.findFirst({
+        where: {
+          company_id: companyId,
+          phone_number_id: metaPhoneNumberId,
+        },
+        select: { id: true },
+      });
 
-    if (phoneNumberId) {
-      const resolved = await resolvePhoneNumber(phoneNumberId);
-      if (!resolved || resolved.companyId !== companyId) {
+      if (!phoneRow) {
         return NextResponse.json({ ok: true, items: [], nextCursor: null });
       }
-      companyPhoneNumberId = resolved.phone.id;
+
+      companyPhoneNumberUuid = phoneRow.id;
+    }
+
+    const whereConv: {
+      installation_id: { in: string[] };
+      company_phone_number_id?: string;
+    } = {
+      installation_id: { in: installIds },
+    };
+
+    if (companyPhoneNumberUuid) {
+      whereConv.company_phone_number_id = companyPhoneNumberUuid;
     }
 
     const conversations = await prisma.messaging_conversation.findMany({
-      where: {
-        integration_installation: {
-          company_id: companyId,
-          provider: "whatsapp",
-        },
-        ...(companyPhoneNumberId ? { company_phone_number_id: companyPhoneNumberId } : {}),
-      },
->>>>>>> 16eafa1 (update)
+      where: whereConv,
       orderBy: [{ last_message_at: "desc" }, { created_at: "desc" }],
       take: take + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -76,6 +82,7 @@ export async function GET(req: NextRequest) {
     });
 
     let nextCursor: string | null = null;
+
     if (conversations.length > take) {
       const last = conversations.pop();
       if (last) nextCursor = last.id;
@@ -96,11 +103,11 @@ export async function GET(req: NextRequest) {
           },
         });
 
-        const unread_count = await prisma.messaging_message.count({
+        const unreadCount = await prisma.messaging_message.count({
           where: {
             conversation_id: c.id,
             direction: "in",
-            provider_ts: c.last_read_at ? { gt: c.last_read_at } : undefined,
+            ...(c.last_read_at ? { provider_ts: { gt: c.last_read_at } } : {}),
           },
         });
 
@@ -114,7 +121,7 @@ export async function GET(req: NextRequest) {
           status: c.status,
           last_message_at: c.last_message_at,
           last_read_at: c.last_read_at,
-          unread_count,
+          unread_count: unreadCount,
           last_message: lastMsg
             ? {
                 direction: lastMsg.direction,

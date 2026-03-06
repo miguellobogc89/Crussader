@@ -10,10 +10,10 @@ import WhatsappAdminPanel, {
 } from "@/app/components/admin/integrations/whatsapp/WhatsappAdminPanel";
 import { useWhatsAppChatEvents } from "@/app/components/admin/integrations/whatsapp/hooks/useWhatsAppChatEvents";
 import { useWhatsAppSystemTurns } from "@/app/components/admin/integrations/whatsapp/hooks/useWhatsAppSystemTurns";
-
 import type { ConversationContact } from "@/app/components/admin/integrations/whatsapp/ConversationHeader";
 import type { TemplateGroupKey } from "@/lib/whatsapp/templateGroups";
 import { toWaDigits } from "@/lib/whatsapp/configuration/phone";
+import ThinkingPanel from "@/app/components/admin/integrations/whatsapp/ThinkingPanel/ThinkingPanel";
 
 function fillTemplateVars(text: string, contact: ConversationContact | null) {
   let out = text;
@@ -61,8 +61,6 @@ type SelectedThreadMeta = {
   environment: "TEST" | "PROD";
 };
 
-// ✅ tu número real (callee) en Cloud API (mientras no haya selector)
-const PROD_PHONE_NUMBER_ID = "968380903015928";
 
 export default function WhatsAppAdminShell({
   initialEvents,
@@ -221,65 +219,14 @@ export default function WhatsAppAdminShell({
   // Pills de memoria: SOLO profile (hook ya lo calcula)
   const memoryPills = useMemo(() => systemModel.memoryPills, [systemModel.memoryPills]);
 
-  const rightPanel = (
-    <div className="flex h-full min-h-0 flex-col p-4">
-      <div className="border-b pb-3">
-        <div className="text-sm font-semibold">Pensamiento IA</div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          Mensajes internos (role=SYSTEM). No se envían al cliente.
-        </div>
-      </div>
-
-      {/* MEMORIA */}
-      <div className="pt-3">
-        <div className="text-[11px] text-muted-foreground">Memoria</div>
-
-        <div className="mt-2 flex flex-wrap gap-2">
-          {memoryPills.length === 0 ? (
-            <div className="text-xs text-muted-foreground">Sin datos en memoria todavía.</div>
-          ) : (
-            memoryPills.map((v) => (
-              <div
-                key={v}
-                className="inline-flex items-center rounded-full border bg-background px-3 py-1 text-[11px] font-medium"
-                title={v}
-              >
-                {v}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Lista de mensajes SYSTEM */}
-      <div className="flex-1 min-h-0 overflow-auto py-3">
-        {!systemModel.canFetch ? (
-          <div className="text-xs text-muted-foreground">
-            Selecciona una conversación para ver mensajes SYSTEM.
-          </div>
-        ) : systemModel.loading && systemModel.turns.length === 0 ? (
-          <div className="text-xs text-muted-foreground">Cargando…</div>
-        ) : systemModel.turns.length === 0 ? (
-          <div className="text-xs text-muted-foreground">Sin mensajes SYSTEM todavía.</div>
-        ) : (
-          <div className="space-y-2">
-            {systemModel.turns.map((t) => (
-              <div key={t.id} className="rounded-xl border bg-background px-3 py-2">
-                <div className="text-sm">{t.text}</div>
-                <div className="mt-1 text-[11px] text-muted-foreground">
-                  {new Date(t.at).toLocaleTimeString("es-ES", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+const rightPanel = (
+  <ThinkingPanel
+    memoryValues={memoryPills}
+    turns={systemModel.turns}
+    loading={systemModel.loading}
+    canFetch={systemModel.canFetch}
+  />
+);
 
   return (
     <WhatsappAdminPanel

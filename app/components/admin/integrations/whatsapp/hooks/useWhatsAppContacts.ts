@@ -55,9 +55,15 @@ async function fetchWaConversations(companyId: string, phoneNumberId: string) {
   params.set("limit", "50");
   params.set("phoneNumberId", phoneNumberId);
 
-  const res = await fetch(`/api/whatsapp/messaging/conversations?${params.toString()}`, {
-    cache: "no-store",
-  });
+  let res: Response;
+
+  try {
+    res = await fetch(`/api/whatsapp/messaging/conversations?${params.toString()}`, {
+      cache: "no-store",
+    });
+  } catch {
+    return { ok: false, items: [] as WaConversationListItem[] };
+  }
 
   const data = await res.json().catch(() => null);
 
@@ -72,9 +78,15 @@ async function fetchCustomers(companyId: string) {
   params.set("companyId", companyId);
   params.set("limit", "200");
 
-  const res = await fetch(`/api/whatsapp/messaging/customers?${params.toString()}`, {
-    cache: "no-store",
-  });
+  let res: Response;
+
+  try {
+    res = await fetch(`/api/whatsapp/messaging/customers?${params.toString()}`, {
+      cache: "no-store",
+    });
+  } catch {
+    return { ok: false, items: [] as CustomerListItem[] };
+  }
 
   const data = await res.json().catch(() => null);
 
@@ -94,30 +106,48 @@ export function useWhatsAppContacts(args: {
   const [search, setSearch] = useState("");
   const [convsRaw, setConvsRaw] = useState<WaConversationListItem[]>([]);
   const [customersRaw, setCustomersRaw] = useState<CustomerListItem[]>([]);
-  const [loadingConvs, setLoadingConvs] = useState(false);
+  const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [conversationsLoadedOnce, setConversationsLoadedOnce] = useState(false);
   const [customersLoadedOnce, setCustomersLoadedOnce] = useState(false);
 
-  // conversaciones (poll)
   useEffect(() => {
-    if (!companyId) return;
+    if (!companyId) {
+      setConvsRaw([]);
+      setLoadingConversations(false);
+      setConversationsLoadedOnce(false);
+      return;
+    }
 
-    const companyIdStrict: string = companyId;
+    const companyIdStrict = companyId;
     let alive = true;
 
     async function tick(first: boolean) {
-      if (first) setLoadingConvs(true);
+      if (first) {
+        setLoadingConversations(true);
+      }
+
       try {
         const r = await fetchWaConversations(companyIdStrict, phoneNumberId);
+
         if (!alive) return;
-        setConvsRaw(r.ok ? r.items : []);
+
+        if (r.ok) {
+          setConvsRaw(r.items);
+          setConversationsLoadedOnce(true);
+        }
       } finally {
-        if (first && alive) setLoadingConvs(false);
+        if (first && alive) {
+          setLoadingConversations(false);
+        }
       }
     }
 
     tick(true);
-    const t = window.setInterval(() => tick(false), pollMs);
+
+    const t = window.setInterval(() => {
+      tick(false);
+    }, pollMs);
 
     return () => {
       alive = false;
@@ -125,27 +155,33 @@ export function useWhatsAppContacts(args: {
     };
   }, [companyId, phoneNumberId, pollMs]);
 
-  // customers (sin poll)
   useEffect(() => {
-    if (!companyId) return;
+    if (!companyId) {
+      setCustomersRaw([]);
+      setLoadingCustomers(false);
+      setCustomersLoadedOnce(false);
+      return;
+    }
 
-    const companyIdStrict: string = companyId;
+    const companyIdStrict = companyId;
     let alive = true;
 
     async function run() {
       setLoadingCustomers(true);
+
       try {
         const r = await fetchCustomers(companyIdStrict);
+
         if (!alive) return;
 
         if (r.ok) {
           setCustomersRaw(r.items);
           setCustomersLoadedOnce(true);
-        } else {
-          setCustomersRaw([]);
         }
       } finally {
-        if (alive) setLoadingCustomers(false);
+        if (alive) {
+          setLoadingCustomers(false);
+        }
       }
     }
 
@@ -183,7 +219,7 @@ export function useWhatsAppContacts(args: {
           conversationId: c.id,
           name,
           phoneE164: phone,
-          lastAtMs: lastAtMs > 0 ? lastAtMs : Date.now(),
+          lastAtMs,
           lastPreview,
           unread,
           agentId: null,
@@ -200,6 +236,7 @@ export function useWhatsAppContacts(args: {
 
   const customers = useMemo(() => {
     const qq = search.trim().toLowerCase();
+
     if (!qq) return customersRaw;
 
     return customersRaw.filter((c) => {
@@ -209,12 +246,28 @@ export function useWhatsAppContacts(args: {
     });
   }, [customersRaw, search]);
 
+  function markConversationReadLocal(conversationId: string) {
+    setConvsRaw((prev) =>
+      prev.map((item) => {
+        if (item.id !== conversationId) return item;
+
+        return {
+          ...item,
+          unread_count: 0,
+        };
+      })
+    );
+  }
+
   return {
     search,
     setSearch,
-    loading: loadingConvs || loadingCustomers,
     contacts,
     customers,
+    loadingConversations,
+    loadingCustomers,
+    conversationsLoadedOnce,
     customersLoadedOnce,
+    markConversationReadLocal,
   };
 }
