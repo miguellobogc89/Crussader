@@ -3,12 +3,18 @@ import { identifyCustomer } from "./idetinfyCustomer";
 import { assureCustomer } from "./assureCustomer";
 import { customerDataUpsert } from "./customerDataUpsert";
 import { appointmentServiceLookup } from "./appointmentServiceLookup";
+import { appointmentInfoLookup } from "./appointmentInfoLookup";
+import { appointmentCancel } from "./appointmentCancel";
+import { appointmentAvailabilityLookup } from "./appointmentAvailabilityLookup";
 
 export const ACTIONS = {
   identify_customer: identifyCustomer,
   assure_customer: assureCustomer,
   customer_data_upsert: customerDataUpsert,
   appointment_service_lookup: appointmentServiceLookup,
+  appointment_info_lookup: appointmentInfoLookup,
+  appointment_cancel: appointmentCancel,
+  appointment_availability_lookup: appointmentAvailabilityLookup,
 } as const;
 
 export type ActionName = keyof typeof ACTIONS;

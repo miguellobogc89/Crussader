@@ -6,7 +6,7 @@ type MemoryBucket = "profile" | "state";
 export async function updateSessionMemory(args: {
   sessionId: string;
   patch: Record<string, unknown>;
-  bucket?: MemoryBucket; // default: "profile"
+  bucket?: MemoryBucket;
 }): Promise<void> {
   const sessionId = String(args.sessionId || "").trim();
   if (!sessionId) throw new Error("Missing sessionId");
@@ -76,6 +76,12 @@ export async function clearSessionStateMemory(args: {
     Object.assign(nextMemory, nextSettings.memory);
   }
 
+  const prevProfile =
+    nextMemory.profile && typeof nextMemory.profile === "object"
+      ? nextMemory.profile
+      : {};
+
+  nextMemory.profile = prevProfile;
   nextMemory.state = {};
   nextSettings.memory = nextMemory;
 

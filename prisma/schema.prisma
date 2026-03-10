@@ -284,37 +284,39 @@ model KnowledgeItem {
 }
 
 model Employee {
-  id            String             @id @default(cuid())
-  name          String
-  notes         String?
-  color         String?
-  active        Boolean            @default(true)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  exceptions    Json?
-  openingHours  Json?
-  timezone      String             @default("Europe/Madrid")
-  job_title     String?            @db.VarChar(64)
-  appointments  Appointment[]
-  locations     EmployeeLocation[]
-  roles         EmployeeRole[]
-  EmployeeShift EmployeeShift[]
-  timeOffs      EmployeeTimeOff[]
-  ShiftEvent    ShiftEvent[]
+  id                  String                @id @default(cuid())
+  name                String
+  notes               String?
+  color               String?
+  active              Boolean               @default(true)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  exceptions          Json?
+  openingHours        Json?
+  timezone            String                @default("Europe/Madrid")
+  job_title           String?               @db.VarChar(64)
+  appointments        Appointment[]
+  AppointmentEmployee AppointmentEmployee[]
+  locations           EmployeeLocation[]
+  roles               EmployeeRole[]
+  EmployeeShift       EmployeeShift[]
+  timeOffs            EmployeeTimeOff[]
+  ShiftEvent          ShiftEvent[]
 
   @@index([active])
 }
 
 model StaffRole {
-  id        String         @id @default(cuid())
-  name      String
-  slug      String         @unique
-  color     String?
-  active    Boolean        @default(true)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
-  employees EmployeeRole[]
-  services  Service[]
+  id                  String                @id @default(cuid())
+  name                String
+  slug                String                @unique
+  color               String?
+  active              Boolean               @default(true)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  employees           EmployeeRole[]
+  services            Service[]
+  ServiceRequiredRole ServiceRequiredRole[]
 }
 
 model EmployeeRole {
@@ -355,31 +357,33 @@ model ResourceType {
 }
 
 model Resource {
-  id           String                  @id @default(cuid())
-  locationId   String
-  name         String
-  notes        String?
-  capacity     Int?
-  active       Boolean                 @default(true)
-  typeId       String?
-  createdAt    DateTime                @default(now())
-  updatedAt    DateTime                @updatedAt
-  appointments Appointment[]
-  location     Location                @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  type         ResourceType?           @relation(fields: [typeId], references: [id])
-  tags         ResourceTagOnResource[]
-  timeOffs     ResourceTimeOff[]
+  id                  String                  @id @default(cuid())
+  locationId          String
+  name                String
+  notes               String?
+  capacity            Int?
+  active              Boolean                 @default(true)
+  typeId              String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  appointments        Appointment[]
+  AppointmentResource AppointmentResource[]
+  location            Location                @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  type                ResourceType?           @relation(fields: [typeId], references: [id])
+  tags                ResourceTagOnResource[]
+  timeOffs            ResourceTimeOff[]
 }
 
 model ResourceTag {
-  id        String                  @id @default(cuid())
-  name      String
-  slug      String                  @unique
-  color     String?
-  createdAt DateTime                @default(now())
-  updatedAt DateTime                @updatedAt
-  resources ResourceTagOnResource[]
-  services  Service[]               @relation("ServiceToResourceTag")
+  id                         String                       @id @default(cuid())
+  name                       String
+  slug                       String                       @unique
+  color                      String?
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
+  resources                  ResourceTagOnResource[]
+  services                   Service[]                    @relation("ServiceToResourceTag")
+  ServiceRequiredResourceTag ServiceRequiredResourceTag[]
 }
 
 model ResourceTagOnResource {
@@ -393,26 +397,28 @@ model ResourceTagOnResource {
 }
 
 model Service {
-  id                    String         @id @default(cuid())
-  locationId            String
-  name                  String
-  description           String?
-  durationMin           Int            @default(30)
-  bufferBeforeMin       Int            @default(0)
-  bufferAfterMin        Int            @default(0)
-  color                 String?
-  requiredRoleId        String?
-  requiredResourceTagId String?
-  active                Boolean        @default(true)
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
-  priceCents            Int            @default(0)
-  price                 Decimal        @default(0) @db.Decimal(10, 2)
-  agentSessions         AgentSession[]
-  appointments          Appointment[]
-  location              Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  requiredTag           ResourceTag?   @relation("ServiceToResourceTag", fields: [requiredResourceTagId], references: [id])
-  requiredRole          StaffRole?     @relation(fields: [requiredRoleId], references: [id])
+  id                         String                       @id @default(cuid())
+  locationId                 String
+  name                       String
+  description                String?
+  durationMin                Int                          @default(30)
+  bufferBeforeMin            Int                          @default(0)
+  bufferAfterMin             Int                          @default(0)
+  color                      String?
+  requiredRoleId             String?
+  requiredResourceTagId      String?
+  active                     Boolean                      @default(true)
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
+  priceCents                 Int                          @default(0)
+  price                      Decimal                      @default(0) @db.Decimal(10, 2)
+  agentSessions              AgentSession[]
+  appointments               Appointment[]
+  location                   Location                     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  requiredTag                ResourceTag?                 @relation("ServiceToResourceTag", fields: [requiredResourceTagId], references: [id])
+  requiredRole               StaffRole?                   @relation(fields: [requiredRoleId], references: [id])
+  ServiceRequiredResourceTag ServiceRequiredResourceTag[]
+  ServiceRequiredRole        ServiceRequiredRole[]
 
   @@index([locationId])
   @@index([active])
@@ -421,30 +427,33 @@ model Service {
 }
 
 model Appointment {
-  id                 String            @id @default(cuid())
-  locationId         String
-  serviceId          String
-  startAt            DateTime
-  endAt              DateTime
-  status             AppointmentStatus @default(PENDING)
-  employeeId         String?
-  resourceId         String?
-  customerName       String?
-  customerPhone      String?
-  customerEmail      String?
-  notes              String?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  customerId         String?
-  createdByAgentId   String?
-  createdInSessionId String?
-  createdByAgent     Agent?            @relation("AppointmentCreatedByAgent", fields: [createdByAgentId], references: [id])
-  createdInSession   AgentSession?     @relation("AppointmentCreatedInSession", fields: [createdInSessionId], references: [id])
-  customer           Customer?         @relation(fields: [customerId], references: [id])
-  employee           Employee?         @relation(fields: [employeeId], references: [id])
-  location           Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  resource           Resource?         @relation(fields: [resourceId], references: [id])
-  service            Service           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  id                  String                @id @default(cuid())
+  locationId          String
+  serviceId           String
+  startAt             DateTime
+  endAt               DateTime
+  status              AppointmentStatus     @default(PENDING)
+  employeeId          String?
+  resourceId          String?
+  customerName        String?
+  customerPhone       String?
+  customerEmail       String?
+  notes               String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  customerId          String?
+  createdByAgentId    String?
+  createdInSessionId  String?
+  cancellation_reason String?
+  createdByAgent      Agent?                @relation("AppointmentCreatedByAgent", fields: [createdByAgentId], references: [id])
+  createdInSession    AgentSession?         @relation("AppointmentCreatedInSession", fields: [createdInSessionId], references: [id])
+  customer            Customer?             @relation(fields: [customerId], references: [id])
+  employee            Employee?             @relation(fields: [employeeId], references: [id])
+  location            Location              @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  resource            Resource?             @relation(fields: [resourceId], references: [id])
+  service             Service               @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  AppointmentEmployee AppointmentEmployee[]
+  AppointmentResource AppointmentResource[]
 
   @@index([employeeId, startAt])
   @@index([locationId, startAt])
@@ -494,7 +503,7 @@ model Customer {
   id                     String                   @id @default(cuid())
   firstName              String
   lastName               String
-  phone                  String
+  phone                  String                   @unique(map: "ux_customer_phone")
   email                  String?
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
@@ -503,10 +512,13 @@ model Customer {
   secondary_phone        String?
   country_code           String?
   secondary_country_code String?
+  whatsapp_name          String?
+  preferred_name         String?
   appointments           Appointment[]
   companies              CompanyCustomer[]
   createdByAgent         Agent?                   @relation("CustomerCreatedByAgent", fields: [createdByAgentId], references: [id])
   createdInSession       AgentSession?            @relation("CustomerCreatedInSession", fields: [createdInSessionId], references: [id])
+  agent_event            agent_event[]
   messaging_conversation messaging_conversation[]
 
   @@index([phone])
@@ -544,6 +556,7 @@ model Agent {
   chat                ChatAgent?
   customersCreated    Customer[]            @relation("CustomerCreatedByAgent")
   voice               VoiceAgent?
+  agent_event         agent_event[]
 
   @@index([companyId, channel, status])
   @@index([name])
@@ -641,6 +654,7 @@ model AgentSession {
   turns               AgentTurn[]
   createdAppointments Appointment[]      @relation("AppointmentCreatedInSession")
   createdCustomers    Customer[]         @relation("CustomerCreatedInSession")
+  agent_event_run     agent_event_run[]
 
   @@index([agentId, companyId, channel, status])
   @@index([environment, startedAt])
@@ -1506,6 +1520,7 @@ model Company {
   ShiftEvent                  ShiftEvent[]
   UserCompany                 UserCompany[]
   WebchatSites                WebchatSite[]                 @relation("CompanyToWebchatSite")
+  agent_event                 agent_event[]
   billing_account             billing_account?
   company_phone_number        company_phone_number[]
   discount_redemption         discount_redemption[]
@@ -2289,6 +2304,8 @@ model messaging_conversation {
   awaiting_need            Boolean                  @default(false)
   perceived_need           String?
   company_phone_number_id  String?                  @db.Uuid
+  agent_event              agent_event[]
+  agent_event_run          agent_event_run[]
   company_phone_number     company_phone_number?    @relation(fields: [company_phone_number_id], references: [id], onUpdate: NoAction, map: "fk_messaging_conversation_company_phone_number")
   Customer                 Customer?                @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_msg_conv_customer")
   integration_installation integration_installation @relation(fields: [installation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_msg_conv_installation")
@@ -2322,7 +2339,7 @@ model messaging_message {
 
 model whatsapp_template {
   id            String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  company_id    String
+  company_id    String?
   template_name String
   title         String
   status        whatsapp_template_status   @default(pending)
@@ -2334,12 +2351,15 @@ model whatsapp_template {
   updated_at    DateTime                   @default(now()) @db.Timestamptz(6)
   is_favorite   Boolean                    @default(false)
   favorite_at   DateTime?                  @db.Timestamptz(6)
-  Company       Company                    @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_whatsapp_template_company")
+  scope         whatsapp_template_scope    @default(private)
+  Company       Company?                   @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_whatsapp_template_company")
 
   @@unique([company_id, template_name], map: "ux_whatsapp_template_company_name")
   @@index([company_id, is_favorite, updated_at(sort: Desc)], map: "idx_whatsapp_template_company_fav_updated")
   @@index([company_id, status], map: "idx_whatsapp_template_company_status")
   @@index([company_id, updated_at(sort: Desc)], map: "idx_whatsapp_template_company_updated")
+  @@index([scope, company_id], map: "idx_whatsapp_template_scope_company")
+  @@index([company_id, scope, status, updated_at(sort: Desc)], map: "idx_whatsapp_template_available_lookup")
 }
 
 model company_phone_number {
@@ -2361,6 +2381,237 @@ model company_phone_number {
   @@unique([company_id, phone_number_e164], map: "ux_company_phone_number_company_e164")
   @@index([company_id, status], map: "ix_company_phone_number_company_status")
   @@index([location_id], map: "ix_company_phone_number_location")
+}
+
+model AppointmentEmployee {
+  id            String      @id
+  appointmentId String
+  employeeId    String
+  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
+  Appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Employee      Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([appointmentId, employeeId])
+  @@index([appointmentId])
+  @@index([employeeId])
+}
+
+model AppointmentResource {
+  id            String      @id
+  appointmentId String
+  resourceId    String
+  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
+  Appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Resource      Resource    @relation(fields: [resourceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([appointmentId, resourceId])
+  @@index([appointmentId])
+  @@index([resourceId])
+}
+
+model ServiceRequiredResourceTag {
+  id            String      @id
+  serviceId     String
+  resourceTagId String
+  quantity      Int         @default(1)
+  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
+  ResourceTag   ResourceTag @relation(fields: [resourceTagId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Service       Service     @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([serviceId, resourceTagId])
+  @@index([resourceTagId])
+  @@index([serviceId])
+}
+
+model ServiceRequiredRole {
+  id        String    @id
+  serviceId String
+  roleId    String
+  quantity  Int       @default(1)
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  StaffRole StaffRole @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  Service   Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([serviceId, roleId])
+  @@index([roleId])
+  @@index([serviceId])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model agent_event {
+  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id             String
+  agent_id               String
+  customer_id            String?
+  conversation_id        String?                 @db.Uuid
+  type                   agent_event_type        @default(CUSTOM)
+  category               String?
+  title                  String
+  description            String?
+  prompt                 String
+  prompt_version         String?
+  timezone               String                  @default("Europe/Madrid")
+  local_time             DateTime?               @db.Time(6)
+  days_of_week           Int[]                   @db.SmallInt
+  status                 agent_event_status      @default(ACTIVE)
+  is_active              Boolean                 @default(true)
+  start_date             DateTime?               @db.Date
+  end_date               DateTime?               @db.Date
+  last_run_at            DateTime?               @db.Timestamptz(6)
+  next_run_at            DateTime?               @db.Timestamptz(6)
+  config                 Json                    @default("{}")
+  meta                   Json                    @default("{}")
+  created_at             DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime                @default(now()) @db.Timestamptz(6)
+  run_at                 DateTime?               @db.Timestamptz(6)
+  Agent                  Agent                   @relation(fields: [agent_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_agent_event_agent")
+  Company                Company                 @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_agent_event_company")
+  messaging_conversation messaging_conversation? @relation(fields: [conversation_id], references: [id], onUpdate: NoAction, map: "fk_agent_event_conversation")
+  Customer               Customer?               @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_agent_event_customer")
+  agent_event_run        agent_event_run[]
+
+  @@index([agent_id], map: "idx_agent_event_agent")
+  @@index([company_id], map: "idx_agent_event_company")
+  @@index([conversation_id], map: "idx_agent_event_conversation")
+  @@index([customer_id], map: "idx_agent_event_customer")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model agent_event_run {
+  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  event_id               String                  @db.Uuid
+  agent_session_id       String?
+  conversation_id        String?                 @db.Uuid
+  scheduled_for          DateTime                @db.Timestamptz(6)
+  started_at             DateTime?               @db.Timestamptz(6)
+  finished_at            DateTime?               @db.Timestamptz(6)
+  status                 agent_event_run_status  @default(PENDING)
+  generated_text         String?
+  provider_message_id    String?
+  error_message          String?
+  payload                Json                    @default("{}")
+  meta                   Json                    @default("{}")
+  created_at             DateTime                @default(now()) @db.Timestamptz(6)
+  messaging_conversation messaging_conversation? @relation(fields: [conversation_id], references: [id], onUpdate: NoAction, map: "fk_agent_event_run_conversation")
+  agent_event            agent_event             @relation(fields: [event_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_agent_event_run_event")
+  AgentSession           AgentSession?           @relation(fields: [agent_session_id], references: [id], onUpdate: NoAction, map: "fk_agent_event_run_session")
+
+  @@index([conversation_id], map: "idx_agent_event_run_conversation")
+  @@index([event_id, created_at(sort: Desc)], map: "idx_agent_event_run_event")
+  @@index([status, scheduled_for], map: "idx_agent_event_run_status")
+}
+
+model live_football_fixture {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider       String
+  sport          String
+  fixture_id     BigInt
+  league_id      BigInt?
+  league_name    String?
+  country_name   String?
+  home_team_id   BigInt?
+  home_team_name String
+  away_team_id   BigInt?
+  away_team_name String
+  status_short   String?
+  minute         Int?
+  home_goals     Int?
+  away_goals     Int?
+  started_at     DateTime? @db.Timestamptz(6)
+  ended_at       DateTime? @db.Timestamptz(6)
+  raw_payload    Json?
+  first_seen_at  DateTime  @default(now()) @db.Timestamptz(6)
+  last_seen_at   DateTime  @default(now()) @db.Timestamptz(6)
+  created_at     DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@unique([provider, fixture_id], map: "live_football_fixture_provider_fixture_unique")
+  @@index([away_team_id], map: "live_football_fixture_away_team_idx")
+  @@index([home_team_id], map: "live_football_fixture_home_team_idx")
+  @@index([last_seen_at], map: "live_football_fixture_last_seen_idx")
+  @@index([league_id], map: "live_football_fixture_league_idx")
+  @@index([provider])
+  @@index([status_short], map: "live_football_fixture_status_idx")
+}
+
+model live_football_event {
+  id                             String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider                       String
+  sport                          String
+  fixture_id                     BigInt
+  event_elapsed                  Int?
+  event_extra                    Int?
+  event_type                     String
+  event_detail                   String?
+  event_comments                 String?
+  team_id                        BigInt?
+  team_name                      String?
+  player_id                      BigInt?
+  player_name                    String?
+  assist_id                      BigInt?
+  assist_name                    String?
+  event_key                      String                           @unique(map: "live_football_event_event_key_unique")
+  raw_payload                    Json?
+  first_seen_at                  DateTime                         @default(now()) @db.Timestamptz(6)
+  created_at                     DateTime                         @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime                         @default(now()) @db.Timestamptz(6)
+  football_subscription_delivery football_subscription_delivery[]
+
+  @@index([event_detail], map: "live_football_event_detail_idx")
+  @@index([provider, fixture_id], map: "live_football_event_fixture_idx")
+  @@index([first_seen_at], map: "live_football_event_seen_idx")
+  @@index([event_type], map: "live_football_event_type_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model football_subscription {
+  id                             String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  channel                        String                           @default("whatsapp")
+  destination                    String
+  provider                       String                           @default("api-football")
+  sport                          String                           @default("football")
+  team_id                        BigInt?
+  team_name                      String?
+  league_id                      BigInt?
+  league_name                    String?
+  country_name                   String?
+  subscription_type              String
+  event_type                     String?
+  frequency                      String?
+  is_active                      Boolean                          @default(true)
+  created_at                     DateTime                         @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime                         @default(now()) @db.Timestamptz(6)
+  config                         Json?
+  football_subscription_delivery football_subscription_delivery[]
+
+  @@index([is_active], map: "football_subscription_active_idx")
+  @@index([destination])
+  @@index([league_id], map: "football_subscription_league_idx")
+  @@index([team_id], map: "football_subscription_team_idx")
+  @@index([subscription_type], map: "football_subscription_type_idx")
+}
+
+model football_subscription_delivery {
+  id                    String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subscription_id       String                @db.Uuid
+  event_id              String                @db.Uuid
+  channel               String
+  destination           String
+  delivery_status       String                @default("pending")
+  delivered_at          DateTime?             @db.Timestamptz(6)
+  error_message         String?
+  created_at            DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime              @default(now()) @db.Timestamptz(6)
+  retry_count           Int                   @default(0)
+  next_retry_at         DateTime?             @db.Timestamptz(6)
+  live_football_event   live_football_event   @relation(fields: [event_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  football_subscription football_subscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([subscription_id, event_id], map: "football_subscription_delivery_unique")
+  @@index([event_id], map: "football_subscription_delivery_event_idx")
+  @@index([delivery_status], map: "football_subscription_delivery_status_idx")
+  @@index([subscription_id], map: "football_subscription_delivery_subscription_idx")
+  @@index([next_retry_at], map: "football_subscription_delivery_next_retry_idx")
 }
 
 /// *
@@ -2529,6 +2780,7 @@ enum AgentSessionStatus {
   ENDED
   ERROR
   ACTIVE
+  IDLE
 }
 
 enum AgentTurnRole {
@@ -2814,4 +3066,31 @@ enum company_phone_number_status {
   active
   pending
   disabled
+}
+
+enum whatsapp_template_scope {
+  public
+  private
+}
+
+enum agent_event_run_status {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  SKIPPED
+  CANCELLED
+}
+
+enum agent_event_status {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
+enum agent_event_type {
+  GOSPEL
+  NEWS
+  REMINDER
+  CUSTOM
 }

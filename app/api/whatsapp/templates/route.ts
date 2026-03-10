@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/whatsapp/templates?companyId=...
+ * Gestión interna: devuelve públicas + privadas de la empresa
  */
 export async function GET(req: NextRequest) {
   try {
@@ -13,14 +14,27 @@ export async function GET(req: NextRequest) {
     const companyId = searchParams.get("companyId");
 
     if (!companyId) {
-      return NextResponse.json({ ok: false, error: "companyId requerido" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "companyId requerido" },
+        { status: 400 }
+      );
     }
 
     const items = await prisma.whatsapp_template.findMany({
-      where: { company_id: companyId },
-      orderBy: { updated_at: "desc" },
+      where: {
+        OR: [
+          { scope: "public" },
+          { scope: "private", company_id: companyId },
+        ],
+      },
+      orderBy: [
+        { scope: "asc" },
+        { updated_at: "desc" },
+      ],
       select: {
         id: true,
+        company_id: true,
+        scope: true,
         template_name: true,
         title: true,
         status: true,

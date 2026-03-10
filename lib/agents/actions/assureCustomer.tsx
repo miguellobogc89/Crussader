@@ -79,17 +79,22 @@ export async function assureCustomer(args: {
     if (p2.length > 0) newPrimaryPhone = p2;
   }
 
-  const existing = await prisma.customer.findFirst({
-    where: { phone: incomingPhone },
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      phone: true,
-      email: true,
-      secondary_phone: true,
-    },
-  });
+const existing = await prisma.customer.findFirst({
+  where: {
+    OR: [
+      { phone: incomingPhone },
+      { secondary_phone: incomingPhone },
+    ],
+  },
+  select: {
+    id: true,
+    firstName: true,
+    lastName: true,
+    phone: true,
+    email: true,
+    secondary_phone: true,
+  },
+});
 
   // 1) NO EXISTE → crear (Unknown o con nombre si viene)
   if (!existing) {
@@ -160,12 +165,29 @@ export async function assureCustomer(args: {
   }
 
   // 3) Update de contacto (email y/o cambio de phone)
-  let shouldChangePhone = false;
-  if (newPrimaryPhone) {
-    if (newPrimaryPhone !== existing.phone) {
+let shouldChangePhone = false;
+
+if (newPrimaryPhone) {
+  if (newPrimaryPhone !== existing.phone) {
+
+    const phoneOwner = await prisma.customer.findFirst({
+      where: {
+        OR: [
+          { phone: newPrimaryPhone },
+          { secondary_phone: newPrimaryPhone },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (!phoneOwner || phoneOwner.id === existing.id) {
       shouldChangePhone = true;
+    } else {
+      // el número pertenece a otro cliente → no cambiar
+      shouldChangePhone = false;
     }
   }
+}
 
   let shouldChangeEmail = false;
   if (inputEmail) {

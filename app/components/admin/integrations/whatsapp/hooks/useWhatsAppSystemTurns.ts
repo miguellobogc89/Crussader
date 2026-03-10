@@ -16,6 +16,8 @@ export type SessionMemory = {
   };
   state?: {
     reason?: string;
+    subReason?: string;
+    step?: string;
     [k: string]: unknown;
   };
   [k: string]: unknown;
@@ -62,38 +64,6 @@ function buildDisplayName(profile: SessionMemory["profile"] | undefined) {
   return parts.join(" ").trim();
 }
 
-function buildReasonPill(memory: SessionMemory | null): string {
-  if (!memory || typeof memory !== "object") {
-    return "";
-  }
-
-  const profile =
-    memory.profile && typeof memory.profile === "object"
-      ? memory.profile
-      : undefined;
-
-  const state =
-    memory.state && typeof memory.state === "object"
-      ? memory.state
-      : undefined;
-
-  let reason = "";
-
-  if (profile && typeof profile.reason === "string") {
-    reason = profile.reason.trim();
-  }
-
-  if (reason.length === 0 && state && typeof state.reason === "string") {
-    reason = state.reason.trim();
-  }
-
-  if (reason.length === 0) {
-    return "";
-  }
-
-  return "reason: " + reason;
-}
-
 function buildMemoryPills(memory: SessionMemory | null): string[] {
   const out: string[] = [];
 
@@ -106,28 +76,86 @@ function buildMemoryPills(memory: SessionMemory | null): string[] {
       ? memory.profile
       : undefined;
 
+  const state =
+    memory.state && typeof memory.state === "object"
+      ? memory.state
+      : undefined;
+
   const displayName = buildDisplayName(profile);
   const email = typeof profile?.email === "string" ? profile.email.trim() : "";
   const phone = typeof profile?.phone === "string" ? profile.phone.trim() : "";
-  const reasonPill = buildReasonPill(memory);
+
+  let reason = "";
+  if (typeof state?.reason === "string") {
+    reason = state.reason.trim();
+  }
+  if (reason.length === 0 && typeof profile?.reason === "string") {
+    reason = profile.reason.trim();
+  }
+
+  const subReason =
+    typeof state?.subReason === "string" ? state.subReason.trim() : "";
+
+  const step =
+    typeof state?.step === "string" ? state.step.trim() : "";
 
   const raw: string[] = [];
 
-  if (displayName.length > 0) raw.push(displayName);
-  if (email.length > 0) raw.push(email);
-  if (phone.length > 0) raw.push(phone);
-  if (reasonPill.length > 0) raw.push(reasonPill);
+  if (displayName.length > 0 && displayName !== "Unknown") {
+    raw.push(displayName);
+  }
+
+  if (email.length > 0) {
+    raw.push(email);
+  }
+
+  if (phone.length > 0) {
+    raw.push(phone);
+  }
+
+  if (subReason.length > 0) {
+    raw.push("subReason:" + subReason);
+  } else if (reason.length > 0) {
+    raw.push("reason:" + reason);
+  }
+
+  if (step.length > 0) {
+    raw.push("step:" + step);
+  }
 
   const unique: string[] = [];
 
   for (const value of raw) {
-    if (value.length === 0) continue;
-    if (value === "Unknown") continue;
+    if (!value) continue;
     if (unique.includes(value)) continue;
     unique.push(value);
   }
 
   return unique;
+}
+
+function buildSessionStatus(memory: SessionMemory | null): "IDLE" | "ACTIVE" {
+  if (!memory || typeof memory !== "object") {
+    return "IDLE";
+  }
+
+  const state =
+    memory.state && typeof memory.state === "object"
+      ? memory.state
+      : undefined;
+
+  if (!state) {
+    return "IDLE";
+  }
+
+  const keys = Object.keys(state).filter((key) => {
+    const value = state[key];
+    if (value === null || value === undefined) return false;
+    if (typeof value === "string" && value.trim().length === 0) return false;
+    return true;
+  });
+
+  return keys.length > 0 ? "ACTIVE" : "IDLE";
 }
 
 export function useWhatsAppSystemTurns(args: {
@@ -195,5 +223,9 @@ export function useWhatsAppSystemTurns(args: {
     return buildMemoryPills(memory);
   }, [memory]);
 
-  return { canFetch, turns, memory, memoryPills, loading };
+  const sessionStatus = useMemo(() => {
+    return buildSessionStatus(memory);
+  }, [memory]);
+
+  return { canFetch, turns, memory, memoryPills, sessionStatus, loading };
 }

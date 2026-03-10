@@ -6,8 +6,16 @@ import {
 } from "@/lib/agents/chat/agentSessionStore";
 import { hydrateSessionBoard } from "@/lib/agents/chat/sessionBoardHydrator";
 import { buildFreeChatReply } from "@/lib/agents/chat/freeChatReply";
-import { classifySimpleMessage } from "@/lib/agents/chat/simpleMessageClassifier";
+import {
+  classifySimpleMessage,
+  classifyAppointmentSubReason,
+} from "@/lib/agents/chat/simpleMessageClassifier";
+import { clearConversationState } from "@/lib/agents/memory/clearConversationState";
 import { conversationRouter } from "@/lib/agents/chat/conversationRouter";
+import {
+  classifyConversationClosure,
+  closeConversationContext,
+} from "@/lib/agents/chat/conversationClosure";
 
 import { ACTIONS } from "@/lib/agents/actions";
 
@@ -85,13 +93,187 @@ export async function whatsappPipeline(args: {
     language,
   });
 
+  await prisma.agentSession.update({
+    where: { id: ensured.sessionId },
+    data: { status: "ACTIVE" },
+  });
+
   await hydrateSessionBoard({ sessionId: ensured.sessionId, companyId });
+
+ await createAgentTurn({
+  sessionId: ensured.sessionId,
+  role: "USER",
+  text: incomingText,
+});
+
+const sessionAfterUser = await prisma.agentSession.findUnique({
+  where: { id: ensured.sessionId },
+  select: { settings: true },
+});
+
+const settingsAfterUser = asObject(sessionAfterUser?.settings);
+const memoryAfterUser = asObject(settingsAfterUser.memory);
+const stateAfterUser = asObject(memoryAfterUser.state);
+
+let currentStepAfterUser = "";
+const stepRaw = stateAfterUser.step;
+
+if (typeof stepRaw === "string") {
+  currentStepAfterUser = stepRaw.trim();
+}
+
+if (currentStepAfterUser === "awaiting_cancellation_reason") {
+  const appointmentIdRaw = stateAfterUser.targetAppointmentId;
+  const appointmentId =
+    typeof appointmentIdRaw === "string" ? appointmentIdRaw.trim() : "";
+
+  if (appointmentId.length > 0) {
+    await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: {
+        cancellation_reason: incomingText,
+      },
+    });
+  }
+
+  await clearConversationState(ensured.sessionId);
+
+  await prisma.agentSession.update({
+    where: { id: ensured.sessionId },
+    data: {
+      status: "IDLE",
+      endedAt: new Date(),
+    },
+  });
+
+  const botText = "Gracias por indicarnos el motivo. Lo tendremos en cuenta.";
 
   await createAgentTurn({
     sessionId: ensured.sessionId,
-    role: "USER",
-    text: incomingText,
+    role: "ASSISTANT",
+    text: botText,
+    payload: {
+      stage: "CANCELLATION_REASON_SAVED",
+      identifyKind: null,
+      assureKind: null,
+      rootIntent: "appointment_management",
+      rootIntentConfidence: null,
+      subReason: "cancel",
+    },
   });
+
+  return {
+    botText,
+    sessionId: ensured.sessionId,
+    stage: "CANCELLATION_REASON_SAVED",
+    runtime: {
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      settingsId: null,
+      stage: "CANCELLATION_REASON_SAVED",
+    },
+    debug: {
+      panelMessage: "cancellation reason saved",
+      identify: null,
+      assure: null,
+      route: null,
+      effectiveIntent: "appointment_management",
+      effectiveSubReason: "cancel",
+    },
+  };
+}
+
+  const sessionBefore = await prisma.agentSession.findUnique({
+    where: { id: ensured.sessionId },
+    select: { settings: true },
+  });
+
+  const sessionBeforeSettings = asObject(sessionBefore?.settings);
+  const sessionBeforeMemory = asObject(sessionBeforeSettings.memory);
+  const sessionBeforeState = asObject(sessionBeforeMemory.state);
+
+  const previousFlow =
+    typeof sessionBeforeState.flow === "string" ? sessionBeforeState.flow.trim() : "";
+  const previousSubReason =
+    typeof sessionBeforeState.subReason === "string"
+      ? sessionBeforeState.subReason.trim()
+      : "";
+
+  if (previousFlow.length > 0) {
+    const closure = classifyConversationClosure(incomingText);
+
+if (closure.shouldClose) {
+  await closeConversationContext({
+    sessionId: ensured.sessionId,
+  });
+  await prisma.agentSession.update({
+    where: { id: ensured.sessionId },
+    data: { status: "IDLE" },
+  });
+
+  await createAgentTurn({
+    sessionId: ensured.sessionId,
+    role: "SYSTEM",
+    text:
+      "conversation_closure → flow=" +
+      String(previousFlow || "null") +
+      " · subReason=" +
+      String(previousSubReason || "null") +
+      " · action=clear_state",
+    payload: {
+      type: "INTERNAL_CONVERSATION_CLOSURE_EVENT",
+      previousFlow: previousFlow || null,
+      previousSubReason: previousSubReason || null,
+      action: "clear_state",
+      sessionStatus: "IDLE",
+    },
+  });
+
+  const built = await buildFreeChatReply({
+    sessionId: ensured.sessionId,
+    userText: incomingText,
+    phone: toPhoneE164,
+    companyId,
+  });
+
+  const closureText = String(built.botText || "").trim();
+
+  await createAgentTurn({
+    sessionId: ensured.sessionId,
+    role: "ASSISTANT",
+    text: closureText,
+    payload: {
+      stage: "CONVERSATION_CLOSED",
+      identifyKind: null,
+      assureKind: null,
+      rootIntent: null,
+      rootIntentConfidence: null,
+      subReason: null,
+      sessionStatus: "IDLE",
+    },
+  });
+
+  return {
+    botText: closureText,
+    sessionId: ensured.sessionId,
+    stage: "CONVERSATION_CLOSED",
+    runtime: {
+      model: "gpt-4o-mini",
+      temperature: 0.2,
+      settingsId: null,
+      stage: "CONVERSATION_CLOSED",
+    },
+    debug: {
+      panelMessage: "conversation closed",
+      identify: null,
+      assure: null,
+      route: null,
+      effectiveIntent: null,
+      effectiveSubReason: null,
+    },
+  };
+}
+  }
 
   const idRes = await ACTIONS.identify_customer({
     companyId,
@@ -150,6 +332,20 @@ export async function whatsappPipeline(args: {
     activeFlow = activeFlowRaw.trim();
   }
 
+  let activeStep = "";
+  const activeStepRaw = sessionAfterRouteState.step;
+
+  if (typeof activeStepRaw === "string") {
+    activeStep = activeStepRaw.trim();
+  }
+
+  let currentSubReason = "";
+  const currentSubReasonRaw = sessionAfterRouteState.subReason;
+
+  if (typeof currentSubReasonRaw === "string") {
+    currentSubReason = currentSubReasonRaw.trim();
+  }
+
   let effectiveIntent = String(route.intent || "");
 
   if (effectiveIntent.length === 0) {
@@ -160,30 +356,40 @@ export async function whatsappPipeline(args: {
 
   if (effectiveIntent !== "appointment_management") {
     if (activeFlow === "appointment_management") {
-      const currentStepRaw = sessionAfterRouteState.step;
-      let currentStep = "";
-
-      if (typeof currentStepRaw === "string") {
-        currentStep = currentStepRaw.trim();
-      }
-
       if (
-        currentStep === "awaiting_service" ||
-        currentStep === "awaiting_service_confirmation" ||
-        currentStep === "awaiting_location" ||
-        currentStep === "awaiting_datetime"
+        activeStep === "awaiting_service" ||
+        activeStep === "awaiting_service_confirmation" ||
+        activeStep === "awaiting_location" ||
+        activeStep === "awaiting_datetime"
       ) {
         effectiveIntent = "appointment_management";
       }
     }
   }
 
-    if (effectiveIntent === "appointment_management") {
+  let effectiveSubReason = currentSubReason;
+
+  if (effectiveIntent === "appointment_management") {
+    const detectedSubReason = classifyAppointmentSubReason({
+      text: incomingText,
+      currentStep: activeStep,
+      currentSubReason,
+    });
+
+    if (detectedSubReason !== "unknown") {
+      effectiveSubReason = detectedSubReason;
+    }
+
+    if (!effectiveSubReason) {
+      effectiveSubReason = "unknown";
+    }
+
     await updateSessionMemoryState({
       sessionId: ensured.sessionId,
       patch: {
         reason: "appointment_management",
         flow: "appointment_management",
+        subReason: effectiveSubReason,
       },
     });
   }
@@ -196,6 +402,8 @@ export async function whatsappPipeline(args: {
       String(route.intent || "null") +
       " · effective=" +
       String(effectiveIntent || "null") +
+      " · subReason=" +
+      String(effectiveSubReason || "null") +
       " · confidence=" +
       String(route.confidence) +
       " · clarify=" +
@@ -204,6 +412,7 @@ export async function whatsappPipeline(args: {
       type: "INTERNAL_ROUTER_EVENT",
       intent: route.intent,
       effectiveIntent,
+      subReason: effectiveSubReason || null,
       confidence: route.confidence,
       needsClarification: route.needsClarification,
       clarificationQuestion: route.clarificationQuestion,
@@ -333,11 +542,14 @@ export async function whatsappPipeline(args: {
       role: "SYSTEM",
       text:
         "appointment_state → flow=appointment_management · step=" +
-        String(currentStep || "null"),
+        String(currentStep || "null") +
+        " · subReason=" +
+        String(effectiveSubReason || "null"),
       payload: {
         type: "INTERNAL_APPOINTMENT_STATE_EVENT",
         flow: "appointment_management",
         step: currentStep || null,
+        subReason: effectiveSubReason || null,
       },
     });
 
@@ -406,6 +618,7 @@ export async function whatsappPipeline(args: {
       assureKind: assureResult && assureResult.kind ? assureResult.kind : null,
       rootIntent: effectiveIntent,
       rootIntentConfidence: route.confidence,
+      subReason: effectiveSubReason || null,
     },
   });
 
@@ -425,6 +638,7 @@ export async function whatsappPipeline(args: {
       assure: assureResult,
       route,
       effectiveIntent,
+      effectiveSubReason,
     },
   };
 }

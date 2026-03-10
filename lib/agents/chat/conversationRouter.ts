@@ -49,16 +49,17 @@ function buildRouterMemoryBlock(memory: {
 
   const rootIntent =
     typeof state.rootIntent === "string" ? state.rootIntent.trim() : "";
-  const flow =
-    typeof state.flow === "string" ? state.flow.trim() : "";
-  const step =
-    typeof state.step === "string" ? state.step.trim() : "";
+  const flow = typeof state.flow === "string" ? state.flow.trim() : "";
+  const step = typeof state.step === "string" ? state.step.trim() : "";
+  const subReason =
+    typeof state.subReason === "string" ? state.subReason.trim() : "";
 
   const lines: string[] = [];
   lines.push("Estado actual de memoria:");
   lines.push("- rootIntent: " + (rootIntent || "vacío"));
   lines.push("- flow: " + (flow || "vacío"));
   lines.push("- step: " + (step || "vacío"));
+  lines.push("- subReason: " + (subReason || "vacío"));
 
   return lines.join("\n");
 }
@@ -101,7 +102,7 @@ export async function conversationRouter(args: {
           "- Si no está suficientemente claro, devuelve needsClarification=true y una pregunta breve.",
           "- Responde solo JSON válido.",
           "",
-          'Formato exacto:',
+          "Formato exacto:",
           '{"intent":"information_request|appointment_management|human_handoff|complaint_intake|out_of_scope|null","confidence":"low|medium|high","needsClarification":true,"clarificationQuestion":"string|null"}',
         ].join("\n"),
       },

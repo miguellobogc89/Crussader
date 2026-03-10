@@ -16,6 +16,22 @@ export type ContactMeta = {
   phoneNumberId?: string | null;
 };
 
+export type ContactRow = {
+  conversationId: string;
+  name: string;
+  phoneE164: string;
+  unread: number;
+  agentId: string | null;
+  phoneNumberId: string | null;
+  lastAtMs: number;
+  lastPreview: string;
+};
+
+export type CustomerListItem = {
+  name: string;
+  phone: string;
+};
+
 function normalizePhone(p: string) {
   return String(p || "").replace(/[^\d]/g, "");
 }

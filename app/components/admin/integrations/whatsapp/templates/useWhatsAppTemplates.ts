@@ -16,13 +16,19 @@ export function useWhatsAppTemplates(companyId: string | null) {
   }, [items]);
 
   const refresh = useCallback(async () => {
-    if (!companyId) return;
+    if (!companyId) {
+      setItems([]);
+      setSelectedId(null);
+      return;
+    }
 
     setLoading(true);
+
     try {
-      const res = await fetch(`/api/whatsapp/templates?companyId=${companyId}`, {
-        cache: "no-store",
-      });
+      const res = await fetch(
+        `/api/whatsapp/templates/available?companyId=${encodeURIComponent(companyId)}`,
+        { cache: "no-store" }
+      );
 
       if (!res.ok) {
         setItems([]);
@@ -52,11 +58,14 @@ export function useWhatsAppTemplates(companyId: string | null) {
         favoriteAt: t.favorite_at ? String(t.favorite_at) : null,
       }));
 
-      // favoritos primero, luego updated
       mapped.sort((a, b) => {
         const af = a.isFavorite ? 1 : 0;
         const bf = b.isFavorite ? 1 : 0;
-        if (bf !== af) return bf - af;
+
+        if (bf !== af) {
+          return bf - af;
+        }
+
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       });
 
@@ -68,9 +77,8 @@ export function useWhatsAppTemplates(companyId: string | null) {
   }, [companyId]);
 
   useEffect(() => {
-    if (!companyId) return;
     refresh();
-  }, [companyId, refresh]);
+  }, [refresh]);
 
   const selected = useMemo(() => {
     return items.find((t) => t.id === selectedId) ?? null;

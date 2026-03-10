@@ -250,7 +250,7 @@ export default function TemplatesListPanel({
             >
               <RefreshCw className={["h-4 w-4", loading ? "animate-spin" : ""].join(" ")} />
             </Button>
-            <TemplatesAddDialog />
+            <TemplatesAddDialog onCreated={onRefresh} />
           </div>
         </div>
 

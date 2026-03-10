@@ -3,13 +3,13 @@
 
 import { useBootstrapStore } from "@/app/providers/bootstrap-store";
 import TemplatesShell from "@/app/components/admin/integrations/whatsapp/templates/TemplatesShell";
-import { useWhatsAppTemplates } from "@/app/components/admin/integrations/whatsapp/templates/useWhatsAppTemplates";
+import { useWhatsAppTemplatesAdmin } from "@/app/components/admin/integrations/whatsapp/templates/useWhatsAppTemplatesAdmin";
 
 export default function WhatsAppTemplatesPage() {
   const companyId = useBootstrapStore((s) => s.data?.activeCompanyResolved?.id ?? null);
 
   const { items, loading, selected, selectedId, setSelectedId, refresh, languages } =
-    useWhatsAppTemplates(companyId);
+    useWhatsAppTemplatesAdmin(companyId);
 
   async function toggleFavorite(templateId: string, next: boolean) {
     if (!companyId) return;

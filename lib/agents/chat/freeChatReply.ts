@@ -1,6 +1,8 @@
+// lib/agents/chat/freeChatReply.ts
 import { openai } from "@/lib/ai";
 import { ACTIONS } from "@/lib/agents/actions";
 import { getSessionMemory } from "@/lib/agents/memory/getSessionMemory";
+import { updateSessionMemory } from "@/lib/agents/memory/updateSessionMemory";
 
 type BuildFreeChatReplyArgs = {
   sessionId: string;
@@ -55,6 +57,7 @@ function buildMemoryBlock(
 
   const flow = memoryValueToText(state.flow);
   const step = memoryValueToText(state.step);
+  const subReason = memoryValueToText(state.subReason);
   const requestedServiceText = memoryValueToText(state.requestedServiceText);
   const selectedLocationId = memoryValueToText(state.selectedLocationId);
   const selectedServiceId = memoryValueToText(state.selectedServiceId);
@@ -67,6 +70,7 @@ function buildMemoryBlock(
     "- profile.phone: " + memoryValueToText(effectivePhone),
     "- state.flow: " + flow,
     "- state.step: " + step,
+    "- state.subReason: " + subReason,
     "- state.requestedServiceText: " + requestedServiceText,
     "- state.selectedLocationId: " + selectedLocationId,
     "- state.selectedServiceId: " + selectedServiceId,
@@ -121,8 +125,33 @@ export async function buildFreeChatReply(
 
           Si memory.state.flow = appointment_management:
           - Nunca interpretes el mensaje del usuario como una pregunta informativa.
-          - El usuario está intentando reservar una cita.
+          - El usuario está intentando gestionar una cita.
 
+          Si memory.state.subReason = info:
+          - El usuario quiere consultar su cita actual.
+          - Debes llamar primero a la tool appointment_info_lookup.
+          - No inventes datos de citas.
+          - Cuando respondas con la cita, cierra de forma natural con: "¿Hay algo más en lo que pueda ayudarte?"
+          - No des información de otras citas ni de terceros.
+          Si memory.state.subReason = cancel y memory.state.step ≠ awaiting_cancel_confirmation:
+          - El usuario quiere cancelar su cita actual.
+          - Primero debes llamar a la tool appointment_info_lookup, no a appointment_cancel.
+          - Si existe una cita activa, muéstrala brevemente y pide confirmación explícita para cancelarla.
+          - Debes pedir una confirmación clara tipo "¿Seguro que quieres cancelarla?".
+          - No canceles la cita todavía en este primer paso.
+          - Si no existe cita activa, indícalo claramente.
+          - No menciones herramientas internas ni procesos internos.
+
+          Si memory.state.subReason = cancel y memory.state.step = awaiting_cancel_confirmation:
+          - Ya has mostrado la cita y ya has pedido confirmación de cancelación.
+          - Ahora debes interpretar la respuesta del usuario.
+          - Si la respuesta implica confirmación, aunque no sea exactamente "sí", debes llamar directamente a la tool appointment_cancel.
+          - Considera confirmación cualquier respuesta que, en lenguaje natural, signifique aceptación o autorización para cancelar.
+          - Ejemplos orientativos de confirmación: "sí", "si por favor", "adelante", "vale", "ok", "cancelala", "hazlo", "correcto", "confírmalo", "puedes cancelarla".
+          - Si la respuesta implica que no quiere cancelarla, no llames a appointment_cancel y responde indicando que mantienes la cita.
+          - Si la respuesta sigue siendo ambigua, entonces sí puedes pedir una aclaración breve.
+          - No vuelvas a preguntar "¿Seguro que quieres cancelarla?" si la respuesta ya implica confirmación.
+          - No menciones herramientas internas ni procesos internos.
           Si memory.state.step = awaiting_service:
           - Debes intentar resolver el servicio usando la tool appointment_service_lookup.
           - Incluso si el mensaje es corto como "higiene", "limpieza", "revisión", "implantes", etc.
@@ -194,6 +223,58 @@ export async function buildFreeChatReply(
               },
             },
             required: ["sessionId", "companyId", "userText"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "appointment_info_lookup",
+          description:
+            "Busca la próxima cita activa del propio cliente dentro de la company actual.",
+          parameters: {
+            type: "object",
+            properties: {
+              sessionId: {
+                type: "string",
+                description: "Sesión actual",
+              },
+              companyId: {
+                type: "string",
+                description: "Company id actual",
+              },
+              phone: {
+                type: "string",
+                description: "Teléfono del cliente que escribe",
+              },
+            },
+            required: ["sessionId", "companyId", "phone"],
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "appointment_cancel",
+          description:
+            "Cancela la próxima cita activa del propio cliente dentro de la company actual.",
+          parameters: {
+            type: "object",
+            properties: {
+              sessionId: {
+                type: "string",
+                description: "Sesión actual",
+              },
+              companyId: {
+                type: "string",
+                description: "Company id actual",
+              },
+              phone: {
+                type: "string",
+                description: "Teléfono del cliente que escribe",
+              },
+            },
+            required: ["sessionId", "companyId", "phone"],
           },
         },
       },
@@ -367,6 +448,159 @@ export async function buildFreeChatReply(
             - No menciones herramientas internas ni ids internos.
             - No inventes disponibilidad real todavía.
             - Responde breve, natural y orientado a avanzar la reserva.
+            `,
+          },
+          {
+            role: "system",
+            content: updatedMemoryBlock,
+          },
+          {
+            role: "system",
+            content: toolResultBlock,
+          },
+          { role: "user", content: userText },
+        ],
+        max_tokens: 180,
+      });
+
+      const followText = safeTrim(follow.choices?.[0]?.message?.content);
+
+      return {
+        botText: followText || "OK",
+      };
+    }
+
+    if (fnName === "appointment_info_lookup") {
+      const res = await ACTIONS.appointment_info_lookup({
+        sessionId,
+        companyId,
+        phone,
+      });
+
+      const updatedMemory = await getSessionMemory(sessionId);
+      const updatedMemoryBlock = buildMemoryBlock(updatedMemory, phone);
+
+      const toolResultBlock = [
+        "Resultado interno de appointment_info_lookup:",
+        "- status: " + String(res.status),
+        "",
+        res.status === "FOUND"
+          ? [
+              "- appointment.startAt: " + String(res.appointment.startAt),
+              "- appointment.endAt: " + String(res.appointment.endAt),
+              "- appointment.status: " + String(res.appointment.status),
+              "- appointment.serviceName: " + String(res.appointment.serviceName),
+              "- appointment.locationTitle: " + String(res.appointment.locationTitle),
+            ].join("\n")
+          : "- no active appointment found",
+        "",
+        "Cómo responder:",
+        "- Si status = FOUND, responde de forma breve y natural con los datos de la cita.",
+        "- Termina con una pregunta suave de continuidad: ¿Hay algo más en lo que pueda ayudarte?",
+        "- Si status = NOT_FOUND, di claramente que no encuentras ninguna cita activa.",
+        "- No inventes datos.",
+        "- No menciones tools, memoria interna, ids ni procesos internos.",
+      ].join("\n");
+
+      const follow = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        messages: [
+          {
+            role: "system",
+            content: `
+            Eres un asistente conversacional de WhatsApp.
+
+            Reglas obligatorias:
+            - Responde únicamente con información de la cita del propio cliente.
+            - Cuando la cita exista, cierra con: "¿Hay algo más en lo que pueda ayudarte?"
+            - No menciones herramientas internas ni ids.
+            - Responde breve, clara y natural.
+            `,
+          },
+          {
+            role: "system",
+            content: updatedMemoryBlock,
+          },
+          {
+            role: "system",
+            content: toolResultBlock,
+          },
+          { role: "user", content: userText },
+        ],
+        max_tokens: 180,
+      });
+
+      const followText = safeTrim(follow.choices?.[0]?.message?.content);
+
+      const currentSubReason =
+        typeof updatedMemory.state?.subReason === "string"
+          ? updatedMemory.state.subReason.trim()
+          : "";
+
+      if (currentSubReason === "cancel" && res.status === "FOUND") {
+        await updateSessionMemory({
+          sessionId,
+          bucket: "state",
+          patch: {
+            step: "awaiting_cancel_confirmation",
+          },
+        });
+      }
+
+      return {
+        botText: followText || "OK",
+      };
+    }
+    if (fnName === "appointment_cancel") {
+      const res = await ACTIONS.appointment_cancel({
+        sessionId,
+        companyId,
+        phone,
+      });
+
+      const updatedMemory = await getSessionMemory(sessionId);
+      const updatedMemoryBlock = buildMemoryBlock(updatedMemory, phone);
+
+      const toolResultBlock = [
+        "Resultado interno de appointment_cancel:",
+        "- status: " + String(res.status),
+        "",
+        res.status === "CANCELLED"
+          ? [
+              "- appointment.startAt: " + String(res.appointment.startAt),
+              "- appointment.endAt: " + String(res.appointment.endAt),
+              "- appointment.serviceName: " + String(res.appointment.serviceName),
+              "- appointment.locationTitle: " + String(res.appointment.locationTitle),
+            ].join("\n")
+          : "- no active appointment found",
+        "",
+        "Cómo responder:",
+        "- Si status = CANCELLED, confirma de forma breve que la cita ha sido cancelada.",
+        "- Después pide el motivo de cancelación de forma opcional, para ayudar a mejorar el servicio.",
+        "- No hagas la pregunta obligatoria.",
+        "- No cierres la conversación todavía.",
+        "- Si status = NOT_FOUND, di claramente que no encuentras ninguna cita activa para cancelar.",
+        "- No menciones tools internas ni ids.",
+      ].join("\n");
+
+      const follow = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        messages: [
+          {
+            role: "system",
+            content: `
+            Eres un asistente conversacional de WhatsApp.
+
+            Reglas obligatorias:
+            - Si la cita se ha cancelado, confírmalo de forma clara y natural.
+            - Después invita al usuario, de forma opcional, a indicar el motivo de la cancelación.
+            - No hagas la petición obligatoria.
+            - No cierres la conversación todavía.
+            - Si no existe cita, explícalo brevemente.
+            - No menciones herramientas internas ni ids.
+            - Responde breve y natural.
             `,
           },
           {
