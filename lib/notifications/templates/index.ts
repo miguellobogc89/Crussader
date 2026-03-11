@@ -1,5 +1,5 @@
 // lib/notifications/templates/index.ts
-import type { Review, User } from "@prisma/client";
+import type { Review } from "@prisma/client";
 import { renderReviewCreatedTemplate } from "@/lib/notifications/templates/reviewCreated";
 
 export type TemplateResult = {
@@ -7,7 +7,8 @@ export type TemplateResult = {
   body?: string;
 };
 
-export type TemplateRenderer<T = any> = (data: T) => Promise<TemplateResult> | TemplateResult;
+export type TemplateRenderer<T = any> =
+  (data: T) => Promise<TemplateResult> | TemplateResult;
 
 const templateRegistry: Record<string, TemplateRenderer<any>> = {
   review_created: (data: Partial<Review>) => renderReviewCreatedTemplate(data),

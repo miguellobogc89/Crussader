@@ -153,16 +153,18 @@ export default function WeekView({
                   }}
                 >
                   {/* Festivo */}
-                  {isHoliday ? (
-                    <div className="pointer-events-none absolute inset-0">
-                      <div className="absolute inset-0 rounded-md bg-amber-50/40" />
-                      <div className="absolute right-2 top-2">
-                        <BankHolidayCell visible={true} title={holidayTitle} />
-                      </div>
-                    </div>
-                  ) : null}
+{isHoliday ? (
+  <div className="pointer-events-none absolute inset-0 z-0">
+    <div className="absolute inset-0 rounded-md bg-amber-50/40" />
+    <div className="absolute right-2 top-2 z-0">
+      <BankHolidayCell visible={true} title={holidayTitle} />
+    </div>
+  </div>
+) : null}
+
 
                   {/* Turnos: por rol (default) o por empleado */}
+                  <div className="relative z-10">
                   {shiftView === "role" ? (
                     <WeekShiftsByRole
                       dayKey={dayKey}
@@ -170,6 +172,7 @@ export default function WeekView({
                       HOURS_COUNT={HOURS_COUNT}
                       ROW_PX={ROW_PX}
                       shiftEvents={safeShiftEvents}
+                      employeeNameById={employeeNameById}
                     />
                   ) : (
                     <WeekShiftsByEmployee
@@ -181,6 +184,7 @@ export default function WeekView({
                       shiftEvents={safeShiftEvents}
                     />
                   )}
+                  </div>
 
                   {/* Overlay clicable por celda */}
                   {Array.from({ length: HOURS_COUNT }, (_, hourIndex) => {
@@ -191,11 +195,12 @@ export default function WeekView({
                       <button
                         key={cellId}
                         type="button"
-                        className={[
-                          "absolute left-0 right-0 rounded-md",
-                          "hover:bg-slate-900/5",
-                          isSelected ? "bg-slate-900/10 ring-1 ring-slate-900/10" : "",
-                        ].join(" ")}
+className={[
+  "absolute left-0 right-0 rounded-md cursor-default",
+  "hover:bg-slate-900/5",
+  isSelected ? "bg-slate-900/10 ring-1 ring-slate-900/10" : "",
+].join(" ")}
+
                         style={{ top: hourIndex * ROW_PX, height: ROW_PX }}
                         onClick={() => {
                           if (onCellClick) onCellClick(cellId);

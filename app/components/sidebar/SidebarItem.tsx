@@ -55,22 +55,24 @@ export function SidebarItem({
       className={[
         "group relative flex rounded-lg transition-colors",
 
+        // ✅ corta flashes de focus/active (ring/outline + highlight móvil)
+        "outline-none focus-visible:outline-none focus-visible:ring-0",
+        "active:outline-none active:ring-0",
+        "[-webkit-tap-highlight-color:transparent]",
+
         // Layout base
         collapsed
           ? [
               "items-center justify-center",
               "px-2",
               "min-h-11",
-              // un poco más alto en pantallas grandes para que no quede “apretado”
               "xl:min-h-10 xl2:min-h-11",
             ].join(" ")
           : [
               "items-start justify-start gap-3",
               "px-3 py-2",
               "min-h-11",
-              // en xl baja un pelín para acompañar tipografía más pequeña
               "xl:px-3 xl:py-1.5 xl:min-h-10",
-              // en xl2 vuelve a airearse
               "xl2:px-3 xl2:py-2 xl2:min-h-11",
             ].join(" "),
 
@@ -85,40 +87,31 @@ export function SidebarItem({
       </div>
 
       {!collapsed && (
-// Dentro de SidebarItem.tsx (solo las clases de texto)
+        <div className="min-w-0 transition-opacity duration-300">
+          <div
+            className={[
+              "truncate font-medium",
+              "text-[13px] leading-[18px]",
+              "xl:text-[14px] xl:leading-[20px]",
+              "xl2:text-sm xl2:leading-[20px]",
+            ].join(" ")}
+          >
+            {item.title}
+          </div>
 
-<div className="min-w-0 transition-opacity duration-300">
-  <div
-    className={[
-      "truncate font-medium",
-      // Base: pequeño en pantallas menores
-      "text-[13px] leading-[18px]",
-      // xl: sube un poco
-      "xl:text-[14px] xl:leading-[20px]",
-      // xl2: tu tamaño “normal”
-      "xl2:text-sm xl2:leading-[20px]",
-    ].join(" ")}
-  >
-    {item.title}
-  </div>
-
-  {item.description && (
-    <div
-      className={[
-        "truncate text-slate-400",
-        // Base: pequeño
-        "text-[11px] leading-[16px]",
-        // xl: sube un poco
-        "xl:text-[12px] xl:leading-[17px]",
-        // xl2: tu tamaño “normal”
-        "xl2:text-xs xl2:leading-[18px]",
-      ].join(" ")}
-    >
-      {item.description}
-    </div>
-  )}
-</div>
-
+          {item.description && (
+            <div
+              className={[
+                "truncate text-slate-400",
+                "text-[11px] leading-[16px]",
+                "xl:text-[12px] xl:leading-[17px]",
+                "xl2:text-xs xl2:leading-[18px]",
+              ].join(" ")}
+            >
+              {item.description}
+            </div>
+          )}
+        </div>
       )}
 
       {typeof item.badge !== "undefined" && !collapsed && (

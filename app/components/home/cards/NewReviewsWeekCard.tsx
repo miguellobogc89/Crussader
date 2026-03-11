@@ -11,7 +11,7 @@ type Props = {
 
 export default function NewReviewsWeekCard({
   count,
-  subtitle = "Nuevas reseñas",
+  subtitle = "Nuevas reseñas esta semana",
 }: Props) {
   const value = count == null ? 0 : count;
 

@@ -22,6 +22,17 @@ async function generateUniqueInviteCode() {
   throw new Error("NO_UNIQUE_CODE");
 }
 
+function assertAdminRole(session: any) {
+  const role = session?.user?.role;
+  if (role !== "system_admin" && role !== "org_admin") {
+    return NextResponse.json(
+      { ok: false, code: "FORBIDDEN_ROLE", message: "Sin permisos." },
+      { status: 403 }
+    );
+  }
+  return null;
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
@@ -30,17 +41,31 @@ export async function GET() {
       { status: 401 }
     );
   }
-
-  const role = (session.user as any).role;
-  if (role !== "system_admin" && role !== "org_admin") {
-    return NextResponse.json(
-      { ok: false, code: "FORBIDDEN_ROLE", message: "Sin permisos para ver leads." },
-      { status: 403 }
-    );
-  }
+  const forbidden = assertAdminRole(session);
+  if (forbidden) return forbidden;
 
   const leads = await prisma.lead.findMany({
     orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      status: true,
+      type: true,
+      source: true,
+      rating: true,
+      reviewCount: true,
+      city: true,
+      category: true,
+      website: true,
+      mapsUrl: true,
+      placeId: true,
+      createdAt: true,
+      updatedAt: true,
+      lastContactAt: true,
+      nextFollowUpAt: true,
+    },
   });
 
   return NextResponse.json({ ok: true, leads });
@@ -50,34 +75,38 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     return NextResponse.json(
-      { ok: false, code: "UNAUTHORIZED", message: "Debes iniciar sesión para crear leads." },
+      { ok: false, code: "UNAUTHORIZED", message: "Debes iniciar sesión." },
       { status: 401 }
     );
   }
-
-  const role = (session.user as any).role;
-  if (role !== "system_admin" && role !== "org_admin") {
-    return NextResponse.json(
-      { ok: false, code: "FORBIDDEN_ROLE", message: "No tienes permisos para crear leads." },
-      { status: 403 }
-    );
-  }
+  const forbidden = assertAdminRole(session);
+  if (forbidden) return forbidden;
 
   const body = await req.json().catch(() => null);
+
   const email = body?.email as string | undefined;
   const name = body?.name as string | undefined;
   const type = body?.type as string | undefined;
 
+  const phone = body?.phone as string | undefined;
+  const website = body?.website as string | undefined;
+  const mapsUrl = body?.mapsUrl as string | undefined;
+  const placeId = body?.placeId as string | undefined;
+  const city = body?.city as string | undefined;
+  const category = body?.category as string | undefined;
+
+  const ratingRaw = body?.rating as number | string | undefined;
+  const reviewCountRaw = body?.reviewCount as number | string | undefined;
+
   if (!email) {
     return NextResponse.json(
-      { ok: false, code: "MISSING_EMAIL", message: "Debes indicar un correo electrónico." },
+      { ok: false, code: "MISSING_EMAIL", message: "Debes indicar un email." },
       { status: 400 }
     );
   }
-
   if (!name) {
     return NextResponse.json(
-      { ok: false, code: "MISSING_NAME", message: "Debes indicar el nombre del lead." },
+      { ok: false, code: "MISSING_NAME", message: "Debes indicar el nombre." },
       { status: 400 }
     );
   }
@@ -86,41 +115,32 @@ export async function POST(req: NextRequest) {
   const normalizedName = name.trim();
   const userId = (session.user as any).id as string;
 
-  // 1) Si ya existe un usuario con ese email → no crear lead ni invite
   const existingUser = await prisma.user.findUnique({
     where: { email: normalizedEmail },
-    select: { id: true, name: true },
+    select: { id: true },
   });
-
   if (existingUser) {
     return NextResponse.json(
       {
         ok: false,
         code: "USER_ALREADY_EXISTS",
-        message:
-          "Ya existe un usuario registrado con este email. No se ha creado un nuevo lead ni invitación.",
-        context: {
-          userId: existingUser.id,
-          email: normalizedEmail,
-        },
+        message: "Ya existe un usuario con ese email.",
+        context: { userId: existingUser.id, email: normalizedEmail },
       },
       { status: 409 }
     );
   }
 
-  // 2) Compañía del usuario que crea el lead
   const userCompany = await prisma.userCompany.findFirst({
     where: { userId },
     select: { companyId: true },
   });
-
   if (!userCompany) {
     return NextResponse.json(
       {
         ok: false,
         code: "NO_COMPANY_FOR_USER",
-        message:
-          "El usuario actual no tiene compañía asociada. Asigna una compañía antes de crear leads.",
+        message: "El usuario actual no tiene compañía asociada.",
       },
       { status: 400 }
     );
@@ -131,52 +151,40 @@ export async function POST(req: NextRequest) {
     ? (upperType as (typeof LEAD_TYPES)[number])
     : "OTHER";
 
-  // 3) ¿Ya existe un lead para este email?
   const existingLead = await prisma.lead.findFirst({
     where: { email: normalizedEmail },
     orderBy: { createdAt: "desc" },
+    select: { id: true, status: true, type: true, createdAt: true },
   });
-
   if (existingLead) {
     return NextResponse.json(
       {
         ok: false,
         code: "LEAD_ALREADY_EXISTS",
-        message:
-          "Ya existe un lead registrado con este email. Revisa el lead existente antes de crear uno nuevo.",
-        context: {
-          leadId: existingLead.id,
-          status: existingLead.status,
-          type: existingLead.type,
-          createdAt: existingLead.createdAt,
-        },
+        message: "Ya existe un lead con ese email.",
+        context: existingLead,
       },
       { status: 409 }
     );
   }
 
-  // 4) ¿Hay ya una invitación activa para este email?
   const existingInvite = await prisma.invite.findFirst({
     where: {
       email: normalizedEmail,
       status: "PENDING" as any,
       used_count: 0,
       max_uses: 1,
-      OR: [
-        { expires_at: null },
-        { expires_at: { gt: new Date() } },
-      ],
+      OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }],
     },
     orderBy: { created_at: "desc" },
+    select: { id: true, code: true, expires_at: true },
   });
-
   if (existingInvite) {
     return NextResponse.json(
       {
         ok: false,
         code: "INVITE_ALREADY_ACTIVE",
-        message:
-          "Ya existe una invitación activa para este email. Utiliza ese código en lugar de generar otro.",
+        message: "Ya existe una invitación activa para este email.",
         context: {
           inviteId: existingInvite.id,
           code: existingInvite.code,
@@ -187,8 +195,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const rating =
+    ratingRaw === undefined || ratingRaw === null || ratingRaw === ""
+      ? null
+      : Number(ratingRaw);
+
+  const reviewCount =
+    reviewCountRaw === undefined || reviewCountRaw === null || reviewCountRaw === ""
+      ? null
+      : Number(reviewCountRaw);
+
   try {
-    // 5) Crear Lead + Invite en transacción
     const result = await prisma.$transaction(async (tx) => {
       const lead = await tx.lead.create({
         data: {
@@ -199,11 +216,35 @@ export async function POST(req: NextRequest) {
           type: leadType,
           source: "OTHER",
           status: "NEW",
+          phone: phone || null,
+          website: website || null,
+          mapsUrl: mapsUrl || null,
+          placeId: placeId || null,
+          city: city || null,
+          category: category || null,
+          rating: rating === null || Number.isNaN(rating) ? null : rating,
+          reviewCount: reviewCount === null || Number.isNaN(reviewCount) ? null : reviewCount,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          status: true,
+          type: true,
+          rating: true,
+          reviewCount: true,
+          city: true,
+          category: true,
+          website: true,
+          mapsUrl: true,
+          placeId: true,
+          createdAt: true,
         },
       });
 
       const code = await generateUniqueInviteCode();
-      const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000); // 14 días
+      const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 
       const invite = await tx.invite.create({
         data: {
@@ -217,21 +258,18 @@ export async function POST(req: NextRequest) {
           expires_at: expiresAt,
           meta: {
             leadType,
-            note: "Beta cerrada test user",
+            note: "Beta cerrada",
           },
         },
+        select: { id: true, code: true, expires_at: true, lead_id: true },
       });
 
       return { lead, invite };
     });
 
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL || "https://app.crussader.com";
-    const url = `${baseUrl}/beta/register?code=${encodeURIComponent(
-      result.invite.code
-    )}`;
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.crussader.com";
+    const url = `${baseUrl}/beta/register?code=${encodeURIComponent(result.invite.code)}`;
 
-    // 6) Email invitación usando plantilla centralizada
     await sendBetaInviteEmail({
       to: normalizedEmail,
       name: normalizedName,
@@ -243,7 +281,7 @@ export async function POST(req: NextRequest) {
       {
         ok: true,
         code: "LEAD_AND_INVITE_CREATED",
-        message: "Lead e invitación creados correctamente.",
+        message: "Lead e invitación creados.",
         lead: result.lead,
         invite: result.invite,
       },
@@ -252,12 +290,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("Error creando lead/invite:", err);
     return NextResponse.json(
-      {
-        ok: false,
-        code: "INTERNAL_ERROR",
-        message:
-          "No se ha podido crear el lead o la invitación. Revisa los logs para más detalles.",
-      },
+      { ok: false, code: "INTERNAL_ERROR", message: "Error interno." },
       { status: 500 }
     );
   }

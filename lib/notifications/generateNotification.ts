@@ -1,17 +1,14 @@
 // lib/notifications/generateNotification.ts
-
-import { Notification, Review, User } from "@prisma/client";
+import type { Review, User } from "@prisma/client";
 import { prismaRaw } from "@/lib/prisma";
-// 👇 Asegura que apunta al index del directorio
 import { renderTemplate } from "@/lib/notifications/templates/index";
+import { notify } from "@/lib/notifications/NotificationEngine";
 
 type NotificationTriggerPayload =
   | { model: "Review"; action: "create"; data: Partial<Review> & { id: string } }
   | { model: "User"; action: "create"; data: Partial<User> & { id: string } };
 
-export async function generateNotification(
-  payload: NotificationTriggerPayload
-): Promise<Notification | void> {
+export async function generateNotification(payload: NotificationTriggerPayload) {
   try {
     if (payload.model === "Review" && payload.action === "create") {
       return await handleReviewCreated(payload.data);
@@ -25,74 +22,49 @@ export async function generateNotification(
   }
 }
 
-async function handleReviewCreated(
-  review: Partial<Review> & { id: string }
-): Promise<Notification> {
-  const locationId = review.locationId ?? null;
-  const reviewId = review.id ?? null;
-  let accountId: string | null = null;
+async function handleReviewCreated(review: Partial<Review> & { id: string }) {
+  if (!review.companyId) {
+    throw new Error(`[handleReviewCreated] review.companyId missing for review ${review.id}`);
+  }
 
-  try {
-    const company = await prismaRaw.company.findUnique({
-      where: { id: review.companyId ?? "" },
-      select: { account_id: true },
-    });
-    accountId = company?.account_id ?? null;
-  } catch (error) {
-    console.warn(`[handleReviewCreated] No se pudo obtener accountId:`, error);
+  const company = await prismaRaw.company.findUnique({
+    where: { id: review.companyId },
+    select: { account_id: true },
+  });
+
+  const accountId = company?.account_id;
+  if (!accountId) {
+    throw new Error(`[handleReviewCreated] accountId not found for company ${review.companyId}`);
   }
 
   const tpl = await renderTemplate("review_created", review);
 
-  const subject = tpl?.subject ?? "Nueva reseña";
-  const body = tpl?.body ?? "";
-
-  return await prismaRaw.notification.create({
-    data: {
-      type: "review_created",
-
-      object_id: review.id,
-      comment: `Nueva reseña con rating ${review.rating ?? "?"}`,
-
-      accountId,
-      locationId,
-      reviewId,
-      userId: null,
-
-      // 🔹 campos nuevos en Notification
-      rating: review.rating ?? null,
-      reviewerName: review.reviewerName ?? null,
-      reviewCreatedAtG: review.createdAtG ?? null,
-
-      metadata: {
-        provider: review.provider ?? null,
-        companyId: review.companyId ?? null,
-      },
-
-      subject,
-      body,
+  return await notify({
+    type: "review_created",
+    accountId,
+    objectId: review.id, // <- required (string)
+    locationId: review.locationId ?? null,
+    reviewId: review.id,
+    subject: tpl.subject,
+    body: tpl.body,
+    metadata: {
+      provider: review.provider ?? null,
+      companyId: review.companyId ?? null,
     },
+    recipients: { mode: "all" },
   });
 }
 
+async function handleUserCreated(user: Partial<User> & { id: string }) {
+  if (!user.account_id) {
+    throw new Error(`[handleUserCreated] account_id missing for user ${user.id}`);
+  }
 
-
-async function handleUserCreated(
-  user: Partial<User> & { id: string }
-): Promise<Notification> {
-  const accountId = user.account_id ?? null;
-  const userId = user.id ?? null;
-
-  return await prismaRaw.notification.create({
-    data: {
-      type: "user_created",
-      object_id: user.id,
-      comment: `Nuevo usuario: ${user.email ?? "sin email"}`,
-      accountId,
-      userId,
-      reviewId: null,
-      locationId: null,
-      metadata: {},
-    },
+  return await notify({
+    type: "user_created",
+    accountId: user.account_id,
+    objectId: user.id,
+    metadata: {},
+    recipients: { mode: "all" },
   });
 }

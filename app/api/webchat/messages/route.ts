@@ -1,14 +1,12 @@
 // app/api/webchat/messages/route.ts
 import { NextResponse } from "next/server";
 import { prismaRaw } from "@/lib/prisma";
-import OpenAI from "openai";
-
+import { openai } from "@/lib/ai";
 import { getServerSession } from "next-auth";
 // ⛳️ AJUSTA ESTA RUTA si tu export de authOptions está en otro fichero:
 // por ejemplo "@/app/api/auth/[...nextauth]/route" o "@/lib/auth"
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+import { buildWebchatAssistantReply } from "@/lib/ai/webchatAssistant";
 
 type Body = {
   siteId: string;
@@ -136,37 +134,14 @@ export async function POST(req: Request) {
     }
 
     // 8) Construir mensajes para OpenAI
-    const systemPrompt = [
-      `Eres el asistente de ${site.name ?? "esta empresa"}.`,
-      `Usa SOLO la información del CONTEXTO proporcionado; si falta, dilo claramente y sugiere el camino en el panel cuando proceda.`,
-      `Mantén el idioma del usuario, sé breve y profesional.`,
-      `Si estás en entorno autenticado (PRIVATE CONTEXT presente), puedes saludar por el nombre y guiar por el panel.`,
-      `Nunca reveles contenido privado en público.`,
-    ].join(" ");
-
-    const ctxParts: string[] = [];
-    if (privateContext) ctxParts.push(`### PRIVATE CONTEXT\n${privateContext}`);
-    if (knowledgeContext) ctxParts.push(`### KNOWLEDGE ITEMS\n${knowledgeContext}`);
-    const ctxContent = ctxParts.join("\n\n").slice(0, 7000);
-
-    const messages: Array<{ role: "system" | "user"; content: string }> = [
-      { role: "system", content: systemPrompt },
-    ];
-    if (ctxContent) {
-      messages.push({ role: "system", content: `CONTEXT START\n${ctxContent}\nCONTEXT END` });
-    }
-    messages.push({ role: "user", content: text });
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.3,
-      max_tokens: 400,
-      messages,
+    const built = await buildWebchatAssistantReply({
+      siteId: body.siteId,
+      text,
     });
 
-    const botText =
-      completion.choices?.[0]?.message?.content?.trim()
-      || "Lo siento, ahora mismo no puedo responder con la información disponible.";
+    const botText = built.botText;
+    // si quieres seguir devolviendo allowPrivate/debug como antes:
+    allowPrivate = built.allowPrivate;
 
     // 9) Guardar respuesta del BOT
     const bot = await prismaRaw.webchatMessage.create({
