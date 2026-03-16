@@ -1,16 +1,21 @@
 // app/api/crussader-assistant/ai-reply/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { assistantPipeline } from "@/lib/crussader-assistant/orchestrator/assistantPipeline";
-import { sendAssistantWhatsAppMessage } from "@/lib/crussader-assistant/chat/sendAssistantWhatsAppMessage";
+import { sendAssistantWhatsAppMessage } from "@/lib/crussader-assistant/legacy/bridges/chat/sendAssistantWhatsAppMessage";
+import { runAssistantIntake } from "@/lib/crussader-assistant/intake/runAssistantIntake";
+import { assistantPipeline } from "@/lib/crussader-assistant/pipeline/assistantPipeline";
+import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
-function asText(v: unknown) {
-  return String(v || "").trim();
+function asText(value: unknown) {
+  return String(value || "").trim();
 }
 
 export async function POST(req: NextRequest) {
+  const debugId = crypto.randomUUID();
+
   try {
     const body = await req.json().catch(() => null);
 
@@ -25,80 +30,78 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false }, { status: 400 });
     }
 
-const conversation = await prisma.messaging_conversation.findUnique({
-  where: { id: conversationId },
-  select: {
-    id: true,
-    installation_id: true,
-    contact_phone_e164: true,
-    customer_id: true,
-    company_phone_number: {
-      select: {
-        phone_number_id: true,
-      },
-    },
-  },
-});
-
-    if (!conversation) {
-      return NextResponse.json({ ok: false, error: "conversation_not_found" });
-    }
-
-    const installation = await prisma.integration_installation.findUnique({
-      where: { id: conversation.installation_id },
-      select: {
-        id: true,
-        company_id: true,
-      },
+    const intake = await runAssistantIntake({
+      conversationId,
+      rawUserText: text
     });
 
-    if (!installation) {
-      return NextResponse.json({ ok: false, error: "installation_not_found" });
+    let pipelineResult: any = null;
+
+    if (intake.replyDecision.type === "TASK_READY") {
+      const conversation = await prisma.messaging_conversation.findUnique({
+        where: { id: conversationId },
+        select: {
+          customer_id: true,
+          installation_id: true,
+          integration_installation: {
+            select: {
+              company_id: true
+            }
+          },
+          Customer: {
+            select: {
+              createdByAgentId: true
+            }
+          }
+        }
+      });
+
+      if (!conversation?.integration_installation?.company_id) {
+        throw new Error("Company not resolved for this conversation");
+      }
+
+      if (!conversation?.customer_id) {
+        throw new Error("Customer not resolved for this conversation");
+      }
+
+      if (!conversation?.Customer?.createdByAgentId) {
+        throw new Error("Agent not resolved for this conversation");
+      }
+
+      pipelineResult = await assistantPipeline({
+        companyId: conversation.integration_installation.company_id,
+        agentId: conversation.Customer.createdByAgentId,
+        conversationId,
+        caller: "debug-caller",
+        callee: "debug-callee",
+        incomingText: text,
+        environment: process.env.NODE_ENV || "development",
+        language: "es",
+        customerId: conversation.customer_id
+      });
+      console.log("[ai-reply][pipelineResult]", pipelineResult);
     }
 
-    const companyId = installation.company_id;
+    const finalText = pipelineResult?.botText || intake.botText;
 
-    const agent = await prisma.agent.findFirst({
-      where: { companyId },
-      select: { id: true },
-    });
-
-    if (!agent) {
-      return NextResponse.json({ ok: false, error: "agent_not_found" });
-    }
-
-    if (!conversation.customer_id) {
-      return NextResponse.json({ ok: false, error: "customer_not_resolved" }, { status: 400 });
-    }
-
-const customerId = conversation.customer_id;
-    const result = await assistantPipeline({
-      companyId,
-      agentId: agent.id,
-      conversationId: conversation.id,
-      caller: conversation.contact_phone_e164 || "",
-      callee: conversation.company_phone_number?.phone_number_id || "",
-      incomingText: text,
-      environment: "PROD",
-      language: "es",
-      customerId,
-    });
-
-    const botText = asText(result.botText);
-
-    if (botText) {
+    if (finalText) {
       await sendAssistantWhatsAppMessage({
         conversationId,
-        text: botText,
+        text: finalText
       });
     }
 
     return NextResponse.json({
       ok: true,
-      botText,
+      botText: finalText,
+      readyTask: intake.readyTask
     });
-  } catch (e) {
-    console.error("[assistant ai-reply]", e);
-    return NextResponse.json({ ok: false });
+  } catch (error) {
+    console.error("[assistant ai-reply] fatal", {
+      debugId,
+      error
+    });
+
+    return NextResponse.json({ ok: false }, { status: 500 });
   }
 }

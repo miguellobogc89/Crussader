@@ -3,11 +3,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { resolvePhoneNumber } from "@/lib/whatsapp/phoneNumbers/resolvePhoneNumber";
 import { ACTIONS } from "@/lib/crussader-assistant/actions";
+import { downloadWhatsAppMedia } from "@/lib/whatsapp/media/downloadWhatsAppMedia";
+import { transcribeAudio } from "@/lib/ai/transcribeAudio";
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN ?? "";
 const WA_DEBUG = process.env.WA_DEBUG === "1";
 
-// Buffer simple en memoria (DEV). Guarda los últimos 50 eventos.
 type WaDebugEvent =
   | {
       kind: "status";
@@ -41,24 +42,31 @@ const WA_DEBUG_EVENTS: WaDebugEvent[] = [];
 
 function pushEvent(e: WaDebugEvent) {
   WA_DEBUG_EVENTS.unshift(e);
+
   if (WA_DEBUG_EVENTS.length > MAX_EVENTS) {
     WA_DEBUG_EVENTS.length = MAX_EVENTS;
   }
 }
 
-function logWA(tag: string, data?: any) {
-  if (!WA_DEBUG) return;
-  if (data !== undefined) {
-    console.log(tag, data);
+function logWA(tag: string, data?: unknown) {
+  if (!WA_DEBUG) {
     return;
   }
-  console.log(tag);
+
+  console.log(tag, data);
 }
 
 function tsToDate(ts?: unknown): Date | null {
-  if (typeof ts !== "string" && typeof ts !== "number") return null;
+  if (typeof ts !== "string" && typeof ts !== "number") {
+    return null;
+  }
+
   const n = Number(ts);
-  if (!Number.isFinite(n) || n <= 0) return null;
+
+  if (!Number.isFinite(n) || n <= 0) {
+    return null;
+  }
+
   return new Date(n * 1000);
 }
 
@@ -71,13 +79,20 @@ type WaValue = {
     wa_id?: string;
     profile?: { name?: string };
   }>;
-  messages?: Array<{
-    from?: string;
-    id?: string;
-    timestamp?: string;
-    type?: string;
-    text?: { body?: string };
-  }>;
+messages?: Array<{
+  from?: string;
+  id?: string;
+  timestamp?: string;
+  type?: string;
+  text?: { body?: string };
+audio?: {
+  id?: string;
+  mime_type?: string;
+  sha256?: string;
+  url?: string;
+  voice?: boolean;
+};
+}>;
   statuses?: Array<{
     id?: string;
     status?: string;
@@ -95,19 +110,20 @@ async function resolveInstallation(value: WaValue): Promise<{
 
   if (phoneNumberId) {
     const resolved = await resolvePhoneNumber(String(phoneNumberId));
+
     if (resolved) {
       const inst = await prisma.integration_installation.findFirst({
         where: {
           provider: "whatsapp",
           status: "active",
-          company_id: resolved.companyId,
-        },
+          company_id: resolved.companyId
+        }
       });
 
       if (inst) {
         return {
           installation: inst,
-          companyPhoneNumberId: resolved.phone.id,
+          companyPhoneNumberId: resolved.phone.id
         };
       }
     }
@@ -118,14 +134,14 @@ async function resolveInstallation(value: WaValue): Promise<{
       where: {
         provider: "whatsapp",
         status: "active",
-        config: { path: ["phone_number_id"], equals: phoneNumberId },
-      },
+        config: { path: ["phone_number_id"], equals: phoneNumberId }
+      }
     });
 
     if (inst) {
       return {
         installation: inst,
-        companyPhoneNumberId: null,
+        companyPhoneNumberId: null
       };
     }
   }
@@ -135,14 +151,14 @@ async function resolveInstallation(value: WaValue): Promise<{
       where: {
         provider: "whatsapp",
         status: "active",
-        config: { path: ["display_phone_number"], equals: displayPhone },
-      },
+        config: { path: ["display_phone_number"], equals: displayPhone }
+      }
     });
 
     if (inst) {
       return {
         installation: inst,
-        companyPhoneNumberId: null,
+        companyPhoneNumberId: null
       };
     }
   }
@@ -159,22 +175,20 @@ async function upsertConversation(args: {
   lastMessageAt?: Date | null;
   companyPhoneNumberId?: string | null;
 }) {
-  const {
-    installationId,
-    contactExternalId,
-    contactPhoneE164,
-    contactName,
-    providerThreadId,
-    lastMessageAt,
-    companyPhoneNumberId,
-  } = args;
+  const installationId = args.installationId;
+  const contactExternalId = args.contactExternalId;
+  const contactPhoneE164 = args.contactPhoneE164;
+  const contactName = args.contactName;
+  const providerThreadId = args.providerThreadId;
+  const lastMessageAt = args.lastMessageAt;
+  const companyPhoneNumberId = args.companyPhoneNumberId;
 
   return prisma.messaging_conversation.upsert({
     where: {
       installation_id_contact_external_id: {
         installation_id: installationId,
-        contact_external_id: contactExternalId,
-      },
+        contact_external_id: contactExternalId
+      }
     },
     create: {
       installation_id: installationId,
@@ -184,7 +198,7 @@ async function upsertConversation(args: {
       provider_thread_id: providerThreadId ?? null,
       status: "open",
       last_message_at: lastMessageAt ?? null,
-      company_phone_number_id: companyPhoneNumberId ?? null,
+      company_phone_number_id: companyPhoneNumberId ?? null
     },
     update: {
       contact_phone_e164: contactPhoneE164 ?? null,
@@ -192,11 +206,10 @@ async function upsertConversation(args: {
       provider_thread_id: providerThreadId ?? null,
       last_message_at: lastMessageAt ?? undefined,
       updated_at: new Date(),
-      company_phone_number_id: companyPhoneNumberId ?? undefined,
-    },
+      company_phone_number_id: companyPhoneNumberId ?? undefined
+    }
   });
 }
-
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -205,22 +218,17 @@ export async function GET(req: Request) {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
-  console.log("[WA][VERIFY]", {
-    mode,
-    token,
-    challenge,
-  });
-
   if (mode === "subscribe" && token === VERIFY_TOKEN && challenge) {
     return new NextResponse(challenge, { status: 200 });
   }
 
   const debug = searchParams.get("debug");
+
   if (debug === "1") {
     return NextResponse.json({
       ok: true,
       count: WA_DEBUG_EVENTS.length,
-      events: WA_DEBUG_EVENTS,
+      events: WA_DEBUG_EVENTS
     });
   }
 
@@ -228,7 +236,6 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-
   const body = await req.json().catch(() => null);
 
   if (!body) {
@@ -261,7 +268,7 @@ export async function POST(req: Request) {
       id,
       text,
       ts,
-      status,
+      status
     });
 
     logWA("[WA][OUT][DEV_PUSH]", { to, id, status });
@@ -274,6 +281,9 @@ export async function POST(req: Request) {
     const change = entry && entry.changes && entry.changes[0] ? entry.changes[0] : null;
     const value: WaValue | null = change ? change.value : null;
 
+    console.log("[WA][RAW_BODY]", JSON.stringify(body, null, 2));
+console.log("[WA][VALUE_MESSAGES]", JSON.stringify(value?.messages ?? null, null, 2));
+
     if (!value) {
       logWA("[WA][SKIP] no value payload");
       return NextResponse.json({ ok: true });
@@ -282,6 +292,7 @@ export async function POST(req: Request) {
     const now = Date.now();
 
     const statuses = value.statuses;
+
     if (Array.isArray(statuses)) {
       for (const s of statuses) {
         pushEvent({
@@ -290,16 +301,22 @@ export async function POST(req: Request) {
           status: String(s.status ?? ""),
           id: s.id ? String(s.id) : undefined,
           to: s.recipient_id ? String(s.recipient_id) : undefined,
-          ts: s.timestamp ? String(s.timestamp) : undefined,
+          ts: s.timestamp ? String(s.timestamp) : undefined
         });
       }
     }
 
     const messages = value.messages;
+
     if (Array.isArray(messages)) {
       for (const m of messages) {
-        const text =
-          m && m.text && typeof m.text.body === "string" ? m.text.body : "";
+        console.log("[WA][MESSAGE_TYPE]", m.type);
+        console.log("[WA][MESSAGE_AUDIO]", JSON.stringify(m.audio ?? null, null, 2));
+        let text = "";
+
+        if (m && m.text && typeof m.text.body === "string") {
+          text = m.text.body;
+        }
 
         pushEvent({
           kind: "message",
@@ -308,7 +325,7 @@ export async function POST(req: Request) {
           id: m.id ? String(m.id) : undefined,
           type: m.type ? String(m.type) : undefined,
           text,
-          ts: m.timestamp ? String(m.timestamp) : undefined,
+          ts: m.timestamp ? String(m.timestamp) : undefined
         });
       }
     }
@@ -321,13 +338,11 @@ export async function POST(req: Request) {
       const from = m0 && m0.from ? String(m0.from) : null;
       const txt =
         m0 && m0.text && typeof m0.text.body === "string" ? m0.text.body : "";
-      logWA("[WA][IN]", { from, text: txt });
+
     }
 
     const resolvedInst = await resolveInstallation(value);
     const installation = resolvedInst.installation;
-
-
 
     if (!installation) {
       logWA("[WA][SKIP] no installation matched");
@@ -371,93 +386,257 @@ export async function POST(req: Request) {
       contactName,
       providerThreadId: null,
       lastMessageAt: lastTs,
-      companyPhoneNumberId: resolvedInst.companyPhoneNumberId,
+      companyPhoneNumberId: resolvedInst.companyPhoneNumberId
     });
 
-const identify = await ACTIONS.identify_assistant_customer({
-  companyId: installation.company_id,
-  phone: contactExternalIdRaw,
-});
+    const identify = await ACTIONS.identify_assistant_customer({
+      companyId: installation.company_id,
+      phone: contactExternalIdRaw
+    });
 
-const assured = await ACTIONS.assure_assistant_customer({
-  companyId: installation.company_id,
-  phone: contactExternalIdRaw,
-  contactName,
-  conversationId: conv.id,
-});
+    const assured = await ACTIONS.assure_assistant_customer({
+      companyId: installation.company_id,
+      phone: contactExternalIdRaw,
+      contactName,
+      conversationId: conv.id
+    });
 
-const resolvedCustomerId =
-  identify.kind === "NONE" ? assured.customerId : identify.customerId;
+    const resolvedCustomerId =
+      identify.kind === "NONE" ? assured.customerId : identify.customerId;
 
-if (resolvedCustomerId) {
-  await prisma.messaging_conversation.update({
-    where: { id: conv.id },
-    data: {
-      customer_id: resolvedCustomerId,
-    },
-  });
-}
-
-
+    if (resolvedCustomerId) {
+      await prisma.messaging_conversation.update({
+        where: { id: conv.id },
+        data: {
+          customer_id: resolvedCustomerId
+        }
+      });
+    }
 
     if (WA_DEBUG) {
-      const c = await prisma.messaging_conversation.findUnique({
+      await prisma.messaging_conversation.findUnique({
         where: { id: conv.id },
-        select: { customer_id: true, contact_phone_e164: true, contact_name: true },
+        select: { customer_id: true, contact_phone_e164: true, contact_name: true }
       });
+    }
 
-      if (c && c.customer_id) {
-        logWA("[WA][CUSTOMER]", {
-          conversationId: conv.id,
-          status: "KNOWN",
-          customerId: c.customer_id,
-        });
-      } else {
-        logWA("[WA][CUSTOMER]", {
-          conversationId: conv.id,
-          status: "NEW",
-        });
+    const rawMessages = Array.isArray(value.messages) ? value.messages : [];
+    const incomingProviderIds: string[] = [];
+
+
+    console.log("[WA][AUDIO_LOOP][START]", rawMessages.map((m) => ({
+  id: m.id,
+  type: m.type,
+  audioId: m.audio?.id
+})));
+    for (const m of rawMessages) {
+      if (typeof m.id === "string" && m.id.trim() !== "") {
+        incomingProviderIds.push(m.id.trim());
       }
     }
 
-    const rows = (value.messages || []).map((m) => {
-      const providerMessageId = m.id ? String(m.id) : null;
+    const existingIncomingIds = new Set<string>();
 
-      const text =
-        m && m.text && typeof m.text.body === "string" ? m.text.body : null;
+    if (incomingProviderIds.length > 0) {
+      const existingIncoming = await prisma.messaging_message.findMany({
+        where: {
+          conversation_id: conv.id,
+          direction: "in",
+          provider_message_id: {
+            in: incomingProviderIds
+          }
+        },
+        select: {
+          provider_message_id: true
+        }
+      });
+
+      for (const row of existingIncoming) {
+        if (typeof row.provider_message_id === "string" && row.provider_message_id.trim() !== "") {
+          existingIncomingIds.add(row.provider_message_id.trim());
+        }
+      }
+    }
+
+const rows: Array<{
+  conversation_id: string;
+  provider_message_id: string | null;
+  direction: string;
+  kind: string;
+  text: string | null;
+  status: string | null;
+  provider_ts: Date | null;
+  payload: any;
+  media_id: string | null;
+  media_url: string | null;
+  mime_type: string | null;
+  file_sha256: string | null;
+  transcription: string | null;
+  transcription_status: string | null;
+  transcription_error: string | null;
+  media_duration_seconds: number | null;
+}> = [];
+
+    const newlyInsertedIncomingIds = new Set<string>();
+
+    for (const m of rawMessages) {
+      const providerMessageId =
+        typeof m.id === "string" && m.id.trim() !== "" ? m.id.trim() : null;
+
+      if (providerMessageId && existingIncomingIds.has(providerMessageId)) {
+        continue;
+      }
+
+      let text: string | null = null;
+
+      if (m.type === "text" && m.text && typeof m.text.body === "string") {
+        text = m.text.body;
+      }
 
       const providerTs = tsToDate(m.timestamp);
 
-      return {
-        conversation_id: conv.id,
-        provider_message_id: providerMessageId,
-        direction: "in",
-        kind: m.type ? String(m.type) : "unknown",
-        text,
-        status: null,
-        provider_ts: providerTs,
-        payload: m as any,
-      };
-    });
+rows.push({
+  conversation_id: conv.id,
+  provider_message_id: providerMessageId,
+  direction: "in",
+  kind: m.type ? String(m.type) : "unknown",
+  text,
+  status: null,
+  provider_ts: providerTs,
+  payload: m as any,
+  media_id: m.type === "audio" ? m.audio?.id ?? null : null,
+  media_url: null,
+  mime_type: m.type === "audio" ? m.audio?.mime_type ?? "audio/ogg" : null,
+  file_sha256: m.type === "audio" ? m.audio?.sha256 ?? null : null,
+  transcription: null,
+  transcription_status: m.type === "audio" ? "pending" : null,
+  transcription_error: null,
+  media_duration_seconds: null
+});
 
-    if (rows.length > 0) {
-      await prisma.messaging_message.createMany({
-        data: rows,
-        skipDuplicates: true,
-      });
+      if (providerMessageId) {
+        newlyInsertedIncomingIds.add(providerMessageId);
+      }
     }
 
+if (rows.length > 0) {
+  await prisma.messaging_message.createMany({
+    data: rows
+  });
+}
+
+console.log(
+  "[WA][AUDIO_LOOP][START]",
+  rawMessages.map((m) => ({
+    id: m.id,
+    type: m.type,
+    audioId: m.audio?.id
+  }))
+);
+
+for (const m of rawMessages) {
+  if (m.type !== "audio") {
+    continue;
+  }
+
+  console.log("[WA][AUDIO_LOOP][MESSAGE]", {
+    id: m.id,
+    type: m.type,
+    audioId: m.audio?.id
+  });
+
+  const mediaId =
+    m.audio && typeof m.audio.id === "string" ? m.audio.id : null;
+
+  const providerMessageId =
+    typeof m.id === "string" && m.id.trim() !== "" ? m.id.trim() : null;
+
+  if (!mediaId || !providerMessageId) {
+    continue;
+  }
+
+  try {
+    console.log("[WA][AUDIO_LOOP][DOWNLOADING]", {
+      providerMessageId,
+      mediaId
+    });
+
+const filePath = await downloadWhatsAppMedia({
+  mediaId,
+  mediaUrl: m.audio?.url ?? null,
+  extension: "ogg"
+});
+    console.log("[WA][AUDIO_LOOP][DOWNLOADED]", {
+      providerMessageId,
+      mediaId,
+      filePath
+    });
+
+    const transcription = await transcribeAudio(filePath);
+
+    console.log("[WA][AUDIO_LOOP][TRANSCRIBED]", {
+      providerMessageId,
+      transcription
+    });
+
+    await prisma.messaging_message.updateMany({
+      where: {
+        conversation_id: conv.id,
+        direction: "in",
+        provider_message_id: providerMessageId
+      },
+      data: {
+        media_url: filePath,
+        transcription,
+        transcription_status: "done"
+      }
+    });
+
+    if (transcription && transcription.length > 0) {
+      let baseUrl = "http://localhost:3000";
+
+      if (process.env.NEXTAUTH_URL && process.env.NEXTAUTH_URL.length > 0) {
+        baseUrl = process.env.NEXTAUTH_URL;
+      }
+
+      await fetch(`${baseUrl}/api/crussader-assistant/ai-reply`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          conversationId: conv.id,
+          text: transcription
+        })
+      });
+    }
+  } catch (error) {
+    console.log("[WA][AUDIO_LOOP][ERROR]", error);
+
+    await prisma.messaging_message.updateMany({
+      where: {
+        conversation_id: conv.id,
+        direction: "in",
+        provider_message_id: providerMessageId
+      },
+      data: {
+        transcription_status: "failed",
+        transcription_error:
+          error instanceof Error ? error.message : "Audio processing failed"
+      }
+    });
+  }
+}
+
     const lastIncoming =
-      value.messages && value.messages.length > 0
-        ? value.messages[value.messages.length - 1]
-        : null;
+      rawMessages.length > 0 ? rawMessages[rawMessages.length - 1] : null;
 
     const lastIncomingTs = lastIncoming ? tsToDate(lastIncoming.timestamp) : null;
 
     if (lastIncomingTs) {
       await prisma.messaging_conversation.update({
         where: { id: conv.id },
-        data: { last_message_at: lastIncomingTs, updated_at: new Date() },
+        data: { last_message_at: lastIncomingTs, updated_at: new Date() }
       });
     }
 
@@ -469,6 +648,7 @@ if (resolvedCustomerId) {
         typeof lastIncoming.id === "string" ? lastIncoming.id.trim() : "";
 
       let incomingText = "";
+
       if (lastIncoming.text && typeof lastIncoming.text.body === "string") {
         incomingText = lastIncoming.text.body.trim();
       }
@@ -476,23 +656,19 @@ if (resolvedCustomerId) {
       const hasText = incomingText.length > 0;
 
       if (isText && hasText && providerMessageId) {
-        const alreadyExists = await prisma.messaging_message.findFirst({
-          where: {
-            conversation_id: conv.id,
-            provider_message_id: providerMessageId,
-            direction: "out",
-          },
-          select: { id: true },
-        });
+        if (!newlyInsertedIncomingIds.has(providerMessageId)) {
+          logWA("[WA][AUTOREPLY][SKIP_DUPLICATE_INBOUND]", {
+            conversationId: conv.id,
+            providerMessageId
+          });
 
-        if (alreadyExists) {
           return NextResponse.json({ ok: true });
         }
 
         const recentIncoming = await prisma.messaging_message.findMany({
           where: {
             conversation_id: conv.id,
-            direction: "in",
+            direction: "in"
           },
           orderBy: [{ provider_ts: "desc" }, { created_at: "desc" }],
           take: 3,
@@ -501,8 +677,8 @@ if (resolvedCustomerId) {
             provider_message_id: true,
             provider_ts: true,
             created_at: true,
-            text: true,
-          },
+            text: true
+          }
         });
 
         if (recentIncoming.length > 1) {
@@ -515,13 +691,20 @@ if (resolvedCustomerId) {
           const diffMs = newestAt.getTime() - previousAt.getTime();
 
           if (diffMs >= 0 && diffMs < 4000) {
-            console.log("[WA][DEBOUNCE] waiting for user to finish typing");
+            logWA("[WA][AUTOREPLY][SKIP_TOO_CLOSE]", {
+              conversationId: conv.id,
+              newestId: newest.provider_message_id,
+              previousId: previous.provider_message_id,
+              diffMs
+            });
+
             return NextResponse.json({ ok: true });
           }
         }
 
         try {
           let baseUrl = "http://localhost:3000";
+
           if (process.env.NEXTAUTH_URL && process.env.NEXTAUTH_URL.length > 0) {
             baseUrl = process.env.NEXTAUTH_URL;
           }
@@ -533,20 +716,21 @@ if (resolvedCustomerId) {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 conversationId: conv.id,
-                text: incomingText,
-              }),
+                text: incomingText
+              })
             }
           );
 
-          const j = await r.json().catch(() => null);
+          const rawText = await r.text().catch(() => "");
 
-          logWA("[WA][AI_REPLY]", {
-            conversationId: conv.id,
-            status: r.status,
-            ok: Boolean(j && j.ok),
-            botTextPreview:
-              j && typeof j.botText === "string" ? j.botText.slice(0, 80) : null,
-          });
+          let j: any = null;
+
+          try {
+            j = rawText ? JSON.parse(rawText) : null;
+          } catch {
+            j = null;
+          }
+
         } catch (e) {
           logWA("[WA][AI_REPLY][ERROR]", e);
         }
@@ -555,7 +739,7 @@ if (resolvedCustomerId) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[WA webhook] error:", err);
+    logWA("[WA][ERROR]", err);
     return NextResponse.json({ ok: true });
   }
 }
