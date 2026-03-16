@@ -1,0 +1,13 @@
+El pipeline del asistente actúa como el controlador de flujo que decide cómo avanzar en la conversación a partir del estado almacenado en memoria. A diferencia del modelo anterior basado en sesiones complejas y múltiples capas de agentes, el nuevo pipeline está diseñado como un router de estado simple y determinista.
+
+El pipeline recibe el mensaje entrante del usuario junto con el identificador de conversación. En ese momento la memoria ya ha sido actualizada por los módulos de intake y traducción de intención. El pipeline únicamente consulta el estado conversacional actual mediante getAssistantConversationState y decide la siguiente acción basándose en el contenido de pendingIntent.
+
+Si no existe un pendingIntent, el pipeline responde con un mensaje general o de ayuda, ya que el sistema no ha identificado todavía una intención concreta que ejecutar.
+
+Si existe un pendingIntent y su estado es WAITING_FOR_DATA, el pipeline analiza el campo missingFields para determinar qué información falta. En función del primer campo pendiente, el sistema genera una pregunta dirigida al usuario solicitando ese dato específico. De esta forma el asistente guía al usuario paso a paso hasta completar la información necesaria.
+
+Cuando el pendingIntent alcanza el estado READY, significa que todos los datos requeridos han sido recopilados y almacenados en collectedData. En ese punto el pipeline puede pasar la ejecución al módulo de acciones correspondiente (por ejemplo creación de eventos, suscripciones o consultas de información). En la implementación actual el pipeline simplemente confirma que la información está completa, pero la siguiente fase del sistema será incorporar un ejecutor de acciones que materialice la operación solicitada.
+
+Este enfoque convierte el pipeline en una capa de control extremadamente simple cuyo único objetivo es interpretar el estado conversacional y dirigir la conversación hacia la recopilación de datos o la ejecución de acciones. Toda la comprensión del lenguaje natural ocurre previamente en el módulo de intake, y toda la persistencia de estado se gestiona en el sistema de memoria. De esta forma el pipeline queda desacoplado de la lógica de interpretación y se limita a coordinar el flujo conversacional.
+
+La arquitectura completa del asistente sigue por tanto un flujo de seis etapas: entrada del usuario, interpretación de intención, actualización de memoria, decisión del pipeline, generación de respuesta y ejecución de acciones. Esta separación de responsabilidades permite evolucionar cada componente de forma independiente y mantener el sistema estable incluso a medida que se añaden nuevas capacidades.

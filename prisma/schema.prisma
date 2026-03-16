@@ -2288,28 +2288,30 @@ model integration_installation {
 }
 
 model messaging_conversation {
-  id                       String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  installation_id          String                   @db.Uuid
-  provider_thread_id       String?
-  contact_external_id      String
-  contact_phone_e164       String?
-  contact_name             String?
-  status                   String                   @default("open")
-  last_message_at          DateTime?                @db.Timestamptz(6)
-  created_at               DateTime                 @default(now()) @db.Timestamptz(6)
-  updated_at               DateTime                 @default(now()) @db.Timestamptz(6)
-  last_read_at             DateTime?                @db.Timestamptz(6)
-  customer_id              String?
-  awaiting_name            Boolean                  @default(false)
-  awaiting_need            Boolean                  @default(false)
-  perceived_need           String?
-  company_phone_number_id  String?                  @db.Uuid
-  agent_event              agent_event[]
-  agent_event_run          agent_event_run[]
-  company_phone_number     company_phone_number?    @relation(fields: [company_phone_number_id], references: [id], onUpdate: NoAction, map: "fk_messaging_conversation_company_phone_number")
-  Customer                 Customer?                @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_msg_conv_customer")
-  integration_installation integration_installation @relation(fields: [installation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_msg_conv_installation")
-  messaging_message        messaging_message[]
+  id                        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  installation_id           String                      @db.Uuid
+  provider_thread_id        String?
+  contact_external_id       String
+  contact_phone_e164        String?
+  contact_name              String?
+  status                    String                      @default("open")
+  last_message_at           DateTime?                   @db.Timestamptz(6)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  last_read_at              DateTime?                   @db.Timestamptz(6)
+  customer_id               String?
+  awaiting_name             Boolean                     @default(false)
+  awaiting_need             Boolean                     @default(false)
+  perceived_need            String?
+  company_phone_number_id   String?                     @db.Uuid
+  assistant_memory          Json                        @default("{}")
+  agent_event               agent_event[]
+  agent_event_run           agent_event_run[]
+  assistant_interaction_log assistant_interaction_log[]
+  company_phone_number      company_phone_number?       @relation(fields: [company_phone_number_id], references: [id], onUpdate: NoAction, map: "fk_messaging_conversation_company_phone_number")
+  Customer                  Customer?                   @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_msg_conv_customer")
+  integration_installation  integration_installation    @relation(fields: [installation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_msg_conv_installation")
+  messaging_message         messaging_message[]
 
   @@unique([installation_id, contact_external_id], map: "ux_msg_conv_installation_contact")
   @@index([installation_id, last_message_at(sort: Desc)], map: "idx_msg_conv_installation_last")
@@ -2330,11 +2332,21 @@ model messaging_message {
   provider_ts            DateTime?              @db.Timestamptz(6)
   payload                Json                   @default("{}")
   created_at             DateTime               @default(now()) @db.Timestamptz(6)
+  media_id               String?
+  media_url              String?
+  mime_type              String?
+  file_sha256            String?
+  transcription          String?
+  transcription_status   String?
+  transcription_error    String?
+  media_duration_seconds Int?
   messaging_conversation messaging_conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_msg_message_conversation")
 
   @@index([conversation_id, created_at(sort: Desc)], map: "idx_msg_message_conversation_created")
   @@index([direction], map: "idx_msg_message_direction")
   @@index([kind], map: "idx_msg_message_kind")
+  @@index([media_id], map: "idx_msg_message_media_id")
+  @@index([transcription_status], map: "idx_msg_message_transcription_status")
 }
 
 model whatsapp_template {
@@ -2444,7 +2456,7 @@ model agent_event {
   agent_id               String
   customer_id            String?
   conversation_id        String?                 @db.Uuid
-  type                   agent_event_type        @default(CUSTOM)
+  type                   agent_event_type
   category               String?
   title                  String
   description            String?
@@ -2464,16 +2476,23 @@ model agent_event {
   created_at             DateTime                @default(now()) @db.Timestamptz(6)
   updated_at             DateTime                @default(now()) @db.Timestamptz(6)
   run_at                 DateTime?               @db.Timestamptz(6)
+  product                String?
+  claimed_until          DateTime?               @db.Timestamptz(6)
+  template_name          String?
+  template_language      String?
+  item_id                String?                 @db.Uuid
   Agent                  Agent                   @relation(fields: [agent_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_agent_event_agent")
   Company                Company                 @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_agent_event_company")
   messaging_conversation messaging_conversation? @relation(fields: [conversation_id], references: [id], onUpdate: NoAction, map: "fk_agent_event_conversation")
   Customer               Customer?               @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_agent_event_customer")
+  agent_cat_item         agent_cat_item?         @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_agent_event_item")
   agent_event_run        agent_event_run[]
 
   @@index([agent_id], map: "idx_agent_event_agent")
   @@index([company_id], map: "idx_agent_event_company")
   @@index([conversation_id], map: "idx_agent_event_conversation")
   @@index([customer_id], map: "idx_agent_event_customer")
+  @@index([status, is_active, next_run_at], map: "idx_agent_event_cron")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -2492,6 +2511,8 @@ model agent_event_run {
   payload                Json                    @default("{}")
   meta                   Json                    @default("{}")
   created_at             DateTime                @default(now()) @db.Timestamptz(6)
+  template_name          String?
+  template_variables     Json?                   @default("{}")
   messaging_conversation messaging_conversation? @relation(fields: [conversation_id], references: [id], onUpdate: NoAction, map: "fk_agent_event_run_conversation")
   agent_event            agent_event             @relation(fields: [event_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_agent_event_run_event")
   AgentSession           AgentSession?           @relation(fields: [agent_session_id], references: [id], onUpdate: NoAction, map: "fk_agent_event_run_session")
@@ -2499,6 +2520,7 @@ model agent_event_run {
   @@index([conversation_id], map: "idx_agent_event_run_conversation")
   @@index([event_id, created_at(sort: Desc)], map: "idx_agent_event_run_event")
   @@index([status, scheduled_for], map: "idx_agent_event_run_status")
+  @@index([status, scheduled_for], map: "idx_agent_event_run_pending")
 }
 
 model live_football_fixture {
@@ -2612,6 +2634,151 @@ model football_subscription_delivery {
   @@index([delivery_status], map: "football_subscription_delivery_status_idx")
   @@index([subscription_id], map: "football_subscription_delivery_subscription_idx")
   @@index([next_retry_at], map: "football_subscription_delivery_next_retry_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model assistant_interaction_log {
+  id                     String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id        String                 @db.Uuid
+  installation_id        String?                @db.Uuid
+  customer_id            String?
+  requested_instruction  String?
+  action                 String?
+  product                String?
+  subtype                String?
+  status                 String                 @default("COMPLETED")
+  started_at             DateTime               @default(now()) @db.Timestamptz(6)
+  finished_at            DateTime?              @db.Timestamptz(6)
+  title                  String
+  description            String
+  collected_data         Json                   @default("{}")
+  result_payload         Json                   @default("{}")
+  created_at             DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime               @default(now()) @db.Timestamptz(6)
+  messaging_conversation messaging_conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_assistant_interaction_log_conversation")
+
+  @@index([conversation_id, created_at(sort: Desc)], map: "idx_assistant_interaction_log_conversation_created")
+  @@index([requested_instruction, created_at(sort: Desc)], map: "idx_assistant_interaction_log_instruction_created")
+  @@index([status, created_at(sort: Desc)], map: "idx_assistant_interaction_log_status_created")
+}
+
+model assistant_conversation_fact {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id String    @db.Uuid
+  fact_type       String
+  fact_text       String
+  source_turn_id  String?   @db.Uuid
+  confidence      Decimal?  @default(1) @db.Decimal
+  is_active       Boolean?  @default(true)
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime? @db.Timestamptz(6)
+
+  @@index([conversation_id, is_active], map: "idx_fact_active")
+  @@index([conversation_id], map: "idx_fact_conversation")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model assistant_conversation_turn {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id     String   @db.Uuid
+  role                String
+  raw_text            String
+  rewritten_text      String?
+  interaction_mode    String?
+  detected_capability String?
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([conversation_id], map: "idx_turn_conversation")
+  @@index([created_at], map: "idx_turn_created")
+}
+
+model agent_cat_action {
+  id                          String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key                         String                        @unique
+  label                       String
+  description                 String?
+  status                      agent_catalog_status          @default(ACTIVE)
+  created_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  agent_cat_capability_action agent_cat_capability_action[]
+
+  @@index([status], map: "idx_agent_cat_action_status")
+}
+
+model agent_cat_capability {
+  id                           String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key                          String                         @unique
+  label                        String
+  description                  String?
+  status                       agent_catalog_status           @default(ACTIVE)
+  is_visible                   Boolean                        @default(true)
+  sort_order                   Int?                           @default(0)
+  created_at                   DateTime                       @default(now()) @db.Timestamptz(6)
+  agent_cat_capability_action  agent_cat_capability_action[]
+  agent_cat_capability_product agent_cat_capability_product[]
+
+  @@index([status], map: "idx_agent_cat_capability_status")
+}
+
+model agent_cat_capability_action {
+  id                   String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  capability_id        String               @db.Uuid
+  action_id            String               @db.Uuid
+  agent_cat_action     agent_cat_action     @relation(fields: [action_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  agent_cat_capability agent_cat_capability @relation(fields: [capability_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([capability_id, action_id])
+}
+
+model agent_cat_capability_product {
+  id                   String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  capability_id        String               @db.Uuid
+  product_id           String               @db.Uuid
+  agent_cat_capability agent_cat_capability @relation(fields: [capability_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  agent_cat_product    agent_cat_product    @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([capability_id, product_id])
+}
+
+model agent_cat_item {
+  id                          String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key                         String                   @unique
+  product_id                  String                   @db.Uuid
+  label                       String
+  description                 String?
+  status                      agent_catalog_status     @default(ACTIVE)
+  created_at                  DateTime                 @default(now()) @db.Timestamptz(6)
+  whatsapp_template_name      String?
+  whatsapp_template_language  String?
+  whatsapp_template_variables Json                     @default("[]")
+  agent_cat_product           agent_cat_product        @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  agent_cat_product_item      agent_cat_product_item[]
+  agent_event                 agent_event[]
+
+  @@index([status], map: "idx_agent_cat_item_status")
+}
+
+model agent_cat_product {
+  id                           String                         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key                          String                         @unique
+  label                        String
+  description                  String?
+  status                       agent_catalog_status           @default(ACTIVE)
+  created_at                   DateTime                       @default(now()) @db.Timestamptz(6)
+  agent_cat_capability_product agent_cat_capability_product[]
+  agent_cat_item               agent_cat_item[]
+  agent_cat_product_item       agent_cat_product_item[]
+
+  @@index([status], map: "idx_agent_cat_product_status")
+}
+
+model agent_cat_product_item {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id        String            @db.Uuid
+  item_id           String            @db.Uuid
+  agent_cat_item    agent_cat_item    @relation(fields: [item_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  agent_cat_product agent_cat_product @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([product_id, item_id])
 }
 
 /// *
@@ -3089,8 +3256,15 @@ enum agent_event_status {
 }
 
 enum agent_event_type {
-  GOSPEL
-  NEWS
   REMINDER
-  CUSTOM
+  DELIVERY
+  ALERT
+  CAMPAIGN
+}
+
+enum agent_catalog_status {
+  PENDING
+  ACTIVE
+  INACTIVE
+  DEPRECATED
 }

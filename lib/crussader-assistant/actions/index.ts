@@ -1,7 +1,7 @@
 // lib/crussader-assistant/actions/index.ts
 
-import { identifyCustomer } from "./identifyCustomer";
-import { assureCustomer } from "./assureCustomer";
+import { identifyCustomer } from "../domains/events/actions/identifyCustomer";
+import { assureCustomer } from "../domains/events/actions/assureCustomer";
 
 export const ACTIONS = {
   identify_assistant_customer: identifyCustomer,

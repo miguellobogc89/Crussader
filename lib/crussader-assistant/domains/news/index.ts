@@ -1,0 +1,1 @@
+﻿export { filterNewsItems } from "./filterNewsItems";

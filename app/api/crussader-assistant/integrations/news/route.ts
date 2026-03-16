@@ -1,6 +1,6 @@
 // app/api/crussader-assistant/integrations/news/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { filterNewsItems } from "@/lib/crussader-assistant/news/filterNewsItems";
+import { filterNewsItems } from "@/lib/crussader-assistant/legacy/bridges/news/filterNewsItems";
 
 export const dynamic = "force-dynamic";
 

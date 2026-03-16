@@ -15,20 +15,29 @@
     "incremental": true,
     "plugins": [{ "name": "next" }],
 
-    // 👇 Añadir
     "baseUrl": ".",
-    "paths": { "@/*": ["./*"] },
+    "paths": {
+      "@/*": ["./*"]
+    },
 
-    // (opcional pero recomendable)
     "forceConsistentCasingInFileNames": true,
     "allowSyntheticDefaultImports": true
   },
+
   "include": [
-    "**/*.ts", 
-    "**/*.tsx", 
-    "**/*.d.ts", 
-    "next-env.d.ts", 
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.d.ts",
+    "next-env.d.ts",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules", ".next"]
+
+  "exclude": [
+    "node_modules",
+    ".next",
+
+    "lib/crussader-assistant/legacy",
+    "lib/crussader-assistant/actions/_events_old",
+    "lib/crussader-assistant/tests"
+  ]
 }

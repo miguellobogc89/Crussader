@@ -23,6 +23,14 @@
     {
       "path": "/api/cron/agent-events",
       "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/cron/agent-event-scheduler",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/agent-event-executor",
+      "schedule": "* * * * *"
     }
   ]
 }
