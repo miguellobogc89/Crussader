@@ -56,6 +56,10 @@ const config: Config = {
         /* Marca opcional */
         crussader: { DEFAULT: "#7c3aed", light: "#a78bfa", dark: "#5b21b6" },
 
+        brand: {
+          primary: "#0B6CF4",
+        },
+
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -133,3 +137,5 @@ const config: Config = {
 };
 
 export default config;
+
+
