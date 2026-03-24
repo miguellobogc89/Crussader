@@ -21,6 +21,7 @@ export type CreateServiceDraft = {
 };
 
 export type SlotItem = {
+  id: string;
   time: string;
   status: "pending" | "fresh" | "recovered" | "unfilled";
   service: string;

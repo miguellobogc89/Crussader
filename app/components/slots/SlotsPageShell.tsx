@@ -20,12 +20,16 @@ type SlotsPageShellProps = {
     slot: SlotItem,
     services: SelectedServiceItem[],
   ) => void;
+  onCompanyChange?: (companyId: string | null) => void;
+  refreshKey?: number;
 };
 
 export function SlotsPageShell({
   onNewCancellation,
   onInvite,
   onSlotClick,
+  onCompanyChange,
+  refreshKey,
 }: SlotsPageShellProps) {
   const [locationId, setLocationId] = useState<string | null>(null);
 
@@ -36,8 +40,9 @@ export function SlotsPageShell({
           <div className="min-w-0 flex-1 max-w-[320px]">
             <div className="mt-2">
               <LocationSelector
-                onSelect={(id) => {
+                onSelect={(id, location) => {
                   setLocationId(id ?? null);
+                  onCompanyChange?.(location?.companyId ?? null);
                 }}
               />
             </div>
@@ -61,6 +66,7 @@ export function SlotsPageShell({
             <SlotsListCard
               locationId={locationId}
               onSlotClick={onSlotClick}
+              refreshKey={refreshKey}
             />
           </div>
 

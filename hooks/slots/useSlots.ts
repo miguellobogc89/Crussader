@@ -30,7 +30,7 @@ export type SlotDTO = {
   services: SlotServiceDTO[];
 };
 
-export function useSlots(locationId?: string | null) {
+export function useSlots(locationId?: string | null, refreshKey?: number) {
   const boot = useBootstrapData();
 
   const [slots, setSlots] = useState<SlotDTO[]>([]);
@@ -79,7 +79,7 @@ export function useSlots(locationId?: string | null) {
     fetchSlots();
 
     return () => controller.abort();
-  }, [boot?.activeCompanyResolved?.id, locationId]);
+  }, [boot?.activeCompanyResolved?.id, locationId, refreshKey]);
 
   return { slots, loading };
 }

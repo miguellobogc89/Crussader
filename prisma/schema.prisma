@@ -508,7 +508,7 @@ model Customer {
   phone                       String                        @unique(map: "ux_customer_phone")
   email                       String?
   createdAt                   DateTime                      @default(now())
-  updatedAt                   DateTime                      @updatedAt
+  updatedAt                   DateTime                      @default(now()) @updatedAt
   createdByAgentId            String?
   createdInSessionId          String?
   secondary_phone             String?
@@ -524,6 +524,7 @@ model Customer {
   customer_slot_alert_profile customer_slot_alert_profile[]
   messaging_conversation      messaging_conversation[]
   slot_recovery_recipient     slot_recovery_recipient[]
+  slot_recovery_reply_event   slot_recovery_reply_event[]
   slot_recovery_slot          slot_recovery_slot[]
 
   @@index([phone])
@@ -1537,6 +1538,7 @@ model Company {
   invoice                     invoice[]
   lead_interaction            lead_interaction[]
   slot_recovery_recipient     slot_recovery_recipient[]
+  slot_recovery_reply_event   slot_recovery_reply_event[]
   slot_recovery_service       slot_recovery_service[]
   slot_recovery_slot          slot_recovery_slot[]
   subscription                subscription[]
@@ -2831,26 +2833,32 @@ model customer_slot_alert_profile {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model slot_recovery_recipient {
-  id                    String             @id @default(dbgenerated("('srr_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
-  slot_recovery_slot_id String
-  company_id            String
-  customer_id           String
-  status                String             @default("queued")
-  template_name         String?
-  provider_message_id   String?
-  failure_reason        String?
-  sent_at               DateTime?          @db.Timestamptz(6)
-  delivered_at          DateTime?          @db.Timestamptz(6)
-  read_at               DateTime?          @db.Timestamptz(6)
-  replied_at            DateTime?          @db.Timestamptz(6)
-  booked_at             DateTime?          @db.Timestamptz(6)
-  payload               Json               @default("{}")
-  meta                  Json               @default("{}")
-  created_at            DateTime           @default(now()) @db.Timestamptz(6)
-  updated_at            DateTime           @default(now()) @db.Timestamptz(6)
-  Company               Company            @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_recipient_company")
-  Customer              Customer           @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_recipient_customer")
-  slot_recovery_slot    slot_recovery_slot @relation(fields: [slot_recovery_slot_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_recipient_slot")
+  id                        String                      @id @default(dbgenerated("('srr_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  slot_recovery_slot_id     String
+  company_id                String
+  customer_id               String
+  status                    String                      @default("queued")
+  template_name             String?
+  provider_message_id       String?
+  failure_reason            String?
+  sent_at                   DateTime?                   @db.Timestamptz(6)
+  delivered_at              DateTime?                   @db.Timestamptz(6)
+  read_at                   DateTime?                   @db.Timestamptz(6)
+  replied_at                DateTime?                   @db.Timestamptz(6)
+  booked_at                 DateTime?                   @db.Timestamptz(6)
+  payload                   Json                        @default("{}")
+  meta                      Json                        @default("{}")
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  reply_source              String?
+  reply_button_id           String?
+  reply_button_text         String?
+  reply_message_id          String?
+  reply_payload             Json                        @default("{}")
+  Company                   Company                     @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_recipient_company")
+  Customer                  Customer                    @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_recipient_customer")
+  slot_recovery_slot        slot_recovery_slot          @relation(fields: [slot_recovery_slot_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_recipient_slot")
+  slot_recovery_reply_event slot_recovery_reply_event[]
 
   @@unique([slot_recovery_slot_id, customer_id], map: "ux_slot_recovery_recipient_slot_customer")
   @@index([company_id], map: "idx_slot_recovery_recipient_company")
@@ -2858,6 +2866,8 @@ model slot_recovery_recipient {
   @@index([customer_id], map: "idx_slot_recovery_recipient_customer")
   @@index([slot_recovery_slot_id], map: "idx_slot_recovery_recipient_slot")
   @@index([status], map: "idx_slot_recovery_recipient_status")
+  @@index([reply_button_id], map: "idx_slot_recovery_recipient_reply_button_id")
+  @@index([reply_source], map: "idx_slot_recovery_recipient_reply_source")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -2890,6 +2900,7 @@ model slot_recovery_slot {
   created_at                                                           DateTime                     @default(now()) @db.Timestamptz(6)
   updated_at                                                           DateTime                     @default(now()) @db.Timestamptz(6)
   slot_recovery_recipient                                              slot_recovery_recipient[]
+  slot_recovery_reply_event                                            slot_recovery_reply_event[]
   Company                                                              Company                      @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_slot_company")
   Location                                                             Location                     @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_slot_location")
   Appointment_slot_recovery_slot_recovered_appointment_idToAppointment Appointment?                 @relation("slot_recovery_slot_recovered_appointment_idToAppointment", fields: [recovered_appointment_id], references: [id], onUpdate: NoAction, map: "fk_slot_recovery_slot_recovered_appointment")
@@ -2939,6 +2950,7 @@ model slot_recovery_service {
   meta                       Json                         @default("{}")
   created_at                 DateTime                     @default(now()) @db.Timestamptz(6)
   updated_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  service_id                 String?
   Company                    Company                      @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_service_company")
   slot_recovery_slot_offer   slot_recovery_slot_offer[]
   slot_recovery_slot_service slot_recovery_slot_service[]
@@ -2961,6 +2973,53 @@ model slot_recovery_slot_service {
   @@unique([slot_recovery_slot_id, slot_recovery_service_id], map: "ux_srss_slot_service")
   @@index([slot_recovery_service_id], map: "idx_srss_service")
   @@index([slot_recovery_slot_id], map: "idx_srss_slot")
+}
+
+model slot_recovery_send {
+  id              String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  companyId       String
+  slotId          String
+  customerId      String
+  phone           String
+  status          String
+  createdAt       DateTime? @default(now()) @db.Timestamp(6)
+  meta_message_id String?
+  error_message   String?
+  sent_at         DateTime? @db.Timestamp(6)
+  delivered_at    DateTime? @db.Timestamp(6)
+  read_at         DateTime? @db.Timestamp(6)
+  failed_at       DateTime? @db.Timestamp(6)
+  replied_at      DateTime? @db.Timestamp(6)
+  reply_type      String?
+  reply_payload   String?
+}
+
+model slot_recovery_reply_event {
+  id                         String                  @id @default(dbgenerated("('srre_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  slot_recovery_slot_id      String
+  slot_recovery_recipient_id String
+  company_id                 String
+  customer_id                String
+  provider_message_id        String?
+  provider_reply_id          String?
+  reply_source               String                  @default("button")
+  button_id                  String?
+  button_text                String?
+  payload                    Json                    @default("{}")
+  meta                       Json                    @default("{}")
+  replied_at                 DateTime                @default(now()) @db.Timestamptz(6)
+  created_at                 DateTime                @default(now()) @db.Timestamptz(6)
+  Company                    Company                 @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_reply_event_company")
+  Customer                   Customer                @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_reply_event_customer")
+  slot_recovery_recipient    slot_recovery_recipient @relation(fields: [slot_recovery_recipient_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_reply_event_recipient")
+  slot_recovery_slot         slot_recovery_slot      @relation(fields: [slot_recovery_slot_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_reply_event_slot")
+
+  @@index([button_id], map: "idx_slot_recovery_reply_event_button_id")
+  @@index([company_id, replied_at(sort: Desc)], map: "idx_slot_recovery_reply_event_company_replied_at")
+  @@index([customer_id], map: "idx_slot_recovery_reply_event_customer")
+  @@index([provider_message_id], map: "idx_slot_recovery_reply_event_provider_message_id")
+  @@index([slot_recovery_recipient_id], map: "idx_slot_recovery_reply_event_recipient")
+  @@index([slot_recovery_slot_id], map: "idx_slot_recovery_reply_event_slot")
 }
 
 /// *

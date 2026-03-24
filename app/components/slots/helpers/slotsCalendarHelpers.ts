@@ -121,9 +121,10 @@ export function mapSlotToLegacyShape(slot: SlotDTO): SlotItem {
 
   if (slot.status === "recovered") {
     return {
+      id: slot.id,
       time,
       status: "recovered",
-      service: slot.serviceName ?? undefined,
+      service: slot.serviceName || "",
     };
   }
 

@@ -8,11 +8,20 @@ import { useWhatsAppTemplatesAdmin } from "@/app/components/admin/integrations/w
 export default function WhatsAppTemplatesPage() {
   const companyId = useBootstrapStore((s) => s.data?.activeCompanyResolved?.id ?? null);
 
-  const { items, loading, selected, selectedId, setSelectedId, refresh, languages } =
-    useWhatsAppTemplatesAdmin(companyId);
+  const {
+    items,
+    loading,
+    selected,
+    selectedId,
+    setSelectedId,
+    refresh,
+    languages,
+  } = useWhatsAppTemplatesAdmin(companyId);
 
   async function toggleFavorite(templateId: string, next: boolean) {
-    if (!companyId) return;
+    if (!companyId) {
+      return;
+    }
 
     try {
       const res = await fetch("/api/whatsapp/templates/favorite", {
@@ -21,11 +30,10 @@ export default function WhatsAppTemplatesPage() {
         body: JSON.stringify({
           companyId,
           templateId,
-          isFavorite: next, // ✅ nombre correcto para el endpoint
+          isFavorite: next,
         }),
       });
 
-      // Si falla, no rompemos UI pero lo dejamos visible en consola
       if (!res.ok) {
         const data = await res.json().catch(() => null);
         console.error("[WA templates] favorite failed", res.status, data);
@@ -37,14 +45,43 @@ export default function WhatsAppTemplatesPage() {
     await refresh();
   }
 
+  async function syncFromMeta() {
+    if (!companyId) {
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `/api/whatsapp/templates/sync?companyId=${encodeURIComponent(companyId)}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.ok) {
+        console.error("[WA templates] sync failed", res.status, data);
+        return;
+      }
+    } catch (e) {
+      console.error("[WA templates] sync network error", e);
+      return;
+    }
+
+    await refresh();
+  }
+
   return (
     <TemplatesShell
       items={items}
       loading={loading}
       selected={selected}
       selectedId={selectedId}
-      onSelect={(id) => setSelectedId(id)}
+      onSelect={(id: string) => setSelectedId(id)}
       onRefresh={refresh}
+      onSync={syncFromMeta}
       languages={languages}
       onToggleFavorite={toggleFavorite}
     />
