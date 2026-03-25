@@ -93,25 +93,31 @@ export async function GET(req: NextRequest) {
         replied_customer_count: true,
         booked_customer_count: true,
         created_at: true,
-slot_recovery_slot_service: {
-  select: {
-    id: true,
-    position: true,
-    slot_recovery_service: {
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        duration_min: true,
-        active: true,
-      },
-    },
-  },
-  orderBy: [
-    { position: "asc" },
-    { created_at: "asc" },
-  ],
-},
+        Appointment_slot_recovery_slot_recovered_appointment_idToAppointment: {
+          select: {
+            id: true,
+            serviceName: true,
+            servicePrice: true,
+            serviceDurationMin: true,
+            slotRecoveryServiceId: true,
+          },
+        },
+        slot_recovery_slot_service: {
+          select: {
+            id: true,
+            position: true,
+            slot_recovery_service: {
+              select: {
+                id: true,
+                name: true,
+                price: true,
+                duration_min: true,
+                active: true,
+              },
+            },
+          },
+          orderBy: [{ position: "asc" }, { created_at: "asc" }],
+        },
       },
       orderBy: {
         starts_at: "asc",
@@ -121,39 +127,50 @@ slot_recovery_slot_service: {
     return NextResponse.json({
       ok: true,
       slots: slots.map((slot) => {
-const services = slot.slot_recovery_slot_service.map((rel) => {
-  const svc = rel.slot_recovery_service;
+        const services = slot.slot_recovery_slot_service.map((rel) => {
+          const svc = rel.slot_recovery_service;
 
-  return {
-    id: svc.id,
-    name: svc.name,
-    price: Number(svc.price),
-    durationMin: svc.duration_min,
-    position: rel.position,
-  };
-});
+          return {
+            id: svc.id,
+            name: svc.name,
+            price: Number(svc.price),
+            durationMin: svc.duration_min,
+            position: rel.position,
+          };
+        });
 
-return {
-  id: slot.id,
-  companyId: slot.company_id,
-  locationId: slot.location_id,
-  startsAt: slot.starts_at,
-  endsAt: slot.ends_at,
-  expiresAt: slot.expires_at,
-  status: slot.status,
-  manualPublishRequired: slot.manual_publish_required,
-  publishedAt: slot.published_at,
-  recoveredAt: slot.recovered_at,
-  serviceName: slot.service_name, // opcional legacy
-  notes: slot.notes,
-  targetCustomerCount: slot.target_customer_count,
-  sentCustomerCount: slot.sent_customer_count,
-  repliedCustomerCount: slot.replied_customer_count,
-  bookedCustomerCount: slot.booked_customer_count,
-  createdAt: slot.created_at,
-  servicesCount: services.length,
-  services,
-};
+        const recoveredAppointment =
+          slot.Appointment_slot_recovery_slot_recovered_appointment_idToAppointment;
+
+        return {
+          id: slot.id,
+          companyId: slot.company_id,
+          locationId: slot.location_id,
+          startsAt: slot.starts_at,
+          endsAt: slot.ends_at,
+          expiresAt: slot.expires_at,
+          status: slot.status,
+          manualPublishRequired: slot.manual_publish_required,
+          publishedAt: slot.published_at,
+          recoveredAt: slot.recovered_at,
+          serviceName: slot.service_name,
+          notes: slot.notes,
+          targetCustomerCount: slot.target_customer_count,
+          sentCustomerCount: slot.sent_customer_count,
+          repliedCustomerCount: slot.replied_customer_count,
+          bookedCustomerCount: slot.booked_customer_count,
+          createdAt: slot.created_at,
+          recoveredServiceId: recoveredAppointment?.slotRecoveryServiceId ?? null,
+          recoveredServiceName: recoveredAppointment?.serviceName ?? null,
+          recoveredSoldAmount:
+            typeof recoveredAppointment?.servicePrice === "number"
+              ? recoveredAppointment.servicePrice
+              : null,
+          recoveredServiceDurationMin:
+            recoveredAppointment?.serviceDurationMin ?? null,
+          servicesCount: services.length,
+          services,
+        };
       }),
     });
   } catch (e) {

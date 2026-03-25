@@ -429,7 +429,7 @@ model Service {
 model Appointment {
   id                                                                          String                @id @default(cuid())
   locationId                                                                  String
-  serviceId                                                                   String
+  serviceId                                                                   String?
   startAt                                                                     DateTime
   endAt                                                                       DateTime
   status                                                                      AppointmentStatus     @default(PENDING)
@@ -445,13 +445,17 @@ model Appointment {
   createdByAgentId                                                            String?
   createdInSessionId                                                          String?
   cancellation_reason                                                         String?
+  serviceName                                                                 String?
+  servicePrice                                                                Float?
+  serviceDurationMin                                                          Int?
+  slotRecoveryServiceId                                                       String?
   createdByAgent                                                              Agent?                @relation("AppointmentCreatedByAgent", fields: [createdByAgentId], references: [id])
   createdInSession                                                            AgentSession?         @relation("AppointmentCreatedInSession", fields: [createdInSessionId], references: [id])
   customer                                                                    Customer?             @relation(fields: [customerId], references: [id])
   employee                                                                    Employee?             @relation(fields: [employeeId], references: [id])
   location                                                                    Location              @relation(fields: [locationId], references: [id], onDelete: Cascade)
   resource                                                                    Resource?             @relation(fields: [resourceId], references: [id])
-  service                                                                     Service               @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  service                                                                     Service?              @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   AppointmentEmployee                                                         AppointmentEmployee[]
   AppointmentResource                                                         AppointmentResource[]
   slot_recovery_slot_slot_recovery_slot_recovered_appointment_idToAppointment slot_recovery_slot[]  @relation("slot_recovery_slot_recovered_appointment_idToAppointment")
@@ -461,6 +465,7 @@ model Appointment {
   @@index([locationId, startAt])
   @@index([createdByAgentId])
   @@index([createdInSessionId])
+  @@index([slotRecoveryServiceId])
 }
 
 model EmployeeTimeOff {
@@ -521,6 +526,7 @@ model Customer {
   createdByAgent              Agent?                        @relation("CustomerCreatedByAgent", fields: [createdByAgentId], references: [id])
   createdInSession            AgentSession?                 @relation("CustomerCreatedInSession", fields: [createdInSessionId], references: [id])
   agent_event                 agent_event[]
+  customer_contact_profile    customer_contact_profile[]
   customer_slot_alert_profile customer_slot_alert_profile[]
   messaging_conversation      messaging_conversation[]
   slot_recovery_recipient     slot_recovery_recipient[]
@@ -1529,6 +1535,7 @@ model Company {
   agent_event                 agent_event[]
   billing_account             billing_account?
   company_phone_number        company_phone_number[]
+  customer_contact_profile    customer_contact_profile[]
   customer_slot_alert_profile customer_slot_alert_profile[]
   discount_redemption         discount_redemption[]
   google_gbp_account          google_gbp_account[]
@@ -3020,6 +3027,39 @@ model slot_recovery_reply_event {
   @@index([provider_message_id], map: "idx_slot_recovery_reply_event_provider_message_id")
   @@index([slot_recovery_recipient_id], map: "idx_slot_recovery_reply_event_recipient")
   @@index([slot_recovery_slot_id], map: "idx_slot_recovery_reply_event_slot")
+}
+
+model customer_contact_profile {
+  id                  String    @id @default(dbgenerated("('ccp_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  company_id          String
+  customer_id         String
+  is_contactable      Boolean   @default(true)
+  interaction_status  String    @default("active")
+  cooldown_until      DateTime? @db.Timestamptz(6)
+  last_notified_at    DateTime? @db.Timestamptz(6)
+  last_response_at    DateTime? @db.Timestamptz(6)
+  last_declined_at    DateTime? @db.Timestamptz(6)
+  last_ignored_at     DateTime? @db.Timestamptz(6)
+  last_booked_at      DateTime? @db.Timestamptz(6)
+  times_notified_7d   Int       @default(0)
+  times_notified_30d  Int       @default(0)
+  times_ignored_30d   Int       @default(0)
+  times_declined_30d  Int       @default(0)
+  manual_blocked      Boolean   @default(false)
+  manual_block_reason String?
+  notes               String?
+  meta                Json      @default("{}")
+  created_at          DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime  @default(now()) @db.Timestamptz(6)
+  Company             Company   @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_customer_contact_profile_company")
+  Customer            Customer  @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_customer_contact_profile_customer")
+
+  @@unique([company_id, customer_id], map: "ux_customer_contact_profile_company_customer")
+  @@index([company_id], map: "idx_customer_contact_profile_company")
+  @@index([company_id, is_contactable, manual_blocked], map: "idx_customer_contact_profile_contactable")
+  @@index([company_id, cooldown_until], map: "idx_customer_contact_profile_cooldown")
+  @@index([customer_id], map: "idx_customer_contact_profile_customer")
+  @@index([company_id, interaction_status], map: "idx_customer_contact_profile_status")
 }
 
 /// *

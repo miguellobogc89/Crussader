@@ -15,6 +15,8 @@ import { claimSlotForRecipient } from "./actions/claimSlotForRecipient";
 import { sendServiceSelectionToRecipient } from "./actions/sendServiceSelectionToRecipient";
 import { recomputeSlotCounters } from "./actions/recomputeSlotCounters";
 import { createAppointmentFromSlot } from "./actions/createAppointmentFromSlot";
+import { sendSlotAlreadyTakenMessage } from "./messaging/sendSlotAlreadyTakenMessage";
+import { sendSlotRecoveryConfirmation } from "./messaging/sendSlotRecoveryConfirmation";
 
 export async function handleSlotRecoveryReplies(value: WaValue) {
   if (!Array.isArray(value.messages) || value.messages.length === 0) {
@@ -119,13 +121,47 @@ if (selectedServiceId) {
   });
 
   // 🔥 ESTA LÍNEA ES LA QUE TE FALTA O NO SE EJECUTA
-  await createAppointmentFromSlot({
-    slotId: matchedRecipient.slot_recovery_slot_id,
-    customerId: matchedRecipient.customer_id,
-    serviceId: selectedServiceId,
+const result = await createAppointmentFromSlot({
+  slotId: matchedRecipient.slot_recovery_slot_id,
+  customerId: matchedRecipient.customer_id,
+  serviceId: selectedServiceId,
+});
+
+if (result.ok) {
+  const slotService = await prisma.slot_recovery_service.findUnique({
+    where: {
+      id: selectedServiceId,
+    },
+    select: {
+      name: true,
+    },
   });
 
-  continue;
+const slotData = await prisma.slot_recovery_slot.findUnique({
+  where: {
+    id: matchedRecipient.slot_recovery_slot_id,
+  },
+  select: {
+    starts_at: true,
+    Location: {
+      select: {
+        title: true,
+      },
+    },
+  },
+});
+
+  if (slotService && slotData) {
+    await sendSlotRecoveryConfirmation({
+      to: fromPhone,
+      serviceName: slotService.name,
+      startAt: slotData.starts_at,
+      locationName: slotData.Location?.title ?? "",
+    });
+  }
+}
+
+continue;
 }
 
     const claimResult = await claimSlotForRecipient({
@@ -133,17 +169,21 @@ if (selectedServiceId) {
       customerId: matchedRecipient.customer_id,
     });
 
-    if (!claimResult.ok) {
-      if (claimResult.reason === "SLOT_ALREADY_TAKEN") {
-        console.log("[SLOT][ALREADY_TAKEN]", {
-          slotId: matchedRecipient.slot_recovery_slot_id,
-          winner: claimResult.slot?.recovered_customer_id,
-          loser: matchedRecipient.customer_id,
-        });
-      }
+if (!claimResult.ok) {
+  if (claimResult.reason === "SLOT_ALREADY_TAKEN") {
+    console.log("[SLOT][ALREADY_TAKEN]", {
+      slotId: matchedRecipient.slot_recovery_slot_id,
+      winner: claimResult.slot?.recovered_customer_id,
+      loser: matchedRecipient.customer_id,
+    });
 
-      continue;
-    }
+    await sendSlotAlreadyTakenMessage({
+      to: fromPhone,
+    });
+  }
+
+  continue;
+}
 
     console.log("[WA][SERVICE_SELECTION][SLOT_STATE]", {
       slotId: matchedRecipient.slot_recovery_slot_id,

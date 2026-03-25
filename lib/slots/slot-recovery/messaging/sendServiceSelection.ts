@@ -1,4 +1,7 @@
-// lib/whatsapp/sendServiceSelection.ts
+// lib/slots/slot-recovery/messaging/sendServiceSelection.ts
+
+import { slotRecoveryTexts } from "./slotRecoveryMessageTexts";
+
 const WHATSAPP_TOKEN = process.env.WHATSAPP_PERMANENT_TOKEN;
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
@@ -10,15 +13,11 @@ type ServiceOption = {
 
 type SendServiceSelectionParams = {
   to: string;
-  bodyText: string;
-  buttonText?: string;
   options: ServiceOption[];
 };
 
 export async function sendServiceSelection({
   to,
-  bodyText,
-  buttonText = "Ver servicios",
   options,
 }: SendServiceSelectionParams) {
   const url = `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`;
@@ -33,7 +32,7 @@ export async function sendServiceSelection({
       interactive: {
         type: "button",
         body: {
-          text: bodyText,
+          text: slotRecoveryTexts.serviceSelection.body,
         },
         action: {
           buttons: options.map((option) => {
@@ -56,10 +55,10 @@ export async function sendServiceSelection({
       interactive: {
         type: "list",
         body: {
-          text: bodyText,
+          text: slotRecoveryTexts.serviceSelection.body,
         },
         action: {
-          button: buttonText,
+          button: slotRecoveryTexts.serviceSelection.button,
           sections: [
             {
               title: "Servicios disponibles",
@@ -77,7 +76,10 @@ export async function sendServiceSelection({
     };
   }
 
-  console.log("[WA][SERVICE_SELECTION][PAYLOAD]", JSON.stringify(payload, null, 2));
+  console.log(
+    "[WA][SERVICE_SELECTION][PAYLOAD]",
+    JSON.stringify(payload, null, 2),
+  );
 
   const res = await fetch(url, {
     method: "POST",
@@ -96,7 +98,7 @@ export async function sendServiceSelection({
     throw new Error(
       typeof data?.error?.message === "string"
         ? data.error.message
-        : "whatsapp_service_selection_send_failed"
+        : "whatsapp_service_selection_send_failed",
     );
   }
 

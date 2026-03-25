@@ -1,4 +1,4 @@
-// lib/whatsapp/sendSlotRecoveryTemplate.ts
+// lib/slots/slot-recovery/messaging/sendSlotRecoveryTemplate.ts
 
 export async function sendSlotRecoveryTemplate(args: {
   to: string;

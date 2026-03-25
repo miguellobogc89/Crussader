@@ -28,6 +28,11 @@ export type SlotDTO = {
   bookedCustomerCount: number;
   servicesCount: number;
   services: SlotServiceDTO[];
+
+  recoveredServiceId: string | null;
+  recoveredServiceName: string | null;
+  recoveredSoldAmount: number | null;
+  recoveredServiceDurationMin: number | null;
 };
 
 export function useSlots(locationId?: string | null, refreshKey?: number) {

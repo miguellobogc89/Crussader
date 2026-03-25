@@ -11,16 +11,29 @@ import {
   Plus,
   Search,
   User,
+  Calendar,
   X,
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+
+type CustomerCluster = "available" | "cooldown" | "has_appointment" | "do_not_notify";
 
 type CustomerListItem = {
   id: string;
   companyId: string;
   customerId: string;
   linkedAt: string;
+  cluster: CustomerCluster;
+  hasAppointment: boolean;
+  interactionStatus: string;
+  manualBlocked: boolean;
+  manualBlockReason: string | null;
+  lastNotifiedAt: string | null;
+  lastResponseAt: string | null;
+  cooldownUntil: string | null;
+  lastAppointmentAt: string | null;
+lastAppointmentServiceName: string | null;
   customer: {
     id: string;
     firstName: string | null;
@@ -101,6 +114,16 @@ function buildInlineCreatedRow(
     companyId,
     customerId: created.customerId,
     linkedAt: new Date().toISOString(),
+    cluster: "available",
+    hasAppointment: false,
+    interactionStatus: "active",
+    manualBlocked: false,
+    manualBlockReason: null,
+    lastNotifiedAt: null,
+    lastResponseAt: null,
+    cooldownUntil: null,
+    lastAppointmentAt: null,
+    lastAppointmentServiceName: null,
     customer: {
       id: created.customer.id,
       firstName: created.customer.firstName,
@@ -119,6 +142,39 @@ function buildInlineCreatedRow(
   };
 }
 
+const STATUS_CONFIG: Record<
+  CustomerCluster,
+  {
+    label: string;
+    badgeClassName: string;
+    dotClassName: string;
+  }
+> = {
+  available: {
+    label: "Disponible",
+    badgeClassName:
+      "border-emerald-500/20 bg-emerald-500/10 text-emerald-600",
+    dotClassName: "bg-emerald-500",
+  },
+  cooldown: {
+    label: "Cooldown",
+    badgeClassName:
+      "border-amber-500/20 bg-amber-500/10 text-amber-600",
+    dotClassName: "bg-amber-500",
+  },
+has_appointment: {
+  label: "Con cita",
+  badgeClassName: "border-crussader/20 bg-crussader/10 text-crussader",
+  dotClassName: "bg-crussader",
+},
+  do_not_notify: {
+    label: "No avisar",
+    badgeClassName:
+      "border-red-500/20 bg-red-500/10 text-red-600",
+    dotClassName: "bg-red-500",
+  },
+};
+
 export function SlotsCustomersPickerModal({
   open,
   onClose,
@@ -126,6 +182,7 @@ export function SlotsCustomersPickerModal({
   slotId,
   onSent,
 }: SlotsCustomersPickerModalProps) {
+  console.log("Modal props", { companyId, slotId, open });
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<CustomerListItem[]>([]);
@@ -145,20 +202,21 @@ export function SlotsCustomersPickerModal({
 
       const params = new URLSearchParams();
       params.set("companyId", companyId);
+      params.set("slotId", slotId);
       params.set("limit", "50");
 
       if (searchValue.trim()) {
         params.set("q", searchValue.trim());
       }
 
-      const response = await fetch(
-        `/api/slots/customers/list?${params.toString()}`,
-        {
-          method: "GET",
-          signal,
-          cache: "no-store",
-        }
-      );
+      const url = `/api/slots/customers/list?${params.toString()}`;
+console.log("customers list url", url);
+
+const response = await fetch(url, {
+  method: "GET",
+  signal,
+  cache: "no-store",
+});
 
       const data = await response.json();
 
@@ -271,7 +329,9 @@ export function SlotsCustomersPickerModal({
   }
 
   function handleSelectAll() {
-    const filteredIds = filtered.map((item) => item.customerId);
+    const filteredIds = filtered
+      .filter((item) => item.cluster !== "has_appointment")
+      .map((item) => item.customerId);
     const allSelected =
       filteredIds.length > 0 &&
       filteredIds.every((id) => selectedIds.includes(id));
@@ -431,6 +491,18 @@ export function SlotsCustomersPickerModal({
     selectAllLabel = "Deseleccionar todos";
   }
 
+  let selectedSummary = `${selectedCount} de ${totalCount} seleccionados`;
+
+  if (totalCount === 0) {
+    selectedSummary = "Sin contactos cargados";
+  }
+
+  let sendButtonLabel = `Enviar a ${selectedCount} contacto`;
+
+  if (selectedCount !== 1) {
+    sendButtonLabel = `Enviar a ${selectedCount} contactos`;
+  }
+
   return (
     <AnimatePresence>
       {open ? (
@@ -451,7 +523,7 @@ export function SlotsCustomersPickerModal({
             className="fixed inset-0 z-[70] flex items-center justify-center p-4"
           >
             <div
-              className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-[0_22px_60px_rgba(37,99,235,0.16)]"
+              className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-card"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="border-b border-border/50 px-6 pb-4 pt-6">
@@ -461,7 +533,7 @@ export function SlotsCustomersPickerModal({
                       Seleccionar contactos
                     </h2>
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      {selectedCount} de {totalCount} seleccionados
+                      {selectedSummary}
                     </p>
                   </div>
 
@@ -492,7 +564,7 @@ export function SlotsCustomersPickerModal({
                       setShowAdd(!showAdd);
                       setCreateError("");
                     }}
-                    className="h-10 shrink-0 rounded-xl border-primary/30 px-3 text-primary"
+                    className="h-10 shrink-0 rounded-xl border-crussader/30 px-3 text-crussader hover:bg-crussader/5"
                   >
                     <Plus className="mr-1 h-4 w-4" />
                     Añadir
@@ -507,7 +579,7 @@ export function SlotsCustomersPickerModal({
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden"
                     >
-                      <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                      <div className="space-y-3 rounded-xl border border-crussader/20 bg-crussader/5 p-4">
                         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                           Nuevo contacto
                         </p>
@@ -549,7 +621,7 @@ export function SlotsCustomersPickerModal({
                               !newFirstName.trim() ||
                               !newPhone.trim()
                             }
-                            className="h-9 rounded-lg px-4 text-sm font-medium"
+                            className="h-9 rounded-lg bg-crussader px-4 text-sm font-medium text-white"
                           >
                             {creatingContact ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -568,20 +640,24 @@ export function SlotsCustomersPickerModal({
                 </AnimatePresence>
               </div>
 
-              <div className="px-6 pb-2">
+              <div className="flex items-center justify-between px-6 pb-2">
                 <button
                   onClick={handleSelectAll}
-                  className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
+                  className="text-xs font-medium text-crussader transition-colors hover:text-crussader/80"
                 >
                   {selectAllLabel}
                 </button>
+
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {selectedCount} seleccionado{selectedCount !== 1 ? "s" : ""}
+                </span>
               </div>
 
               <div className="flex-1 overflow-auto px-6 pb-4">
                 <div className="space-y-1">
                   {loading ? (
                     <div className="flex justify-center py-10">
-                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
                   ) : null}
 
@@ -594,45 +670,110 @@ export function SlotsCustomersPickerModal({
                   {!loading
                     ? filtered.map((item) => {
                         const isSelected = selectedIds.includes(item.customerId);
+                        const clusterConfig = STATUS_CONFIG[item.cluster];
+                        const isDisabled = item.cluster === "has_appointment";
 
-                        return (
-                          <button
-                            key={item.id}
-                            onClick={() => toggleSelect(item.customerId)}
-                            className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-150 ${
-                              isSelected
-                                ? "border-primary/20 bg-primary/5"
-                                : "border-transparent hover:bg-muted/60"
-                            }`}
-                          >
-                            <div
-                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all duration-150 ${
-                                isSelected
-                                  ? "border-primary bg-primary"
-                                  : "border-border bg-white"
-                              }`}
-                            >
-                              {isSelected ? (
-                                <Check className="h-3 w-3 text-primary-foreground" />
-                              ) : null}
-                            </div>
+                        let rowClassName =
+                          "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-150";
 
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
-                              <span className="text-xs font-semibold text-muted-foreground">
-                                {getInitials(item)}
-                              </span>
-                            </div>
+                        if (isSelected) {
+                          rowClassName += " border-primary/20 bg-primary/5";
+                        }
 
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium text-foreground">
-                                {item.customer.displayName}
-                              </p>
-                              <p className="text-xs tabular-nums text-muted-foreground">
-                                {getFullPhone(item)}
-                              </p>
-                            </div>
-                          </button>
-                        );
+                        if (!isSelected) {
+                          rowClassName +=
+                            " border-transparent hover:bg-muted/60";
+                        }
+
+                        let checkboxClassName =
+                          "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all duration-150";
+
+                        if (isSelected) {
+                          checkboxClassName += " border-primary bg-primary";
+                        }
+
+                        if (!isSelected) {
+                          checkboxClassName += " border-border bg-white";
+                        }
+
+return (
+  <button
+    key={item.id}
+    onClick={() => {
+      if (isDisabled) {
+        return;
+      }
+
+      toggleSelect(item.customerId);
+    }}
+    disabled={isDisabled}
+    className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-150 ${
+isSelected
+  ? "border-crussader/20 bg-crussader/5"
+  : "border-transparent hover:bg-muted/60"
+    } ${isDisabled ? "opacity-50" : ""}`}
+  >
+    <div
+      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all duration-150 ${
+        isSelected ? "border-crussader bg-crussader" : "border-border bg-white"
+      }`}
+    >
+      {isSelected ? (
+        <Check className="h-3 w-3 text-primary-foreground" />
+      ) : null}
+    </div>
+
+    <div className="relative">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
+        <span className="text-xs font-semibold text-muted-foreground">
+          {getInitials(item)}
+        </span>
+      </div>
+
+      <span
+        className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${clusterConfig.dotClassName}`}
+      />
+    </div>
+
+<div className="min-w-0 flex-1">
+  <p className="truncate text-sm font-medium text-foreground">
+    {item.customer.displayName}
+  </p>
+  <p className="text-xs tabular-nums text-muted-foreground">
+    {getFullPhone(item)}
+  </p>
+</div>
+
+
+{item.lastAppointmentAt ? (
+  <div className="flex flex-col items-start mr-2 rounded-lg border border-border/50 bg-muted/50 px-2 py-1">
+    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+      <Calendar className="h-3 w-3" />
+      <span>
+        {new Date(item.lastAppointmentAt).toLocaleDateString("es-ES", {
+          day: "2-digit",
+          month: "short",
+        })}
+      </span>
+    </div>
+
+    {item.lastAppointmentServiceName ? (
+      <span className="max-w-[90px] truncate text-[10px] font-medium text-foreground">
+        {item.lastAppointmentServiceName}
+      </span>
+    ) : null}
+  </div>
+) : null}
+
+    <span
+      className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold ${clusterConfig.badgeClassName}`}
+    >
+      {clusterConfig.label}
+    </span>
+
+    
+  </button>
+);
                       })
                     : null}
                 </div>
@@ -642,12 +783,12 @@ export function SlotsCustomersPickerModal({
                 <Button
                   onClick={handleSend}
                   disabled={selectedCount === 0 || sending}
-                  className="h-11 w-full rounded-xl font-semibold"
+                  className="h-11 w-full rounded-xl bg-crussader font-semibold text-white shadow-sm transition-all duration-150 hover:bg-crussader/90"
                 >
                   {sending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    `Enviar a ${selectedCount} contacto${selectedCount !== 1 ? "s" : ""}`
+                    sendButtonLabel
                   )}
                 </Button>
               </div>

@@ -54,7 +54,7 @@ const config: Config = {
         star: { filled: "hsl(var(--star-filled))", empty: "hsl(var(--star-empty))" },
 
         /* Marca opcional */
-        crussader: { DEFAULT: "#7c3aed", light: "#a78bfa", dark: "#5b21b6" },
+        crussader: { DEFAULT: "#0B6CF4", light: "#4D94F7", dark: "#084BB3" },
 
         brand: {
           primary: "#0B6CF4",

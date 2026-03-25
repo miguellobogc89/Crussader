@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendSlotRecoveryTemplate } from "@/lib/whatsapp/sendSlotRecoveryTemplate";
+import { sendSlotRecoveryTemplate } from "@/lib/slots/slot-recovery/messaging/sendSlotRecoveryTemplate";
 
 export async function POST(request: NextRequest) {
   try {

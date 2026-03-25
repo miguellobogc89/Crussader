@@ -1,7 +1,7 @@
 // lib/slots/slot-recovery/actions/sendServiceSelectionToRecipient.ts
 
 import { prisma } from "@/lib/prisma";
-import { sendServiceSelection } from "@/lib/whatsapp/sendServiceSelection";
+import { sendServiceSelection } from "@/lib/slots/slot-recovery/messaging/sendServiceSelection";
 
 type SendServiceSelectionToRecipientParams = {
   recipientId: string;
@@ -59,17 +59,15 @@ export async function sendServiceSelectionToRecipient(
     }),
   });
 
-  const selectionResult = await sendServiceSelection({
-    to: params.toPhone,
-    bodyText: "¡Genial! Has conseguido la reserva. ¿Qué servicio quieres reservar?",
-    buttonText: "Elegir servicio",
-    options: availableServices.map((item) => {
-      return {
-        id: `SERVICE_${item.slot_recovery_service.id}`,
-        title: item.slot_recovery_service.name,
-      };
-    }),
-  });
+const selectionResult = await sendServiceSelection({
+  to: params.toPhone,
+  options: availableServices.map((item) => {
+    return {
+      id: `SERVICE_${item.slot_recovery_service.id}`,
+      title: item.slot_recovery_service.name,
+    };
+  }),
+});
 
   let selectionMessageId: string | null = null;
 
@@ -81,35 +79,14 @@ export async function sendServiceSelectionToRecipient(
     selectionMessageId = selectionResult.messages[0].id;
   }
 
-console.log("[WA][SERVICE_SELECTION][DEBUG_SAVE]", {
-  recipientId: params.recipientId,
-  selectionMessageId,
-});
-
-await prisma.slot_recovery_recipient.update({
-  where: {
-    id: params.recipientId,
-  },
-  data: {
-    reply_message_id: selectionMessageId,
-  },
-});
-
-const check = await prisma.slot_recovery_recipient.findUnique({
-  where: {
-    id: params.recipientId,
-  },
-  select: {
-    reply_message_id: true,
-  },
-});
-
-console.log("[WA][SERVICE_SELECTION][CHECK_DB]", check);
-
-console.log("[WA][SERVICE_SELECTION][SAVED_REPLY_MESSAGE_ID]", {
-  recipientId: params.recipientId,
-  selectionMessageId,
-});
+  await prisma.slot_recovery_recipient.update({
+    where: {
+      id: params.recipientId,
+    },
+    data: {
+      reply_message_id: selectionMessageId,
+    },
+  });
 
   return {
     ok: true,

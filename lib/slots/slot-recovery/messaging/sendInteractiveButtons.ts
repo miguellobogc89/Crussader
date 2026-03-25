@@ -1,4 +1,4 @@
-// lib/whatsapp/sendInteractiveButtons.ts
+// lib/slots/slot-recovery/messaging/sendInteractiveButtons.ts
 
 const WHATSAPP_TOKEN = process.env.WHATSAPP_PERMANENT_TOKEN;
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
