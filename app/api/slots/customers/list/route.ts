@@ -208,6 +208,56 @@ export async function GET(request: NextRequest) {
 
     const customerIds = customers.map((row) => row.customerId);
 
+    
+
+const slotServices = await prisma.slot_recovery_slot_service.findMany({
+  where: {
+    slot_recovery_slot_id: slotId,
+  },
+  select: {
+    slot_recovery_service_id: true,
+  },
+});
+
+const serviceIds = slotServices.map((s) => s.slot_recovery_service_id);
+
+const interests = await prisma.customer_service_interest.findMany({
+  where: {
+    company_id: companyId,
+    customer_id: {
+      in: customerIds,
+    },
+    slot_recovery_service_id: {
+      in: serviceIds,
+    },
+  },
+  select: {
+    customer_id: true,
+    interest_type: true,
+  },
+});
+
+const scoreMap = new Map<string, number>();
+
+for (const interest of interests) {
+  let score = 0;
+
+  if (interest.interest_type === "booked") {
+    score = 5;
+  }
+
+  if (interest.interest_type === "explicit") {
+    score = 3;
+  }
+
+  if (interest.interest_type === "offered_click") {
+    score = 1;
+  }
+
+  const prev = scoreMap.get(interest.customer_id) ?? 0;
+  scoreMap.set(interest.customer_id, prev + score);
+}
+
     const contactProfiles = await prisma.customer_contact_profile.findMany({
       where: {
         company_id: companyId,
@@ -239,7 +289,6 @@ export async function GET(request: NextRequest) {
     if (slotLocationId) {
 
       console.log("slotLocationId", slotLocationId);
-console.log("customerIds", customerIds);
       appointments = await prisma.appointment.findMany({
         where: {
           customerId: {
@@ -263,16 +312,7 @@ console.log("customerIds", customerIds);
         },
       });
 
-      console.log(
-  "appointments debug",
-  appointments.map((a) => {
-    return {
-      customerId: a.customerId,
-      startAt: a.startAt,
-      serviceName: a.serviceName,
-    };
-  })
-);
+
     }
 
 const lastAppointmentByCustomerId = new Map<
@@ -331,6 +371,7 @@ const cluster = getCluster({
         id: row.id,
         companyId: row.companyId,
         customerId: row.customerId,
+        interestScore: scoreMap.get(row.customerId) ?? 0,
         linkedAt: row.createdAt,
         cluster,
         hasAppointment,
@@ -361,6 +402,10 @@ const cluster = getCluster({
     });
 
     items.sort((a, b) => {
+      const scoreDiff = (b.interestScore ?? 0) - (a.interestScore ?? 0);
+if (scoreDiff !== 0) {
+  return scoreDiff;
+}
       const clusterDiff = getClusterOrder(a.cluster) - getClusterOrder(b.cluster);
       if (clusterDiff !== 0) {
         return clusterDiff;

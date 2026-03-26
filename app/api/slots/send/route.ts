@@ -56,12 +56,6 @@ export async function POST(request: NextRequest) {
       skipDuplicates: true,
     });
 
-    console.log("[SLOTS][RECIPIENTS][CREATED]", {
-      slotId,
-      companyId,
-      count: recipientInsertResult.count,
-      recipientRecords,
-    });
 
     await prisma.slot_recovery_send.createMany({
       data: records,
@@ -220,6 +214,19 @@ const result = await sendSlotRecoveryTemplate({
             sent_at: new Date(),
           },
         });
+
+        await prisma.slot_recovery_recipient.updateMany({
+  where: {
+    company_id: record.companyId,
+    slot_recovery_slot_id: record.slotId,
+    customer_id: record.customerId,
+  },
+  data: {
+    status: "sent",
+    provider_message_id: messageId,
+    sent_at: new Date(),
+  },
+});
       } catch (error) {
         console.error("[WA][SEND][FAIL]", error);
 

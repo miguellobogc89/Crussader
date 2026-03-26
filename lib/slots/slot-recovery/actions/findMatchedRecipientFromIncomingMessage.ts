@@ -9,11 +9,20 @@ type FindMatchedRecipientFromIncomingMessageParams = {
 export async function findMatchedRecipientFromIncomingMessage(
   params: FindMatchedRecipientFromIncomingMessageParams,
 ) {
+  const contextMessageId = params.contextMessageId.trim();
+
+  if (contextMessageId === "") {
+    return {
+      matchedRecipient: null,
+      matchedSend: null,
+    };
+  }
+
   let matchedRecipient = await prisma.slot_recovery_recipient.findFirst({
     where: {
       OR: [
-        { provider_message_id: params.contextMessageId },
-        { reply_message_id: params.contextMessageId },
+        { provider_message_id: contextMessageId },
+        { reply_message_id: contextMessageId },
       ],
     },
     orderBy: {
@@ -26,7 +35,7 @@ export async function findMatchedRecipientFromIncomingMessage(
   if (!matchedRecipient) {
     matchedSend = await prisma.slot_recovery_send.findFirst({
       where: {
-        meta_message_id: params.contextMessageId,
+        meta_message_id: contextMessageId,
       },
       orderBy: {
         createdAt: "desc",

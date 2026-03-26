@@ -34,7 +34,6 @@ export async function POST(req: Request) {
     const change = changes.length > 0 ? changes[0] : null;
     const value: WaValue | null = change && change.value ? change.value : null;
 
-    console.log("[WA][SLOT_RECOVERY][RAW]", JSON.stringify(body, null, 2));
 
     if (!value) {
       return NextResponse.json({ ok: true });

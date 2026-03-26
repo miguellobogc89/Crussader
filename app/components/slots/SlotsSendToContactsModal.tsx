@@ -16,59 +16,19 @@ import {
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-
-type CustomerCluster = "available" | "cooldown" | "has_appointment" | "do_not_notify";
-
-type CustomerListItem = {
-  id: string;
-  companyId: string;
-  customerId: string;
-  linkedAt: string;
-  cluster: CustomerCluster;
-  hasAppointment: boolean;
-  interactionStatus: string;
-  manualBlocked: boolean;
-  manualBlockReason: string | null;
-  lastNotifiedAt: string | null;
-  lastResponseAt: string | null;
-  cooldownUntil: string | null;
-  lastAppointmentAt: string | null;
-lastAppointmentServiceName: string | null;
-  customer: {
-    id: string;
-    firstName: string | null;
-    lastName: string | null;
-    preferredName: string | null;
-    whatsappName: string | null;
-    displayName: string;
-    phone: string | null;
-    secondaryPhone: string | null;
-    email: string | null;
-    countryCode: string | null;
-    secondaryCountryCode: string | null;
-    createdAt: string;
-    updatedAt: string;
-  };
-};
-
-type CreateCustomerResponseItem = {
-  customerId: string;
-  customer: {
-    id: string;
-    firstName: string | null;
-    lastName: string | null;
-    preferredName: string | null;
-    whatsappName: string | null;
-    displayName: string;
-    phone: string | null;
-    secondaryPhone: string | null;
-    email: string | null;
-    countryCode: string | null;
-    secondaryCountryCode: string | null;
-    createdAt: string;
-    updatedAt: string;
-  };
-};
+import { useToast } from "@/app/components/ui/use-toast";
+import {
+  MAX_SELECTED_CONTACTS,
+  STATUS_CONFIG,
+  buildInlineCreatedRow,
+  buildSmartSelectionIds,
+  getFullPhone,
+  getInitials,
+  isCooldownCluster,
+  isHardBlocked,
+  type CreateCustomerResponseItem,
+  type CustomerListItem,
+} from "@/app/components/slots/helpers/slotsCustomersPickerHelpers";
 
 type SlotsCustomersPickerModalProps = {
   open: boolean;
@@ -79,102 +39,6 @@ type SlotsCustomersPickerModalProps = {
   onAddContact?: () => void;
 };
 
-function getInitials(item: CustomerListItem): string {
-  const first =
-    item.customer.firstName?.trim().charAt(0) ||
-    item.customer.displayName?.trim().charAt(0) ||
-    "C";
-
-  const last = item.customer.lastName?.trim().charAt(0) || "";
-
-  return `${first}${last}`.toUpperCase();
-}
-
-function getFullPhone(item: CustomerListItem): string {
-  const phone = item.customer.phone?.trim() || "";
-  const countryCode = item.customer.countryCode?.trim() || "";
-
-  if (!phone) {
-    return "";
-  }
-
-  if (!countryCode) {
-    return phone;
-  }
-
-  return `${countryCode} ${phone}`.trim();
-}
-
-function buildInlineCreatedRow(
-  companyId: string,
-  created: CreateCustomerResponseItem
-): CustomerListItem {
-  return {
-    id: `inline-${created.customerId}`,
-    companyId,
-    customerId: created.customerId,
-    linkedAt: new Date().toISOString(),
-    cluster: "available",
-    hasAppointment: false,
-    interactionStatus: "active",
-    manualBlocked: false,
-    manualBlockReason: null,
-    lastNotifiedAt: null,
-    lastResponseAt: null,
-    cooldownUntil: null,
-    lastAppointmentAt: null,
-    lastAppointmentServiceName: null,
-    customer: {
-      id: created.customer.id,
-      firstName: created.customer.firstName,
-      lastName: created.customer.lastName,
-      preferredName: created.customer.preferredName,
-      whatsappName: created.customer.whatsappName,
-      displayName: created.customer.displayName,
-      phone: created.customer.phone,
-      secondaryPhone: created.customer.secondaryPhone,
-      email: created.customer.email,
-      countryCode: created.customer.countryCode,
-      secondaryCountryCode: created.customer.secondaryCountryCode,
-      createdAt: created.customer.createdAt,
-      updatedAt: created.customer.updatedAt,
-    },
-  };
-}
-
-const STATUS_CONFIG: Record<
-  CustomerCluster,
-  {
-    label: string;
-    badgeClassName: string;
-    dotClassName: string;
-  }
-> = {
-  available: {
-    label: "Disponible",
-    badgeClassName:
-      "border-emerald-500/20 bg-emerald-500/10 text-emerald-600",
-    dotClassName: "bg-emerald-500",
-  },
-  cooldown: {
-    label: "Cooldown",
-    badgeClassName:
-      "border-amber-500/20 bg-amber-500/10 text-amber-600",
-    dotClassName: "bg-amber-500",
-  },
-has_appointment: {
-  label: "Con cita",
-  badgeClassName: "border-crussader/20 bg-crussader/10 text-crussader",
-  dotClassName: "bg-crussader",
-},
-  do_not_notify: {
-    label: "No avisar",
-    badgeClassName:
-      "border-red-500/20 bg-red-500/10 text-red-600",
-    dotClassName: "bg-red-500",
-  },
-};
-
 export function SlotsCustomersPickerModal({
   open,
   onClose,
@@ -182,12 +46,29 @@ export function SlotsCustomersPickerModal({
   slotId,
   onSent,
 }: SlotsCustomersPickerModalProps) {
-  console.log("Modal props", { companyId, slotId, open });
+  const { toast } = useToast();
+
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<CustomerListItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
+
+  const [expandedClusters, setExpandedClusters] = useState<Record<string, boolean>>({
+  available: true,
+  cooldown: false,
+  has_appointment: false,
+  do_not_notify: false,
+});
+
+function toggleCluster(cluster: string) {
+  setExpandedClusters((prev) => {
+    return {
+      ...prev,
+      [cluster]: !prev[cluster],
+    };
+  });
+}
 
   const [showAdd, setShowAdd] = useState(false);
   const [creatingContact, setCreatingContact] = useState(false);
@@ -210,13 +91,12 @@ export function SlotsCustomersPickerModal({
       }
 
       const url = `/api/slots/customers/list?${params.toString()}`;
-console.log("customers list url", url);
 
-const response = await fetch(url, {
-  method: "GET",
-  signal,
-  cache: "no-store",
-});
+      const response = await fetch(url, {
+        method: "GET",
+        signal,
+        cache: "no-store",
+      });
 
       const data = await response.json();
 
@@ -231,7 +111,7 @@ const response = await fetch(url, {
 
       setItems([]);
     },
-    [companyId]
+    [companyId, slotId]
   );
 
   useEffect(() => {
@@ -239,7 +119,6 @@ const response = await fetch(url, {
       return;
     }
 
-    setSelectedIds([]);
     setShowAdd(false);
     setCreatingContact(false);
     setCreateError("");
@@ -247,6 +126,15 @@ const response = await fetch(url, {
     setNewLastName("");
     setNewPhone("+34 ");
   }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const nextIds = buildSmartSelectionIds(items);
+    setSelectedIds(nextIds);
+  }, [open, items]);
 
   useEffect(() => {
     if (!open) {
@@ -313,44 +201,116 @@ const response = await fetch(url, {
     });
   }, [items, query]);
 
+  const groupedItems = useMemo(() => {
+  return {
+    available: filtered.filter((item) => item.cluster === "available"),
+    cooldown: filtered.filter((item) => item.cluster === "cooldown"),
+    has_appointment: filtered.filter((item) => item.cluster === "has_appointment"),
+    do_not_notify: filtered.filter((item) => item.cluster === "do_not_notify"),
+  };
+}, [filtered]);
+
+const clusterOrder: Array<keyof typeof groupedItems> = [
+  "available",
+  "cooldown",
+  "has_appointment",
+  "do_not_notify",
+];
+
   const selectedCustomers = useMemo(() => {
     const selectedSet = new Set(selectedIds);
     return items.filter((item) => selectedSet.has(item.customerId));
   }, [items, selectedIds]);
 
-  function toggleSelect(customerId: string) {
-    setSelectedIds((current) => {
-      if (current.includes(customerId)) {
-        return current.filter((id) => id !== customerId);
-      }
-
-      return [...current, customerId];
-    });
-  }
-
-  function handleSelectAll() {
-    const filteredIds = filtered
-      .filter((item) => item.cluster !== "has_appointment")
-      .map((item) => item.customerId);
-    const allSelected =
-      filteredIds.length > 0 &&
-      filteredIds.every((id) => selectedIds.includes(id));
-
-    if (allSelected) {
-      setSelectedIds((current) => {
-        return current.filter((id) => !filteredIds.includes(id));
-      });
+  function handleToggleSelect(item: CustomerListItem) {
+    if (isHardBlocked(item.cluster)) {
       return;
     }
 
     setSelectedIds((current) => {
-      const next = new Set(current);
-
-      for (const id of filteredIds) {
-        next.add(id);
+      if (current.includes(item.customerId)) {
+        return current.filter((id) => id !== item.customerId);
       }
 
-      return Array.from(next);
+      if (current.length >= MAX_SELECTED_CONTACTS) {
+        toast({
+          title: "Límite alcanzado",
+          description:
+            "Límite de 10 alcanzado. Desmarca a alguien para añadir otro",
+        });
+        return current;
+      }
+
+      return [...current, item.customerId];
+    });
+  }
+
+  function handleSelectAll() {
+    const selectableIds: string[] = [];
+
+    for (const item of filtered) {
+      if (!isHardBlocked(item.cluster)) {
+        selectableIds.push(item.customerId);
+      }
+    }
+
+    let allSelected = false;
+
+    if (selectableIds.length > 0) {
+      allSelected = selectableIds.every((id) => selectedIds.includes(id));
+    }
+
+    if (allSelected) {
+      setSelectedIds((current) => {
+        return current.filter((id) => !selectableIds.includes(id));
+      });
+      return;
+    }
+
+    const nextIds: string[] = [];
+
+    for (const item of filtered) {
+      if (isHardBlocked(item.cluster)) {
+        continue;
+      }
+
+      if (nextIds.includes(item.customerId)) {
+        continue;
+      }
+
+      nextIds.push(item.customerId);
+
+      if (nextIds.length >= MAX_SELECTED_CONTACTS) {
+        break;
+      }
+    }
+
+    setSelectedIds(nextIds);
+
+    if (selectableIds.length > MAX_SELECTED_CONTACTS) {
+      toast({
+        title: "Selección limitada",
+        description:
+          "Solo se han marcado los primeros 10 contactos permitidos",
+      });
+    }
+  }
+
+    function handleSmartSelection() {
+    const nextIds = buildSmartSelectionIds(items);
+    setSelectedIds(nextIds);
+
+    if (nextIds.length === 0) {
+      toast({
+        title: "Sin candidatos",
+        description: "No hay contactos disponibles para sugerir",
+      });
+      return;
+    }
+
+    toast({
+      title: "Selección Inteligente aplicada",
+      description: `${nextIds.length} contactos sugeridos automáticamente`,
     });
   }
 
@@ -388,7 +348,11 @@ const response = await fetch(url, {
         throw new Error(data?.error || "No se pudo crear el contacto");
       }
 
-      const createdRow = buildInlineCreatedRow(companyId, data.item);
+      const createdRow = buildInlineCreatedRow(
+        companyId,
+        data.item as CreateCustomerResponseItem
+      );
+
       const alreadyExists = items.some(
         (item) => item.customerId === createdRow.customerId
       );
@@ -403,6 +367,15 @@ const response = await fetch(url, {
 
       setSelectedIds((current) => {
         if (current.includes(createdRow.customerId)) {
+          return current;
+        }
+
+        if (current.length >= MAX_SELECTED_CONTACTS) {
+          toast({
+            title: "Contacto creado",
+            description:
+              "Se creó el contacto, pero no se marcó porque ya hay 10 seleccionados",
+          });
           return current;
         }
 
@@ -483,9 +456,23 @@ const response = await fetch(url, {
   const totalCount = items.length;
 
   let selectAllLabel = "Seleccionar todos";
-  const allFilteredSelected =
-    filtered.length > 0 &&
-    filtered.every((item) => selectedIds.includes(item.customerId));
+  let allFilteredSelected = false;
+
+  if (filtered.length > 0) {
+    const selectableFilteredIds: string[] = [];
+
+    for (const item of filtered) {
+      if (!isHardBlocked(item.cluster)) {
+        selectableFilteredIds.push(item.customerId);
+      }
+    }
+
+    if (selectableFilteredIds.length > 0) {
+      allFilteredSelected = selectableFilteredIds.every((id) =>
+        selectedIds.includes(id)
+      );
+    }
+  }
 
   if (allFilteredSelected) {
     selectAllLabel = "Deseleccionar todos";
@@ -503,15 +490,25 @@ const response = await fetch(url, {
     sendButtonLabel = `Enviar a ${selectedCount} contactos`;
   }
 
+  let addButtonDisabled = false;
+  if (creatingContact || !newFirstName.trim() || !newPhone.trim()) {
+    addButtonDisabled = true;
+  }
+
+  let sendDisabled = false;
+  if (selectedCount === 0 || sending) {
+    sendDisabled = true;
+  }
+
   return (
     <AnimatePresence>
-      {open ? (
+      {open && (
         <>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-foreground/20 backdrop-blur-sm"
+            className="fixed inset-0 z-[60] bg-black/30"
             onClick={resetAndClose}
           />
 
@@ -523,7 +520,7 @@ const response = await fetch(url, {
             className="fixed inset-0 z-[70] flex items-center justify-center p-4"
           >
             <div
-              className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-card"
+              className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-border/60 bg-white"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="border-b border-border/50 px-6 pb-4 pt-6">
@@ -571,231 +568,276 @@ const response = await fetch(url, {
                   </Button>
                 </div>
 
-                <AnimatePresence>
-                  {showAdd ? (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="space-y-3 rounded-xl border border-crussader/20 bg-crussader/5 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          Nuevo contacto
-                        </p>
+                {showAdd && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="space-y-3 rounded-xl border border-crussader/20 bg-crussader/5 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Nuevo contacto
+                      </p>
 
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="relative">
-                            <User className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                              value={newFirstName}
-                              onChange={(e) => setNewFirstName(e.target.value)}
-                              placeholder="Nombre"
-                              className="h-9 rounded-lg border-border/60 bg-white pl-9 text-sm"
-                            />
-                          </div>
-
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="relative">
+                          <User className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                           <Input
-                            value={newLastName}
-                            onChange={(e) => setNewLastName(e.target.value)}
-                            placeholder="Apellidos"
-                            className="h-9 rounded-lg border-border/60 bg-white text-sm"
+                            value={newFirstName}
+                            onChange={(e) => setNewFirstName(e.target.value)}
+                            placeholder="Nombre"
+                            className="h-9 rounded-lg border-border/60 bg-white pl-9 text-sm"
                           />
                         </div>
 
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
-                            <Phone className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                              value={newPhone}
-                              onChange={(e) => setNewPhone(e.target.value)}
-                              placeholder="+34 600 000 000"
-                              className="h-9 rounded-lg border-border/60 bg-white pl-9 text-sm"
-                            />
-                          </div>
+                        <Input
+                          value={newLastName}
+                          onChange={(e) => setNewLastName(e.target.value)}
+                          placeholder="Apellidos"
+                          className="h-9 rounded-lg border-border/60 bg-white text-sm"
+                        />
+                      </div>
 
-                          <Button
-                            onClick={handleCreateContact}
-                            disabled={
-                              creatingContact ||
-                              !newFirstName.trim() ||
-                              !newPhone.trim()
-                            }
-                            className="h-9 rounded-lg bg-crussader px-4 text-sm font-medium text-white"
-                          >
-                            {creatingContact ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              "Guardar"
-                            )}
-                          </Button>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Phone className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            value={newPhone}
+                            onChange={(e) => setNewPhone(e.target.value)}
+                            placeholder="+34 600 000 000"
+                            className="h-9 rounded-lg border-border/60 bg-white pl-9 text-sm"
+                          />
                         </div>
 
-                        {createError ? (
-                          <p className="text-sm text-red-600">{createError}</p>
-                        ) : null}
+                        <Button
+                          onClick={handleCreateContact}
+                          disabled={addButtonDisabled}
+                          className="h-9 rounded-lg bg-crussader px-4 text-sm font-medium text-white"
+                        >
+                          {creatingContact && (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          )}
+                          {!creatingContact && "Guardar"}
+                        </Button>
                       </div>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
+
+                      {createError && (
+                        <p className="text-sm text-red-600">{createError}</p>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
               </div>
 
               <div className="flex items-center justify-between px-6 pb-2">
-                <button
-                  onClick={handleSelectAll}
-                  className="text-xs font-medium text-crussader transition-colors hover:text-crussader/80"
-                >
-                  {selectAllLabel}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleSelectAll}
+                    className="text-xs font-medium text-crussader transition-colors hover:text-crussader/80"
+                  >
+                    {selectAllLabel}
+                  </button>
+
+                  <button
+                    onClick={handleSmartSelection}
+                    className="text-xs font-semibold text-emerald-600 transition-colors hover:text-emerald-700"
+                  >
+                    Sugerir 10 mejores candidatos
+                  </button>
+                </div>
 
                 <span className="text-xs tabular-nums text-muted-foreground">
-                  {selectedCount} seleccionado{selectedCount !== 1 ? "s" : ""}
+                  {selectedCount} seleccionados
                 </span>
               </div>
 
-              <div className="flex-1 overflow-auto px-6 pb-4">
+              <div className="h-[420px] overflow-y-auto px-6 pb-4">
                 <div className="space-y-1">
-                  {loading ? (
+                  {loading && (
                     <div className="flex justify-center py-10">
                       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
-                  ) : null}
+                  )}
 
-                  {!loading && filtered.length === 0 ? (
+                  {!loading && filtered.length === 0 && (
                     <p className="py-8 text-center text-sm text-muted-foreground">
                       No se encontraron contactos
                     </p>
+                  )}
+
+{!loading &&
+  clusterOrder.map((clusterKey) => {
+    const clusterItems = groupedItems[clusterKey];
+    const clusterConfig = STATUS_CONFIG[clusterKey];
+    const isExpanded = expandedClusters[clusterKey];
+
+    if (clusterItems.length === 0) {
+      return null;
+    }
+
+    return (
+      <div key={clusterKey} className="border-b border-border/50 last:border-b-0">
+<button
+  onClick={() => toggleCluster(clusterKey)}
+  className="flex w-full items-center justify-between px-1 py-3 text-left transition-colors hover:bg-muted/30"
+>
+          <div className="flex items-center gap-2">
+            <span
+              className={`h-2.5 w-2.5 rounded-full ${clusterConfig.dotClassName}`}
+            />
+            <span className="text-sm font-medium text-foreground">
+              {clusterConfig.label}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              ({clusterItems.length})
+            </span>
+          </div>
+
+          <span className="text-xs text-muted-foreground">
+            {isExpanded ? "Ocultar" : "Mostrar"}
+          </span>
+        </button>
+
+        {isExpanded ? (
+          <div className="space-y-1 pb-3">
+            {clusterItems.map((item) => {
+              const isSelected = selectedIds.includes(item.customerId);
+              const isDisabled = isHardBlocked(item.cluster);
+              const isCooldown = isCooldownCluster(item.cluster);
+
+              let rowClassName =
+                "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-150";
+
+              if (isSelected) {
+                rowClassName += " border-crussader/20 bg-crussader/5";
+              }
+
+              if (!isSelected) {
+                rowClassName += " border-transparent hover:bg-muted/60";
+              }
+
+              if (isDisabled) {
+                rowClassName += " opacity-50";
+              }
+
+              let checkboxClassName =
+                "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all duration-150";
+
+              if (isSelected) {
+                checkboxClassName += " border-crussader bg-crussader";
+              }
+
+              if (!isSelected) {
+                checkboxClassName += " border-border bg-white";
+              }
+
+              if (isCooldown) {
+                if (isSelected) {
+                  checkboxClassName =
+                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-orange-500 bg-orange-500 transition-all duration-150";
+                }
+
+                if (!isSelected) {
+                  checkboxClassName =
+                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-orange-400 bg-white transition-all duration-150";
+                }
+              }
+
+              let title: string | undefined = undefined;
+
+              if (isCooldown) {
+                title = "Contacto notificado recientemente";
+              }
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleToggleSelect(item)}
+                  disabled={isDisabled}
+                  title={title}
+                  className={rowClassName}
+                >
+                  <div className={checkboxClassName}>
+                    {isSelected ? (
+                      <Check className="h-3 w-3 text-primary-foreground" />
+                    ) : null}
+                  </div>
+
+                  <div className="relative">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        {getInitials(item)}
+                      </span>
+                    </div>
+
+                    <span
+                      className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${clusterConfig.dotClassName}`}
+                    />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {item.customer.displayName}
+                    </p>
+                    <p className="text-xs tabular-nums text-muted-foreground">
+                      {getFullPhone(item)}
+                    </p>
+                  </div>
+
+                  {item.lastAppointmentAt ? (
+                    <div className="mr-2 flex flex-col items-start rounded-lg border border-border/50 bg-muted/50 px-2 py-1">
+                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <Calendar className="h-3 w-3" />
+                        <span>
+                          {new Date(item.lastAppointmentAt).toLocaleDateString(
+                            "es-ES",
+                            {
+                              day: "2-digit",
+                              month: "short",
+                            }
+                          )}
+                        </span>
+                      </div>
+
+                      {item.lastAppointmentServiceName ? (
+                        <span className="max-w-[90px] truncate text-[10px] font-medium text-foreground">
+                          {item.lastAppointmentServiceName}
+                        </span>
+                      ) : null}
+                    </div>
                   ) : null}
 
-                  {!loading
-                    ? filtered.map((item) => {
-                        const isSelected = selectedIds.includes(item.customerId);
-                        const clusterConfig = STATUS_CONFIG[item.cluster];
-                        const isDisabled = item.cluster === "has_appointment";
-
-                        let rowClassName =
-                          "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-150";
-
-                        if (isSelected) {
-                          rowClassName += " border-primary/20 bg-primary/5";
-                        }
-
-                        if (!isSelected) {
-                          rowClassName +=
-                            " border-transparent hover:bg-muted/60";
-                        }
-
-                        let checkboxClassName =
-                          "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all duration-150";
-
-                        if (isSelected) {
-                          checkboxClassName += " border-primary bg-primary";
-                        }
-
-                        if (!isSelected) {
-                          checkboxClassName += " border-border bg-white";
-                        }
-
-return (
-  <button
-    key={item.id}
-    onClick={() => {
-      if (isDisabled) {
-        return;
-      }
-
-      toggleSelect(item.customerId);
-    }}
-    disabled={isDisabled}
-    className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-150 ${
-isSelected
-  ? "border-crussader/20 bg-crussader/5"
-  : "border-transparent hover:bg-muted/60"
-    } ${isDisabled ? "opacity-50" : ""}`}
-  >
-    <div
-      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all duration-150 ${
-        isSelected ? "border-crussader bg-crussader" : "border-border bg-white"
-      }`}
-    >
-      {isSelected ? (
-        <Check className="h-3 w-3 text-primary-foreground" />
-      ) : null}
-    </div>
-
-    <div className="relative">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
-        <span className="text-xs font-semibold text-muted-foreground">
-          {getInitials(item)}
-        </span>
+                  <span
+                    className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold ${clusterConfig.badgeClassName}`}
+                  >
+                    {clusterConfig.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
-
-      <span
-        className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${clusterConfig.dotClassName}`}
-      />
-    </div>
-
-<div className="min-w-0 flex-1">
-  <p className="truncate text-sm font-medium text-foreground">
-    {item.customer.displayName}
-  </p>
-  <p className="text-xs tabular-nums text-muted-foreground">
-    {getFullPhone(item)}
-  </p>
-</div>
-
-
-{item.lastAppointmentAt ? (
-  <div className="flex flex-col items-start mr-2 rounded-lg border border-border/50 bg-muted/50 px-2 py-1">
-    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-      <Calendar className="h-3 w-3" />
-      <span>
-        {new Date(item.lastAppointmentAt).toLocaleDateString("es-ES", {
-          day: "2-digit",
-          month: "short",
-        })}
-      </span>
-    </div>
-
-    {item.lastAppointmentServiceName ? (
-      <span className="max-w-[90px] truncate text-[10px] font-medium text-foreground">
-        {item.lastAppointmentServiceName}
-      </span>
-    ) : null}
-  </div>
-) : null}
-
-    <span
-      className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold ${clusterConfig.badgeClassName}`}
-    >
-      {clusterConfig.label}
-    </span>
-
-    
-  </button>
-);
-                      })
-                    : null}
+    );
+  })}
                 </div>
               </div>
 
               <div className="border-t border-border/50 px-6 py-4">
                 <Button
                   onClick={handleSend}
-                  disabled={selectedCount === 0 || sending}
+                  disabled={sendDisabled}
                   className="h-11 w-full rounded-xl bg-crussader font-semibold text-white shadow-sm transition-all duration-150 hover:bg-crussader/90"
                 >
-                  {sending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    sendButtonLabel
-                  )}
+                  {sending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {!sending && sendButtonLabel}
                 </Button>
               </div>
             </div>
           </motion.div>
         </>
-      ) : null}
+      )}
     </AnimatePresence>
   );
 }

@@ -28,7 +28,6 @@ export async function sendSlotRecoveryTemplate(args: {
     },
   };
 
-  console.log("[WA][SEND][PAYLOAD]", JSON.stringify(payload, null, 2));
 
   const response = await fetch(url, {
     method: "POST",

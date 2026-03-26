@@ -72,7 +72,7 @@ export function SlotsPageShell({
 
           <div className="space-y-6">
             <SlotsInterestedClientsCard onInvite={onInvite} />
-            <SlotsActivityFeedCard />
+            <SlotsActivityFeedCard locationId={locationId} />
           </div>
         </div>
       </StandardCard>

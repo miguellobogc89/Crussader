@@ -92,8 +92,6 @@ export async function sendServiceSelection({
 
   const data = await res.json();
 
-  console.log("[WA][SERVICE_SELECTION][RESPONSE]", data);
-
   if (!res.ok) {
     throw new Error(
       typeof data?.error?.message === "string"

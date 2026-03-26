@@ -12,6 +12,7 @@ type HandleSelectedServiceReplyParams = {
   repliedAt: Date | null;
   messageId: string | null;
   existingMeta: unknown;
+  replyEventId: string | null;
 };
 
 export async function handleSelectedServiceReply(
@@ -47,12 +48,20 @@ export async function handleSelectedServiceReply(
     },
   });
 
-  const updatedRecipient = await prisma.slot_recovery_recipient.findUnique({
+  const recipientWithSlot = await prisma.slot_recovery_recipient.findUnique({
     where: {
       id: params.recipientId,
     },
     select: {
       id: true,
+      company_id: true,
+      customer_id: true,
+      slot_recovery_slot_id: true,
+      slot_recovery_slot: {
+        select: {
+          location_id: true,
+        },
+      },
       reply_source: true,
       reply_button_id: true,
       reply_button_text: true,
@@ -63,13 +72,33 @@ export async function handleSelectedServiceReply(
     },
   });
 
-  console.log(
-    "[WA][SERVICE_SELECTION][RECIPIENT_UPDATED]",
-    updatedRecipient,
-  );
+  if (recipientWithSlot) {
+    await prisma.customer_service_interest.createMany({
+      data: [
+        {
+          company_id: recipientWithSlot.company_id,
+          customer_id: recipientWithSlot.customer_id,
+          location_id: recipientWithSlot.slot_recovery_slot.location_id,
+          slot_recovery_slot_id: recipientWithSlot.slot_recovery_slot_id,
+          slot_recovery_service_id: params.selectedServiceId,
+          interest_type: "explicit",
+          source: "slot_recovery",
+          source_event_id: params.replyEventId,
+        },
+      ],
+      skipDuplicates: true,
+    });
+  }
+
+  console.log("[WA][SERVICE_SELECTION][RECIPIENT_UPDATED]", {
+    recipientId: recipientWithSlot?.id ?? null,
+    slotId: recipientWithSlot?.slot_recovery_slot_id ?? null,
+    customerId: recipientWithSlot?.customer_id ?? null,
+    selectedServiceId: params.selectedServiceId,
+  });
 
   return {
     ok: true,
-    recipient: updatedRecipient,
+    recipient: recipientWithSlot,
   };
 }

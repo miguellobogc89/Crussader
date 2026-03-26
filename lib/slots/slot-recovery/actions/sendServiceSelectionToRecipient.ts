@@ -48,16 +48,6 @@ export async function sendServiceSelectionToRecipient(
     };
   }
 
-  console.log("[WA][SERVICE_SELECTION][BUTTON_CANDIDATES]", {
-    slotId: params.slotId,
-    servicesCount: availableServices.length,
-    services: availableServices.map((item) => {
-      return {
-        id: item.slot_recovery_service.id,
-        name: item.slot_recovery_service.name,
-      };
-    }),
-  });
 
 const selectionResult = await sendServiceSelection({
   to: params.toPhone,

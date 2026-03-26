@@ -36,8 +36,6 @@ export async function sendTextMessage({
 
   const data = await res.json();
 
-  console.log("[WA][TEXT][RESPONSE]", data);
-
   if (!res.ok) {
     throw new Error(
       typeof data?.error?.message === "string"
