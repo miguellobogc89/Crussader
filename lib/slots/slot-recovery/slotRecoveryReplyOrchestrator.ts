@@ -42,6 +42,11 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
     }
 
     const repliedAt = tsToDate(message.timestamp);
+    let safeRepliedAt = repliedAt;
+
+if (!safeRepliedAt) {
+  safeRepliedAt = new Date();
+}
     const replyPayload = buildReplyPayload(message);
     const contextMessageId = getContextMessageId(message);
 
@@ -89,7 +94,7 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
       fromPhone,
       replyType,
       replyPayload,
-      repliedAt,
+      repliedAt: safeRepliedAt,
     });
 
     if (replyType === "BOOK" || replyType === "RESERVAR") {
@@ -150,7 +155,7 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
         replyPayload,
         contextMessageId,
         fromPhone,
-        repliedAt,
+        repliedAt: safeRepliedAt,
         messageId: incomingMessageId,
         existingMeta: matchedRecipient.meta,
         replyEventId: null,
@@ -191,7 +196,7 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
           from_phone: fromPhone,
           selected_service_id: selectedServiceId,
         },
-        replied_at: repliedAt,
+        replied_at: safeRepliedAt,
         status: "replied",
         meta: {
           ...safeMeta,
@@ -208,7 +213,7 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
 
       if (result.ok) {
         recipientUpdateData.status = "booked";
-        recipientUpdateData.booked_at = repliedAt;
+        recipientUpdateData.booked_at = safeRepliedAt;
       }
 
       await prisma.slot_recovery_recipient.update({
@@ -222,45 +227,92 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
         slotId: matchedRecipient.slot_recovery_slot_id,
       });
 
-      if (result.ok) {
-        const slotService = await prisma.slot_recovery_service.findUnique({
-          where: {
-            id: selectedServiceId,
-          },
-          select: {
-            name: true,
-          },
-        });
+if (result.ok) {
+  console.log("[ACTIVITY][BOOKED_EVENT_CREATING]", {
+    recipientId: matchedRecipient.id,
+    slotId: matchedRecipient.slot_recovery_slot_id,
+    serviceId: selectedServiceId,
+  });
 
-        const slotData = await prisma.slot_recovery_slot.findUnique({
-          where: {
-            id: matchedRecipient.slot_recovery_slot_id,
-          },
-          select: {
-            starts_at: true,
-            Location: {
-              select: {
-                title: true,
-              },
-            },
-          },
-        });
+  const slotService = await prisma.slot_recovery_service.findUnique({
+    where: {
+      id: selectedServiceId,
+    },
+    select: {
+      name: true,
+    },
+  });
 
-        if (slotService && slotData) {
-          let locationName = "";
+  const slotData = await prisma.slot_recovery_slot.findUnique({
+    where: {
+      id: matchedRecipient.slot_recovery_slot_id,
+    },
+    select: {
+      company_id: true,
+      location_id: true,
+      starts_at: true,
+      Location: {
+        select: {
+          title: true,
+        },
+      },
+    },
+  });
 
-          if (slotData.Location && slotData.Location.title) {
-            locationName = slotData.Location.title;
-          }
+  const bookedCustomer = await prisma.customer.findUnique({
+    where: {
+      id: matchedRecipient.customer_id,
+    },
+    select: {
+      firstName: true,
+      preferred_name: true,
+      whatsapp_name: true,
+    },
+  });
 
-          await sendSlotRecoveryConfirmation({
-            to: fromPhone,
-            serviceName: slotService.name,
-            startAt: slotData.starts_at,
-            locationName,
-          });
-        }
-      }
+  if (slotData && slotService) {
+    let bookedCustomerName = "Cliente";
+
+    if (bookedCustomer?.preferred_name) {
+      bookedCustomerName = bookedCustomer.preferred_name;
+    } else if (bookedCustomer?.whatsapp_name) {
+      bookedCustomerName = bookedCustomer.whatsapp_name;
+    } else if (bookedCustomer?.firstName) {
+      bookedCustomerName = bookedCustomer.firstName;
+    }
+
+    await prisma.slot_recovery_activity.create({
+      data: {
+        company_id: slotData.company_id,
+        location_id: slotData.location_id,
+        slot_recovery_slot_id: matchedRecipient.slot_recovery_slot_id,
+        event_type: "slot_booked",
+        title: `${bookedCustomerName} ha reservado el hueco para ${slotService.name}`,
+        payload: {
+          customer_id: matchedRecipient.customer_id,
+          customer_name: bookedCustomerName,
+          service_id: selectedServiceId,
+          service_name: slotService.name,
+        },
+      },
+    });
+  }
+
+  if (slotService && slotData) {
+    let locationName = "";
+
+    if (slotData.Location && slotData.Location.title) {
+      locationName = slotData.Location.title;
+    }
+
+    await sendSlotRecoveryConfirmation({
+      to: fromPhone,
+      serviceName: slotService.name,
+      startAt: slotData.starts_at,
+      locationName,
+    });
+  }
+}
 
       continue;
     }
@@ -277,6 +329,78 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
           winner: claimResult.slot?.recovered_customer_id,
           loser: matchedRecipient.customer_id,
         });
+
+        const slotDataForMissedActivity = await prisma.slot_recovery_slot.findUnique({
+  where: {
+    id: matchedRecipient.slot_recovery_slot_id,
+  },
+  select: {
+    company_id: true,
+    location_id: true,
+  },
+});
+
+if (slotDataForMissedActivity) {
+  const existingMissedActivity = await prisma.slot_recovery_activity.findFirst({
+    where: {
+      slot_recovery_slot_id: matchedRecipient.slot_recovery_slot_id,
+      event_type: "booking_missed",
+    },
+    select: {
+      id: true,
+      payload: true,
+    },
+  });
+
+  let missedCount = 1;
+
+  if (
+    existingMissedActivity &&
+    existingMissedActivity.payload &&
+    typeof existingMissedActivity.payload === "object" &&
+    !Array.isArray(existingMissedActivity.payload)
+  ) {
+    const payloadObject = existingMissedActivity.payload as Record<string, unknown>;
+    const currentCount = payloadObject.missed_count;
+
+    if (typeof currentCount === "number") {
+      missedCount = currentCount + 1;
+    }
+  }
+
+  let missedTitle = "1 usuario intentó reservar pero ya estaba ocupado";
+
+  if (missedCount > 1) {
+    missedTitle = `${missedCount} usuarios intentaron reservar pero ya estaba ocupado`;
+  }
+
+  if (existingMissedActivity) {
+    await prisma.slot_recovery_activity.update({
+      where: {
+        id: existingMissedActivity.id,
+      },
+      data: {
+        title: missedTitle,
+        payload: {
+          missed_count: missedCount,
+        },
+      },
+    });
+  } else {
+    await prisma.slot_recovery_activity.create({
+      data: {
+        company_id: slotDataForMissedActivity.company_id,
+        location_id: slotDataForMissedActivity.location_id,
+        slot_recovery_slot_id: matchedRecipient.slot_recovery_slot_id,
+        event_type: "booking_missed",
+        title: missedTitle,
+        payload: {
+          missed_count: missedCount,
+        },
+      },
+    });
+  }
+}
 
         await sendSlotAlreadyTakenMessage({
           to: fromPhone,
@@ -351,7 +475,7 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
         context_message_id: contextMessageId,
         from_phone: fromPhone,
       },
-      replied_at: repliedAt,
+      replied_at: safeRepliedAt,
       status: nextStatus,
       meta: {
         ...safeMeta,

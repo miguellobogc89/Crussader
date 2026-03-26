@@ -3090,12 +3090,29 @@ model customer_service_interest {
   slot_recovery_service     slot_recovery_service?     @relation(fields: [slot_recovery_service_id], references: [id], onUpdate: NoAction, map: "fk_csi_slot_recovery_service")
   slot_recovery_reply_event slot_recovery_reply_event? @relation(fields: [source_event_id], references: [id], onUpdate: NoAction, map: "fk_csi_source_event")
 
+  @@unique([company_id, customer_id, slot_recovery_slot_id, slot_recovery_service_id, interest_type], map: "ux_csi_unique_interest")
   @@index([company_id, customer_id], map: "idx_csi_company_customer")
   @@index([created_at(sort: Desc)], map: "idx_csi_created_at")
   @@index([customer_id], map: "idx_csi_customer")
   @@index([interest_type], map: "idx_csi_interest_type")
   @@index([slot_recovery_service_id], map: "idx_csi_service")
   @@index([slot_recovery_slot_id], map: "idx_csi_slot")
+}
+
+model slot_recovery_activity {
+  id                    String    @id @default(dbgenerated("('sra_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  company_id            String
+  location_id           String
+  slot_recovery_slot_id String
+  event_type            String
+  title                 String
+  payload               Json?     @default("{}")
+  created_at            DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([company_id], map: "idx_sra_company")
+  @@index([created_at(sort: Desc)], map: "idx_sra_created_at")
+  @@index([location_id], map: "idx_sra_location")
+  @@index([slot_recovery_slot_id], map: "idx_sra_slot")
 }
 
 /// *

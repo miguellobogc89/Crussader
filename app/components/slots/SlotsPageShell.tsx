@@ -1,4 +1,3 @@
-// app/components/slots/SlotsPageShell.tsx
 "use client";
 
 import { useState } from "react";
@@ -32,6 +31,7 @@ export function SlotsPageShell({
   refreshKey,
 }: SlotsPageShellProps) {
   const [locationId, setLocationId] = useState<string | null>(null);
+  const [companyId, setCompanyId] = useState<string | null>(null);
 
   return (
     <div className="space-y-6">
@@ -42,6 +42,7 @@ export function SlotsPageShell({
               <LocationSelector
                 onSelect={(id, location) => {
                   setLocationId(id ?? null);
+                  setCompanyId(location?.companyId ?? null);
                   onCompanyChange?.(location?.companyId ?? null);
                 }}
               />
@@ -57,9 +58,12 @@ export function SlotsPageShell({
           </Button>
         </div>
 
-        <StandardCard className="px-5 py-3">
-          <SlotsStatsCard />
-        </StandardCard>
+        <div className="px-3 py-3">
+          <SlotsStatsCard
+            companyId={companyId ?? ""}
+            locationId={locationId}
+          />
+        </div>
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_300px]">
           <div className="space-y-6">

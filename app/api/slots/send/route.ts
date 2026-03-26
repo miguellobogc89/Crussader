@@ -72,6 +72,30 @@ export async function POST(request: NextRequest) {
   },
 });
 
+const slotForActivity = await prisma.slot_recovery_slot.findUnique({
+  where: {
+    id: slotId,
+  },
+  select: {
+    location_id: true,
+  },
+});
+
+if (slotForActivity) {
+  await prisma.slot_recovery_activity.create({
+    data: {
+      company_id: companyId,
+      location_id: slotForActivity.location_id,
+      slot_recovery_slot_id: slotId,
+      event_type: "invite_sent",
+      title: `Invitación enviada a ${records.length} usuarios`,
+      payload: {
+        recipients_count: records.length,
+      },
+    },
+  });
+}
+
     
 
 const slot = await prisma.slot_recovery_slot.findUnique({
