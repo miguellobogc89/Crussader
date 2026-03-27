@@ -138,9 +138,7 @@ const message = renderTemplate(
           </button>
         </div>
 
-        <p className="mt-2 text-right text-[10px] tabular-nums text-gray-500">
-          Vista previa de plantilla
-        </p>
+  
       </div>
     </div>
   );

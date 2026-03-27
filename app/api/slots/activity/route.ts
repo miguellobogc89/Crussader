@@ -26,12 +26,13 @@ export async function GET(request: NextRequest) {
     });
 
     const items = activities.map((item) => {
-      return {
-        id: item.id,
-        text: item.title,
-        time: item.created_at,
-        status: item.event_type,
-      };
+        return {
+            id: item.id,
+            text: item.title,
+            time: item.created_at,
+            status: item.event_type,
+            payload: item.payload,
+        };
     });
 
     return NextResponse.json({

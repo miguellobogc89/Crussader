@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendSlotRecoveryTemplate } from "@/lib/slots/slot-recovery/messaging/sendSlotRecoveryTemplate";
+import { logSlotActivity } from "@/lib/slots/slot-recovery/logSlotActivity";
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,18 +83,16 @@ const slotForActivity = await prisma.slot_recovery_slot.findUnique({
 });
 
 if (slotForActivity) {
-  await prisma.slot_recovery_activity.create({
-    data: {
-      company_id: companyId,
-      location_id: slotForActivity.location_id,
-      slot_recovery_slot_id: slotId,
-      event_type: "invite_sent",
-      title: `Invitación enviada a ${records.length} usuarios`,
-      payload: {
-        recipients_count: records.length,
-      },
-    },
-  });
+await logSlotActivity({
+  companyId,
+  locationId: slotForActivity.location_id,
+  slotId,
+  eventType: "invite_sent",
+  title: `Invitación enviada a ${records.length} usuarios`,
+  payload: {
+    recipients_count: records.length,
+  },
+});
 }
 
     

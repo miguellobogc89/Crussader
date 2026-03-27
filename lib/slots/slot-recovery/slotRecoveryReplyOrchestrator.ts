@@ -17,6 +17,7 @@ import { recomputeSlotCounters } from "./actions/recomputeSlotCounters";
 import { createAppointmentFromSlot } from "./actions/createAppointmentFromSlot";
 import { sendSlotAlreadyTakenMessage } from "./messaging/sendSlotAlreadyTakenMessage";
 import { sendSlotRecoveryConfirmation } from "./messaging/sendSlotRecoveryConfirmation";
+import { logSlotActivity } from "@/lib/slots/slot-recovery/logSlotActivity";
 
 export async function handleSlotRecoveryReplies(value: WaValue) {
   if (!Array.isArray(value.messages) || value.messages.length === 0) {
@@ -281,21 +282,19 @@ if (result.ok) {
       bookedCustomerName = bookedCustomer.firstName;
     }
 
-    await prisma.slot_recovery_activity.create({
-      data: {
-        company_id: slotData.company_id,
-        location_id: slotData.location_id,
-        slot_recovery_slot_id: matchedRecipient.slot_recovery_slot_id,
-        event_type: "slot_booked",
-        title: `${bookedCustomerName} ha reservado el hueco para ${slotService.name}`,
-        payload: {
-          customer_id: matchedRecipient.customer_id,
-          customer_name: bookedCustomerName,
-          service_id: selectedServiceId,
-          service_name: slotService.name,
-        },
-      },
-    });
+await logSlotActivity({
+  companyId: slotData.company_id,
+  locationId: slotData.location_id,
+  slotId: matchedRecipient.slot_recovery_slot_id,
+  eventType: "slot_booked",
+  title: `${bookedCustomerName} ha reservado el hueco para ${slotService.name}`,
+  payload: {
+    customer_id: matchedRecipient.customer_id,
+    customer_name: bookedCustomerName,
+    service_id: selectedServiceId,
+    service_name: slotService.name,
+  },
+});
   }
 
   if (slotService && slotData) {
@@ -324,6 +323,55 @@ if (result.ok) {
 
     if (!claimResult.ok) {
       if (claimResult.reason === "SLOT_ALREADY_TAKEN") {
+
+        if (claimResult.ok) {
+  const slotData = await prisma.slot_recovery_slot.findUnique({
+    where: {
+      id: matchedRecipient.slot_recovery_slot_id,
+    },
+    select: {
+      company_id: true,
+      location_id: true,
+    },
+  });
+
+  const bookedCustomer = await prisma.customer.findUnique({
+    where: {
+      id: matchedRecipient.customer_id,
+    },
+    select: {
+      firstName: true,
+      preferred_name: true,
+      whatsapp_name: true,
+    },
+  });
+
+  if (slotData) {
+    let bookedCustomerName = "Cliente";
+
+    if (bookedCustomer?.preferred_name) {
+      bookedCustomerName = bookedCustomer.preferred_name;
+    } else if (bookedCustomer?.whatsapp_name) {
+      bookedCustomerName = bookedCustomer.whatsapp_name;
+    } else if (bookedCustomer?.firstName) {
+      bookedCustomerName = bookedCustomer.firstName;
+    }
+
+    await prisma.slot_recovery_activity.create({
+      data: {
+        company_id: slotData.company_id,
+        location_id: slotData.location_id,
+        slot_recovery_slot_id: matchedRecipient.slot_recovery_slot_id,
+        event_type: "slot_booked",
+        title: `${bookedCustomerName} ha reservado el hueco`,
+        payload: {
+          customer_id: matchedRecipient.customer_id,
+          customer_name: bookedCustomerName,
+        },
+      },
+    });
+  }
+}
         console.log("[SLOT][ALREADY_TAKEN]", {
           slotId: matchedRecipient.slot_recovery_slot_id,
           winner: claimResult.slot?.recovered_customer_id,
@@ -387,18 +435,16 @@ if (slotDataForMissedActivity) {
       },
     });
   } else {
-    await prisma.slot_recovery_activity.create({
-      data: {
-        company_id: slotDataForMissedActivity.company_id,
-        location_id: slotDataForMissedActivity.location_id,
-        slot_recovery_slot_id: matchedRecipient.slot_recovery_slot_id,
-        event_type: "booking_missed",
-        title: missedTitle,
-        payload: {
-          missed_count: missedCount,
-        },
-      },
-    });
+await logSlotActivity({
+  companyId: slotDataForMissedActivity.company_id,
+  locationId: slotDataForMissedActivity.location_id,
+  slotId: matchedRecipient.slot_recovery_slot_id,
+  eventType: "booking_missed",
+  title: missedTitle,
+  payload: {
+    missed_count: missedCount,
+  },
+});
   }
 }
 

@@ -54,7 +54,7 @@ export function SlotsPageShell({
             className="h-11 rounded-xl px-5 font-medium shadow-primary-glow"
           >
             <Plus className="mr-2 h-4 w-4" />
-            Nueva cancelación
+            Hueco disponible
           </Button>
         </div>
 

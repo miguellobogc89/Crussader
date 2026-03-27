@@ -1,3 +1,4 @@
+// app/components/slots/modal/SlotServiceSelector.ts
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -12,7 +13,7 @@ import type {
 } from "./slotModal.types";
 
 type SlotServiceSelectorProps = {
-  locationId: string;
+  companyId: string;
   slotDurationMin: number;
   selectedServices: SelectedServiceItem[];
   onChange: (services: SelectedServiceItem[]) => void;
@@ -72,7 +73,7 @@ function isServiceSelected(
 }
 
 export function SlotServiceSelector({
-  locationId,
+  companyId,
   slotDurationMin,
   selectedServices,
   onChange,
@@ -90,7 +91,7 @@ export function SlotServiceSelector({
   });
 
   useEffect(() => {
-    if (!locationId) {
+    if (!companyId) {
       setServices([]);
       return;
     }
@@ -103,7 +104,7 @@ export function SlotServiceSelector({
         setErrorText("");
 
         const params = new URLSearchParams();
-        params.set("locationId", locationId);
+        params.set("locationId", companyId);
 
         const response = await fetch(
           `${SERVICES_LIST_ENDPOINT}?${params.toString()}`,
@@ -152,10 +153,10 @@ export function SlotServiceSelector({
     loadServices();
 
     return () => controller.abort();
-  }, [locationId]);
+  }, [companyId]);
 
   useEffect(() => {
-    if (!locationId) {
+    if (!companyId) {
       return;
     }
 
@@ -173,7 +174,7 @@ export function SlotServiceSelector({
     if (filteredSelectedServices.length !== selectedServices.length) {
       onChange(filteredSelectedServices);
     }
-  }, [locationId, services, slotDurationMin, selectedServices, onChange]);
+  }, [companyId, services, slotDurationMin, selectedServices, onChange]);
 
   const compatibleServices = useMemo(() => {
     return services
@@ -206,7 +207,7 @@ export function SlotServiceSelector({
   async function handleCreateService() {
     setCreateErrorText("");
 
-    if (!locationId) {
+    if (!companyId) {
       setCreateErrorText("Selecciona una ubicación.");
       return;
     }
@@ -244,7 +245,7 @@ export function SlotServiceSelector({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          locationId,
+          companyId,
           name,
           price,
           durationMin,
@@ -282,6 +283,14 @@ export function SlotServiceSelector({
       setIsCreating(false);
     }
   }
+
+  console.log({
+  companyId,
+  slotDurationMin,
+  services,
+  compatibleServices,
+  selectedServices,
+});
 
   return (
     <div className="space-y-4">
