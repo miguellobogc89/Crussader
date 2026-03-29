@@ -352,7 +352,7 @@ if (!assignResponse.ok || !assignData?.ok) {
                   </div>
 
                   <SlotServiceSelector
-                    locationId={selectedLocationId}
+                    companyId={selectedLocationId}
                     slotDurationMin={slotDurationMin}
                     selectedServices={selectedServices}
                     onChange={setSelectedServices}

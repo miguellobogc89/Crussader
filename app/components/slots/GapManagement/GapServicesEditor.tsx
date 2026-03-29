@@ -5,7 +5,7 @@
 import { Droplets, Scissors, Sparkles } from "lucide-react";
 import type { SelectedServiceItem } from "@/app/components/slots/slots.types";
 
-type Promotion = "none" | "10" | "25";
+type Promotion = "none" | "100" | "25";
 
 type GapServicesEditorProps = {
   services: SelectedServiceItem[];
@@ -14,7 +14,7 @@ type GapServicesEditorProps = {
 };
 
 function getDiscountedPrice(price: number, promo: Promotion): number {
-  if (promo === "10") {
+  if (promo === "100") {
     return Math.round(price * 0.9);
   }
 

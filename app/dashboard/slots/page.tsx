@@ -24,11 +24,12 @@ type SlotTemplateData = {
 export default function SlotsPage() {
   const [companyId, setCompanyId] = useState<string | null>(null);
 
-  const [selectedSlot, setSelectedSlot] = useState<{
-    day: string;
-    slot: SlotItem;
-    services: SelectedServiceItem[];
-  } | null>(null);
+const [selectedSlot, setSelectedSlot] = useState<{
+  day: string;
+  slot: SlotItem;
+  services: SelectedServiceItem[];
+  locationId: string | null;
+} | null>(null);
 
   const [slotTemplate, setSlotTemplate] = useState<SlotTemplateData | null>(null);
   const [showNewCancellation, setShowNewCancellation] = useState(false);
@@ -88,28 +89,34 @@ export default function SlotsPage() {
       title="Huecos"
       description="Recupera citas canceladas automáticamente con WhatsApp."
     >
-      <SlotsPageShell
-        onNewCancellation={() => setShowNewCancellation(true)}
-        onInvite={() => setShowInvite(true)}
-        onCompanyChange={(id: string | null) => setCompanyId(id)}
-        onSlotClick={(day, slot, services) => {
-          setSelectedSlot({ day, slot, services });
-        }}
-        refreshKey={refreshKey}
-      />
+<SlotsPageShell
+  onNewCancellation={() => setShowNewCancellation(true)}
+  onInvite={() => setShowInvite(true)}
+  onCompanyChange={(id: string | null) => setCompanyId(id)}
+  onSlotClick={(day, slot, services, locationId) => {
+    setSelectedSlot({
+      day,
+      slot,
+      services,
+      locationId,
+    });
+  }}
+  refreshKey={refreshKey}
+/>
 
       {companyId && selectedSlot && shouldOpenManagementPanel ? (
-        <SlotsGapManagementPanel
-          open={true}
-          onClose={() => setSelectedSlot(null)}
-          day={selectedSlot.day}
-          slot={selectedSlot.slot}
-          services={selectedSlot.services}
-          companyId={companyId}
-          templateBody={slotTemplate?.body_preview ?? ""}
-          companyName={companyName}
-          onSent={() => setRefreshKey((prev) => prev + 1)}
-        />
+<SlotsGapManagementPanel
+  open={true}
+  onClose={() => setSelectedSlot(null)}
+  day={selectedSlot.day}
+  slot={selectedSlot.slot}
+  services={selectedSlot.services}
+  companyId={companyId}
+  locationId={selectedSlot.locationId ?? ""}
+  templateBody={slotTemplate?.body_preview ?? ""}
+  companyName={companyName}
+  onSent={() => setRefreshKey((prev) => prev + 1)}
+/>
       ) : null}
 
       {selectedSlot && !shouldOpenManagementPanel ? (

@@ -18,6 +18,7 @@ type SlotsPageShellProps = {
     day: string,
     slot: SlotItem,
     services: SelectedServiceItem[],
+    locationId: string | null,
   ) => void;
   onCompanyChange?: (companyId: string | null) => void;
   refreshKey?: number;
@@ -69,7 +70,9 @@ export function SlotsPageShell({
           <div className="space-y-6">
             <SlotsListCard
               locationId={locationId}
-              onSlotClick={onSlotClick}
+              onSlotClick={(day, slot, services) => {
+                onSlotClick(day, slot, services, locationId);
+              }}
               refreshKey={refreshKey}
             />
           </div>

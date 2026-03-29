@@ -174,6 +174,7 @@ function renderPanel(
   durationMinutes: number,
   services: SelectedServiceItem[],
   setSelectedServices: (services: SelectedServiceItem[]) => void,
+  companyId: string,
   locationId: string,
   promotion: Promotion,
   setPromotion: (value: Promotion) => void,
@@ -254,12 +255,10 @@ function renderPanel(
             </div>
           </div>
 
-<p className="text-xs text-red-500">
-  locationId: {locationId} | duration: {durationMinutes}
-</p>
 
 <SlotServiceSelector
-  companyId={locationId}
+  companyId={companyId}
+  locationId={locationId}
   slotDurationMin={durationMinutes}
   selectedServices={services}
   onChange={(next) => setSelectedServices(next)}
@@ -409,6 +408,7 @@ useEffect(() => {
   durationMinutes,
   selectedServices,
   setSelectedServices,
+  companyId,
   locationId,
   promotion,
   setPromotion,
