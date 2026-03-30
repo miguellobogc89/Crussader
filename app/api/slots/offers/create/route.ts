@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
         const createdOffer = await tx.slot_recovery_slot_offer.create({
           data: {
             slot_recovery_slot_id: slot.id,
-            service_id: service ? service.id : null,
+            slot_recovery_service_id: service ? service.id : null,
             service_name: offer.serviceName,
             price_cents: offer.priceCents,
             price: offer.price,

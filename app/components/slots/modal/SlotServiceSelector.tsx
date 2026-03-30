@@ -19,7 +19,7 @@ import type {
 } from "./slotModal.types";
 
 type SlotServiceSelectorProps = {
-  companyId: string;
+  companyId?: string;
   locationId: string;
   slotId: string;
   slotDurationMin: number;
@@ -156,7 +156,7 @@ export function SlotServiceSelector({
   });
 
   useEffect(() => {
-    if (!companyId) {
+    if (!locationId && !companyId) {
       setServices([]);
       return;
     }
@@ -169,7 +169,12 @@ export function SlotServiceSelector({
         setErrorText("");
 
         const params = new URLSearchParams();
-        params.set("companyId", companyId);
+
+        if (locationId) {
+          params.set("locationId", locationId);
+        } else if (companyId) {
+          params.set("companyId", companyId);
+        }
 
         const response = await fetch(
           `${SERVICES_LIST_ENDPOINT}?${params.toString()}`,
@@ -218,7 +223,7 @@ export function SlotServiceSelector({
     loadServices();
 
     return () => controller.abort();
-  }, [companyId]);
+  }, [locationId, companyId]);
 
   useEffect(() => {
     if (!companyId) {

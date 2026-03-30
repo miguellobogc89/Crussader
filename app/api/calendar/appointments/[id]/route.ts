@@ -100,9 +100,9 @@ if (customerId !== undefined) {
       const s = new Date(startAt);
       if (isNaN(s.getTime())) return NextResponse.json({ error: "startAt inválido" }, { status: 400 });
       const totalMin =
-        (appt.service.durationMin ?? 0) +
-        (appt.service.bufferBeforeMin ?? 0) +
-        (appt.service.bufferAfterMin ?? 0);
+        (appt.service?.durationMin ?? 0) +
+        (appt.service?.bufferBeforeMin ?? 0) +
+        (appt.service?.bufferAfterMin ?? 0);
       const e = new Date(s.getTime() + totalMin * MS_MIN);
       patch.startAt = s;
       patch.endAt = e;

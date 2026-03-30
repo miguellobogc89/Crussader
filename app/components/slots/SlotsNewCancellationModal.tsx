@@ -350,13 +350,13 @@ if (!assignResponse.ok || !assignData?.ok) {
                       />
                     </div>
                   </div>
-
-                  <SlotServiceSelector
-                    companyId={selectedLocationId}
-                    slotDurationMin={slotDurationMin}
-                    selectedServices={selectedServices}
-                    onChange={setSelectedServices}
-                  />
+<SlotServiceSelector
+  locationId={selectedLocationId}
+  slotId=""
+  slotDurationMin={slotDurationMin}
+  selectedServices={selectedServices}
+  onChange={setSelectedServices}
+/>
 
                   {errorText ? (
                     <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">

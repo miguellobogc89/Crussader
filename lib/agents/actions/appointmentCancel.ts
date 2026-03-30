@@ -106,7 +106,7 @@ export async function appointmentCancel(args: {
       targetAppointmentStatus: "CANCELLED",
       targetAppointmentStartAt: updated.startAt.toISOString(),
       targetAppointmentEndAt: updated.endAt.toISOString(),
-      targetAppointmentServiceName: updated.service.name,
+      targetAppointmentServiceName: updated.service?.name,
       targetAppointmentLocationTitle: updated.location.title,
       flow: "appointment_management",
       subReason: "cancel",
@@ -124,7 +124,7 @@ export async function appointmentCancel(args: {
       startAt: updated.startAt.toISOString(),
       endAt: updated.endAt.toISOString(),
       locationTitle: updated.location.title,
-      serviceName: updated.service.name,
+      serviceName: updated.service?.name ?? "",
     },
     message: "appointment cancelled",
   };
