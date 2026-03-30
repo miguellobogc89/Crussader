@@ -24,9 +24,9 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!Array.isArray(body.services) || body.services.length === 0) {
+    if (!Array.isArray(body.services)) {
       return NextResponse.json(
-        { ok: false, error: "services is required." },
+        { ok: false, error: "services must be an array." },
         { status: 400 }
       );
     }
@@ -60,22 +60,17 @@ export async function POST(req: Request) {
       })
       .filter((service) => service !== null);
 
-    if (normalizedServices.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: "No valid services received." },
-        { status: 400 }
-      );
-    }
-
     await prisma.slot_recovery_slot_service.deleteMany({
       where: {
         slot_recovery_slot_id: slotId,
       },
     });
 
-    await prisma.slot_recovery_slot_service.createMany({
-      data: normalizedServices,
-    });
+    if (normalizedServices.length > 0) {
+      await prisma.slot_recovery_slot_service.createMany({
+        data: normalizedServices,
+      });
+    }
 
     return NextResponse.json({
       ok: true,

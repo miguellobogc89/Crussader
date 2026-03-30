@@ -148,9 +148,9 @@ const rows = Array.isArray(boot.locations)
     </button>
   );
 
-  if (!hasMoreOptions) {
-    return TriggerButton;
-  }
+if (!hasMoreOptions) {
+  return null;
+}
 
   return (
     <DropdownMenu>

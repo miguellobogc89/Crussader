@@ -88,6 +88,7 @@ const [selectedSlot, setSelectedSlot] = useState<{
     <PageShell
       title="Huecos"
       description="Recupera citas canceladas automáticamente con WhatsApp."
+      variant="full"
     >
 <SlotsPageShell
   onNewCancellation={() => setShowNewCancellation(true)}
@@ -116,6 +117,7 @@ const [selectedSlot, setSelectedSlot] = useState<{
   templateBody={slotTemplate?.body_preview ?? ""}
   companyName={companyName}
   onSent={() => setRefreshKey((prev) => prev + 1)}
+  onServicesSaved={() => setRefreshKey((prev) => prev + 1)}
 />
       ) : null}
 

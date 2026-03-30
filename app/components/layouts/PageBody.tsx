@@ -26,7 +26,7 @@ export default function PageBody({
         "w-full mx-auto",
         widthClasses,
         // padding horizontal + vertical responsivo
-        "px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8",
+        "px-4 sm:px-6 xl:px-8 xl2:px-8 py-4 sm:py-6 lg:py-8",
       ].join(" ")}
     >
       {toolbar && <div className="mb-4">{toolbar}</div>}

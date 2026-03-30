@@ -20,6 +20,13 @@ export type CustomerListItem = {
   cooldownUntil: string | null;
   lastAppointmentAt: string | null;
   lastAppointmentServiceName: string | null;
+  waitlist: {
+    id: string;
+    isUrgent: boolean;
+    serviceName: string | null;
+    note: string | null;
+    createdAt: string | Date;
+  } | null;
   customer: {
     id: string;
     firstName: string | null;
@@ -57,6 +64,20 @@ export type CreateCustomerResponseItem = {
 };
 
 export const MAX_SELECTED_CONTACTS = 10;
+
+export const DEFAULT_EXPANDED_CLUSTERS: Record<CustomerCluster, boolean> = {
+  available: true,
+  cooldown: false,
+  has_appointment: false,
+  do_not_notify: false,
+};
+
+export const CLUSTER_ORDER: CustomerCluster[] = [
+  "available",
+  "cooldown",
+  "has_appointment",
+  "do_not_notify",
+];
 
 export const STATUS_CONFIG: Record<
   CustomerCluster,
@@ -115,6 +136,134 @@ export function getFullPhone(item: CustomerListItem): string {
   return `${countryCode} ${phone}`.trim();
 }
 
+export function formatLastAppointmentDate(value: string | null): string {
+  if (!value) {
+    return "";
+  }
+
+  return new Date(value).toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "short",
+  });
+}
+
+export function getGroupedItems(items: CustomerListItem[]) {
+  return {
+    available: items.filter((item) => item.cluster === "available"),
+    cooldown: items.filter((item) => item.cluster === "cooldown"),
+    has_appointment: items.filter((item) => item.cluster === "has_appointment"),
+    do_not_notify: items.filter((item) => item.cluster === "do_not_notify"),
+  };
+}
+
+export function filterCustomerItems(
+  items: CustomerListItem[],
+  query: string
+): CustomerListItem[] {
+  const q = query.toLowerCase().trim();
+
+  if (!q) {
+    return items;
+  }
+
+  return items.filter((item) => {
+    const displayName = item.customer.displayName.toLowerCase();
+    const firstName = item.customer.firstName?.toLowerCase() || "";
+    const lastName = item.customer.lastName?.toLowerCase() || "";
+    const phone = getFullPhone(item).toLowerCase();
+
+    if (displayName.includes(q)) {
+      return true;
+    }
+
+    if (firstName.includes(q)) {
+      return true;
+    }
+
+    if (lastName.includes(q)) {
+      return true;
+    }
+
+    if (phone.includes(q)) {
+      return true;
+    }
+
+    return false;
+  });
+}
+
+export function getSelectableIds(items: CustomerListItem[]): string[] {
+  const ids: string[] = [];
+
+  for (const item of items) {
+    if (!item.customerId) {
+      continue;
+    }
+
+    if (isHardBlocked(item.cluster)) {
+      continue;
+    }
+
+    ids.push(item.customerId);
+  }
+
+  return ids;
+}
+
+export function buildSelectedSummary(
+  selectedCount: number,
+  totalCount: number
+): string {
+  if (totalCount === 0) {
+    return "Sin contactos cargados";
+  }
+
+  return `${selectedCount} de ${totalCount} seleccionados`;
+}
+
+export function buildSendButtonLabel(selectedCount: number): string {
+  if (selectedCount === 1) {
+    return "Enviar a 1 contacto";
+  }
+
+  return `Enviar a ${selectedCount} contactos`;
+}
+
+export function getCreateContactDisabled(params: {
+  creatingContact: boolean;
+  newFirstName: string;
+  newPhone: string;
+}): boolean {
+  if (params.creatingContact) {
+    return true;
+  }
+
+  if (!params.newFirstName.trim()) {
+    return true;
+  }
+
+  if (!params.newPhone.trim()) {
+    return true;
+  }
+
+  return false;
+}
+
+export function getSendDisabled(params: {
+  selectedCount: number;
+  sending: boolean;
+}): boolean {
+  if (params.selectedCount === 0) {
+    return true;
+  }
+
+  if (params.sending) {
+    return true;
+  }
+
+  return false;
+}
+
 export function buildInlineCreatedRow(
   companyId: string,
   created: CreateCustomerResponseItem
@@ -134,6 +283,7 @@ export function buildInlineCreatedRow(
     cooldownUntil: null,
     lastAppointmentAt: null,
     lastAppointmentServiceName: null,
+    waitlist: null,
     customer: {
       id: created.customer.id,
       firstName: created.customer.firstName,
@@ -172,36 +322,114 @@ export function isCooldownCluster(cluster: CustomerCluster): boolean {
   return false;
 }
 
-export function sortCustomersForSmartSelection(
-  items: CustomerListItem[]
-): CustomerListItem[] {
-  const availableItems = items.filter((item) => item.cluster === "available");
+export function getItemTitle(item: CustomerListItem): string | undefined {
+  if (!item.customerId) {
+    return "Entrada de lista de espera sin cliente enlazado";
+  }
 
-  return [...availableItems].sort((a, b) => {
-    const aHasHistory = !!a.lastAppointmentAt;
-    const bHasHistory = !!b.lastAppointmentAt;
+  if (isCooldownCluster(item.cluster)) {
+    return "Contacto notificado recientemente";
+  }
 
-    if (!aHasHistory && bHasHistory) {
-      return -1;
+  return undefined;
+}
+
+export function getItemDisabled(item: CustomerListItem): boolean {
+  if (!item.customerId) {
+    return true;
+  }
+
+  if (isHardBlocked(item.cluster)) {
+    return true;
+  }
+
+  return false;
+}
+
+export function getItemRowClassName(params: {
+  isSelected: boolean;
+  isDisabled: boolean;
+}): string {
+  let className =
+    "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-150";
+
+  if (params.isSelected) {
+    className += " border-crussader/20 bg-crussader/5";
+  }
+
+  if (!params.isSelected) {
+    className += " border-transparent hover:bg-muted/60";
+  }
+
+  if (params.isDisabled) {
+    className += " opacity-50";
+  }
+
+  return className;
+}
+
+export function getCheckboxClassName(params: {
+  isSelected: boolean;
+  isCooldown: boolean;
+}): string {
+  let className =
+    "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all duration-150";
+
+  if (params.isSelected) {
+    className += " border-crussader bg-crussader";
+  }
+
+  if (!params.isSelected) {
+    className += " border-border bg-white";
+  }
+
+  if (params.isCooldown) {
+    if (params.isSelected) {
+      return "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-orange-500 bg-orange-500 transition-all duration-150";
     }
 
-    if (aHasHistory && !bHasHistory) {
-      return 1;
-    }
+    return "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-orange-400 bg-white transition-all duration-150";
+  }
 
-    if (!aHasHistory && !bHasHistory) {
-      return 0;
-    }
-
-    const aTime = new Date(a.lastAppointmentAt as string).getTime();
-    const bTime = new Date(b.lastAppointmentAt as string).getTime();
-
-    return aTime - bTime;
-  });
+  return className;
 }
 
 export function buildSmartSelectionIds(items: CustomerListItem[]): string[] {
-  return sortCustomersForSmartSelection(items)
+  const selectable = items.filter((item) => {
+    if (!item.customerId) {
+      return false;
+    }
+
+    if (isHardBlocked(item.cluster)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const urgentWaitlist = selectable.filter((item) => item.waitlist?.isUrgent);
+
+  if (urgentWaitlist.length > 0) {
+    return urgentWaitlist.slice(0, 1).map((item) => item.customerId!);
+  }
+
+  const normalWaitlist = selectable.filter((item) => {
+    if (!item.waitlist) {
+      return false;
+    }
+
+    if (item.waitlist.isUrgent) {
+      return false;
+    }
+
+    return true;
+  });
+
+  if (normalWaitlist.length > 0) {
+    return normalWaitlist.slice(0, 3).map((item) => item.customerId!);
+  }
+
+  return selectable
     .slice(0, MAX_SELECTED_CONTACTS)
-    .map((item) => item.customerId);
+    .map((item) => item.customerId!);
 }

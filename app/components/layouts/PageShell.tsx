@@ -2,7 +2,6 @@
 "use client";
 
 import { ReactNode, Suspense, useEffect, useRef } from "react";
-import { SessionProvider } from "next-auth/react";
 import RouteTransitionOverlay from "./RouteTransitionOverlay";
 import PageBody from "./PageBody";
 import PageHeader from "./PageHeader";
@@ -93,7 +92,6 @@ export default function PageShell({
   // ─────────────────────────────────────────────
   if (isLoading) {
     return (
-      <SessionProvider refetchOnWindowFocus={false}>
         <div ref={shellRef} className="relative w-full h-full">
           <RouteTransitionOverlay scope="container" className="z-50" />
 
@@ -125,7 +123,6 @@ export default function PageShell({
             </div>
           </div>
         </div>
-      </SessionProvider>
     );
   }
 
@@ -133,7 +130,6 @@ export default function PageShell({
   //  MODO NORMAL (contenido ya listo)
   // ─────────────────────────────────────────────
   return (
-    <SessionProvider refetchOnWindowFocus={false}>
       <div ref={shellRef} className="relative w-full h-full">
         <RouteTransitionOverlay scope="container" className="z-50" />
 
@@ -170,6 +166,5 @@ export default function PageShell({
           <PageBody variant={variant}>{children}</PageBody>
         </Suspense>
       </div>
-    </SessionProvider>
   );
 }

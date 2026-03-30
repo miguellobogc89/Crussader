@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Calendar, Clock, Percent, Users, X } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { GapWhatsAppPreview } from "@/app/components/slots/GapManagement/GapWhatsAppPreview";
-import { SlotsCustomersPickerModal } from "@/app/components/slots/SlotsSendToContactsModal";
+import { SlotsCustomersPickerModal } from "@/app/components/slots/SendToContactsModal/SlotsSendToContactsModal";
 import { SlotServiceSelector } from "@/app/components/slots/modal/SlotServiceSelector";
 import type {
   SelectedServiceItem,
@@ -27,6 +27,7 @@ type SlotsGapManagementPanelProps = {
   templateBody: string;
   companyName: string;
   onSent?: () => void;
+  onServicesSaved?: () => void;
 };
 
 const promotionOptions: { value: Promotion; label: string; desc: string }[] = [
@@ -174,8 +175,10 @@ function renderPanel(
   durationMinutes: number,
   services: SelectedServiceItem[],
   setSelectedServices: (services: SelectedServiceItem[]) => void,
+  onServicesSaved: (() => void) | undefined,
   companyId: string,
   locationId: string,
+  slotId: string,
   promotion: Promotion,
   setPromotion: (value: Promotion) => void,
   clientCount: number[],
@@ -259,9 +262,11 @@ function renderPanel(
 <SlotServiceSelector
   companyId={companyId}
   locationId={locationId}
+  slotId={slotId}
   slotDurationMin={durationMinutes}
   selectedServices={services}
   onChange={(next) => setSelectedServices(next)}
+  onSaved={onServicesSaved}
 />
 
           <div className="space-y-2.5">
@@ -337,6 +342,7 @@ export function SlotsGapManagementPanel({
   templateBody,
   companyName,
   onSent,
+  onServicesSaved,
 }: SlotsGapManagementPanelProps) {
   const normalizedDay = useMemo(() => {
     return normalizeDayLabel(day);
@@ -356,6 +362,7 @@ export function SlotsGapManagementPanel({
   const [customersModalOpen, setCustomersModalOpen] = useState(false);
   const [sentCount, setSentCount] = useState<number>(0);
   const [createCustomerModalOpen, setCreateCustomerModalOpen] = useState(false);
+  const [slotsRefreshKey, setSlotsRefreshKey] = useState(0);
 
   const durationMinutes = useMemo(() => {
     return getDurationMinutes(timeStart, timeEnd);
@@ -387,6 +394,10 @@ useEffect(() => {
     setCustomersModalOpen(true);
   }
 
+  function handleServicesSaved() {
+  setSlotsRefreshKey((value) => value + 1);
+}
+
   function handleSent() {
     setSentCount((current) => current + 1);
     setCustomersModalOpen(false);
@@ -408,8 +419,10 @@ useEffect(() => {
   durationMinutes,
   selectedServices,
   setSelectedServices,
+  onServicesSaved,
   companyId,
   locationId,
+  slot?.id || "",
   promotion,
   setPromotion,
   clientCount,

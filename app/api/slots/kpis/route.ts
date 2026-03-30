@@ -83,9 +83,6 @@ const allSlots = await prisma.slot_recovery_slot.findMany({
   },
 });
 
-console.log("[SLOTS_KPIS] companyId:", companyId);
-console.log("[SLOTS_KPIS] locationId:", locationId);
-console.log("[SLOTS_KPIS] allSlots:", allSlots);
 
 const totalSlots = allSlots.length;
 const recoveredSlots = allSlots.filter((slot) => slot.status === "recovered").length;

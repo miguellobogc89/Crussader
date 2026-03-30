@@ -35,6 +35,42 @@ export type SlotDTO = {
   recoveredServiceDurationMin: number | null;
 };
 
+type SlotsCacheEntry = {
+  slots: SlotDTO[];
+  cachedAt: number;
+};
+
+const CACHE_TTL_MS = 60_000;
+const slotsCache = new Map<string, SlotsCacheEntry>();
+
+function getCacheKey(companyId: string, locationId?: string | null): string {
+  return `${companyId}::${locationId ?? "all"}`;
+}
+
+function getCachedSlots(cacheKey: string): SlotDTO[] | null {
+  const entry = slotsCache.get(cacheKey);
+
+  if (!entry) {
+    return null;
+  }
+
+  const isExpired = Date.now() - entry.cachedAt > CACHE_TTL_MS;
+
+  if (isExpired) {
+    slotsCache.delete(cacheKey);
+    return null;
+  }
+
+  return entry.slots;
+}
+
+function setCachedSlots(cacheKey: string, slots: SlotDTO[]): void {
+  slotsCache.set(cacheKey, {
+    slots,
+    cachedAt: Date.now(),
+  });
+}
+
 export function useSlots(locationId?: string | null, refreshKey?: number) {
   const boot = useBootstrapData();
 
@@ -49,12 +85,20 @@ export function useSlots(locationId?: string | null, refreshKey?: number) {
     }
 
     const companyId: string = rawCompanyId;
+    const cacheKey = getCacheKey(companyId, locationId);
+    const cachedSlots = getCachedSlots(cacheKey);
+
+    if (cachedSlots) {
+      setSlots(cachedSlots);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     const controller = new AbortController();
 
     async function fetchSlots() {
       try {
-        setLoading(true);
-
         const params = new URLSearchParams();
         params.set("companyId", companyId);
 
@@ -69,15 +113,18 @@ export function useSlots(locationId?: string | null, refreshKey?: number) {
 
         const json = await res.json();
 
-        if (json.ok) {
+        if (json.ok && Array.isArray(json.slots)) {
           setSlots(json.slots);
+          setCachedSlots(cacheKey, json.slots);
         }
       } catch (e) {
         if ((e as Error).name !== "AbortError") {
           console.error("slots_fetch_error", e);
         }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     }
 

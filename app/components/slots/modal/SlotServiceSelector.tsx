@@ -21,9 +21,11 @@ import type {
 type SlotServiceSelectorProps = {
   companyId: string;
   locationId: string;
+  slotId: string;
   slotDurationMin: number;
   selectedServices: SelectedServiceItem[];
   onChange: (services: SelectedServiceItem[]) => void;
+  onSaved?: () => void;
 };
 
 const SERVICES_LIST_ENDPOINT = "/api/slots/services/list";
@@ -129,9 +131,11 @@ function buildSelectedSavedServices(
 export function SlotServiceSelector({
   companyId,
   locationId,
+  slotId,
   slotDurationMin,
   selectedServices,
   onChange,
+  onSaved,
 }: SlotServiceSelectorProps) {
   const [services, setServices] = useState<SavedServiceItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -144,6 +148,7 @@ export function SlotServiceSelector({
   const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
   const [createErrorText, setCreateErrorText] = useState("");
   const [createSuccessText, setCreateSuccessText] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const [draft, setDraft] = useState<CreateServiceDraft>({
     name: "",
     price: "",
@@ -263,6 +268,54 @@ export function SlotServiceSelector({
       window.clearTimeout(timeout);
     };
   }, [justAddedId]);
+
+useEffect(() => {
+  if (!slotId) {
+    return;
+  }
+
+  const timeout = window.setTimeout(async () => {
+    try {
+      setIsSaving(true);
+
+      const response = await fetch("/api/slots/services/assign", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          slotId,
+          services: selectedServices.map((service, index) => {
+            return {
+              serviceId: service.serviceId,
+              position: index,
+            };
+          }),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data?.ok) {
+        throw new Error(data?.error || "No se pudieron guardar los servicios.");
+      }
+
+      // 👇 AQUÍ está lo importante
+      if (onSaved) {
+        onSaved();
+      }
+
+    } catch (error) {
+      console.error("[autosave services]", error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, 400);
+
+  return () => {
+    window.clearTimeout(timeout);
+  };
+}, [selectedServices, slotId, onSaved]);
 
   const compatibleServices = useMemo(() => {
     return sortServices(
@@ -408,6 +461,13 @@ export function SlotServiceSelector({
       setIsSubmittingCreate(false);
     }
   }
+
+  {isSaving && (
+  <div className="text-xs text-muted-foreground flex items-center gap-1">
+    <Loader2 className="h-3 w-3 animate-spin" />
+    Guardando...
+  </div>
+)}
 
   return (
     <div className="space-y-3">

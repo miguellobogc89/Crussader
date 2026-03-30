@@ -1,14 +1,8 @@
+// app/components/slots/SlotsStatsCard.tsx
 "use client";
 
 import { useEffect, useState } from "react";
-import { slotStatsMock } from "./slots.mock";
-import { RefreshCw, Send, TrendingUp } from "lucide-react";
-
-const ICONS: Record<string, any> = {
-  recovered: RefreshCw,
-  messages: Send,
-  "response-rate": TrendingUp,
-};
+import { Euro, RefreshCw, TrendingUp, Zap } from "lucide-react";
 
 type Props = {
   companyId: string;
@@ -41,36 +35,72 @@ export function SlotsStatsCard({ companyId, locationId }: Props) {
     fetchKpis();
   }, [companyId, locationId]);
 
-  return (
-    <div className="flex items-center gap-6 border-b border-border pb-3">
-      {slotStatsMock.map((stat) => {
-        const Icon = ICONS[stat.id];
+  const stats = [
+    {
+      id: "income",
+      label: "Ingresos recuperados",
+      value: "840€",
+      sub: "(+12%)",
+      Icon: Euro,
+    },
+    {
+      id: "recovered",
+      label: "Huecos rescatados",
+      value: recovered,
+      sub: `de ${recoveredTotal}`,
+      Icon: RefreshCw,
+    },
+    {
+      id: "response-rate",
+      label: "Tasa de respuesta",
+      value: "68%",
+      sub: "",
+      Icon: TrendingUp,
+    },
+    {
+      id: "urgent",
+      label: "Urgencias activas",
+      value: "4",
+      sub: "",
+      Icon: Zap,
+      iconClassName: "text-orange-500",
+    },
+  ];
 
-        const value = stat.id === "recovered" ? recovered : stat.value;
-        const sub =
-          stat.id === "recovered" ? `de ${recoveredTotal}` : stat.sub;
+  return (
+    <div className="flex items-center gap-6">
+      {stats.map((stat) => {
+        const Icon = stat.Icon;
 
         return (
           <div
             key={stat.id}
-            className="flex items-center gap-3 min-w-0"
+            className="flex min-w-0 items-center gap-3"
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-crussader/10">
-              {Icon && <Icon className="h-4 w-4 text-crussader" />}
+              <Icon
+                className={[
+                  "h-4 w-4",
+                  stat.iconClassName ?? "text-crussader",
+                ].join(" ")}
+              />
             </div>
 
             <div className="flex flex-col leading-tight">
-              <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+              <span className="whitespace-nowrap text-[11px] text-muted-foreground">
                 {stat.label}
               </span>
 
               <div className="flex items-baseline gap-1">
-                <span className="text-base font-semibold text-foreground tabular-nums">
-                  {value}
+                <span className="tabular-nums text-base font-semibold text-foreground">
+                  {stat.value}
                 </span>
-                <span className="text-[11px] text-muted-foreground">
-                  {sub}
-                </span>
+
+                {stat.sub ? (
+                  <span className="text-[11px] text-muted-foreground">
+                    {stat.sub}
+                  </span>
+                ) : null}
               </div>
             </div>
           </div>

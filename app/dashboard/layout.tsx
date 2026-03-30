@@ -1,7 +1,8 @@
 // app/dashboard/layout.tsx
 import * as React from "react";
-import { SessionProvider } from "next-auth/react";
-import { SidebarProvider } from "@/app/components/ui/sidebar";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import AppProviders from "@/app/providers/AppProviders";
 import { AppSidebar } from "@/app/components/AppSidebar";
 import PageContainer from "@/app/components/PageContainer";
 import { getBootstrapData } from "@/lib/bootstrap";
@@ -15,18 +16,18 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getServerSession(authOptions);
+  console.log("[dashboard layout][server session]", session);
   const initialData = await getBootstrapData();
 
   const needsEnsureActiveCompany =
     !initialData.activeCompany && (initialData.companies?.length ?? 0) > 0;
 
   return (
-    <SidebarProvider>
+    <AppProviders session={session}>
       <BootstrapProvider initialData={initialData} autoFetchIfEmpty={false}>
-        {/* ====== Guard de redirección (cliente) ====== */}
         <DashboardRouteGuard />
 
-        {/* ====== Soft-lock orientación: estilos globales ====== */}
         <style>{`
           .orientation-guard { display: none; }
           @media (orientation: landscape) and (max-height: 480px) {
@@ -35,7 +36,6 @@ export default async function DashboardLayout({
           }
         `}</style>
 
-        {/* ====== Overlay que pide girar el dispositivo en paisaje bajo ====== */}
         <div className="orientation-guard fixed inset-0 z-[1000] bg-slate-900 text-white items-center justify-center p-6">
           <div className="text-center max-w-sm">
             <div className="text-5xl mb-4">🔁</div>
@@ -46,20 +46,16 @@ export default async function DashboardLayout({
           </div>
         </div>
 
-        {/* ====== App normal (se oculta en landscape bajo) ====== */}
-        <div className="app-root flex h-svh w-full bg-gradient-to-br from-background via-background to-muted/20">
-          {/* Sidebar (izquierda) */}
+        <div className="app-root flex h-svh w-full">
           <AppSidebar />
 
-          {/* Contenido (derecha): ahora es el "scope" del overlay */}
-          <div className={["relative flex min-w-0 flex-1 overflow-y-auto overflow-x-hidden",
-              // móvil: alto exacto = viewport - topbar (h-12 = 3rem)
+          <div
+            className={[
+              "relative flex min-w-0 flex-1 overflow-y-auto overflow-x-hidden",
               "h-[calc(100svh-3rem)] pt-12",
-              // md+: vuelve al comportamiento normal
               "md:h-svh md:pt-0",
             ].join(" ")}
           >
-            {/* 👇 Overlay limitado al área de página, NO tapa la sidebar */}
             <RouteTransitionOverlay scope="container" />
 
             <main className="flex-1 bg-background min-w-0">
@@ -70,21 +66,20 @@ export default async function DashboardLayout({
 
         <Toaster />
 
-        {/* ====== Asegurar compañía activa (sin componentes nuevos) ====== */}
         {needsEnsureActiveCompany ? (
           <script
             dangerouslySetInnerHTML={{
               __html: `
-              (function() {
-                try {
-                  fetch('/api/me/active-company', { method: 'POST' });
-                } catch (_) {}
-              })();
-            `,
+                (function() {
+                  try {
+                    fetch('/api/me/active-company', { method: 'POST' });
+                  } catch (_) {}
+                })();
+              `,
             }}
           />
         ) : null}
       </BootstrapProvider>
-    </SidebarProvider>
+    </AppProviders>
   );
 }

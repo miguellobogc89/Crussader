@@ -7,7 +7,7 @@ import { BellDot, Loader2, RefreshCw } from "lucide-react";
 import StandardCard from "@/app/components/crussader/UX/standardCard";
 import { useSlots } from "@/hooks/slots/useSlots";
 import type { SlotItem, SelectedServiceItem } from "./slots.types";
-import { SlotsWeeklyCalendarItem } from "./SlotsWeeklyCalendarItem";
+import { SlotsListCardItem } from "./SlotsListCardItem";
 import type { SlotDTO } from "@/hooks/slots/useSlots";
 import { getPendingPublishCount } from "./helpers/slotsCalendarHelpers";
 
@@ -150,7 +150,7 @@ export function SlotsListCard({
                 <div className="space-y-3">
                   {groupItems.map((slot) => {
                     return (
-                      <SlotsWeeklyCalendarItem
+                      <SlotsListCardItem
                         key={slot.id}
                         slot={slot}
                         onClick={onSlotClick}

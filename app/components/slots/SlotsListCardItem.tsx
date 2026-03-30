@@ -1,4 +1,4 @@
-// app/components/slots/SlotsWeeklyCalendarItem.tsx
+// app/components/slots/SlotsListCardItem.tsx
 "use client";
 
 import { Clock3 } from "lucide-react";
@@ -15,7 +15,7 @@ import {
   toSelectedServices,
 } from "./helpers/slotsWeeklyCalendarItemHelpers";
 
-type SlotsWeeklyCalendarItemProps = {
+type SlotsListCardItemProps = {
   slot: SlotDTO;
   onClick?: (
     day: string,
@@ -24,10 +24,10 @@ type SlotsWeeklyCalendarItemProps = {
   ) => void;
 };
 
-export function SlotsWeeklyCalendarItem({
+export function SlotsListCardItem({
   slot,
   onClick,
-}: SlotsWeeklyCalendarItemProps) {
+}: SlotsListCardItemProps) {
   const statusLabel = getStatusLabel(slot);
   const legacySlot = toLegacySlot(slot);
   const priceRange = getSlotPriceRange(slot);

@@ -32,7 +32,7 @@ export const NAV_ITEMS: SidebarNavItem[] = [
     icon: Building2,
   },
   {
-    title: "Turnos de empleados",
+    title: "Calendario",
     href: "/dashboard/calendar",
     icon: CalendarDays,
   },
