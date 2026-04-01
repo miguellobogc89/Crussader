@@ -4,7 +4,7 @@
 import { Clock3 } from "lucide-react";
 import type { SlotDTO } from "@/hooks/slots/useSlots";
 import type { SlotItem, SelectedServiceItem } from "./slots.types";
-import { formatTimeRange, getStatusLabel } from "./helpers/slotsCalendarHelpers";
+import { formatTimeRange, getStatusLabel } from "./helpers/AvailableSlotsListHelpers";
 import {
   formatEuro,
   getSlotPriceRange,
@@ -36,13 +36,36 @@ export function SlotsListCardItem({
   const dayLabel = slot.startsAt;
   const recovered = isRecoveredSlot(slot);
 
+function getLeftBorderClass(slot: SlotDTO): string {
+  if (slot.status === "pending_publish") {
+    return "border-l-4 border-l-amber-400";
+  }
+
+  if (slot.status === "sent") {
+    return "border-l-4 border-l-blue-500";
+  }
+
+  if (slot.status === "recovered") {
+    return "border-l-4 border-l-emerald-500";
+  }
+
+  if (slot.status === "expired" || slot.status === "cancelled") {
+    return "border-l-4 border-l-slate-300";
+  }
+
+  return "border-l-4 border-l-slate-200";
+}
+
   return (
     <button
       type="button"
       onClick={() => {
         onClick?.(dayLabel, legacySlot, selectedServices);
       }}
-      className="w-full rounded-lg border border-[#e5e7eb] bg-white px-5 py-4 text-left transition-all duration-150 hover:border-[#e0dbff] hover:bg-[#faf9ff]"
+className={[
+  "w-full rounded-lg border border-[#e5e7eb] bg-white px-5 py-4 text-left transition-all duration-150 hover:border-[#e0dbff] hover:bg-[#faf9ff]",
+  getLeftBorderClass(slot),
+].join(" ")}
     >
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -51,36 +74,52 @@ export function SlotsListCardItem({
           </div>
 
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="text-[15px] font-semibold text-[#171717]">
-                {formatTimeRange(slot.startsAt, slot.endsAt)}
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+<div className="flex items-center gap-2">
+  <div className="text-[15px] font-semibold text-[#171717]">
+    {formatTimeRange(slot.startsAt, slot.endsAt)}
+  </div>
+
+  {slot.employeeName ? (
+    <>
+      <span className="text-[#9CA3AF]">·</span>
+      <div className="text-[14px] font-medium text-[#6B7280]">
+        {slot.employeeName}
+      </div>
+    </>
+  ) : null}
+</div>
+
+                {priceRange && (
+                  <div className="inline-flex items-center rounded-[10px] border border-[#DBEAFE] bg-[#F8FBFF] px-2.5 py-1 text-xs font-semibold text-[#0B6CF4]">
+                    {formatEuro(priceRange.min)}
+                    {!recovered && priceRange.min !== priceRange.max && (
+                      <> - {formatEuro(priceRange.max)}</>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {priceRange && (
-                <div className="inline-flex items-center rounded-[10px] border border-[#DBEAFE] bg-[#F8FBFF] px-2.5 py-1 text-xs font-semibold text-[#0B6CF4]">
-                  {formatEuro(priceRange.min)}
-                  {!recovered && priceRange.min !== priceRange.max && (
-                    <> - {formatEuro(priceRange.max)}</>
-                  )}
-                </div>
-              )}
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                {visibleServices.map((service) => {
+                  return (
+                    <span
+                      key={service.id}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-1.5 text-xs font-medium text-[#1E3A8A]"
+                    >
+                      <span className="truncate">{service.name}</span>
+                      <span className="font-semibold text-brand-primary">
+                        {formatEuro(service.price)}
+                      </span>
+                    </span>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="mt-2 flex flex-wrap gap-2">
-              {visibleServices.map((service) => {
-                return (
-                  <span
-                    key={service.id}
-                    className="inline-flex items-center gap-2 rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-1.5 text-xs font-medium text-[#1E3A8A]"
-                  >
-                    <span className="truncate">{service.name}</span>
-                    <span className="font-semibold text-brand-primary">
-                      {formatEuro(service.price)}
-                    </span>
-                  </span>
-                );
-              })}
-            </div>
+
           </div>
         </div>
 

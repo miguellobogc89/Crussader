@@ -14,6 +14,8 @@ export type SlotServiceDTO = {
 
 export type SlotDTO = {
   id: string;
+  employeeId: string | null;
+  employeeName: string | null;
   startsAt: string;
   endsAt: string;
   status: string;
@@ -114,6 +116,7 @@ export function useSlots(locationId?: string | null, refreshKey?: number) {
         const json = await res.json();
 
         if (json.ok && Array.isArray(json.slots)) {
+          console.log("slots_list_response", json.slots);
           setSlots(json.slots);
           setCachedSlots(cacheKey, json.slots);
         }

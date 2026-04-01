@@ -10,10 +10,13 @@ const prisma = new PrismaClient();
 
 type CreateSlotBody = {
   locationId?: string;
+  selectedLocationId?: string;
+  employeeId?: string;
   startsAt?: string;
   endsAt?: string;
-  serviceName?: string;
+  serviceName?: string | null;
   notes?: string;
+  selectedServiceIds?: string[];
 };
 
 export async function POST(req: NextRequest) {
@@ -42,11 +45,21 @@ export async function POST(req: NextRequest) {
 
     const body = (await req.json()) as CreateSlotBody;
 
-    const locationId = body.locationId?.trim();
-    const startsAtRaw = body.startsAt?.trim();
-    const endsAtRaw = body.endsAt?.trim();
-    const serviceNameRaw = body.serviceName?.trim();
-    const notesRaw = body.notes?.trim();
+    const rawLocationId = body.locationId ?? body.selectedLocationId ?? "";
+    const locationId = rawLocationId.trim();
+    const employeeId = (body.employeeId ?? "").trim();
+    const startsAtRaw = body.startsAt?.trim() ?? "";
+    const endsAtRaw = body.endsAt?.trim() ?? "";
+    const serviceNameRaw = body.serviceName?.trim() ?? "";
+    const notesRaw = body.notes?.trim() ?? "";
+
+    const selectedServiceIds = Array.isArray(body.selectedServiceIds)
+      ? body.selectedServiceIds
+          .map((value) => String(value).trim())
+          .filter((value, index, array) => {
+            return value.length > 0 && array.indexOf(value) === index;
+          })
+      : [];
 
     if (!locationId) {
       return NextResponse.json(
@@ -138,50 +151,127 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const serviceName = serviceNameRaw ? serviceNameRaw : null;
-    const notes = notesRaw ? notesRaw : null;
+    if (selectedServiceIds.length > 0) {
+      const services = await prisma.slot_recovery_service.findMany({
+        where: {
+          id: { in: selectedServiceIds },
+          company_id: location.companyId,
+        },
+        select: {
+          id: true,
+        },
+      });
 
-    const slot = await prisma.slot_recovery_slot.create({
-      data: {
-        company_id: location.companyId,
-        location_id: location.id,
-        starts_at: startsAt,
-        ends_at: endsAt,
-        expires_at: startsAt,
-        status: "pending_publish",
-        manual_publish_required: true,
-        service_name: serviceName,
-        notes,
-      },
-      select: {
-        id: true,
-        company_id: true,
-        location_id: true,
-        starts_at: true,
-        ends_at: true,
-        expires_at: true,
-        status: true,
-        manual_publish_required: true,
-        service_name: true,
-        notes: true,
-        created_at: true,
-      },
+      if (services.length !== selectedServiceIds.length) {
+        return NextResponse.json(
+          { ok: false, error: "invalid_selected_services" },
+          { status: 400 }
+        );
+      }
+    }
+
+    const serviceName = serviceNameRaw || null;
+    const notes = notesRaw || null;
+
+    const created = await prisma.$transaction(async (tx) => {
+      const slot = await tx.slot_recovery_slot.create({
+        data: {
+          company_id: location.companyId,
+          location_id: location.id,
+          starts_at: startsAt,
+          ends_at: endsAt,
+          expires_at: startsAt,
+          status: "pending_publish",
+          manual_publish_required: true,
+          service_name: serviceName,
+          notes,
+          employee_id: employeeId || null,
+        },
+        select: {
+          id: true,
+          company_id: true,
+          location_id: true,
+          starts_at: true,
+          ends_at: true,
+          expires_at: true,
+          status: true,
+          manual_publish_required: true,
+          service_name: true,
+          notes: true,
+          employee_id: true,
+          created_at: true,
+          Employee: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (selectedServiceIds.length > 0) {
+        await tx.slot_recovery_slot_service.createMany({
+          data: selectedServiceIds.map((serviceId, index) => {
+            return {
+              slot_recovery_slot_id: slot.id,
+              slot_recovery_service_id: serviceId,
+              position: index,
+            };
+          }),
+        });
+      }
+
+      const persistedServices = await tx.slot_recovery_slot_service.findMany({
+        where: {
+          slot_recovery_slot_id: slot.id,
+        },
+        orderBy: {
+          position: "asc",
+        },
+        select: {
+          slot_recovery_service: {
+            select: {
+              id: true,
+              name: true,
+              duration_min: true,
+              price: true,
+              active: true,
+            },
+          },
+        },
+      });
+
+      return {
+        slot,
+        services: persistedServices.map((row) => {
+          return {
+            id: row.slot_recovery_service.id,
+            name: row.slot_recovery_service.name,
+            durationMin: row.slot_recovery_service.duration_min,
+            price: Number(row.slot_recovery_service.price),
+            active: row.slot_recovery_service.active,
+          };
+        }),
+      };
     });
 
     return NextResponse.json({
       ok: true,
       slot: {
-        id: slot.id,
-        companyId: slot.company_id,
-        locationId: slot.location_id,
-        startsAt: slot.starts_at,
-        endsAt: slot.ends_at,
-        expiresAt: slot.expires_at,
-        status: slot.status,
-        manualPublishRequired: slot.manual_publish_required,
-        serviceName: slot.service_name,
-        notes: slot.notes,
-        createdAt: slot.created_at,
+        id: created.slot.id,
+        companyId: created.slot.company_id,
+        locationId: created.slot.location_id,
+        startsAt: created.slot.starts_at,
+        endsAt: created.slot.ends_at,
+        expiresAt: created.slot.expires_at,
+        status: created.slot.status,
+        manualPublishRequired: created.slot.manual_publish_required,
+        serviceName: created.slot.service_name,
+        notes: created.slot.notes,
+        employeeId: created.slot.employee_id,
+        employeeName: created.slot.Employee?.name ?? null,
+        createdAt: created.slot.created_at,
+        services: created.services,
       },
     });
   } catch (e) {

@@ -9,6 +9,7 @@ import { SlotsWaitlistRow, type WaitlistRowItem } from "./SlotsWaitlistRow";
 import { WaitlistInlineCreate } from "./WaitlistInlineCreate";
 
 type Props = {
+  companyId: string | null;
   locationId: string | null;
   refreshKey?: number;
 };
@@ -26,6 +27,7 @@ type WaitlistListResponseItem = {
 const WAITLIST_LIST_ENDPOINT = "/api/slots/waitlist/list";
 
 export function WaitlistCard({
+  companyId,
   locationId,
   refreshKey = 0,
 }: Props) {
@@ -140,6 +142,7 @@ useEffect(() => {
         <div className="flex h-full flex-col gap-3 overflow-y-auto px-4 py-4">
           {isAdding ? (
             <WaitlistInlineCreate
+              companyId={companyId}
               locationId={locationId}
               onCancel={handleCancelCreate}
               onCreated={handleCreated}

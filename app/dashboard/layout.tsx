@@ -1,7 +1,9 @@
 // app/dashboard/layout.tsx
+// app/dashboard/layout.tsx
 import * as React from "react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { Inter } from "next/font/google";
 import AppProviders from "@/app/providers/AppProviders";
 import { AppSidebar } from "@/app/components/AppSidebar";
 import PageContainer from "@/app/components/PageContainer";
@@ -11,13 +13,16 @@ import { Toaster } from "@/app/components/ui/toaster";
 import RouteTransitionOverlay from "@/app/components/layouts/RouteTransitionOverlay";
 import DashboardRouteGuard from "@/app/dashboard/DashboardRouteGuard";
 
+const inter = Inter({
+  subsets: ["latin"],
+});
+
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const session = await getServerSession(authOptions);
-  console.log("[dashboard layout][server session]", session);
   const initialData = await getBootstrapData();
 
   const needsEnsureActiveCompany =
@@ -36,17 +41,17 @@ export default async function DashboardLayout({
           }
         `}</style>
 
-        <div className="orientation-guard fixed inset-0 z-[1000] bg-slate-900 text-white items-center justify-center p-6">
-          <div className="text-center max-w-sm">
-            <div className="text-5xl mb-4">🔁</div>
-            <h2 className="text-xl font-semibold mb-2">Gira el dispositivo</h2>
+        <div className="orientation-guard fixed inset-0 z-[1000] items-center justify-center bg-slate-900 p-6 text-white">
+          <div className="max-w-sm text-center">
+            <div className="mb-4 text-5xl">🔁</div>
+            <h2 className="mb-2 text-xl font-semibold">Gira el dispositivo</h2>
             <p className="text-sm text-slate-300">
               Para una mejor experiencia, usa la aplicación en formato vertical.
             </p>
           </div>
         </div>
 
-        <div className="app-root flex h-svh w-full">
+        <div className={`app-root flex h-svh w-full ${inter.className}`}>
           <AppSidebar />
 
           <div
@@ -58,7 +63,7 @@ export default async function DashboardLayout({
           >
             <RouteTransitionOverlay scope="container" />
 
-            <main className="flex-1 bg-background min-w-0">
+            <main className="min-w-0 flex-1 bg-background">
               <PageContainer>{children}</PageContainer>
             </main>
           </div>

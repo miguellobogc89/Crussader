@@ -1,4 +1,4 @@
-// app/components/slots/SlotsListCard.tsx
+// app/components/slots/AvailableSlotsList.tsx
 
 "use client";
 
@@ -9,9 +9,9 @@ import { useSlots } from "@/hooks/slots/useSlots";
 import type { SlotItem, SelectedServiceItem } from "./slots.types";
 import { SlotsListCardItem } from "./SlotsListCardItem";
 import type { SlotDTO } from "@/hooks/slots/useSlots";
-import { getPendingPublishCount } from "./helpers/slotsCalendarHelpers";
+import { getPendingPublishCount } from "./helpers/AvailableSlotsListHelpers";
 
-type SlotsWeeklyCalendarCardProps = {
+type AvailableSlotsListProps = {
   locationId?: string | null;
   refreshKey?: number;
   onSlotClick?: (
@@ -31,11 +31,35 @@ function getSlotGroupKey(slot: SlotDTO): string {
 }
 
 function getGroupLabel(groupKey: string): string {
-  if (groupKey === "pending") return "Pendientes de publicar";
-  if (groupKey === "sent") return "Enviados";
-  if (groupKey === "recovered") return "Recuperados";
-  if (groupKey === "lost") return "Perdidos";
-  return "Otros";
+  if (groupKey === "recovered") {
+    return "Recuperados";
+  }
+
+  if (groupKey === "lost") {
+    return "Perdidos";
+  }
+
+  const groupDate = new Date(`${groupKey}T00:00:00`);
+  const today = new Date();
+  const tomorrow = new Date();
+
+  today.setHours(0, 0, 0, 0);
+  tomorrow.setHours(0, 0, 0, 0);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (groupDate.getTime() === today.getTime()) {
+    return "Hoy";
+  }
+
+  if (groupDate.getTime() === tomorrow.getTime()) {
+    return "Mañana";
+  }
+
+  return new Intl.DateTimeFormat("es-ES", {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+  }).format(groupDate);
 }
 
 function getGroupOrder(groupKey: string): number {
@@ -60,7 +84,7 @@ export function SlotsListCard({
   locationId,
   refreshKey,
   onSlotClick,
-}: SlotsWeeklyCalendarCardProps) {
+}: AvailableSlotsListProps) {
   const [manualRefreshKey, setManualRefreshKey] = useState(0);
   const combinedRefreshKey = (refreshKey ?? 0) + manualRefreshKey;
 
@@ -70,31 +94,68 @@ export function SlotsListCard({
     return getPendingPublishCount(slots);
   }, [slots]);
 
-  const groupedSlots = useMemo(() => {
-    const groups: Record<string, typeof slots> = {};
+const groupedSlots = useMemo(() => {
+  const dayGroups: Record<string, typeof slots> = {};
+  const recoveredSlots: typeof slots = [];
+  const lostSlots: typeof slots = [];
 
-    for (const slot of slots) {
-      const groupKey = getSlotGroupKey(slot);
+  for (const slot of slots) {
+    const isLost = slot.status === "expired" || slot.status === "cancelled";
+    const isRecovered = Boolean(slot.recoveredAt) || slot.status === "recovered";
 
-      if (!groups[groupKey]) {
-        groups[groupKey] = [];
-      }
-
-      groups[groupKey].push(slot);
+    if (isRecovered) {
+      recoveredSlots.push(slot);
+      continue;
     }
 
-    return Object.entries(groups)
-      .map(([groupKey, groupSlots]) => {
-        const sorted = [...groupSlots].sort((a, b) => {
-          return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
-        });
+    if (isLost) {
+      lostSlots.push(slot);
+      continue;
+    }
 
-        return [groupKey, sorted] as const;
-      })
-      .sort((a, b) => {
-        return getGroupOrder(a[0]) - getGroupOrder(b[0]);
+    const dayKey = new Date(slot.startsAt).toISOString().slice(0, 10);
+
+    if (!dayGroups[dayKey]) {
+      dayGroups[dayKey] = [];
+    }
+
+    dayGroups[dayKey].push(slot);
+  }
+
+  const orderedDayGroups = Object.entries(dayGroups)
+    .map(([dayKey, groupSlots]) => {
+      const sorted = [...groupSlots].sort((a, b) => {
+        return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
       });
-  }, [slots]);
+
+      return [dayKey, sorted] as const;
+    })
+    .sort((a, b) => {
+      return new Date(a[0]).getTime() - new Date(b[0]).getTime();
+    });
+
+  const trailingGroups: Array<readonly [string, typeof slots]> = [];
+
+  if (recoveredSlots.length > 0) {
+    trailingGroups.push([
+      "recovered",
+      [...recoveredSlots].sort((a, b) => {
+        return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+      }),
+    ]);
+  }
+
+  if (lostSlots.length > 0) {
+    trailingGroups.push([
+      "lost",
+      [...lostSlots].sort((a, b) => {
+        return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+      }),
+    ]);
+  }
+
+  return [...orderedDayGroups, ...trailingGroups];
+}, [slots]);
 
   function handleRefresh() {
     setManualRefreshKey((value) => value + 1);

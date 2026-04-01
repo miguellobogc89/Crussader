@@ -1,4 +1,4 @@
-// app/components/slots/helpers/slotsCalendarHelpers.ts
+// app/components/slots/helpers/AvailableSlotsListHelpers.ts
 import type { SlotDTO } from "@/hooks/slots/useSlots";
 import type { SlotItem } from "../slots.types";
 

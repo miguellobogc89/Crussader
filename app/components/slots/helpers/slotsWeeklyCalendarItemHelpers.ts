@@ -1,7 +1,7 @@
 // app/components/slots/helpers/slotsWeeklyCalendarItemHelpers.ts
 import type { SlotDTO } from "@/hooks/slots/useSlots";
 import type { SlotItem, SelectedServiceItem } from "../slots.types";
-import { formatTimeRange } from "./slotsCalendarHelpers";
+import { formatTimeRange } from "./AvailableSlotsListHelpers";
 
 export type SlotServiceLike = {
   id: string;

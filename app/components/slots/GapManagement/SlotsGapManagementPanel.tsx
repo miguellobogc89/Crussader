@@ -1,10 +1,9 @@
 // app/components/slots/GapManagement/SlotsGapManagementPanel.tsx
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Calendar, Clock, Percent, Users, X } from "lucide-react";
+import { Calendar, Clock, Percent, X } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { GapWhatsAppPreview } from "@/app/components/slots/GapManagement/GapWhatsAppPreview";
 import { SlotsCustomersPickerModal } from "@/app/components/slots/SendToContactsModal/SlotsSendToContactsModal";
@@ -37,11 +36,7 @@ const promotionOptions: { value: Promotion; label: string; desc: string }[] = [
 ];
 
 function extractStartTime(slot: SlotItem | null): string {
-  if (!slot) {
-    return "17:00";
-  }
-
-  if (!slot.time) {
+  if (!slot?.time) {
     return "17:00";
   }
 
@@ -58,11 +53,7 @@ function extractStartTime(slot: SlotItem | null): string {
 }
 
 function extractEndTime(slot: SlotItem | null): string {
-  if (!slot) {
-    return "18:00";
-  }
-
-  if (!slot.time) {
+  if (!slot?.time) {
     return "18:00";
   }
 
@@ -155,41 +146,41 @@ function getDurationMinutes(start: string, end: string): number {
   return endMinutes - startMinutes;
 }
 
-function renderSentMessage(sentCount: number) {
-  if (sentCount <= 0) {
-    return null;
-  }
+type RenderPanelArgs = {
+  open: boolean;
+  onClose: () => void;
+  dateLabel: string;
+  timeStart: string;
+  durationMinutes: number;
+  selectedServices: SelectedServiceItem[];
+  setSelectedServices: (services: SelectedServiceItem[]) => void;
+  handleServicesSaved: () => void;
+  locationId: string;
+  slotId: string;
+  promotion: Promotion;
+  setPromotion: (value: Promotion) => void;
+  handleOpenCustomersModal: () => void;
+  templateBody: string;
+  companyName: string;
+};
 
-  return (
-    <p className="mt-2 text-xs font-medium text-primary">
-      Ya se ha realizado un envío para este hueco en esta sesión.
-    </p>
-  );
-}
-
-function renderPanel(
-  open: boolean,
-  onClose: () => void,
-  dateLabel: string,
-  timeStart: string,
-  durationMinutes: number,
-  services: SelectedServiceItem[],
-  setSelectedServices: (services: SelectedServiceItem[]) => void,
-  onServicesSaved: (() => void) | undefined,
-  companyId: string,
-  locationId: string,
-  slotId: string,
-  promotion: Promotion,
-  setPromotion: (value: Promotion) => void,
-  clientCount: number[],
-  setClientCount: (value: number[]) => void,
-  subscribedOnly: boolean,
-  setSubscribedOnly: (value: boolean) => void,
-  sentCount: number,
-  handleOpenCustomersModal: () => void,
-  templateBody: string,
-  companyName: string,
-) {
+function renderPanel({
+  open,
+  onClose,
+  dateLabel,
+  timeStart,
+  durationMinutes,
+  selectedServices,
+  setSelectedServices,
+  handleServicesSaved,
+  locationId,
+  slotId,
+  promotion,
+  setPromotion,
+  handleOpenCustomersModal,
+  templateBody,
+  companyName,
+}: RenderPanelArgs) {
   if (!open) {
     return null;
   }
@@ -258,16 +249,14 @@ function renderPanel(
             </div>
           </div>
 
-
-<SlotServiceSelector
-  companyId={companyId}
-  locationId={locationId}
-  slotId={slotId}
-  slotDurationMin={durationMinutes}
-  selectedServices={services}
-  onChange={(next) => setSelectedServices(next)}
-  onSaved={onServicesSaved}
-/>
+          <SlotServiceSelector
+            locationId={locationId}
+            slotId={slotId}
+            slotDurationMin={durationMinutes}
+            selectedServices={selectedServices}
+            onChange={setSelectedServices}
+            onSaved={handleServicesSaved}
+          />
 
           <div className="space-y-2.5">
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -294,6 +283,7 @@ function renderPanel(
                 return (
                   <button
                     key={option.value}
+                    type="button"
                     onClick={() => setPromotion(option.value)}
                     className={wrapperClass}
                   >
@@ -305,11 +295,8 @@ function renderPanel(
             </div>
           </div>
 
-
-
-
           <GapWhatsAppPreview
-            services={services}
+            services={selectedServices}
             promotion={promotion}
             day={dateLabel}
             timeStart={timeStart}
@@ -355,14 +342,10 @@ export function SlotsGapManagementPanel({
   const [date, setDate] = useState(normalizedDay);
   const [timeStart, setTimeStart] = useState(extractStartTime(slot));
   const [timeEnd, setTimeEnd] = useState(extractEndTime(slot));
-  const [selectedServices, setSelectedServices] = useState<SelectedServiceItem[]>(services);
-  const [clientCount, setClientCount] = useState([20]);
-  const [subscribedOnly, setSubscribedOnly] = useState(true);
+  const [selectedServices, setSelectedServices] =
+    useState<SelectedServiceItem[]>(services);
   const [promotion, setPromotion] = useState<Promotion>("none");
   const [customersModalOpen, setCustomersModalOpen] = useState(false);
-  const [sentCount, setSentCount] = useState<number>(0);
-  const [createCustomerModalOpen, setCreateCustomerModalOpen] = useState(false);
-  const [slotsRefreshKey, setSlotsRefreshKey] = useState(0);
 
   const durationMinutes = useMemo(() => {
     return getDurationMinutes(timeStart, timeEnd);
@@ -372,13 +355,12 @@ export function SlotsGapManagementPanel({
     setDate(normalizedDay);
   }, [normalizedDay]);
 
-useEffect(() => {
-  setTimeStart(extractStartTime(slot));
-  setTimeEnd(extractEndTime(slot));
-  setPromotion("none");
-  setSentCount(0);
-  setSelectedServices(services);
-}, [slot, services]);
+  useEffect(() => {
+    setTimeStart(extractStartTime(slot));
+    setTimeEnd(extractEndTime(slot));
+    setPromotion("none");
+    setSelectedServices(services);
+  }, [slot, services]);
 
   function handleOpenCustomersModal() {
     if (!slot?.id) {
@@ -395,11 +377,12 @@ useEffect(() => {
   }
 
   function handleServicesSaved() {
-  setSlotsRefreshKey((value) => value + 1);
-}
+    if (onServicesSaved) {
+      onServicesSaved();
+    }
+  }
 
   function handleSent() {
-    setSentCount((current) => current + 1);
     setCustomersModalOpen(false);
     onClose();
 
@@ -411,29 +394,23 @@ useEffect(() => {
   return (
     <>
       <AnimatePresence>
-{renderPanel(
-  open,
-  onClose,
-  dayChipLabel,
-  timeStart,
-  durationMinutes,
-  selectedServices,
-  setSelectedServices,
-  onServicesSaved,
-  companyId,
-  locationId,
-  slot?.id || "",
-  promotion,
-  setPromotion,
-  clientCount,
-  setClientCount,
-  subscribedOnly,
-  setSubscribedOnly,
-  sentCount,
-  handleOpenCustomersModal,
-  templateBody,
-  companyName,
-)}
+        {renderPanel({
+          open,
+          onClose,
+          dateLabel: dayChipLabel || date,
+          timeStart,
+          durationMinutes,
+          selectedServices,
+          setSelectedServices,
+          handleServicesSaved,
+          locationId,
+          slotId: slot?.id || "",
+          promotion,
+          setPromotion,
+          handleOpenCustomersModal,
+          templateBody,
+          companyName,
+        })}
       </AnimatePresence>
 
       <SlotsCustomersPickerModal
@@ -442,25 +419,7 @@ useEffect(() => {
         companyId={companyId}
         slotId={slot?.id || ""}
         onSent={handleSent}
-        onAddContact={() => {
-          setCustomersModalOpen(false);
-          setCreateCustomerModalOpen(true);
-        }}
       />
-
-      {createCustomerModalOpen && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30">
-          <div className="rounded-2xl bg-white p-6 shadow-xl">
-            <p className="text-sm font-medium">Modal crear contacto</p>
-            <Button
-              className="mt-4"
-              onClick={() => setCreateCustomerModalOpen(false)}
-            >
-              Cerrar
-            </Button>
-          </div>
-        </div>
-      )}
     </>
   );
 }

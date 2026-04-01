@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import PageShell from "@/app/components/layouts/PageShell";
 import { SlotsGapManagementPanel } from "@/app/components/slots/GapManagement/SlotsGapManagementPanel";
 import { SlotsGapControlPanel } from "@/app/components/slots/GapManagement/SlotsGapControlPanel";
-import { SlotsNewCancellationModal } from "@/app/components/slots/SlotsNewCancellationModal";
+import { NewCancellationModal } from "@/app/components/slots/NewAvailableSlotModal/NewCancellationModal";
 import { SlotsInviteModal } from "@/app/components/slots/SlotsInviteModal";
 import { SlotsPageShell } from "@/app/components/slots/SlotsPageShell";
 import { useBootstrapData } from "@/app/providers/bootstrap-store";
@@ -23,24 +23,25 @@ type SlotTemplateData = {
 
 export default function SlotsPage() {
   const [companyId, setCompanyId] = useState<string | null>(null);
-
-const [selectedSlot, setSelectedSlot] = useState<{
-  day: string;
-  slot: SlotItem;
-  services: SelectedServiceItem[];
-  locationId: string | null;
-} | null>(null);
+  const [locationId, setLocationId] = useState<string | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<{
+    day: string;
+    slot: SlotItem;
+    services: SelectedServiceItem[];
+    locationId: string | null;
+  } | null>(null);
 
   const [slotTemplate, setSlotTemplate] = useState<SlotTemplateData | null>(null);
   const [showNewCancellation, setShowNewCancellation] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
   const boot = useBootstrapData();
   const companyName = boot?.activeCompanyResolved?.name ?? "tu negocio";
 
   const shouldOpenManagementPanel =
-  selectedSlot?.slot.status === "pending" ||
-  selectedSlot?.slot.status === "fresh";
+    selectedSlot?.slot.status === "pending" ||
+    selectedSlot?.slot.status === "fresh";
 
   useEffect(() => {
     if (!companyId || !selectedSlot || !shouldOpenManagementPanel) {
@@ -82,7 +83,7 @@ const [selectedSlot, setSelectedSlot] = useState<{
     fetchTemplate();
 
     return () => controller.abort();
-  }, [companyId, selectedSlot]);
+  }, [companyId, selectedSlot, shouldOpenManagementPanel]);
 
   return (
     <PageShell
@@ -90,35 +91,38 @@ const [selectedSlot, setSelectedSlot] = useState<{
       description="Recupera citas canceladas automáticamente con WhatsApp."
       variant="full"
     >
-<SlotsPageShell
-  onNewCancellation={() => setShowNewCancellation(true)}
-  onInvite={() => setShowInvite(true)}
-  onCompanyChange={(id: string | null) => setCompanyId(id)}
-  onSlotClick={(day, slot, services, locationId) => {
-    setSelectedSlot({
-      day,
-      slot,
-      services,
-      locationId,
-    });
-  }}
-  refreshKey={refreshKey}
-/>
+      <SlotsPageShell
+        companyId={companyId}
+        locationId={locationId}
+        onCompanyChange={setCompanyId}
+        onLocationChange={setLocationId}
+        onNewCancellation={() => setShowNewCancellation(true)}
+        onInvite={() => setShowInvite(true)}
+        onSlotClick={(day, slot, services, slotLocationId) => {
+          setSelectedSlot({
+            day,
+            slot,
+            services,
+            locationId: slotLocationId,
+          });
+        }}
+        refreshKey={refreshKey}
+      />
 
       {companyId && selectedSlot && shouldOpenManagementPanel ? (
-<SlotsGapManagementPanel
-  open={true}
-  onClose={() => setSelectedSlot(null)}
-  day={selectedSlot.day}
-  slot={selectedSlot.slot}
-  services={selectedSlot.services}
-  companyId={companyId}
-  locationId={selectedSlot.locationId ?? ""}
-  templateBody={slotTemplate?.body_preview ?? ""}
-  companyName={companyName}
-  onSent={() => setRefreshKey((prev) => prev + 1)}
-  onServicesSaved={() => setRefreshKey((prev) => prev + 1)}
-/>
+        <SlotsGapManagementPanel
+          open={true}
+          onClose={() => setSelectedSlot(null)}
+          day={selectedSlot.day}
+          slot={selectedSlot.slot}
+          services={selectedSlot.services}
+          companyId={companyId}
+          locationId={selectedSlot.locationId ?? ""}
+          templateBody={slotTemplate?.body_preview ?? ""}
+          companyName={companyName}
+          onSent={() => setRefreshKey((prev) => prev + 1)}
+          onServicesSaved={() => setRefreshKey((prev) => prev + 1)}
+        />
       ) : null}
 
       {selectedSlot && !shouldOpenManagementPanel ? (
@@ -129,9 +133,10 @@ const [selectedSlot, setSelectedSlot] = useState<{
         />
       ) : null}
 
-      <SlotsNewCancellationModal
+      <NewCancellationModal
         open={showNewCancellation}
         onClose={() => setShowNewCancellation(false)}
+        locationId={locationId ?? ""}
       />
 
       <SlotsInviteModal

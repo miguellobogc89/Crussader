@@ -1,5 +1,4 @@
 // app/components/slots/configuration/ConfigurationCard.tsx
-
 "use client";
 
 import { useState } from "react";
@@ -11,15 +10,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { ConfigurationCalendarModal } from "./ConfigurationCalendarModal";
-import { ConfigurationEmployeesServicesModal } from "./ConfigurationEmployeesServicesModal";
-import { ConfigurationClientsTableModal } from "./ConfigurationClientsTableModal";
+import { EmployeesServicesModal } from "./EmployeesServicesModal";
 
 type ConfigurationCardProps = {
-  companyId: string | null;
+  locationId: string | null;
 };
 
 export function ConfigurationCard({
-  companyId,
+  locationId,
 }: ConfigurationCardProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [employeesServicesOpen, setEmployeesServicesOpen] = useState(false);
@@ -39,16 +37,6 @@ export function ConfigurationCard({
             </h3>
           </div>
 
-          <div className="mt-4 rounded-xl bg-slate-50 p-4">
-            <p className="text-sm font-medium text-foreground">
-              Accesos rápidos
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">
-              Gestiona calendario, empleados, servicios y base de clientes
-              desde un único punto.
-            </p>
-          </div>
-
           <div className="mt-4 grid gap-2">
             <Button
               type="button"
@@ -65,6 +53,7 @@ export function ConfigurationCard({
               onClick={() => setEmployeesServicesOpen(true)}
               variant="outline"
               className="h-10 w-full justify-start rounded-xl border-slate-200 bg-white text-foreground hover:bg-slate-50"
+              disabled={!locationId}
             >
               <Users2 className="mr-2 h-4 w-4 text-slate-500" />
               Empleados y servicios
@@ -88,16 +77,13 @@ export function ConfigurationCard({
         onClose={() => setCalendarOpen(false)}
       />
 
-      <ConfigurationEmployeesServicesModal
+      <EmployeesServicesModal
         open={employeesServicesOpen}
         onClose={() => setEmployeesServicesOpen(false)}
+        locationId={locationId ?? ""}
       />
 
-      <ConfigurationClientsTableModal
-        open={clientsTableOpen}
-        onClose={() => setClientsTableOpen(false)}
-        companyId={companyId ?? ""}
-      />
+
     </>
   );
 }

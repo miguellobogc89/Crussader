@@ -1,6 +1,7 @@
+// app/components/slots/modal/SlotServiceSelector.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import {
   Droplets,
@@ -19,7 +20,6 @@ import type {
 } from "./slotModal.types";
 
 type SlotServiceSelectorProps = {
-  companyId?: string;
   locationId: string;
   slotId: string;
   slotDurationMin: number;
@@ -129,7 +129,6 @@ function buildSelectedSavedServices(
 }
 
 export function SlotServiceSelector({
-  companyId,
   locationId,
   slotId,
   slotDurationMin,
@@ -149,15 +148,20 @@ export function SlotServiceSelector({
   const [createErrorText, setCreateErrorText] = useState("");
   const [createSuccessText, setCreateSuccessText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [hasLoadedServices, setHasLoadedServices] = useState(false);
   const [draft, setDraft] = useState<CreateServiceDraft>({
     name: "",
     price: "",
     durationMin: "",
   });
 
+  const hasMountedForSlotRef = useRef(false);
+  const lastSlotIdRef = useRef("");
+
   useEffect(() => {
-    if (!locationId && !companyId) {
+    if (!locationId) {
       setServices([]);
+      setHasLoadedServices(false);
       return;
     }
 
@@ -167,14 +171,10 @@ export function SlotServiceSelector({
       try {
         setLoading(true);
         setErrorText("");
+        setHasLoadedServices(false);
 
         const params = new URLSearchParams();
-
-        if (locationId) {
-          params.set("locationId", locationId);
-        } else if (companyId) {
-          params.set("companyId", companyId);
-        }
+        params.set("locationId", locationId);
 
         const response = await fetch(
           `${SERVICES_LIST_ENDPOINT}?${params.toString()}`,
@@ -191,6 +191,7 @@ export function SlotServiceSelector({
           setErrorText("No se pudieron cargar los servicios.");
           setServices([]);
           setLoading(false);
+          setHasLoadedServices(true);
           return;
         }
 
@@ -208,6 +209,7 @@ export function SlotServiceSelector({
 
         setServices(nextServices);
         setLoading(false);
+        setHasLoadedServices(true);
       } catch (error) {
         if ((error as Error).name === "AbortError") {
           return;
@@ -217,16 +219,17 @@ export function SlotServiceSelector({
         setErrorText("No se pudieron cargar los servicios.");
         setServices([]);
         setLoading(false);
+        setHasLoadedServices(true);
       }
     }
 
     loadServices();
 
     return () => controller.abort();
-  }, [locationId, companyId]);
+  }, [locationId]);
 
   useEffect(() => {
-    if (!companyId) {
+    if (!hasLoadedServices) {
       return;
     }
 
@@ -244,7 +247,7 @@ export function SlotServiceSelector({
     if (filteredSelectedServices.length !== selectedServices.length) {
       onChange(filteredSelectedServices);
     }
-  }, [companyId, services, slotDurationMin, selectedServices, onChange]);
+  }, [hasLoadedServices, services, slotDurationMin, selectedServices, onChange]);
 
   useEffect(() => {
     if (!createSuccessText) {
@@ -274,53 +277,67 @@ export function SlotServiceSelector({
     };
   }, [justAddedId]);
 
-useEffect(() => {
-  if (!slotId) {
-    return;
-  }
-
-  const timeout = window.setTimeout(async () => {
-    try {
-      setIsSaving(true);
-
-      const response = await fetch("/api/slots/services/assign", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          slotId,
-          services: selectedServices.map((service, index) => {
-            return {
-              serviceId: service.serviceId,
-              position: index,
-            };
-          }),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data?.ok) {
-        throw new Error(data?.error || "No se pudieron guardar los servicios.");
-      }
-
-      // 👇 AQUÍ está lo importante
-      if (onSaved) {
-        onSaved();
-      }
-
-    } catch (error) {
-      console.error("[autosave services]", error);
-    } finally {
-      setIsSaving(false);
+  useEffect(() => {
+    if (lastSlotIdRef.current !== slotId) {
+      lastSlotIdRef.current = slotId;
+      hasMountedForSlotRef.current = false;
     }
-  }, 400);
+  }, [slotId]);
 
-  return () => {
-    window.clearTimeout(timeout);
-  };
-}, [selectedServices, slotId, onSaved]);
+  useEffect(() => {
+    if (!slotId) {
+      return;
+    }
+
+    if (!hasLoadedServices) {
+      return;
+    }
+
+    if (!hasMountedForSlotRef.current) {
+      hasMountedForSlotRef.current = true;
+      return;
+    }
+
+    const timeout = window.setTimeout(async () => {
+      try {
+        setIsSaving(true);
+
+        const response = await fetch("/api/slots/services/assign", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            slotId,
+            services: selectedServices.map((service, index) => {
+              return {
+                serviceId: service.serviceId,
+                position: index,
+              };
+            }),
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data?.ok) {
+          throw new Error(data?.error || "No se pudieron guardar los servicios.");
+        }
+
+        if (onSaved) {
+          onSaved();
+        }
+      } catch (error) {
+        console.error("[autosave services]", error);
+      } finally {
+        setIsSaving(false);
+      }
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [selectedServices, slotId, hasLoadedServices, onSaved]);
 
   const compatibleServices = useMemo(() => {
     return sortServices(
@@ -467,21 +484,24 @@ useEffect(() => {
     }
   }
 
-  {isSaving && (
-  <div className="text-xs text-muted-foreground flex items-center gap-1">
-    <Loader2 className="h-3 w-3 animate-spin" />
-    Guardando...
-  </div>
-)}
-
   return (
     <div className="space-y-3">
       <div className="space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Servicios ofertados
-        </p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Servicios ofertados
+          </p>
+
+          {isSaving ? (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Guardando...
+            </div>
+          ) : null}
+        </div>
+
         <p className="text-xs text-muted-foreground">
-          Se muestran los servicios de la empresa que caben en {slotDurationMin} min.
+          Se muestran los servicios de la ubicación que caben en {slotDurationMin} min.
         </p>
       </div>
 
@@ -503,19 +523,19 @@ useEffect(() => {
           <div className="space-y-3">
             <div className="flex min-h-[44px] flex-wrap gap-2">
               <AnimatePresence mode="popLayout">
-{selectedSavedServices.length === 0 ? (
-  <motion.div
-    key="empty-banner"
-    layout
-    initial={{ opacity: 0, y: 6 }}
-    animate={{ opacity: 1, y: 0 }}
-    exit={{ opacity: 0, y: -6 }}
-    className="flex w-full items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800"
-  >
-    <PackageOpen className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-    <span>Este hueco aún no tiene servicios asignados.</span>
-  </motion.div>
-) : null}
+                {selectedSavedServices.length === 0 ? (
+                  <motion.div
+                    key="empty-banner"
+                    layout
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="flex w-full items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800"
+                  >
+                    <PackageOpen className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                    <span>Este hueco aún no tiene servicios asignados.</span>
+                  </motion.div>
+                ) : null}
 
                 {selectedSavedServices.map((service) => {
                   const Icon = getServiceIcon(service.name);
@@ -566,21 +586,21 @@ useEffect(() => {
                         ) : null}
                       </AnimatePresence>
 
-<AnimatePresence initial={false}>
-  {isHovered && !isNew ? (
-    <motion.button
-      type="button"
-      initial={{ opacity: 0, scale: 0.5 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.5 }}
-      transition={{ duration: 0.15 }}
-      onClick={() => removeService(service.id)}
-      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow-sm transition-transform active:scale-90"
-    >
-      <X className="h-3 w-3" />
-    </motion.button>
-  ) : null}
-</AnimatePresence>
+                      <AnimatePresence initial={false}>
+                        {isHovered && !isNew ? (
+                          <motion.button
+                            type="button"
+                            initial={{ opacity: 0, scale: 0.5 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.5 }}
+                            transition={{ duration: 0.15 }}
+                            onClick={() => removeService(service.id)}
+                            className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow-sm transition-transform active:scale-90"
+                          >
+                            <X className="h-3 w-3" />
+                          </motion.button>
+                        ) : null}
+                      </AnimatePresence>
                     </motion.div>
                   );
                 })}
@@ -737,88 +757,94 @@ useEffect(() => {
                           transition={{ type: "spring", damping: 26, stiffness: 300 }}
                           className="overflow-hidden"
                         >
-<div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,3fr)_78px_86px_auto_auto]">
-  <input
-    value={draft.name}
-    onChange={(e) =>
-      setDraft((current) => {
-        return {
-          ...current,
-          name: e.target.value,
-        };
-      })
-    }
-    placeholder="Nombre"
-    autoFocus
-    className="h-8 min-w-0 rounded-lg border border-border/60 bg-card px-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#2563EB] focus:ring-0"
-  />
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,3fr)_78px_86px_auto_auto]">
+                            <input
+                              value={draft.name}
+                              onChange={(e) =>
+                                setDraft((current) => {
+                                  return {
+                                    ...current,
+                                    name: e.target.value,
+                                  };
+                                })
+                              }
+                              placeholder="Nombre"
+                              autoFocus
+                              className="h-8 min-w-0 rounded-lg border border-border/60 bg-card px-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#2563EB] focus:ring-0"
+                            />
 
-  <div className="relative">
-    <input
-      value={draft.price}
-      onChange={(e) =>
-        setDraft((current) => {
-          return {
-            ...current,
-            price: e.target.value.replace(/[^0-9,.]/g, ""),
-          };
-        })
-      }
-      placeholder="0"
-      className="h-8 w-full rounded-lg border border-border/60 bg-card px-2.5 pr-7 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#2563EB] focus:ring-0"
-    />
-    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-      €
-    </span>
-  </div>
+                            <div className="relative">
+                              <input
+                                value={draft.price}
+                                onChange={(e) =>
+                                  setDraft((current) => {
+                                    return {
+                                      ...current,
+                                      price: e.target.value.replace(/[^0-9,.]/g, ""),
+                                    };
+                                  })
+                                }
+                                placeholder="0"
+                                className="h-8 w-full rounded-lg border border-border/60 bg-card px-2.5 pr-7 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#2563EB] focus:ring-0"
+                              />
+                              <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                €
+                              </span>
+                            </div>
 
-  <div className="relative">
-    <input
-      value={draft.durationMin}
-      onChange={(e) =>
-        setDraft((current) => {
-          return {
-            ...current,
-            durationMin: e.target.value.replace(/[^0-9]/g, ""),
-          };
-        })
-      }
-      placeholder="0"
-      className="h-8 w-full rounded-lg border border-border/60 bg-card px-2.5 pr-9 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#2563EB] focus:ring-0"
-    />
-    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-      min
-    </span>
-  </div>
+                            <div className="relative">
+                              <input
+                                value={draft.durationMin}
+                                onChange={(e) =>
+                                  setDraft((current) => {
+                                    return {
+                                      ...current,
+                                      durationMin: e.target.value.replace(/[^0-9]/g, ""),
+                                    };
+                                  })
+                                }
+                                placeholder="0"
+                                className="h-8 w-full rounded-lg border border-border/60 bg-card px-2.5 pr-9 text-sm tabular-nums text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#2563EB] focus:ring-0"
+                              />
+                              <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                min
+                              </span>
+                            </div>
 
-  <button
-    type="button"
-    onClick={handleCreateService}
-    disabled={isSubmittingCreate}
-    className="h-8 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95 disabled:opacity-40"
-  >
-    {isSubmittingCreate ? "Creando..." : "Crear"}
-  </button>
+                            <button
+                              type="button"
+                              onClick={handleCreateService}
+                              disabled={isSubmittingCreate}
+                              className="h-8 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 active:scale-95 disabled:opacity-40"
+                            >
+                              {isSubmittingCreate ? "Creando..." : "Crear"}
+                            </button>
 
-  <button
-    type="button"
-    onClick={() => {
-      setIsCreating(false);
-      setCreateErrorText("");
-      setDraft({
-        name: "",
-        price: "",
-        durationMin: "",
-      });
-    }}
-    className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-muted"
-  >
-    <X className="h-3.5 w-3.5 text-muted-foreground" />
-  </button>
-</div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsCreating(false);
+                                setCreateErrorText("");
+                                setDraft({
+                                  name: "",
+                                  price: "",
+                                  durationMin: "",
+                                });
+                              }}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-muted"
+                            >
+                              <X className="h-3.5 w-3.5 text-muted-foreground" />
+                            </button>
+                          </div>
                         </motion.div>
                       ) : null}
                     </AnimatePresence>
+
+                    {createErrorText ? (
+                      <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                        {createErrorText}
+                      </div>
+                    ) : null}
                   </div>
                 </motion.div>
               ) : null}
