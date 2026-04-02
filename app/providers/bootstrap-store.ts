@@ -6,6 +6,15 @@ import type { BootstrapData } from "@/lib/bootstrap";
 
 type Status = "idle" | "loading" | "ready" | "error";
 
+export type BootstrapLocation = {
+  id: string;
+  title: string;
+  city?: string | null;
+  reviewsCount?: number | null;
+  openingHours?: any | null;
+  companyId?: string | null;
+};
+
 export type BootstrapState = {
   data?: BootstrapData & {
     /** Campos derivados que NO rompen el shape anterior */
@@ -14,6 +23,9 @@ export type BootstrapState = {
   };
   status: Status;
   error?: string;
+
+  activeLocationId: string | null;
+  activeLocation: BootstrapLocation | null;
 
   /** Hidrata el store con datos ya cargados en el servidor (o desde API) */
   load: (initial: BootstrapData) => void;
@@ -26,6 +38,11 @@ export type BootstrapState = {
 
   /** 🔧 Actualiza parcialmente los datos del usuario en el store (evita re-fetch) */
   patchMe: (patch: Partial<BootstrapData["user"]>) => void;
+
+  setActiveLocation: (
+    locationId: string | null,
+    location?: BootstrapLocation | null
+  ) => void;
 };
 
 /* ============================
@@ -51,7 +68,62 @@ function getName(x: any): string | null {
 // Rol si existe (en memberships)
 function getRole(x: any): string | null | undefined {
   const r = x?.role;
-  return typeof r === "string" ? r : undefined;
+  if (typeof r === "string") return r;
+  return undefined;
+}
+
+function normalizeLocations(data: BootstrapData): BootstrapLocation[] {
+  if (!Array.isArray((data as any).locations)) return [];
+
+  return (data as any).locations.map((l: any) => ({
+    id: String(l.id),
+    title: String(l.title ?? "Sin nombre"),
+    city: l.city ?? null,
+    reviewsCount: l.reviewsCount ?? 0,
+    openingHours: l.openingHours ?? null,
+    companyId: l.companyId ? String(l.companyId) : null,
+  }));
+}
+
+function resolveInitialLocation(data: BootstrapData): {
+  activeLocationId: string | null;
+  activeLocation: BootstrapLocation | null;
+} {
+  const locations = normalizeLocations(data);
+
+  if (locations.length === 0) {
+    return {
+      activeLocationId: null,
+      activeLocation: null,
+    };
+  }
+
+  let defaultId: string | null = null;
+
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem("dashboard:locationId");
+    const validSaved = locations.some((location) => location.id === saved);
+
+    if (validSaved && saved) {
+      defaultId = saved;
+    }
+  }
+
+  if (!defaultId) {
+    defaultId = locations[0].id;
+  }
+
+  const selected =
+    locations.find((location) => location.id === defaultId) ?? null;
+
+  if (typeof window !== "undefined" && defaultId) {
+    localStorage.setItem("dashboard:locationId", defaultId);
+  }
+
+  return {
+    activeLocationId: defaultId,
+    activeLocation: selected,
+  };
 }
 
 /**
@@ -62,7 +134,6 @@ function enrichBootstrap<T extends BootstrapData>(data: T): T & {
   companiesResolved: Array<{ id: string; name: string; role?: string | null }>;
   activeCompanyResolved: { id: string; name: string; role?: string | null } | null;
 } {
-  // 1) Si el servidor ya envió companiesResolved, respétalo
   const serverResolved = (data as any).companiesResolved as
     | Array<{ id: string; name: string; role?: string | null }>
     | undefined;
@@ -76,7 +147,6 @@ function enrichBootstrap<T extends BootstrapData>(data: T): T & {
       role: c.role ?? null,
     }));
   } else {
-    // 2) Construir a partir de "companies" (memberships) si no vino resuelto
     const rawList: any[] = Array.isArray((data as any).companies)
       ? ((data as any).companies as any[])
       : [];
@@ -86,46 +156,58 @@ function enrichBootstrap<T extends BootstrapData>(data: T): T & {
     for (const item of rawList) {
       const id = getId(item);
       if (!id) continue;
-      const role = getRole(item) ?? null;
 
-      // Intenta deducir nombre desde varias formas
+      const role = getRole(item) ?? null;
       const name = getName(item) ?? `Empresa ${id.slice(0, 6)}…`;
 
       if (!seen.has(id)) {
         seen.set(id, { id, name, role });
-      } else {
-        const prev = seen.get(id)!;
-        // Si teníamos fallback y ahora logramos un nombre real, sobrescribe
-        if (prev.name.startsWith("Empresa ") && getName(item)) {
-          seen.set(id, { id, name, role: prev.role ?? role });
-        }
+        continue;
+      }
+
+      const prev = seen.get(id)!;
+
+      if (prev.name.startsWith("Empresa ") && getName(item)) {
+        seen.set(id, { id, name, role: prev.role ?? role });
       }
     }
 
     companiesResolved = Array.from(seen.values());
   }
 
-  // 3) activeCompanyResolved: preferir el aportado por servidor si existe
   const serverActiveResolved =
-    (data as any).activeCompanyResolved as { id: string; name: string; role?: string | null } | null | undefined;
+    (data as any).activeCompanyResolved as
+      | { id: string; name: string; role?: string | null }
+      | null
+      | undefined;
 
-  let activeCompanyResolved: { id: string; name: string; role?: string | null } | null;
+  let activeCompanyResolved: {
+    id: string;
+    name: string;
+    role?: string | null;
+  } | null;
 
   if (serverActiveResolved) {
     activeCompanyResolved = serverActiveResolved;
   } else {
-    // Si no vino, intenta resolver desde activeCompany (objeto rico) o por id
     const activeRaw: any = (data as any).activeCompany ?? null;
     const activeId = getId(activeRaw) ?? companiesResolved[0]?.id ?? null;
 
-    const fromList = activeId ? companiesResolved.find((c) => c.id === activeId) ?? null : null;
+    const fromList = activeId
+      ? companiesResolved.find((c) => c.id === activeId) ?? null
+      : null;
 
     if (fromList) {
       activeCompanyResolved = { ...fromList };
     } else if (activeId) {
       const fallbackName =
         (activeRaw && getName(activeRaw)) || `Empresa ${activeId.slice(0, 6)}…`;
-      activeCompanyResolved = { id: activeId, name: fallbackName, role: getRole(activeRaw) ?? null };
+
+      activeCompanyResolved = {
+        id: activeId,
+        name: fallbackName,
+        role: getRole(activeRaw) ?? null,
+      };
     } else {
       activeCompanyResolved = null;
     }
@@ -134,50 +216,71 @@ function enrichBootstrap<T extends BootstrapData>(data: T): T & {
   return Object.assign({}, data, { companiesResolved, activeCompanyResolved });
 }
 
-const storeCreator: StateCreator<BootstrapState> = (set, get) => ({
+const storeCreator: StateCreator<BootstrapState> = (set) => ({
   data: undefined,
   status: "idle",
   error: undefined,
 
-  load: (initial: BootstrapData) =>
+  activeLocationId: null,
+  activeLocation: null,
+
+  load: (initial: BootstrapData) => {
+    const enriched = enrichBootstrap(initial);
+    const locationState = resolveInitialLocation(initial);
+
     set({
-      data: enrichBootstrap(initial),
+      data: enriched,
       status: "ready",
       error: undefined,
-    }),
+      activeLocationId: locationState.activeLocationId,
+      activeLocation: locationState.activeLocation,
+    });
+  },
 
   clear: () =>
     set({
       data: undefined,
       status: "idle",
       error: undefined,
+      activeLocationId: null,
+      activeLocation: null,
     }),
 
   fetchFromApi: async () => {
     set({ status: "loading", error: undefined });
+
     try {
       const res = await fetch("/api/bootstrap", { cache: "no-store" });
+
       if (!res.ok) {
         throw new Error(`bootstrap_api_${res.status}`);
       }
-      const json: { ok: boolean; data?: BootstrapData; error?: string } = await res.json();
+
+      const json: { ok: boolean; data?: BootstrapData; error?: string } =
+        await res.json();
 
       if (!json.ok || !json.data) {
         throw new Error(json.error ?? "bootstrap_api_error");
       }
 
+      const enriched = enrichBootstrap(json.data);
+      const locationState = resolveInitialLocation(json.data);
+
       set({
-        data: enrichBootstrap(json.data),
+        data: enriched,
         status: "ready",
         error: undefined,
+        activeLocationId: locationState.activeLocationId,
+        activeLocation: locationState.activeLocation,
       });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "bootstrap_fetch_failed";
+      const msg =
+        err instanceof Error ? err.message : "bootstrap_fetch_failed";
+
       set({ status: "error", error: msg });
     }
   },
 
-  // ⚠️ Corregido: antes actualizaba 'me', ahora actualiza 'user'
   patchMe: (patch) =>
     set((s) =>
       s.data
@@ -189,6 +292,21 @@ const storeCreator: StateCreator<BootstrapState> = (set, get) => ({
           }
         : {}
     ),
+
+  setActiveLocation: (locationId, location) => {
+    if (typeof window !== "undefined") {
+      if (locationId) {
+        localStorage.setItem("dashboard:locationId", locationId);
+      } else {
+        localStorage.removeItem("dashboard:locationId");
+      }
+    }
+
+    set({
+      activeLocationId: locationId,
+      activeLocation: location ?? null,
+    });
+  },
 });
 
 export const useBootstrapStore = create<BootstrapState>(storeCreator);
@@ -197,13 +315,27 @@ export const useBootstrapStore = create<BootstrapState>(storeCreator);
 export function useBootstrapData() {
   return useBootstrapStore((s) => s.data);
 }
+
 export function useBootstrapStatus() {
   return useBootstrapStore((s) => s.status);
 }
+
 export function useBootstrapError() {
   return useBootstrapStore((s) => s.error);
 }
-/** Selector para el patch local de "me" (onboardingStatus, name, etc.) */
+
 export function usePatchMe() {
   return useBootstrapStore((s) => s.patchMe);
+}
+
+export function useActiveLocationId() {
+  return useBootstrapStore((s) => s.activeLocationId);
+}
+
+export function useActiveLocation() {
+  return useBootstrapStore((s) => s.activeLocation);
+}
+
+export function useSetActiveLocation() {
+  return useBootstrapStore((s) => s.setActiveLocation);
 }

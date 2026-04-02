@@ -36,6 +36,7 @@ export function WaitlistInlineCreate({
 }: Props) {
   const [query, setQuery] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [isNewCustomer, setIsNewCustomer] = useState(false);
   const [selectedCustomerPhone, setSelectedCustomerPhone] = useState<string | null>(null);
 
   const [showCreateCustomer, setShowCreateCustomer] = useState(false);
@@ -283,19 +284,26 @@ function getTimePreference(): string[] | null {
         throw new Error(data?.error || "No se pudo guardar la entrada");
       }
 
-      const created: WaitlistRowItem = {
-        id: String(data.item.id),
-        customerName: String(data.item.customerName ?? trimmedName),
-        customerPhone: data.item.customerPhone
-          ? String(data.item.customerPhone)
-          : null,
-        serviceName: data.item.serviceName
-          ? String(data.item.serviceName)
-          : null,
-        note: data.item.note ? String(data.item.note) : null,
-        isUrgent: Boolean(data.item.isUrgent),
-        createdAt: String(data.item.createdAt),
-      };
+const created: WaitlistRowItem = {
+  id: String(data.item.id),
+  customerName: String(data.item.customerName ?? trimmedName),
+  customerPhone: data.item.customerPhone
+    ? String(data.item.customerPhone)
+    : null,
+  serviceName: data.item.serviceName
+    ? String(data.item.serviceName)
+    : null,
+  note: data.item.note ? String(data.item.note) : null,
+  isUrgent: Boolean(data.item.isUrgent),
+  isNewCustomer,
+  createdAt: String(data.item.createdAt),
+  employees: Array.isArray(data.item.employees)
+    ? data.item.employees.map((employee: { id: string; name: string }) => ({
+        id: String(employee.id),
+        name: String(employee.name ?? ""),
+      }))
+    : [],
+};
 
       onCreated(created);
     } catch (error) {
@@ -349,6 +357,7 @@ return (
             setQuery(item.fullName);
             setSelectedCustomerId(item.customerId);
             setSelectedCustomerPhone(item.phone);
+            setIsNewCustomer(false);
             setShowCreateCustomer(false);
           }}
           onRequestCreate={(draftName) => {
@@ -367,6 +376,7 @@ return (
               setQuery(item.displayName);
               setSelectedCustomerId(item.customerId);
               setSelectedCustomerPhone(item.phone);
+              setIsNewCustomer(true);
               setShowCreateCustomer(false);
             }}
           />

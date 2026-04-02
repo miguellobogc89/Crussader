@@ -16,7 +16,7 @@ import { Brand } from "@/app/components/sidebar/Brand";
 import { UserFooter } from "@/app/components/sidebar/UserFooter";
 import { Menu } from "lucide-react";
 import { BetaPlanCard } from "@/app/components/sidebar/BetaPlanCard";
-
+import { SidebarLocationSelector } from "@/app/components/sidebar/SidebarLocationSelector";
 import { NAV_ITEMS, type SidebarNavItem } from "@/app/components/sidebar/sidebar.nav";
 
 /* ======== util ======== */
@@ -247,6 +247,7 @@ export function AppSidebar() {
         </nav>
 
         <BetaPlanCard collapsed={collapsed} variant="beta" />
+        <SidebarLocationSelector collapsed={collapsed} />
 
         <UserFooter
           collapsed={collapsed}

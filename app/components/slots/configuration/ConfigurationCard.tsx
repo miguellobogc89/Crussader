@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { ConfigurationCalendarModal } from "./ConfigurationCalendarModal";
+import { AdminModal } from "./admin/AdminModal";
 import { EmployeesServicesModal } from "./EmployeesServicesModal";
 
 type ConfigurationCardProps = {
@@ -21,7 +22,7 @@ export function ConfigurationCard({
 }: ConfigurationCardProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [employeesServicesOpen, setEmployeesServicesOpen] = useState(false);
-  const [clientsTableOpen, setClientsTableOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
 
   return (
     <>
@@ -56,17 +57,18 @@ export function ConfigurationCard({
               disabled={!locationId}
             >
               <Users2 className="mr-2 h-4 w-4 text-slate-500" />
-              Empleados y servicios
+              Asignar servicios
             </Button>
 
             <Button
               type="button"
-              onClick={() => setClientsTableOpen(true)}
+              onClick={() => setAdminOpen(true)}
               variant="outline"
               className="h-10 w-full justify-start rounded-xl border-slate-200 bg-white text-foreground hover:bg-slate-50"
+              disabled={!locationId}
             >
               <Table2 className="mr-2 h-4 w-4 text-slate-500" />
-              Tabla de clientes
+              Administración
             </Button>
           </div>
         </div>
@@ -83,7 +85,11 @@ export function ConfigurationCard({
         locationId={locationId ?? ""}
       />
 
-
+      <AdminModal
+        open={adminOpen}
+        onClose={() => setAdminOpen(false)}
+        locationId={locationId ?? ""}
+      />
     </>
   );
 }

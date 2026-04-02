@@ -31,48 +31,62 @@ export function WaitlistCustomerCreate({
   const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
 
-  async function handleSave() {
-    if (!companyId || !locationId || !name.trim()) {
-      return;
-    }
+async function handleSave() {
+  const trimmedName = name.trim();
+  const trimmedPhone = phone.trim();
 
-    try {
-      setSaving(true);
-
-      const res = await fetch(ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyId,
-          locationId,
-          name: name.trim(),
-          phone: phone.trim() || null,
-        }),
-      });
-
-      const data = await res.json();
-
-      const id = String(data.customer?.id ?? data.item?.id);
-      const displayName = String(
-        data.customer?.displayName ?? name.trim()
-      );
-
-      const rawPhone =
-        data.customer?.phone ?? data.item?.phone ?? phone.trim() ?? null;
-
-      const finalPhone = rawPhone ? String(rawPhone) : null;
-
-      onCreated({
-        customerId: id,
-        displayName,
-        phone: finalPhone,
-      });
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSaving(false);
-    }
+  if (!companyId || !locationId || !trimmedName || !trimmedPhone) {
+    return;
   }
+
+  const parts = trimmedName.split(/\s+/).filter(Boolean);
+  const firstName = parts[0] ?? "";
+  const lastName = parts.slice(1).join(" ");
+
+  try {
+    setSaving(true);
+
+    const res = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyId,
+        locationId,
+        firstName,
+        lastName,
+        phone: trimmedPhone,
+      }),
+    });
+
+    const data = await res.json();
+
+    const rawId =
+      data.item?.customerId ??
+      data.item?.customer?.id ??
+      null;
+
+    const id = rawId ? String(rawId) : "";
+
+    const displayName = String(
+      data.item?.customer?.displayName ?? trimmedName
+    );
+
+    const rawPhone =
+      data.item?.customer?.phone ?? trimmedPhone ?? null;
+
+    const finalPhone = rawPhone ? String(rawPhone) : null;
+
+    onCreated({
+      customerId: id,
+      displayName,
+      phone: finalPhone,
+    });
+  } catch (e) {
+    console.error(e);
+  } finally {
+    setSaving(false);
+  }
+}
 
   return (
     <div className="rounded-xl border bg-card p-3">

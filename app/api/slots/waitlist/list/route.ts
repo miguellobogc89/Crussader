@@ -34,55 +34,74 @@ export async function GET(request: NextRequest) {
     const companyId = location.companyId;
     const now = new Date();
 
-    const items = await prisma.slot_waitlist_entry.findMany({
-      where: {
-        company_id: companyId,
-        location_id: locationId,
-        status: "active",
-        OR: [
-          {
-            expires_at: null,
-          },
-          {
-            expires_at: {
-              gt: now,
-            },
-          },
-        ],
+const items = await prisma.slot_waitlist_entry.findMany({
+  where: {
+    company_id: companyId,
+    location_id: locationId,
+    status: "active",
+    OR: [
+      {
+        expires_at: null,
       },
-      orderBy: [
-        {
-          is_urgent: "desc",
+      {
+        expires_at: {
+          gt: now,
         },
-        {
-          created_at: "desc",
-        },
-      ],
+      },
+    ],
+  },
+  orderBy: [
+    {
+      is_urgent: "desc",
+    },
+    {
+      created_at: "desc",
+    },
+  ],
+  select: {
+    id: true,
+    customer_name: true,
+    customer_phone: true,
+    service_name: true,
+    note: true,
+    is_urgent: true,
+    created_at: true,
+    slot_waitlist_entry_employee: {
       select: {
-        id: true,
-        customer_name: true,
-        customer_phone: true,
-        service_name: true,
-        note: true,
-        is_urgent: true,
-        created_at: true,
+        employee_id: true,
+        Employee: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
-    });
+    },
+  },
+});
 
-    return NextResponse.json({
-      ok: true,
-      items: items.map((item) => {
+return NextResponse.json({
+  ok: true,
+  items: items.map((item) => {
+    return {
+      id: item.id,
+      customerName: item.customer_name,
+      customerPhone: item.customer_phone,
+      serviceName: item.service_name,
+      note: item.note,
+      isUrgent: item.is_urgent,
+      createdAt: item.created_at.toISOString(),
+      employees: item.slot_waitlist_entry_employee.map((row) => {
         return {
-          id: item.id,
-          customerName: item.customer_name,
-          customerPhone: item.customer_phone,
-          serviceName: item.service_name,
-          note: item.note,
-          isUrgent: item.is_urgent,
-          createdAt: item.created_at.toISOString(),
+          id: row.Employee.id,
+          name: row.Employee.name,
         };
       }),
-    });
+    };
+  }),
+});
+
+
   } catch (error) {
     console.error("GET /api/slots/waitlist/list error", error);
 
