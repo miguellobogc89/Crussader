@@ -39,7 +39,7 @@ export function SlotsStatsCard({ companyId, locationId }: Props) {
     {
       id: "income",
       label: "Ingresos recuperados",
-      value: "840€",
+      value: "1.840€",
       sub: "(+12%)",
       Icon: Euro,
     },

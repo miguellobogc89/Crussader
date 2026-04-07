@@ -1,12 +1,16 @@
 // app/components/calendar/CalendarShell.tsx
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import LocationSelector from "@/app/components/crussader/LocationSelector";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import ResourceView from "@/app/components/calendar/resources/ResourceView";
 import CalendarView from "@/app/components/calendar/calendar/CalendarView";
 import DetailsView from "@/app/components/calendar/details/DetailsView";
+
+import {
+  useActiveLocationId,
+  useBootstrapData,
+} from "@/app/providers/bootstrap-store";
 
 import type {
   ShiftTypeValue,
@@ -30,19 +34,24 @@ function todayDayKey() {
 }
 
 export default function CalendarShell() {
-  const [locationId, setLocationId] = useState<string | null>(null);
+  const activeLocationId = useActiveLocationId();
+  const bootstrapData = useBootstrapData();
+const companyId = bootstrapData?.activeCompanyResolved?.id ?? null;
+  const [locationId, setLocationId] = useState<string | null>(activeLocationId);
 
-  // data snapshots
+  useEffect(() => {
+    if (!activeLocationId) return;
+    setLocationId(activeLocationId);
+  }, [activeLocationId]);
+
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [templates, setTemplates] = useState<ShiftTemplateLite[]>([]);
 
-  // selección resources
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [shiftType, setShiftType] = useState<ShiftTypeValue>({
     templateId: "standard",
   });
 
-  // click calendario
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
 
   const employeeNameById = useCallback(
@@ -55,6 +64,7 @@ export default function CalendarShell() {
   );
 
   void templates;
+  void DetailsView;
 
   const selectedDayKey = useMemo(() => {
     const k = dayKeyFromCellId(selectedCellId);
@@ -62,12 +72,13 @@ export default function CalendarShell() {
     return todayDayKey();
   }, [selectedCellId]);
 
-  // por ahora vacío: solo layout
   const painted = useMemo(() => new Map(), []);
+
+  void selectedDayKey;
+  void painted;
 
   return (
     <>
-      <LocationSelector onSelect={(id) => setLocationId(id)} />
 
       <div className="flex min-h-[70vh] h-[calc(100vh-180px)] gap-4">
         <ResourceView
@@ -83,13 +94,12 @@ export default function CalendarShell() {
         />
 
         <CalendarView
+          companyId={companyId}
           locationId={locationId}
           employeeNameById={employeeNameById}
           onCellClick={(cellId: string) => setSelectedCellId(cellId)}
           selectedCellId={selectedCellId}
         />
-
-
       </div>
     </>
   );

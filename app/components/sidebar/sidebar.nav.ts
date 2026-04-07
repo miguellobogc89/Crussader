@@ -1,14 +1,11 @@
 // app/components/sidebar/sidebar.nav.ts
 import type { NavItem } from "@/app/components/sidebar/types";
 import {
-  Home,
-  MessageSquareText,
-  Building2,
+  LayoutDashboard,
   CalendarDays,
-  Target,
-  FlaskConical,
+  MessageSquareText,
+  Settings,
   Shield,
-  MessagesSquare,
 } from "lucide-react";
 
 export type SidebarNavItem = NavItem & {
@@ -18,18 +15,8 @@ export type SidebarNavItem = NavItem & {
 export const NAV_ITEMS: SidebarNavItem[] = [
   {
     title: "Inicio",
-    href: "/dashboard/home",
-    icon: Home,
-  },
-  {
-    title: "Reseñas",
-    href: "/dashboard/reviews",
-    icon: MessageSquareText,
-  },
-  {
-    title: "Mi negocio",
-    href: "/dashboard/mybusiness_old",
-    icon: Building2,
+    href: "/dashboard/slots",
+    icon: LayoutDashboard,
   },
   {
     title: "Calendario",
@@ -37,24 +24,17 @@ export const NAV_ITEMS: SidebarNavItem[] = [
     icon: CalendarDays,
   },
   {
-    title: "Labs",
-    href: "/dashboard/labs",
-    icon: FlaskConical,
+    title: "Reseñas",
+    href: "/dashboard/reviews",
+    icon: MessageSquareText,
+  },
+  {
+    title: "Configuración",
+    href: "/dashboard/settings",
+    icon: Settings,
   },
 
   // Admin-only
-  {
-    title: "Leads",
-    href: "/dashboard/crm/lead",
-    icon: Target,
-    requiresAdmin: true,
-  },
-  {
-    title: "Mensajes",
-    href: "/dashboard/whatsapp",
-    icon: MessagesSquare,
-    requiresAdmin: true,
-  },
   {
     title: "Admin",
     href: "/dashboard/admin",

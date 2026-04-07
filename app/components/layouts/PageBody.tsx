@@ -23,14 +23,16 @@ export default function PageBody({
     <main
       role="main"
       className={[
-        "w-full mx-auto",
+        "w-full mx-auto flex min-h-0 flex-1 flex-col overflow-hidden",
         widthClasses,
-        // padding horizontal + vertical responsivo
         "px-4 sm:px-6 xl:px-8 xl2:px-8 py-4 sm:py-6 lg:py-8",
       ].join(" ")}
     >
-      {toolbar && <div className="mb-4">{toolbar}</div>}
-      {children}
+      {toolbar ? <div className="mb-4 shrink-0">{toolbar}</div> : null}
+
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {children}
+      </div>
     </main>
   );
 }

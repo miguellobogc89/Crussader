@@ -13,6 +13,7 @@ import type { CalendarAppt, HolidayLite } from "./types";
 
 import WeekShiftsByEmployee from "@/app/components/calendar/calendar/WeekShiftsByEmployee";
 import WeekShiftsByRole from "@/app/components/calendar/calendar/WeekShiftsByRole";
+import AppointmentBlock from "@/app/components/calendar/calendar/AppointmentBlock";
 
 type ShiftEventLite = {
   id: string;
@@ -41,6 +42,7 @@ type Props = {
   selectedCellId?: string | null;
 
   shiftEvents?: ShiftEventLite[];
+  slots?: any[];
 };
 
 export default function WeekView({
@@ -56,6 +58,7 @@ export default function WeekView({
   onCellClick,
   selectedCellId,
   shiftEvents,
+  slots = [],
 }: Props) {
   const [shiftView, setShiftView] = useState<"role" | "employee">("role");
 
@@ -63,6 +66,23 @@ export default function WeekView({
   const WEEK_HEADER_PX = 0;
 
   const safeShiftEvents = shiftEvents ? shiftEvents : [];
+
+  const safeSlots = Array.isArray(slots) ? slots : [];
+
+const slotsByDay = new Map<string, any[]>();
+
+for (const slot of safeSlots) {
+  if (!slot?.startsAt || !slot?.endsAt) continue;
+
+  const dayKey = localKeyTZ(new Date(slot.startsAt));
+  const current = slotsByDay.get(dayKey);
+
+  if (current) {
+    current.push(slot);
+  } else {
+    slotsByDay.set(dayKey, [slot]);
+  }
+}
 
   function makeCellId(dayKey: string, hourIndex: number) {
     return `${dayKey}|${hourIndex}`;
@@ -130,6 +150,7 @@ export default function WeekView({
         {days.map((d) => {
           const dayKey = localKeyTZ(d);
           const list = apptsByDay.get(dayKey) ?? [];
+          const slotList = slotsByDay.get(dayKey) ?? [];
 
           const holidayList = holidays.filter(
             (h) => localKeyTZ(new Date(h.date)) === dayKey
@@ -209,6 +230,50 @@ className={[
                     );
                   })}
 
+                  {slotList.map((slot) => {
+  const start = new Date(slot.startsAt);
+  const end = new Date(slot.endsAt);
+
+  const startMinutes = start.getHours() * 60 + start.getMinutes();
+  const endMinutes = end.getHours() * 60 + end.getMinutes();
+
+  const top = ((startMinutes - START_HOUR * 60) / 60) * ROW_PX;
+  const height = ((endMinutes - startMinutes) / 60) * ROW_PX;
+
+  if (height <= 0) return null;
+
+  return (
+    <div
+      key={slot.id}
+      className="absolute left-[6px] right-[6px] z-20 rounded-md border border-dashed border-[#0B6CF4]/55 bg-[#0B6CF4]/10 px-2 py-1"
+      style={{
+        top,
+        height,
+      }}
+    >
+      <div className="flex h-full min-w-0 flex-col justify-between">
+        <div className="text-[11px] font-semibold text-[#0B6CF4]">
+          Hueco disponible
+        </div>
+
+        <div className="flex min-w-0 flex-wrap gap-1">
+          {slot.serviceName ? (
+            <span className="inline-flex max-w-full items-center rounded-md border border-[#0B6CF4]/30 bg-white/80 px-1.5 py-0.5 text-[11px] font-medium text-slate-800">
+              <span className="truncate">{slot.serviceName}</span>
+            </span>
+          ) : null}
+
+          {slot.employeeName ? (
+            <span className="inline-flex max-w-full items-center rounded-md border border-[#0B6CF4]/25 bg-white/70 px-1.5 py-0.5 text-[11px] font-medium text-slate-700">
+              <span className="truncate">{slot.employeeName}</span>
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+})}
+
                   {/* Pills (citas) encima */}
                   {(() => {
                     const layout = layoutDayAppts(list, START_HOUR, ROW_PX);
@@ -231,20 +296,16 @@ className={[
                             width: widthStyle,
                           }}
                         >
-                          <AppointmentPill
-                            startAtISO={a.startAt}
-                            title={a.serviceName ?? "Cita"}
-                            subtitle={[a.employeeName, a.resourceName]
-                              .filter(Boolean)
-                              .join(" · ")}
-                            color={a.serviceColor ?? undefined}
-                            onClick={() => {
-                              if (onSelect) onSelect(a.id);
-                            }}
-                            onDoubleClick={() => {
-                              if (onEdit) onEdit(a.id);
-                            }}
-                          />
+<AppointmentBlock
+  id={a.id}
+  startAtISO={a.startAt}
+  serviceName={a.serviceName}
+  employeeName={a.employeeName}
+  resourceName={a.resourceName}
+  serviceColor={a.serviceColor}
+  onSelect={onSelect}
+  onEdit={onEdit}
+/>
                         </div>
                       );
                     });

@@ -153,7 +153,7 @@ const nextItems: WaitlistRowItem[] = data.items.map(
   }
 
   return (
-    <StandardCard className="flex h-full min-h-[720px] flex-col border-border/60 bg-white">
+    <div className="flex h-full flex-col">
 <div className="border-b border-border/60 px-5 py-4">
   <div className="flex items-start justify-between gap-4">
     <div className="min-w-0 flex-1">
@@ -252,6 +252,6 @@ const nextItems: WaitlistRowItem[] = data.items.map(
 )}
         </motion.div>
       </div>
-    </StandardCard>
+    </div>
   );
 }

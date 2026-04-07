@@ -62,6 +62,7 @@ type Props = {
   apptsForMonth?: CalendarAppt[];
 
   shiftEvents?: ShiftEventLite[];
+  slots?: any[];
 };
 
 export default function CalendarOnly({
@@ -78,6 +79,8 @@ export default function CalendarOnly({
   apptsForDay,
   apptsForMonth,
   shiftEvents,
+  slots,
+  
 }: Props) {
   const weekStart = useMemo(() => startOfWeekMon(selectedDate), [selectedDate]);
 
@@ -212,6 +215,7 @@ export default function CalendarOnly({
             }}
             apptsByDay={weekApptsByDay}
             shiftEvents={safeShiftEvents}
+  slots={slots}
           />
         ) : null}
 

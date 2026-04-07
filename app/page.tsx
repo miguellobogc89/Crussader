@@ -7,7 +7,7 @@ export default async function Home() {
   const session = await getServerSession(authOptions);
 
   if (session) {
-    redirect("/dashboard/home");
+    redirect("/dashboard/slots");
   }
 
   // primera experiencia: conectar negocio

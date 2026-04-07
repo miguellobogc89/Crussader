@@ -1,7 +1,9 @@
+// app/components/calendar/calendarCalendarView.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import CalendarOnly from "@/app/components/calendar/calendar/index";
+import type { CalendarAppt } from "@/app/components/calendar/calendar/types";
 
 export type Range = { fromISO: string; toISO: string };
 
@@ -22,29 +24,51 @@ function addDays(d: Date, n: number) {
   return x;
 }
 
+function localDayKey(dateInput: string | Date) {
+  const d = new Date(dateInput);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 type ShiftEventLite = {
   id: string;
   employeeId: string | null;
   locationId: string | null;
-  startAt: string; // ISO
-  endAt: string; // ISO
+  startAt: string;
+  endAt: string;
   kind: string;
   label: string | null;
   templateId: string | null;
 };
 
+type AppointmentLite = {
+  id: string;
+  startAt: string;
+  endAt: string;
+  status: string | null;
+  serviceId: string | null;
+  serviceName: string | null;
+  customerName: string | null;
+  employeeId: string | null;
+  resourceId?: string | null;
+  employeeName?: string | null;
+  resourceName?: string | null;
+};
+
 type Props = {
+  companyId: string | null;
   locationId: string | null;
   onRangeChange?: (r: Range) => void;
-
   employeeNameById?: (id: string) => string;
   employeeColorById?: (id: string) => string | null;
-
   onCellClick?: (cellId: string) => void;
   selectedCellId?: string | null;
 };
 
 export default function CalendarView({
+  companyId,
   locationId,
   onRangeChange,
   employeeNameById,
@@ -55,9 +79,9 @@ export default function CalendarView({
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [view, setView] = useState<ToolbarView>("week");
   const [shiftEvents, setShiftEvents] = useState<ShiftEventLite[]>([]);
+  const [appointments, setAppointments] = useState<CalendarAppt[]>([]);
 
   const range = useMemo<Range>(() => {
-    // por defecto semana completa
     let start = startOfWeekMon(selectedDate);
     let end = addDays(start, 6);
     end.setHours(23, 59, 59, 999);
@@ -88,10 +112,19 @@ export default function CalendarView({
       end.setHours(23, 59, 59, 999);
     }
 
+    if (view === "month") {
+      start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      start.setHours(0, 0, 0, 0);
+
+      end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+      end.setHours(23, 59, 59, 999);
+    }
+
     return { fromISO: start.toISOString(), toISO: end.toISOString() };
   }, [selectedDate, view]);
 
   const rangeKey = useMemo(() => `${range.fromISO}|${range.toISO}`, [range]);
+  const [slots, setSlots] = useState<any[]>([]);
 
   useEffect(() => {
     if (!locationId) return;
@@ -99,12 +132,11 @@ export default function CalendarView({
     onRangeChange(range);
   }, [locationId, rangeKey, onRangeChange, range]);
 
-  // ✅ fetch shift-events
   useEffect(() => {
     let cancelled = false;
 
     async function run() {
-      if (!locationId) {
+      if (!companyId || !locationId) {
         setShiftEvents([]);
         return;
       }
@@ -140,9 +172,160 @@ export default function CalendarView({
     };
   }, [locationId, rangeKey, range.fromISO, range.toISO]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      if (!locationId) {
+        setAppointments([]);
+        return;
+      }
+
+const url =
+  `/api/calendar/appointments?locationId=${encodeURIComponent(locationId)}` +
+  `&from=${encodeURIComponent(range.fromISO)}` +
+  `&to=${encodeURIComponent(range.toISO)}`;
+
+      try {
+        const res = await fetch(url, { method: "GET" });
+        const json = await res.json().catch(() => null);
+
+        if (cancelled) return;
+
+        if (!res.ok || !json || json.ok === false) {
+          setAppointments([]);
+          return;
+        }
+
+        const items = Array.isArray(json.items) ? (json.items as AppointmentLite[]) : [];
+
+        const mapped: CalendarAppt[] = items.map((item) => {
+          let resolvedEmployeeName: string | null = null;
+
+          if (item.employeeName && item.employeeName.trim().length > 0) {
+            resolvedEmployeeName = item.employeeName.trim();
+          } else if (item.employeeId && employeeNameById) {
+            resolvedEmployeeName = employeeNameById(item.employeeId);
+          }
+
+          return {
+            id: item.id,
+            startAt: item.startAt,
+            endAt: item.endAt,
+            serviceName: item.serviceName,
+            employeeName: resolvedEmployeeName,
+            resourceName: item.resourceName ?? null,
+            status: item.status,
+            serviceId: item.serviceId,
+            customerName: item.customerName,
+          };
+        });
+
+        setAppointments(mapped);
+      } catch {
+        if (cancelled) return;
+        setAppointments([]);
+      }
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locationId, rangeKey, range.fromISO, range.toISO, employeeNameById]);
+
+  useEffect(() => {
+  let cancelled = false;
+
+  async function run() {
+    if (!companyId || !locationId) {
+      setSlots([]);
+      return;
+    }
+
+const url =
+  `/api/slots/list?companyId=${encodeURIComponent(companyId)}` +
+  `&locationId=${encodeURIComponent(locationId)}`;
+
+    try {
+      const res = await fetch(url);
+      const json = await res.json().catch(() => null);
+
+      console.log("[slots status]", res.status);
+console.log("[slots json]", json);
+
+      if (cancelled) return;
+
+      if (!res.ok || !json || json.ok === false) {
+        setSlots([]);
+        return;
+      }
+
+      setSlots(Array.isArray(json.slots) ? json.slots : []);
+    } catch {
+      if (cancelled) return;
+      setSlots([]);
+    }
+  }
+
+  run();
+
+  return () => {
+    cancelled = true;
+  };
+}, [companyId, locationId]);
+
+  const apptsByDay = useMemo(() => {
+    const map = new Map<string, CalendarAppt[]>();
+
+    for (const appt of appointments) {
+      const key = localDayKey(appt.startAt);
+      const current = map.get(key);
+
+      if (current) {
+        current.push(appt);
+      } else {
+        map.set(key, [appt]);
+      }
+    }
+
+    for (const entry of map.values()) {
+      entry.sort((a, b) => {
+        return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
+      });
+    }
+
+    return map;
+  }, [appointments]);
+
+  const apptsForDay = useMemo(() => {
+    const key = localDayKey(selectedDate);
+    const items = apptsByDay.get(key);
+
+    if (items) return items;
+    return [];
+  }, [apptsByDay, selectedDate]);
+
+  const apptsForMonth = useMemo(() => {
+    return appointments
+      .slice()
+      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  }, [appointments]);
+
   void employeeColorById;
 
   const blocked = !locationId;
+
+    console.log("[CalendarView] appointments", appointments);
+  console.log("[CalendarView] apptsByDay", Array.from(apptsByDay.entries()));
+  console.log("[CalendarView] view", view, "selectedDate", selectedDate);
+
+  console.log("[CalendarView] locationId", locationId);
+console.log("[CalendarView] appointments", appointments);
+console.log("[CalendarView] apptsByDay", Array.from(apptsByDay.entries()));
+console.log("[CalendarView] view", view, "selectedDate", selectedDate);
+
 
   return (
     <div className="flex-1 min-w-0 flex flex-col h-full">
@@ -163,6 +346,10 @@ export default function CalendarView({
                 onCellClick={onCellClick}
                 selectedCellId={selectedCellId}
                 shiftEvents={shiftEvents}
+                apptsByDay={apptsByDay}
+                apptsForDay={apptsForDay}
+                apptsForMonth={apptsForMonth}
+                slots={slots}
               />
             )}
           </div>

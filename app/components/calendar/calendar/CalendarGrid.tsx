@@ -38,6 +38,7 @@ type Props = {
   // ✅ nuevos
   apptsByDay?: Map<string, CalendarAppt[]>;
   shiftEvents?: ShiftEventLite[];
+  slots?: any[];
 };
 
 export default function CalendarGrid({
@@ -52,6 +53,7 @@ export default function CalendarGrid({
   onReachEnd,
   apptsByDay,
   shiftEvents,
+  slots,
 }: Props) {
   function fallbackEmployeeNameById(id: string) {
     return id;
@@ -212,6 +214,7 @@ export default function CalendarGrid({
               onCellClick={onCellClick}
               selectedCellId={selectedCellId}
               shiftEvents={safeShiftEvents}
+              slots={slots}
             />
           </div>
         </div>
