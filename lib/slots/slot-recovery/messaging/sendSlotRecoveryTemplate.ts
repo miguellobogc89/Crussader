@@ -40,16 +40,16 @@ export async function sendSlotRecoveryTemplate(args: {
 
   const data = await response.json();
 
-if (!response.ok) {
-  console.error("[WA][SEND][ERROR][STATUS]", response.status);
-  console.error("[WA][SEND][ERROR][BODY]", JSON.stringify(data, null, 2));
+  if (!response.ok) {
+    console.error("[WA][SEND][ERROR][STATUS]", response.status);
+    console.error("[WA][SEND][ERROR][BODY]", JSON.stringify(data, null, 2));
 
-  throw new Error(
-    typeof data?.error?.message === "string"
-      ? data.error.message
-      : "WhatsApp send failed"
-  );
-}
+    throw new Error(
+      typeof data?.error?.message === "string"
+        ? data.error.message
+        : "WhatsApp send failed"
+    );
+  }
 
   return data;
 }

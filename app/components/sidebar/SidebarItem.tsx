@@ -99,18 +99,7 @@ export function SidebarItem({
             {item.title}
           </div>
 
-          {item.description && (
-            <div
-              className={[
-                "truncate text-slate-400",
-                "text-[11px] leading-[16px]",
-                "xl:text-[12px] xl:leading-[17px]",
-                "xl2:text-xs xl2:leading-[18px]",
-              ].join(" ")}
-            >
-              {item.description}
-            </div>
-          )}
+
         </div>
       )}
 

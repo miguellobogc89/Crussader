@@ -2,9 +2,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Siren } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
-import StandardCard from "@/app/components/crussader/UX/standardCard";
 import { SlotsWaitlistRow, type WaitlistRowItem } from "./SlotsWaitlistRow";
 import { WaitlistInlineCreate } from "./WaitlistInlineCreate";
 import { AnimatePresence, motion } from "framer-motion";
@@ -28,6 +27,7 @@ type WaitlistListResponseItem = {
   serviceName: string | null;
   note: string | null;
   isUrgent: boolean;
+  isNewCustomer?: boolean;
   createdAt: string;
   employees: WaitlistListResponseItemEmployee[];
 };
@@ -40,25 +40,32 @@ export function WaitlistCard({
   locationId,
   refreshKey = 0,
 }: Props) {
+  console.log("[WaitlistCard] render", { companyId, locationId, refreshKey });
+
   const [items, setItems] = useState<WaitlistRowItem[]>([]);
   const [loadingList, setLoadingList] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
 
-useEffect(() => {
-  if (!locationId) {
-    setItems([]);
-    return;
-  }
+  useEffect(() => {
+    console.log("[WaitlistCard] useEffect start", { locationId, refreshKey });
 
-  const safeLocationId = locationId;
-  const controller = new AbortController();
+    if (!locationId) {
+      console.log("[WaitlistCard] no locationId");
+      setItems([]);
+      return;
+    }
 
-  async function loadWaitlist() {
-    try {
-      setLoadingList(true);
+    const safeLocationId = locationId;
+    const controller = new AbortController();
 
-      const params = new URLSearchParams();
-      params.set("locationId", safeLocationId);
+    async function loadWaitlist() {
+      console.log("[WaitlistCard] loadWaitlist called", { safeLocationId });
+
+      try {
+        setLoadingList(true);
+
+        const params = new URLSearchParams();
+        params.set("locationId", safeLocationId);
 
         const response = await fetch(
           `${WAITLIST_LIST_ENDPOINT}?${params.toString()}`,
@@ -69,35 +76,32 @@ useEffect(() => {
           }
         );
 
-const data = await response.json();
-console.log("[waitlist:list]", JSON.stringify(data.items, null, 2));
+        const data = await response.json();
+        console.log("[waitlist:list:raw]", JSON.stringify(data, null, 2));
 
-if (!response.ok || !data?.ok || !Array.isArray(data.items)) {
-  setItems([]);
-  return;
-}
+        if (!response.ok || !data?.ok || !Array.isArray(data.items)) {
+          console.error("[WaitlistCard] invalid waitlist response", data);
+          return;
+        }
 
-const nextItems: WaitlistRowItem[] = data.items.map(
-  (item: WaitlistListResponseItem) => {
-    console.log("[waitlist:item]", JSON.stringify(item, null, 2));
-
-    return {
-      id: String(item.id),
-      customerName: String(item.customerName ?? ""),
-      customerPhone: item.customerPhone ? String(item.customerPhone) : null,
-      serviceName: item.serviceName ? String(item.serviceName) : null,
-      note: item.note ? String(item.note) : null,
-      isUrgent: Boolean(item.isUrgent),
-      createdAt: String(item.createdAt),
-      employees: Array.isArray(item.employees)
-        ? item.employees.map((employee) => ({
-            id: String(employee.id),
-            name: String(employee.name ?? ""),
-          }))
-        : [],
-    };
-  }
-);
+        const nextItems: WaitlistRowItem[] = data.items.map(
+          (item: WaitlistListResponseItem) => ({
+            id: String(item.id),
+            customerName: String(item.customerName ?? ""),
+            customerPhone: item.customerPhone ? String(item.customerPhone) : null,
+            serviceName: item.serviceName ? String(item.serviceName) : null,
+            note: item.note ? String(item.note) : null,
+            isUrgent: Boolean(item.isUrgent),
+            isNewCustomer: Boolean(item.isNewCustomer),
+            createdAt: String(item.createdAt),
+            employees: Array.isArray(item.employees)
+              ? item.employees.map((employee) => ({
+                  id: String(employee.id),
+                  name: String(employee.name ?? ""),
+                }))
+              : [],
+          })
+        );
 
         setItems(nextItems);
       } catch (error) {
@@ -106,7 +110,6 @@ const nextItems: WaitlistRowItem[] = data.items.map(
         }
 
         console.error("[WaitlistCard] loadWaitlist", error);
-        setItems([]);
       } finally {
         setLoadingList(false);
       }
@@ -144,7 +147,6 @@ const nextItems: WaitlistRowItem[] = data.items.map(
 
       if (!response.ok || !data?.ok) {
         setItems(previousItems);
-        return;
       }
     } catch (error) {
       console.error("[WaitlistCard] handleRemove", error);
@@ -154,56 +156,56 @@ const nextItems: WaitlistRowItem[] = data.items.map(
 
   return (
     <div className="flex h-full flex-col">
-<div className="border-b border-border/60 px-5 py-4">
-  <div className="flex items-start justify-between gap-4">
-    <div className="min-w-0 flex-1">
-      <div className="flex items-center gap-2">
-        <h3 className="truncate text-[15px] font-semibold text-foreground">
-          Lista de espera
-          <span className="ml-1 text-muted-foreground">({items.length})</span>
-        </h3>
-      </div>
+      <div className="border-b border-border/60 px-5 py-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="truncate text-[15px] font-semibold text-foreground">
+                Lista de espera
+                <span className="ml-1 text-muted-foreground">({items.length})</span>
+              </h3>
+            </div>
 
-      <div className="mt-2 flex items-center gap-2 overflow-x-auto">
-        <div className="shrink-0 rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">
-          Urgencias{" "}
-          <span className="ml-1 font-semibold">
-            {items.filter((item) => item.isUrgent).length}
-          </span>
+            <div className="mt-2 flex items-center gap-2 overflow-x-auto">
+              <div className="shrink-0 rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">
+                Urgencias{" "}
+                <span className="ml-1 font-semibold">
+                  {items.filter((item) => item.isUrgent).length}
+                </span>
+              </div>
+
+              <div className="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                Nuevos{" "}
+                <span className="ml-1 font-semibold">
+                  {items.filter((item) => item.isNewCustomer).length}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => setIsAdding((prev) => !prev)}
+            disabled={!locationId}
+            className={cn(
+              "h-8 shrink-0 rounded-lg px-3 text-xs font-semibold transition-all duration-150",
+              isAdding
+                ? "border border-[#0B6CF4] bg-white text-slate-700 shadow-[0_2px_8px_rgba(11,108,244,0.12)] hover:bg-blue-50"
+                : "bg-[#0B6CF4] text-white shadow-[0_2px_8px_rgba(11,108,244,0.18)] hover:bg-[#0a5ed8]"
+            )}
+          >
+            {isAdding ? (
+              "Cancelar"
+            ) : (
+              <>
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Añadir
+              </>
+            )}
+          </Button>
         </div>
-
-        <div className="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-          Nuevos{" "}
-          <span className="ml-1 font-semibold">
-            {items.filter((item) => item.isNewCustomer).length}
-          </span>
-        </div>
       </div>
-    </div>
-
-    <Button
-      type="button"
-      size="sm"
-      onClick={() => setIsAdding((prev) => !prev)}
-      disabled={!locationId}
-      className={cn(
-        "h-8 shrink-0 rounded-lg px-3 text-xs font-semibold transition-all duration-150",
-        isAdding
-          ? "border border-[#0B6CF4] bg-white text-slate-700 shadow-[0_2px_8px_rgba(11,108,244,0.12)] hover:bg-blue-50"
-          : "bg-[#0B6CF4] text-white shadow-[0_2px_8px_rgba(11,108,244,0.18)] hover:bg-[#0a5ed8]"
-      )}
-    >
-      {isAdding ? (
-        "Cancelar"
-      ) : (
-        <>
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          Añadir
-        </>
-      )}
-    </Button>
-  </div>
-</div>
 
       <div className="flex-1 overflow-hidden">
         <motion.div
@@ -231,25 +233,22 @@ const nextItems: WaitlistRowItem[] = data.items.map(
             </div>
           ) : null}
 
-{!loadingList && (
-  <AnimatePresence initial={false}>
-    {items.map((item) => (
-      <motion.div
-        key={item.id}
-        layout
-        initial={{ opacity: 0, y: 8, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -8, scale: 0.98 }}
-        transition={{ duration: 0.18 }}
-      >
-        <SlotsWaitlistRow
-          item={item}
-          onRemove={handleRemove}
-        />
-      </motion.div>
-    ))}
-  </AnimatePresence>
-)}
+          {!loadingList && (
+            <AnimatePresence initial={false}>
+              {items.map((item) => (
+                <motion.div
+                  key={item.id}
+                  layout
+                  initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <SlotsWaitlistRow item={item} onRemove={handleRemove} />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          )}
         </motion.div>
       </div>
     </div>

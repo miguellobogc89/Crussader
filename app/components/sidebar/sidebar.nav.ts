@@ -6,6 +6,8 @@ import {
   MessageSquareText,
   Settings,
   Shield,
+  Users,
+  Briefcase,
 } from "lucide-react";
 
 export type SidebarNavItem = NavItem & {
@@ -32,6 +34,16 @@ export const NAV_ITEMS: SidebarNavItem[] = [
     title: "Configuración",
     href: "/dashboard/settings",
     icon: Settings,
+  },
+  {
+    title: "Plantilla",
+    href: "/dashboard/mybusiness/staff",
+    icon: Briefcase,
+  },
+  {
+    title: "Clientes",
+    href: "/dashboard/mybusiness/clients",
+    icon: Users,
   },
 
   // Admin-only

@@ -37,7 +37,7 @@ type PricePillProps = {
 
 export function PricePill({ min, max }: PricePillProps) {
   return (
-    <span className="inline-flex items-center rounded-full border border-[#BBF7D0] bg-[#F0FDF4] px-3 py-1 text-xs font-semibold text-[#166534] tabular-nums">
+    <span className="inline-flex items-center rounded-full border border-[#DCFCE7] bg-[#F7FEFA] px-3 py-1 text-xs font-semibold tabular-nums text-[#166534]">
       {min}
       {max && max !== min ? <> - {max}</> : null}
     </span>
@@ -58,7 +58,7 @@ function getRemainingLabel(startsAt: string): string {
   const diffMs = startTime - Date.now();
 
   if (diffMs <= 0) {
-    return "Llegó";
+    return "Vencido";
   }
 
   const totalMinutes = Math.ceil(diffMs / 60000);
@@ -94,8 +94,12 @@ export function RemainingTimePill({ startsAt }: RemainingTimePillProps) {
     };
   }, [startsAt]);
 
+  if (label === "Vencido") {
+    return null;
+  }
+
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-1 text-xs font-semibold text-[#475569] tabular-nums">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-1 text-xs font-semibold tabular-nums text-[#475569]">
       <Timer className="h-3.5 w-3.5" />
       {label}
     </span>
@@ -123,5 +127,24 @@ export function SentBadge({ count }: SentBadgeProps) {
       <Users className="h-3.5 w-3.5" />
       Enviado{count ? ` a ${count}` : ""}
     </span>
+  );
+}
+
+type StatusDotLabelProps = {
+  label: string;
+  tone: "success" | "muted";
+};
+
+export function StatusDotLabel({ label, tone }: StatusDotLabelProps) {
+  const dotClassName =
+    tone === "success" ? "bg-[#10B981]" : "bg-[#CBD5E1]";
+  const textClassName =
+    tone === "success" ? "text-[#10B981]" : "text-[#94A3B8]";
+
+  return (
+    <div className={`inline-flex items-center gap-2 text-xs font-semibold ${textClassName}`}>
+      <span className={`h-2 w-2 rounded-full ${dotClassName}`} />
+      {label}
+    </div>
   );
 }

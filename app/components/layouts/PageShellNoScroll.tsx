@@ -1,7 +1,7 @@
-//app/components/layouts/PageShellNoScroll.tsx
+// app/components/layouts/PageShellNoScroll.tsx
 "use client";
 
-import { ReactNode, Suspense, useEffect, useRef } from "react";
+import { ReactNode, Suspense, useEffect, useMemo, useRef } from "react";
 import RouteTransitionOverlay from "./RouteTransitionOverlay";
 import PageHeader from "./PageHeader";
 import {
@@ -27,6 +27,23 @@ type Props = {
   hideHeaderArea?: boolean;
 };
 
+type BootstrapCompanyLite = {
+  id?: string | null;
+  name?: string | null;
+};
+
+type BootstrapLocationLite = {
+  id?: string | null;
+  companyId?: string | null;
+};
+
+type BootstrapDataLite = {
+  activeCompanyResolved?: BootstrapCompanyLite | null;
+  activeLocationResolved?: BootstrapLocationLite | null;
+  companies?: BootstrapCompanyLite[];
+  locations?: BootstrapLocationLite[];
+};
+
 export default function PageShellNoScroll({
   title,
   description,
@@ -42,24 +59,73 @@ export default function PageShellNoScroll({
   const activeLocationId = useActiveLocationId();
   const fetchFromApi = useBootstrapStore((s) => s.fetchFromApi);
 
-  useEffect(() => {
-    if (status === "idle") {
-      fetchFromApi();
-    }
-  }, [status, fetchFromApi]);
+useEffect(() => {
+  console.log("[PageShellNoScroll] bootstrap effect", {
+    status,
+    hasData: Boolean(bootstrapData),
+  });
 
-  const bootstrapCompanyId = bootstrapData?.activeCompanyResolved?.id ?? null;
-  const bootstrapLocationId = activeLocationId ?? null;
-  const companyName = bootstrapData?.activeCompanyResolved?.name ?? "tu negocio";
+  void fetchFromApi();
+}, [fetchFromApi, status, bootstrapData]);
+
+  const resolvedData = useMemo(() => {
+    const safeData = (bootstrapData ?? undefined) as BootstrapDataLite | undefined;
+
+    const companies = Array.isArray(safeData?.companies) ? safeData.companies : [];
+    const locations = Array.isArray(safeData?.locations) ? safeData.locations : [];
+
+    const fallbackCompany =
+      safeData?.activeCompanyResolved ??
+      companies.find((item) => item?.id) ??
+      null;
+
+    const locationFromActiveId = activeLocationId
+      ? locations.find((item) => item?.id === activeLocationId) ?? null
+      : null;
+
+    const locationFromCompany = fallbackCompany?.id
+      ? locations.find((item) => item?.companyId === fallbackCompany.id) ?? null
+      : null;
+
+    const fallbackLocation =
+      safeData?.activeLocationResolved ??
+      locationFromActiveId ??
+      locationFromCompany ??
+      locations.find((item) => item?.id) ??
+      null;
+
+    const bootstrapCompanyId =
+      fallbackCompany?.id ?? fallbackLocation?.companyId ?? null;
+
+    const bootstrapLocationId =
+      activeLocationId ?? fallbackLocation?.id ?? null;
+
+    const companyName = fallbackCompany?.name ?? "tu negocio";
+
+    console.log("[PageShellNoScroll resolved]", {
+      status,
+      bootstrapCompanyId,
+      bootstrapLocationId,
+      companyName,
+      companiesCount: companies.length,
+      locationsCount: locations.length,
+    });
+
+    return {
+      bootstrapCompanyId,
+      bootstrapLocationId,
+      companyName,
+    };
+  }, [bootstrapData, activeLocationId, status]);
 
   const content =
-    typeof children === "function"
-      ? children({
-          bootstrapCompanyId,
-          bootstrapLocationId,
-          companyName,
-        })
-      : children;
+    typeof children === "function" ? children(resolvedData) : children;
+
+      console.log("[PageShellNoScroll render]", {
+    status,
+    hasData: Boolean(bootstrapData),
+    activeLocationId,
+  });
 
   return (
     <div
@@ -68,7 +134,6 @@ export default function PageShellNoScroll({
     >
       <RouteTransitionOverlay scope="container" className="z-50" />
 
-      {/* HEADER → NO crece */}
       {!hideHeaderArea && (
         <div className="shrink-0">
           <PageHeader title={title} description={description} rightSlot={toolbar} />
@@ -83,7 +148,6 @@ export default function PageShellNoScroll({
         </div>
       )}
 
-      {/* BODY → AQUÍ está la clave */}
       <div className="min-h-0 flex-1 overflow-hidden">
         <Suspense
           fallback={

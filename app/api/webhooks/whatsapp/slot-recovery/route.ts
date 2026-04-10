@@ -39,6 +39,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    console.log("[WA][WEBHOOK][DEBUG]", JSON.stringify(value, null, 2));
+
     await handleSlotRecoveryStatuses(value);
     await handleSlotRecoveryReplies(value);
 

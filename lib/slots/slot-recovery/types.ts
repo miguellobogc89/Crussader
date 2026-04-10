@@ -46,4 +46,16 @@ export type WaMessageItem = {
 export type WaValue = {
   statuses?: WaStatusItem[];
   messages?: WaMessageItem[];
+
+  contacts?: {
+    profile?: {
+      name?: string;
+    };
+    wa_id?: string;
+  }[];
+
+  metadata?: {
+    display_phone_number?: string;
+    phone_number_id?: string;
+  };
 };

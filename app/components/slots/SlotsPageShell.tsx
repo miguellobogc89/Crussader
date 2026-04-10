@@ -56,6 +56,17 @@ export function SlotsPageShell({
     effectiveCompanyId = bootstrapData.activeCompanyResolved.id;
   }
 
+    console.log("[SlotsPageShell]", {
+    companyIdProp: companyId,
+    locationIdProp: locationId,
+    activeLocationId,
+    activeLocation,
+    bootstrapActiveCompany: bootstrapData?.activeCompanyResolved,
+    effectiveCompanyId,
+    effectiveLocationId,
+  });
+
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
       <StandardCard className="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
