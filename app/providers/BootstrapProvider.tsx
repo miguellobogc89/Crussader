@@ -15,26 +15,26 @@ export default function BootstrapProvider({
   initialData,
   autoFetchIfEmpty = true,
 }: Props) {
-  // ❌ NO crear objetos en el selector
   const data = useBootstrapStore((s) => s.data);
   const status = useBootstrapStore((s) => s.status);
   const load = useBootstrapStore((s) => s.load);
   const fetchFromApi = useBootstrapStore((s) => s.fetchFromApi);
 
-  // Evitar re-hidrataciones múltiples
   const hydratedRef = useRef(false);
 
   useEffect(() => {
-    // 1) Hidratar con initialData solo una vez
-    if (!hydratedRef.current && initialData && !data) {
+    if (hydratedRef.current) {
+      return;
+    }
+
+    if (initialData) {
       load(initialData);
       hydratedRef.current = true;
       return;
     }
 
-    // 2) Si no hay initialData ni data y se permite, pedir a la API (una vez)
-    if (!hydratedRef.current && !initialData && !data && autoFetchIfEmpty && status === "idle") {
-      fetchFromApi();
+    if (!data && autoFetchIfEmpty && status === "idle") {
+      void fetchFromApi();
       hydratedRef.current = true;
     }
   }, [initialData, data, status, load, fetchFromApi, autoFetchIfEmpty]);

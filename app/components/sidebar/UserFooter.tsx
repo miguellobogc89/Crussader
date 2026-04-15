@@ -1,3 +1,4 @@
+// app/components/sidebar/UserFooter.tsx
 "use client";
 
 import Link from "next/link";
@@ -65,6 +66,20 @@ export function UserFooter({
     };
   }, []);
 
+  const rowClass = [
+    "flex items-center transition-colors",
+    "text-slate-300 hover:text-white hover:bg-slate-800/60",
+    "min-h-10 xl2:min-h-11",
+  ].join(" ");
+
+  const labelClass = [
+    "font-medium",
+    "text-[13px]",
+    "xl2:text-sm xl2:leading-[20px]",
+  ].join(" ");
+
+  const smallIconClass = "h-4 w-4 xl2:h-5 xl2:w-5";
+
   return (
     <div className="sticky bottom-0 z-10 bg-slate-900">
       <div className="border-t border-slate-800">
@@ -73,14 +88,13 @@ export function UserFooter({
             href="/dashboard/notifications"
             onClick={onItemNavigate}
             className={[
-              "relative flex items-center transition-colors",
-              "text-slate-300 hover:text-white hover:bg-slate-800/60",
-              "min-h-11 xl:min-h-10 xl2:min-h-11",
+              "relative",
+              rowClass,
               collapsed ? "justify-center px-2" : "justify-start gap-3 px-3",
             ].join(" ")}
           >
             <div className="relative">
-              <Bell className="h-5 w-5" />
+              <Bell className={smallIconClass} />
 
               {isClient && unread > 0 && (
                 <div className="absolute -top-1 -right-1 flex items-center justify-center">
@@ -101,18 +115,7 @@ export function UserFooter({
               )}
             </div>
 
-            {!collapsed && (
-              <span
-                className={[
-                  "font-medium",
-                  "text-sm",
-                  "xl:text-[13px] xl:leading-[18px]",
-                  "xl2:text-sm xl2:leading-[20px]",
-                ].join(" ")}
-              >
-                Notificaciones
-              </span>
-            )}
+            {!collapsed && <span className={labelClass}>Notificaciones</span>}
           </Link>
         )}
 
@@ -121,72 +124,59 @@ export function UserFooter({
             href="/dashboard/support"
             onClick={onItemNavigate}
             className={[
-              "flex items-center transition-colors",
-              "text-slate-300 hover:text-white hover:bg-slate-800/60",
-              "min-h-11 xl:min-h-10 xl2:min-h-11",
+              rowClass,
               collapsed ? "justify-center px-2" : "justify-start gap-3 px-3",
             ].join(" ")}
             title={collapsed ? "Soporte" : undefined}
           >
-            <span className="text-base xl:text-[15px] xl2:text-base">💡</span>
+            <span
+              className={[
+                "flex items-center justify-center shrink-0 leading-none",
+                "text-[14px] xl2:text-[16px]",
+                "w-4 h-4 xl2:w-5 xl2:h-5",
+              ].join(" ")}
+            >
+              💡
+            </span>
 
-            {!collapsed && (
-              <span
-                className={[
-                  "font-medium",
-                  "text-sm",
-                  "xl:text-[13px] xl:leading-[18px]",
-                  "xl2:text-sm xl2:leading-[20px]",
-                ].join(" ")}
-              >
-                Soporte
-              </span>
-            )}
+            {!collapsed && <span className={labelClass}>Soporte</span>}
           </Link>
         )}
 
-        {/* CONFIGURACIÓN */}
         <div className="border-t border-slate-800">
           <Link
             href="/dashboard/settings"
             onClick={onItemNavigate}
             className={[
-              "flex items-center transition-colors",
-              "text-slate-300 hover:text-white hover:bg-slate-800/60",
-              "min-h-11 xl:min-h-10 xl2:min-h-11",
+              rowClass,
               collapsed ? "justify-center px-2" : "justify-start gap-3 px-3",
             ].join(" ")}
             title={collapsed ? "Configuración" : undefined}
           >
-            <span className="text-base xl:text-[15px] xl2:text-base">⚙️</span>
+            <span
+              className={[
+                "flex items-center justify-center shrink-0 leading-none",
+                "text-[14px] xl2:text-[16px]",
+                "w-4 h-4 xl2:w-5 xl2:h-5",
+              ].join(" ")}
+            >
+              ⚙️
+            </span>
 
-            {!collapsed && (
-              <span
-                className={[
-                  "font-medium",
-                  "text-sm",
-                  "xl:text-[13px] xl:leading-[18px]",
-                  "xl2:text-sm xl2:leading-[20px]",
-                ].join(" ")}
-              >
-                Configuración
-              </span>
-            )}
+            {!collapsed && <span className={labelClass}>Configuración</span>}
           </Link>
         </div>
       </div>
 
       <div className="border-t border-slate-800" />
 
-      {/* USUARIO */}
       <div className="border-b border-transparent">
         <button
           type="button"
           onClick={() => setUserMenuOpen((v: boolean) => !v)}
           className={[
-            "w-full flex items-center transition-colors",
-            "text-slate-300 hover:text-white hover:bg-slate-800/60",
-            "min-h-11 xl:min-h-10 xl2:min-h-11",
+            "w-full",
+            rowClass,
             collapsed ? "justify-center px-2" : "justify-between px-3",
           ].join(" ")}
           title={collapsed ? (user?.name ?? "Usuario") : undefined}
@@ -197,13 +187,13 @@ export function UserFooter({
               <img
                 src={user.image}
                 alt={user?.name ?? "Usuario"}
-                className="h-6 w-6 rounded-full object-cover shrink-0"
+                className="h-4 w-4 xl2:h-5 xl2:w-5 rounded-full object-cover shrink-0"
               />
             ) : (
               <div
                 className={[
-                  "h-6 w-6 rounded-full bg-primary/20 text-primary grid place-items-center shrink-0 font-semibold",
-                  "text-xs xl:text-[11px] xl2:text-xs",
+                  "h-4 w-4 xl2:h-5 xl2:w-5 rounded-full bg-primary/20 text-primary grid place-items-center shrink-0 font-semibold",
+                  "text-[10px] xl2:text-[11px]",
                 ].join(" ")}
               >
                 {userInitial}
@@ -211,14 +201,7 @@ export function UserFooter({
             )}
 
             {!collapsed && (
-              <span
-                className={[
-                  "font-medium truncate max-w-[12rem]",
-                  "text-sm",
-                  "xl:text-[13px] xl:leading-[18px]",
-                  "xl2:text-sm xl2:leading-[20px]",
-                ].join(" ")}
-              >
+              <span className={["font-medium truncate max-w-[12rem]", labelClass].join(" ")}>
                 {user?.name ?? "Usuario"}
               </span>
             )}
@@ -228,7 +211,7 @@ export function UserFooter({
             <ChevronDown
               className={[
                 "transition-transform duration-300",
-                "h-4 w-4 xl:h-[14px] xl:w-[14px] xl2:h-4 xl2:w-4",
+                smallIconClass,
                 userMenuOpen ? "rotate-180" : "",
               ].join(" ")}
             />
@@ -249,11 +232,11 @@ export function UserFooter({
                   className={[
                     "w-full flex items-center justify-start gap-3 rounded-lg px-3 transition-colors",
                     "text-red-400 hover:text-red-300 hover:bg-red-900/20",
-                    "min-h-11 xl:min-h-10 xl2:min-h-11",
+                    "min-h-10 xl2:min-h-11",
                   ].join(" ")}
                 >
                   <svg
-                    className="h-5 w-5 xl:h-[18px] xl:w-[18px] xl2:h-5 xl2:w-5"
+                    className={smallIconClass}
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -266,16 +249,7 @@ export function UserFooter({
                     <line x1="21" y1="12" x2="9" y2="12" />
                   </svg>
 
-                  <span
-                    className={[
-                      "font-medium",
-                      "text-sm",
-                      "xl:text-[13px] xl:leading-[18px]",
-                      "xl2:text-sm xl2:leading-[20px]",
-                    ].join(" ")}
-                  >
-                    Cerrar sesión
-                  </span>
+                  <span className={labelClass}>Cerrar sesión</span>
                 </button>
               </div>
             </div>

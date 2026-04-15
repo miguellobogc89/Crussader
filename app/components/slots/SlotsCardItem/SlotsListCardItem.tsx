@@ -86,34 +86,38 @@ function getCardClass(slot: SlotDTO): string {
 
   if (effectiveStatus === "pending_publish" || effectiveStatus === "sent") {
     return [
-      "w-full rounded-xl border px-5 py-4 text-left transition-all duration-150",
+      "w-full rounded-xl border px-3 py-3 text-left transition-all duration-150 xl:px-3.5 xl:py-3.5 xl2:px-5 xl2:py-4",
       "border-[#BFDBFE] bg-white",
       "hover:border-[#93C5FD] hover:bg-[#F8FBFF]",
+      "cursor-pointer",
       getLeftBorderClass(slot),
     ].join(" ");
   }
 
   if (effectiveStatus === "recovered") {
     return [
-      "w-full rounded-xl border px-5 py-4 text-left transition-all duration-150",
+      "w-full rounded-xl border px-3 py-3 text-left transition-all duration-150 xl:px-3.5 xl:py-3.5 xl2:px-5 xl2:py-4",
       "border-[#D1FAE5] bg-white",
       "hover:border-[#A7F3D0] hover:bg-[#FAFFFC]",
+      "cursor-pointer",
       getLeftBorderClass(slot),
     ].join(" ");
   }
 
   if (effectiveStatus === "expired") {
     return [
-      "w-full rounded-xl border px-5 py-4 text-left transition-all duration-150",
+      "w-full rounded-xl border px-3 py-3 text-left transition-all duration-150 xl:px-3.5 xl:py-3.5 xl2:px-5 xl2:py-4",
       "border-[#E5E7EB] bg-[#FCFCFD]",
       "hover:border-[#D1D5DB] hover:bg-[#FAFAFA]",
+      "cursor-pointer",
       getLeftBorderClass(slot),
     ].join(" ");
   }
 
   return [
-    "w-full rounded-lg border border-[#E5E7EB] bg-white px-5 py-4 text-left transition-all duration-150",
+    "w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-3 text-left transition-all duration-150 xl:px-3.5 xl:py-3.5 xl2:px-5 xl2:py-4",
     "hover:border-[#E5E7EB] hover:bg-white",
+    "cursor-pointer",
     getLeftBorderClass(slot),
   ].join(" ");
 }
@@ -142,10 +146,10 @@ export function SlotsListCardItem({
       }}
       className={getCardClass(slot)}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-3 xl:gap-4 xl2:gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <div className="text-[15px] font-semibold tabular-nums text-[#171717]">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 xl:gap-2">
+            <div className="text-[13px] font-semibold tabular-nums text-[#171717] xl:text-sm xl2:text-[15px]">
               {formatTimeRange(slot.startsAt, slot.endsAt)}
             </div>
 
@@ -154,7 +158,7 @@ export function SlotsListCardItem({
             {!isExpired ? <RemainingTimePill startsAt={slot.startsAt} /> : null}
           </div>
 
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-1.5 flex flex-wrap gap-1.5 xl:mt-2 xl:gap-2 xl2:mt-2 xl2:gap-2">
             {visibleServices.map((service) => {
               return (
                 <ServicePill
@@ -167,7 +171,7 @@ export function SlotsListCardItem({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-col items-end gap-3">
+        <div className="flex shrink-0 flex-col items-end gap-2 xl:gap-2.5 xl2:gap-3">
           {priceRange ? (
             <PricePill
               min={formatEuro(priceRange.min)}

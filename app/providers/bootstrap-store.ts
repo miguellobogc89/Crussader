@@ -20,6 +20,17 @@ export type BootstrapState = {
     /** Campos derivados que NO rompen el shape anterior */
     companiesResolved?: Array<{ id: string; name: string; role?: string | null }>;
     activeCompanyResolved?: { id: string; name: string; role?: string | null } | null;
+    activeLocationResolved?: {
+      id: string;
+      title: string;
+      companyId: string;
+    } | null;
+    sessionContext: {
+      userId: string;
+      userRole: "system_admin" | "org_admin" | "user" | "test";
+      companyId: string | null;
+      locationId: string | null;
+    };
   };
   status: Status;
   error?: string;
@@ -213,7 +224,49 @@ function enrichBootstrap<T extends BootstrapData>(data: T): T & {
     }
   }
 
-  return Object.assign({}, data, { companiesResolved, activeCompanyResolved });
+    const serverActiveLocationResolved =
+    (data as any).activeLocationResolved as
+      | { id: string; title: string; companyId: string }
+      | null
+      | undefined;
+
+  const activeLocationResolved =
+    serverActiveLocationResolved ??
+    (Array.isArray((data as any).locations) && (data as any).locations.length > 0
+      ? {
+          id: String((data as any).locations[0].id),
+          title: String((data as any).locations[0].title ?? "Sin nombre"),
+          companyId: String((data as any).locations[0].companyId),
+        }
+      : null);
+
+  const serverSessionContext =
+    (data as any).sessionContext as
+      | {
+          userId: string;
+          userRole: "system_admin" | "org_admin" | "user" | "test";
+          companyId: string | null;
+          locationId: string | null;
+        }
+      | undefined;
+
+  const sessionContext = serverSessionContext ?? {
+    userId: String((data as any).user?.id ?? ""),
+    userRole: ((data as any).user?.role ?? "user") as
+      | "system_admin"
+      | "org_admin"
+      | "user"
+      | "test",
+    companyId: activeCompanyResolved?.id ?? null,
+    locationId: activeLocationResolved?.id ?? null,
+  };
+
+  return Object.assign({}, data, {
+    companiesResolved,
+    activeCompanyResolved,
+    activeLocationResolved,
+    sessionContext,
+  });
 }
 
 const storeCreator: StateCreator<BootstrapState> = (set) => ({
@@ -338,4 +391,16 @@ export function useActiveLocation() {
 
 export function useSetActiveLocation() {
   return useBootstrapStore((s) => s.setActiveLocation);
+}
+
+export function useSessionContext() {
+  return useBootstrapStore((s) => s.data?.sessionContext ?? null);
+}
+
+export function useActiveCompanyResolved() {
+  return useBootstrapStore((s) => s.data?.activeCompanyResolved ?? null);
+}
+
+export function useActiveLocationResolved() {
+  return useBootstrapStore((s) => s.data?.activeLocationResolved ?? null);
 }

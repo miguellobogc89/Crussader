@@ -51,6 +51,18 @@ export type BootstrapData = {
   } | null;
   /** ✅ NUEVO: alias cómodo para el cliente */
   activeCompanyResolved?: { id: string; name: string } | null;
+    activeLocationResolved?: {
+    id: string;
+    title: string;
+    companyId: string;
+  } | null;
+
+  sessionContext: {
+    userId: string;
+    userRole: "system_admin" | "org_admin" | "user" | "test";
+    companyId: string | null;
+    locationId: string | null;
+  };
   locations: Array<{
     id: string;
     companyId: string;
@@ -266,8 +278,26 @@ export async function getBootstrapData(): Promise<BootstrapData> {
       })
     : [];
 
-  // ✅ NUEVO: alias cómodo para el cliente
-  const activeCompanyResolved = activeCompany ? { id: activeCompany.id, name: activeCompany.name } : null;
+  // ✅ NUEVO: alias cómodos para el cliente
+  const activeCompanyResolved = activeCompany
+    ? { id: activeCompany.id, name: activeCompany.name }
+    : null;
+
+  const activeLocationResolved =
+    locations.length > 0
+      ? {
+          id: locations[0].id,
+          title: locations[0].title,
+          companyId: locations[0].companyId,
+        }
+      : null;
+
+  const sessionContext = {
+    userId: user.id,
+    userRole: user.role,
+    companyId: activeCompany?.id ?? null,
+    locationId: activeLocationResolved?.id ?? null,
+  };
 
   return {
     user: {
@@ -298,6 +328,8 @@ export async function getBootstrapData(): Promise<BootstrapData> {
         }
       : null,
     activeCompanyResolved,
+    activeLocationResolved,
+    sessionContext,
     locations,
     connections,
   };

@@ -11,7 +11,7 @@ type ServicePillProps = {
 
 export function ServicePill({ name, price }: ServicePillProps) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-md bg-[#F3F4F6] px-2.5 py-1 text-xs font-medium text-[#6B7280]">
+    <span className="inline-flex items-center gap-1 rounded-md bg-[#F3F4F6] px-2 py-0.5 text-[10px] font-medium text-[#6B7280] xl:gap-1.5 xl:px-2.5 xl:py-1 xl:text-[11px] xl2:gap-2 xl2:text-xs">
       <span className="truncate">{name}</span>
       <span className="font-semibold">{price}</span>
     </span>
@@ -24,7 +24,7 @@ type EmployeePillProps = {
 
 export function EmployeePill({ name }: EmployeePillProps) {
   return (
-    <span className="inline-flex items-center rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-1 text-xs font-semibold text-[#0B6CF4]">
+    <span className="inline-flex items-center rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2 py-0.5 text-[10px] font-semibold text-[#0B6CF4] xl:px-2.5 xl:py-1 xl:text-[11px] xl2:px-3 xl2:text-xs">
       {name}
     </span>
   );
@@ -37,7 +37,7 @@ type PricePillProps = {
 
 export function PricePill({ min, max }: PricePillProps) {
   return (
-    <span className="inline-flex items-center rounded-full border border-[#DCFCE7] bg-[#F7FEFA] px-3 py-1 text-xs font-semibold tabular-nums text-[#166534]">
+    <span className="inline-flex items-center rounded-full border border-[#DCFCE7] bg-[#F7FEFA] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[#166534] xl:px-2.5 xl:py-1 xl:text-[11px] xl2:px-3 xl2:text-xs">
       {min}
       {max && max !== min ? <> - {max}</> : null}
     </span>
@@ -99,8 +99,8 @@ export function RemainingTimePill({ startsAt }: RemainingTimePillProps) {
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#CBD5E1] bg-[#F8FAFC] px-3 py-1 text-xs font-semibold tabular-nums text-[#475569]">
-      <Timer className="h-3.5 w-3.5" />
+    <span className="inline-flex items-center gap-1 rounded-full border border-[#CBD5E1] bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[#475569] xl:gap-1.5 xl:px-2.5 xl:py-1 xl:text-[11px] xl2:px-3 xl2:text-xs">
+      <Timer className="h-3 w-3 xl:h-3.5 xl:w-3.5" />
       {label}
     </span>
   );
@@ -110,8 +110,8 @@ export function RemainingTimePill({ startsAt }: RemainingTimePillProps) {
 
 export function PendingBadge() {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#FCD34D] bg-[#FFF7ED] px-3 py-1 text-xs font-semibold text-[#EA580C]">
-      <Send className="h-3.5 w-3.5" />
+    <span className="inline-flex items-center gap-1 rounded-full border border-[#FCD34D] bg-[#FFF7ED] px-2 py-0.5 text-[10px] font-semibold text-[#EA580C] xl:gap-1.5 xl:px-2.5 xl:py-1 xl:text-[11px] xl2:px-3 xl2:text-xs">
+      <Send className="h-3 w-3 xl:h-3.5 xl:w-3.5" />
       Sin publicar
     </span>
   );
@@ -123,8 +123,8 @@ type SentBadgeProps = {
 
 export function SentBadge({ count }: SentBadgeProps) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-1 text-xs font-semibold text-[#0B6CF4]">
-      <Users className="h-3.5 w-3.5" />
+    <span className="inline-flex items-center gap-1 rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2 py-0.5 text-[10px] font-semibold text-[#0B6CF4] xl:gap-1.5 xl:px-2.5 xl:py-1 xl:text-[11px] xl2:px-3 xl2:text-xs">
+      <Users className="h-3 w-3 xl:h-3.5 xl:w-3.5" />
       Enviado{count ? ` a ${count}` : ""}
     </span>
   );
@@ -142,8 +142,10 @@ export function StatusDotLabel({ label, tone }: StatusDotLabelProps) {
     tone === "success" ? "text-[#10B981]" : "text-[#94A3B8]";
 
   return (
-    <div className={`inline-flex items-center gap-2 text-xs font-semibold ${textClassName}`}>
-      <span className={`h-2 w-2 rounded-full ${dotClassName}`} />
+    <div
+      className={`inline-flex items-center gap-1.5 text-[10px] font-semibold xl:gap-2 xl:text-[11px] xl2:text-xs ${textClassName}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full xl:h-2 xl:w-2 ${dotClassName}`} />
       {label}
     </div>
   );

@@ -65,14 +65,13 @@ export function SidebarItem({
           ? [
               "items-center justify-center",
               "px-2",
-              "min-h-11",
-              "xl:min-h-10 xl2:min-h-11",
+              "min-h-10",
+              "xl2:min-h-11",
             ].join(" ")
           : [
-              "items-start justify-start gap-3",
-              "px-3 py-2",
-              "min-h-11",
-              "xl:px-3 xl:py-1.5 xl:min-h-10",
+              "items-center justify-start gap-2.5",
+              "px-2.5 py-1.5",
+              "min-h-10",
               "xl2:px-3 xl2:py-2 xl2:min-h-11",
             ].join(" "),
 
@@ -82,7 +81,7 @@ export function SidebarItem({
       ].join(" ")}
       title={collapsed ? item.title : undefined}
     >
-      <div className={collapsed ? "" : "mt-[2px]"}>
+      <div className="shrink-0">
         <SidebarIcon icon={item.icon} />
       </div>
 
@@ -91,7 +90,7 @@ export function SidebarItem({
           <div
             className={[
               "truncate font-medium",
-              "text-[13px] leading-[18px]",
+              "text-[12.5px] leading-[18px]",
               "xl:text-[14px] xl:leading-[20px]",
               "xl2:text-sm xl2:leading-[20px]",
             ].join(" ")}
@@ -108,7 +107,7 @@ export function SidebarItem({
           className={[
             "ml-auto rounded-md bg-slate-700/60 px-2 py-0.5 text-slate-200",
             "text-xs",
-            "xl:text-[11px]",
+            "text-[11px]",
             "xl2:text-xs",
           ].join(" ")}
         >

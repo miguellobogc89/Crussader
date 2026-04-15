@@ -13,6 +13,7 @@ type Props = {
   companyId: string | null;
   locationId: string | null;
   refreshKey?: number;
+  onHeaderChange?: (header: React.ReactNode) => void;
 };
 
 type WaitlistListResponseItemEmployee = {
@@ -39,6 +40,7 @@ export function WaitlistCard({
   companyId,
   locationId,
   refreshKey = 0,
+  onHeaderChange,
 }: Props) {
   console.log("[WaitlistCard] render", { companyId, locationId, refreshKey });
 
@@ -154,64 +156,74 @@ export function WaitlistCard({
     }
   }
 
-  return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-border/60 px-5 py-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h3 className="truncate text-[15px] font-semibold text-foreground">
-                Lista de espera
-                <span className="ml-1 text-muted-foreground">({items.length})</span>
-              </h3>
-            </div>
+  const urgentCount = items.filter((item) => item.isUrgent).length;
+  const newCount = items.filter((item) => item.isNewCustomer).length;
 
-            <div className="mt-2 flex items-center gap-2 overflow-x-auto">
-              <div className="shrink-0 rounded-full bg-orange-50 px-3 py-1 text-xs font-medium text-orange-700">
-                Urgencias{" "}
-                <span className="ml-1 font-semibold">
-                  {items.filter((item) => item.isUrgent).length}
-                </span>
-              </div>
+  const cardHeader = (
+  <div className="flex w-full items-start gap-3 xl2:gap-4">
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-2">
+        <h3 className="truncate text-[13px] font-semibold text-foreground xl:text-sm xl2:text-[15px]">
+          Lista de espera
+          <span className="ml-1 text-muted-foreground">({items.length})</span>
+        </h3>
+      </div>
 
-              <div className="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                Nuevos{" "}
-                <span className="ml-1 font-semibold">
-                  {items.filter((item) => item.isNewCustomer).length}
-                </span>
-              </div>
-            </div>
-          </div>
+      <div className="mt-1.5 flex items-center gap-1.5 overflow-x-auto xl2:mt-2 xl2:gap-2">
+        <div className="shrink-0 rounded-full bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-orange-700 xl2:px-3 xl2:py-1 xl2:text-xs">
+          Urgencias
+          <span className="ml-1 font-semibold">{urgentCount}</span>
+        </div>
 
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => setIsAdding((prev) => !prev)}
-            disabled={!locationId}
-            className={cn(
-              "h-8 shrink-0 rounded-lg px-3 text-xs font-semibold transition-all duration-150",
-              isAdding
-                ? "border border-[#0B6CF4] bg-white text-slate-700 shadow-[0_2px_8px_rgba(11,108,244,0.12)] hover:bg-blue-50"
-                : "bg-[#0B6CF4] text-white shadow-[0_2px_8px_rgba(11,108,244,0.18)] hover:bg-[#0a5ed8]"
-            )}
-          >
-            {isAdding ? (
-              "Cancelar"
-            ) : (
-              <>
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                Añadir
-              </>
-            )}
-          </Button>
+        <div className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 xl2:px-3 xl2:py-1 xl2:text-xs">
+          Nuevos
+          <span className="ml-1 font-semibold">{newCount}</span>
         </div>
       </div>
+    </div>
+  </div>
+  );
+
+useEffect(() => {
+  if (!onHeaderChange) {
+    return;
+  }
+
+  onHeaderChange(cardHeader);
+}, [items.length, urgentCount, newCount, onHeaderChange]);
+
+  return (
+    <div className="flex h-full flex-col">
 
       <div className="flex-1 overflow-hidden">
         <motion.div
           layout
-          className="flex h-full flex-col gap-3 overflow-y-auto px-4 py-4"
+          className="flex h-full flex-col gap-2 overflow-y-auto px-3 py-3 xl:px-4 xl:py-4 xl2:gap-3"
         >
+
+          <motion.div layout>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setIsAdding((prev) => !prev)}
+              disabled={!locationId}
+              className={cn(
+                "h-8 w-full justify-center rounded-xl px-3 text-[11px] font-semibold transition-all duration-150 xl:h-9 xl:text-xs",
+                isAdding
+                  ? "border border-[#0B6CF4] bg-white text-slate-700 shadow-[0_2px_8px_rgba(11,108,244,0.12)] hover:bg-blue-50"
+                  : "bg-[#0B6CF4] text-white shadow-[0_2px_8px_rgba(11,108,244,0.18)] hover:bg-[#0a5ed8]"
+              )}
+            >
+              {isAdding ? (
+                "Cancelar"
+              ) : (
+                <>
+                  <Plus className="mr-1 h-3 w-3 xl:mr-1.5 xl:h-3.5 xl:w-3.5" />
+                  Nuevo
+                </>
+              )}
+            </Button>
+          </motion.div>
           {isAdding ? (
             <WaitlistInlineCreate
               companyId={companyId}
@@ -222,13 +234,13 @@ export function WaitlistCard({
           ) : null}
 
           {loadingList ? (
-            <div className="flex items-center justify-center py-10">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <div className="flex items-center justify-center py-8 xl:py-10">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground xl:h-5 xl:w-5" />
             </div>
           ) : null}
 
           {!loadingList && items.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+            <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 px-3 py-6 text-center text-xs text-muted-foreground xl:px-4 xl:py-8 xl:text-sm">
               No hay entradas activas en la lista
             </div>
           ) : null}

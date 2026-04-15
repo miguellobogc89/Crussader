@@ -1,5 +1,4 @@
 // app/dashboard/slots/page.tsx
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -36,14 +35,6 @@ function SlotsPageContent({
   bootstrapLocationId,
   companyName,
 }: SlotsPageContentProps) {
-  console.log("[SlotsPage render-prop]", {
-    bootstrapCompanyId,
-    bootstrapLocationId,
-    companyName,
-  });
-
-  const [companyId, setCompanyId] = useState<string | null>(null);
-  const [locationId, setLocationId] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<{
     day: string;
     slot: SlotItem;
@@ -56,8 +47,8 @@ function SlotsPageContent({
   const [showInvite, setShowInvite] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const effectiveCompanyId = companyId ?? bootstrapCompanyId ?? null;
-  const effectiveLocationId = locationId ?? bootstrapLocationId ?? null;
+  const effectiveCompanyId = bootstrapCompanyId ?? null;
+  const effectiveLocationId = bootstrapLocationId ?? null;
 
   const shouldOpenManagementPanel =
     selectedSlot?.slot.status === "pending" ||
@@ -69,8 +60,8 @@ function SlotsPageContent({
       return;
     }
 
-    const safeCompanyId: string = effectiveCompanyId;
     const controller = new AbortController();
+    const safeCompanyId = effectiveCompanyId;
 
     async function fetchTemplate() {
       try {
@@ -114,8 +105,6 @@ function SlotsPageContent({
         <SlotsPageShell
           companyId={effectiveCompanyId}
           locationId={effectiveLocationId}
-          onCompanyChange={setCompanyId}
-          onLocationChange={setLocationId}
           onNewCancellation={() => setShowNewCancellation(true)}
           onInvite={() => setShowInvite(true)}
           onSlotClick={(day, slot, services, slotLocationId) => {
@@ -170,19 +159,22 @@ function SlotsPageContent({
 
 export default function SlotsPage() {
   return (
-    <div className={inter.className}>
-      <PageShellNoScroll
-        title="Gestión de huecos disponibles"
-        description="Recupera citas canceladas automáticamente con WhatsApp."
-      >
-        {({ bootstrapCompanyId, bootstrapLocationId, companyName }) => (
-          <SlotsPageContent
-            bootstrapCompanyId={bootstrapCompanyId ?? null}
-            bootstrapLocationId={bootstrapLocationId ?? null}
-            companyName={companyName ?? null}
-          />
-        )}
-      </PageShellNoScroll>
+    <div className={`${inter.className} flex h-full min-h-0 overflow-hidden`}>
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <PageShellNoScroll
+          title="Gestión de huecos disponibles"
+          description="Recupera citas canceladas automáticamente con WhatsApp."
+          titleIconName="CalendarClock"
+        >
+          {({ bootstrapCompanyId, bootstrapLocationId, companyName }) => (
+            <SlotsPageContent
+              bootstrapCompanyId={bootstrapCompanyId ?? null}
+              bootstrapLocationId={bootstrapLocationId ?? null}
+              companyName={companyName ?? null}
+            />
+          )}
+        </PageShellNoScroll>
+      </div>
     </div>
   );
 }

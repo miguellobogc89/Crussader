@@ -1,5 +1,4 @@
 // app/dashboard/layout.tsx
-// app/dashboard/layout.tsx
 import * as React from "react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
