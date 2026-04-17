@@ -70,7 +70,6 @@ export async function POST(request: NextRequest) {
     }
 
     const companyId = location.companyId;
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const created = await prisma.slot_waitlist_entry.create({
       data: {
@@ -86,7 +85,7 @@ export async function POST(request: NextRequest) {
         time_preference: timePreference,
         day_preference: dayPreference,
         status: "active",
-        expires_at: expiresAt,
+        expires_at: null,
 
         // 🔴 NUEVO: guardar empleados
         slot_waitlist_entry_employee: {

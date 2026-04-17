@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useBootstrapData } from "@/app/providers/bootstrap-store";
 
 export type SlotServiceDTO = {
   id: string;
@@ -45,8 +44,8 @@ type SlotsCacheEntry = {
 const CACHE_TTL_MS = 60_000;
 const slotsCache = new Map<string, SlotsCacheEntry>();
 
-function getCacheKey(companyId: string, locationId?: string | null): string {
-  return `${companyId}::${locationId ?? "all"}`;
+function getCacheKey(locationId?: string | null): string {
+  return locationId ?? "no-location";
 }
 
 function getCachedSlots(cacheKey: string): SlotDTO[] | null {
@@ -74,20 +73,18 @@ function setCachedSlots(cacheKey: string, slots: SlotDTO[]): void {
 }
 
 export function useSlots(locationId?: string | null, refreshKey?: number) {
-  const boot = useBootstrapData();
-
   const [slots, setSlots] = useState<SlotDTO[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const rawCompanyId = boot?.activeCompanyResolved?.id;
-
-    if (typeof rawCompanyId !== "string" || rawCompanyId.length === 0) {
+    if (typeof locationId !== "string" || locationId.length === 0) {
+      setSlots([]);
+      setLoading(false);
       return;
     }
+    const safeLocationId = locationId;
 
-    const companyId: string = rawCompanyId;
-    const cacheKey = getCacheKey(companyId, locationId);
+    const cacheKey = getCacheKey(locationId);
     const cachedSlots = getCachedSlots(cacheKey);
 
     if (cachedSlots) {
@@ -102,11 +99,7 @@ export function useSlots(locationId?: string | null, refreshKey?: number) {
     async function fetchSlots() {
       try {
         const params = new URLSearchParams();
-        params.set("companyId", companyId);
-
-        if (typeof locationId === "string" && locationId.length > 0) {
-          params.set("locationId", locationId);
-        }
+params.set("locationId", safeLocationId);
 
         const res = await fetch(`/api/slots/list?${params.toString()}`, {
           signal: controller.signal,
@@ -116,10 +109,12 @@ export function useSlots(locationId?: string | null, refreshKey?: number) {
         const json = await res.json();
 
         if (json.ok && Array.isArray(json.slots)) {
-          console.log("slots_list_response", json.slots);
           setSlots(json.slots);
           setCachedSlots(cacheKey, json.slots);
+          return;
         }
+
+        setSlots([]);
       } catch (e) {
         if ((e as Error).name !== "AbortError") {
           console.error("slots_fetch_error", e);
@@ -131,10 +126,10 @@ export function useSlots(locationId?: string | null, refreshKey?: number) {
       }
     }
 
-    fetchSlots();
+    void fetchSlots();
 
     return () => controller.abort();
-  }, [boot?.activeCompanyResolved?.id, locationId, refreshKey]);
+  }, [locationId, refreshKey]);
 
   return { slots, loading };
 }

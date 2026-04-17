@@ -17,7 +17,6 @@ export type BootstrapLocation = {
 
 export type BootstrapState = {
   data?: BootstrapData & {
-    /** Campos derivados que NO rompen el shape anterior */
     companiesResolved?: Array<{ id: string; name: string; role?: string | null }>;
     activeCompanyResolved?: { id: string; name: string; role?: string | null } | null;
     activeLocationResolved?: {
@@ -38,16 +37,9 @@ export type BootstrapState = {
   activeLocationId: string | null;
   activeLocation: BootstrapLocation | null;
 
-  /** Hidrata el store con datos ya cargados en el servidor (o desde API) */
   load: (initial: BootstrapData) => void;
-
-  /** Limpia el buffer (por ejemplo, al cerrar sesión o cambiar de empresa) */
   clear: () => void;
-
-  /** Fetch contra /api/bootstrap si no tienes initialData en el provider */
   fetchFromApi: () => Promise<void>;
-
-  /** 🔧 Actualiza parcialmente los datos del usuario en el store (evita re-fetch) */
   patchMe: (patch: Partial<BootstrapData["user"]>) => void;
 
   setActiveLocation: (
@@ -60,7 +52,6 @@ export type BootstrapState = {
  * Normalizadores seguros
  * ============================ */
 
-// Id desde { id } | { companyId }
 function getId(x: any): string | null {
   if (!x || typeof x !== "object") return null;
   if (typeof x.id === "string") return x.id;
@@ -68,7 +59,6 @@ function getId(x: any): string | null {
   return null;
 }
 
-// Nombre si existe en el objeto (company completa o relación)
 function getName(x: any): string | null {
   if (!x || typeof x !== "object") return null;
   if (typeof x.name === "string") return x.name;
@@ -76,7 +66,6 @@ function getName(x: any): string | null {
   return null;
 }
 
-// Rol si existe (en memberships)
 function getRole(x: any): string | null | undefined {
   const r = x?.role;
   if (typeof r === "string") return r;
@@ -109,14 +98,26 @@ function resolveInitialLocation(data: BootstrapData): {
     };
   }
 
+  const serverLocationId =
+    (data as any).activeLocationResolved?.id ??
+    (data as any).sessionContext?.locationId ??
+    null;
+
   let defaultId: string | null = null;
 
   if (typeof window !== "undefined") {
     const saved = localStorage.getItem("dashboard:locationId");
-    const validSaved = locations.some((location) => location.id === saved);
+    const validSaved = !!saved && locations.some((location) => location.id === saved);
 
-    if (validSaved && saved) {
+    if (validSaved) {
       defaultId = saved;
+    }
+  }
+
+  if (!defaultId && serverLocationId) {
+    const validServer = locations.some((location) => location.id === serverLocationId);
+    if (validServer) {
+      defaultId = serverLocationId;
     }
   }
 
@@ -137,13 +138,16 @@ function resolveInitialLocation(data: BootstrapData): {
   };
 }
 
-/**
- * A partir de BootstrapData genera (o consolida si ya vienen del server)
- * companiesResolved + activeCompanyResolved. No rompe el shape original.
- */
 function enrichBootstrap<T extends BootstrapData>(data: T): T & {
   companiesResolved: Array<{ id: string; name: string; role?: string | null }>;
   activeCompanyResolved: { id: string; name: string; role?: string | null } | null;
+  activeLocationResolved: { id: string; title: string; companyId: string } | null;
+  sessionContext: {
+    userId: string;
+    userRole: "system_admin" | "org_admin" | "user" | "test";
+    companyId: string | null;
+    locationId: string | null;
+  };
 } {
   const serverResolved = (data as any).companiesResolved as
     | Array<{ id: string; name: string; role?: string | null }>
@@ -186,6 +190,24 @@ function enrichBootstrap<T extends BootstrapData>(data: T): T & {
     companiesResolved = Array.from(seen.values());
   }
 
+  const locations = normalizeLocations(data);
+
+  const serverActiveLocationResolved =
+    (data as any).activeLocationResolved as
+      | { id: string; title: string; companyId: string }
+      | null
+      | undefined;
+
+  const activeLocationResolved =
+    serverActiveLocationResolved ??
+    (locations.length > 0
+      ? {
+          id: locations[0].id,
+          title: locations[0].title,
+          companyId: String(locations[0].companyId ?? ""),
+        }
+      : null);
+
   const serverActiveResolved =
     (data as any).activeCompanyResolved as
       | { id: string; name: string; role?: string | null }
@@ -201,44 +223,25 @@ function enrichBootstrap<T extends BootstrapData>(data: T): T & {
   if (serverActiveResolved) {
     activeCompanyResolved = serverActiveResolved;
   } else {
-    const activeRaw: any = (data as any).activeCompany ?? null;
-    const activeId = getId(activeRaw) ?? companiesResolved[0]?.id ?? null;
+    const derivedCompanyId = activeLocationResolved?.companyId ?? null;
 
-    const fromList = activeId
-      ? companiesResolved.find((c) => c.id === activeId) ?? null
-      : null;
+    if (derivedCompanyId) {
+      const fromList =
+        companiesResolved.find((c) => c.id === derivedCompanyId) ?? null;
 
-    if (fromList) {
-      activeCompanyResolved = { ...fromList };
-    } else if (activeId) {
-      const fallbackName =
-        (activeRaw && getName(activeRaw)) || `Empresa ${activeId.slice(0, 6)}…`;
-
-      activeCompanyResolved = {
-        id: activeId,
-        name: fallbackName,
-        role: getRole(activeRaw) ?? null,
-      };
+      if (fromList) {
+        activeCompanyResolved = { ...fromList };
+      } else {
+        activeCompanyResolved = {
+          id: derivedCompanyId,
+          name: `Empresa ${derivedCompanyId.slice(0, 6)}…`,
+          role: null,
+        };
+      }
     } else {
       activeCompanyResolved = null;
     }
   }
-
-    const serverActiveLocationResolved =
-    (data as any).activeLocationResolved as
-      | { id: string; title: string; companyId: string }
-      | null
-      | undefined;
-
-  const activeLocationResolved =
-    serverActiveLocationResolved ??
-    (Array.isArray((data as any).locations) && (data as any).locations.length > 0
-      ? {
-          id: String((data as any).locations[0].id),
-          title: String((data as any).locations[0].title ?? "Sin nombre"),
-          companyId: String((data as any).locations[0].companyId),
-        }
-      : null);
 
   const serverSessionContext =
     (data as any).sessionContext as
@@ -265,7 +268,11 @@ function enrichBootstrap<T extends BootstrapData>(data: T): T & {
     companiesResolved,
     activeCompanyResolved,
     activeLocationResolved,
-    sessionContext,
+    sessionContext: {
+      ...sessionContext,
+      companyId: activeCompanyResolved?.id ?? sessionContext.companyId ?? null,
+      locationId: activeLocationResolved?.id ?? sessionContext.locationId ?? null,
+    },
   });
 }
 
@@ -278,11 +285,39 @@ const storeCreator: StateCreator<BootstrapState> = (set) => ({
   activeLocation: null,
 
   load: (initial: BootstrapData) => {
-    const enriched = enrichBootstrap(initial);
     const locationState = resolveInitialLocation(initial);
 
+    const activeLocationResolved = locationState.activeLocation
+      ? {
+          id: locationState.activeLocation.id,
+          title: locationState.activeLocation.title,
+          companyId: String(locationState.activeLocation.companyId ?? ""),
+        }
+      : null;
+
+    const baseEnriched = enrichBootstrap(initial);
+
+    const activeCompanyResolved = activeLocationResolved?.companyId
+      ? baseEnriched.companiesResolved.find(
+          (c) => c.id === activeLocationResolved.companyId
+        ) ?? {
+          id: activeLocationResolved.companyId,
+          name: `Empresa ${activeLocationResolved.companyId.slice(0, 6)}…`,
+          role: null,
+        }
+      : null;
+
     set({
-      data: enriched,
+      data: {
+        ...baseEnriched,
+        activeLocationResolved,
+        activeCompanyResolved,
+        sessionContext: {
+          ...baseEnriched.sessionContext,
+          locationId: activeLocationResolved?.id ?? null,
+          companyId: activeCompanyResolved?.id ?? null,
+        },
+      },
       status: "ready",
       error: undefined,
       activeLocationId: locationState.activeLocationId,
@@ -316,11 +351,38 @@ const storeCreator: StateCreator<BootstrapState> = (set) => ({
         throw new Error(json.error ?? "bootstrap_api_error");
       }
 
-      const enriched = enrichBootstrap(json.data);
       const locationState = resolveInitialLocation(json.data);
+      const baseEnriched = enrichBootstrap(json.data);
+
+      const activeLocationResolved = locationState.activeLocation
+        ? {
+            id: locationState.activeLocation.id,
+            title: locationState.activeLocation.title,
+            companyId: String(locationState.activeLocation.companyId ?? ""),
+          }
+        : null;
+
+      const activeCompanyResolved = activeLocationResolved?.companyId
+        ? baseEnriched.companiesResolved.find(
+            (c) => c.id === activeLocationResolved.companyId
+          ) ?? {
+            id: activeLocationResolved.companyId,
+            name: `Empresa ${activeLocationResolved.companyId.slice(0, 6)}…`,
+            role: null,
+          }
+        : null;
 
       set({
-        data: enriched,
+        data: {
+          ...baseEnriched,
+          activeLocationResolved,
+          activeCompanyResolved,
+          sessionContext: {
+            ...baseEnriched.sessionContext,
+            locationId: activeLocationResolved?.id ?? null,
+            companyId: activeCompanyResolved?.id ?? null,
+          },
+        },
         status: "ready",
         error: undefined,
         activeLocationId: locationState.activeLocationId,
@@ -355,16 +417,53 @@ const storeCreator: StateCreator<BootstrapState> = (set) => ({
       }
     }
 
-    set({
-      activeLocationId: locationId,
-      activeLocation: location ?? null,
+    set((state) => {
+      const locations = state.data ? normalizeLocations(state.data) : [];
+      const resolvedLocation =
+        location ??
+        locations.find((l) => l.id === locationId) ??
+        null;
+
+      const nextCompanyId = resolvedLocation?.companyId
+        ? String(resolvedLocation.companyId)
+        : null;
+
+      const nextCompanyResolved = nextCompanyId
+        ? state.data?.companiesResolved?.find((c) => c.id === nextCompanyId) ?? {
+            id: nextCompanyId,
+            name: `Empresa ${nextCompanyId.slice(0, 6)}…`,
+            role: null,
+          }
+        : null;
+
+      return {
+        activeLocationId: locationId,
+        activeLocation: resolvedLocation,
+        data: state.data
+          ? {
+              ...state.data,
+              activeLocationResolved: resolvedLocation
+                ? {
+                    id: resolvedLocation.id,
+                    title: resolvedLocation.title,
+                    companyId: String(resolvedLocation.companyId ?? ""),
+                  }
+                : null,
+              activeCompanyResolved: nextCompanyResolved,
+              sessionContext: {
+                ...state.data.sessionContext,
+                locationId: resolvedLocation?.id ?? null,
+                companyId: nextCompanyId,
+              },
+            }
+          : state.data,
+      };
     });
   },
 });
 
 export const useBootstrapStore = create<BootstrapState>(storeCreator);
 
-/** Selectores tipados */
 export function useBootstrapData() {
   return useBootstrapStore((s) => s.data);
 }

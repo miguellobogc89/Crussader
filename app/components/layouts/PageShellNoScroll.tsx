@@ -8,7 +8,6 @@ import {
   useActiveLocationId,
   useActiveLocationResolved,
   useActiveCompanyResolved,
-  useSessionContext,
 } from "@/app/providers/bootstrap-store";
 import Spinner from "@/app/components/crussader/UX/Spinner";
 import type PageTitle from "./PageTitle";
@@ -40,30 +39,26 @@ export default function PageShellNoScroll({
 }: Props) {
   const shellRef = useRef<HTMLDivElement | null>(null);
 
-  const sessionContext = useSessionContext();
-  const activeCompanyResolved = useActiveCompanyResolved();
-  const activeLocationResolved = useActiveLocationResolved();
-  const activeLocationId = useActiveLocationId();
+const activeCompanyResolved = useActiveCompanyResolved();
+const activeLocationResolved = useActiveLocationResolved();
+const activeLocationId = useActiveLocationId();
 
-  const resolvedData: ShellRenderData = {
-    bootstrapCompanyId:
-      sessionContext?.companyId ?? activeCompanyResolved?.id ?? null,
-    bootstrapLocationId:
-      activeLocationId ??
-      sessionContext?.locationId ??
-      activeLocationResolved?.id ??
-      null,
-    companyName: activeCompanyResolved?.name ?? "tu negocio",
-  };
+const resolvedData: ShellRenderData = {
+  bootstrapCompanyId:
+    activeLocationResolved?.companyId ?? activeCompanyResolved?.id ?? null,
+  bootstrapLocationId:
+    activeLocationId ?? activeLocationResolved?.id ?? null,
+  companyName: activeCompanyResolved?.name ?? "tu negocio",
+};
 
   const content =
     typeof children === "function" ? children(resolvedData) : children;
 
   return (
-<div
-  ref={shellRef}
-  className="relative flex h-[calc(100vh-var(--dashboard-header-offset,0px))] min-h-0 flex-col overflow-hidden"
->
+    <div
+      ref={shellRef}
+      className="relative flex h-[calc(100vh-var(--dashboard-header-offset,0px))] w-full min-w-0 min-h-0 flex-1 flex-col overflow-hidden"
+    >
       <RouteTransitionOverlay scope="container" className="z-50" />
 
       {!hideHeaderArea ? (

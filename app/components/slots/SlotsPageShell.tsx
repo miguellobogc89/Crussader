@@ -1,6 +1,7 @@
 // app/components/slots/SlotsPageShell.tsx
 "use client";
-import { useState } from "react";
+
+import React, { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { SlotsStatsCard } from "./SlotsStatsCard";
@@ -9,11 +10,6 @@ import { SlotsActivityFeedCard } from "./activity/SlotsActivityFeedCard";
 import type { SlotItem, SelectedServiceItem } from "./slots.types";
 import { WaitlistCard } from "./Waitlist/WaitlistCard";
 import StandardCard from "@/app/components/crussader/UX/standardCard";
-import {
-  useActiveLocation,
-  useActiveLocationId,
-  useActiveCompanyResolved,
-} from "@/app/providers/bootstrap-store";
 
 type SlotsPageShellProps = {
   companyId: string | null;
@@ -36,30 +32,27 @@ export function SlotsPageShell({
   onSlotClick,
   refreshKey,
 }: SlotsPageShellProps) {
-  const activeCompanyResolved = useActiveCompanyResolved();
-  const activeLocationId = useActiveLocationId();
-  const activeLocation = useActiveLocation();
-
   const [slotsListHeader, setSlotsListHeader] = useState<React.ReactNode>(null);
   const [waitlistHeader, setWaitlistHeader] = useState<React.ReactNode>(null);
   const [activityHeader, setActivityHeader] = useState<React.ReactNode>(null);
 
-  const effectiveLocationId = locationId ?? activeLocationId ?? null;
+  const effectiveLocationId = locationId;
+  const effectiveCompanyId = companyId;
 
-  const effectiveCompanyId =
-    companyId ??
-    activeLocation?.companyId ??
-    activeCompanyResolved?.id ??
-    null;
+  if (!effectiveLocationId) {
+    return null;
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden px-3 pb-3 pt-1 lg:px-4 lg:pb-4 lg:pt-1 xl:px-5 xl:pb-5 xl:pt-1 xl2:px-6 xl2:pb-6 xl2:pt-6">
       <div className="flex shrink-0 items-center justify-between gap-3 lg:gap-4 xl:gap-5 xl2:gap-6">
         <div className="min-w-0 flex-1 px-4 py-2">
-          <SlotsStatsCard
-            companyId={effectiveCompanyId ?? ""}
-            locationId={effectiveLocationId}
-          />
+          {effectiveCompanyId ? (
+            <SlotsStatsCard
+              companyId={effectiveCompanyId}
+              locationId={effectiveLocationId}
+            />
+          ) : null}
         </div>
 
         <div className="mr-2 flex shrink-0 items-center">

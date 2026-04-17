@@ -4,63 +4,79 @@
 import { useEffect, useState } from "react";
 import type { ActivityItem } from "@/app/components/slots/helpers/slotsActivityFeedHelpers";
 
-
 export function useSlotsActivity(locationId?: string | null) {
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(false);
-const [error, setError] = useState<string | null>(null);
-const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   useEffect(() => {
     if (!locationId) {
       setItems([]);
+      setLoading(false);
+      setError(null);
+      setHasLoadedOnce(false);
       return;
     }
 
     let isMounted = true;
 
-const fetchActivity = () => {
-  if (!hasLoadedOnce) {
-    setLoading(true);
-  }
-
-  setError(null);
-
-  fetch(`/api/slots/activity?locationId=${locationId}`)
-    .then((res) => res.json())
-    .then((data) => {
-      if (!isMounted) return;
-
-      if (data.ok) {
-        setItems(data.items);
-        setHasLoadedOnce(true);
-      } else {
-        setError("Error cargando actividad");
+    const fetchActivity = async (showLoader: boolean) => {
+      if (showLoader) {
+        setLoading(true);
       }
-    })
-    .catch(() => {
-      if (!isMounted) return;
-      setError("Error de red");
-    })
-    .finally(() => {
-      if (!isMounted) return;
-      setLoading(false);
-    });
-};
 
-    fetchActivity();
+      setError(null);
 
-    const interval = setInterval(fetchActivity, 5000);
+      try {
+        const res = await fetch(
+          `/api/slots/activity?locationId=${encodeURIComponent(locationId)}`,
+          { cache: "no-store" }
+        );
+
+        const data = await res.json();
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (data?.ok && Array.isArray(data.items)) {
+          setItems(data.items);
+          setHasLoadedOnce(true);
+          return;
+        }
+
+        setError("Error cargando actividad");
+      } catch {
+        if (!isMounted) {
+          return;
+        }
+
+        setError("Error de red");
+      } finally {
+        if (!isMounted) {
+          return;
+        }
+
+        setLoading(false);
+      }
+    };
+
+    void fetchActivity(!hasLoadedOnce);
+
+    const interval = setInterval(() => {
+      void fetchActivity(false);
+    }, 5000);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [locationId]);
+  }, [locationId, hasLoadedOnce]);
 
   return {
     items,
-  loading,
-  error,
+    loading,
+    error,
   };
 }

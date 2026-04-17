@@ -28,6 +28,9 @@ const SERVICES_LIST_ENDPOINT = "/api/slots/services/list";
 const EMPLOYEES_LIST_ENDPOINT = "/api/slots/employees/list";
 const WAITLIST_CREATE_ENDPOINT = "/api/slots/waitlist/create";
 
+const servicesCache = new Map<string, ServiceOption[]>();
+const employeesCache = new Map<string, EmployeeOption[]>();
+
 export function WaitlistInlineCreate({
   companyId,
   locationId,
@@ -64,6 +67,21 @@ export function WaitlistInlineCreate({
       return;
     }
 
+    const cachedServices = servicesCache.get(locationId);
+
+    if (cachedServices) {
+      setServices(cachedServices);
+
+      if (cachedServices.length > 0) {
+        setSelectedServiceId((current) => current ?? cachedServices[0].id);
+        setSelectedServiceName((current) =>
+          current.trim().length > 0 ? current : cachedServices[0].name
+        );
+      }
+
+      return;
+    }
+
     const safeLocationId = locationId;
     const controller = new AbortController();
 
@@ -95,11 +113,14 @@ export function WaitlistInlineCreate({
             name: String(item.name ?? ""),
           }));
 
+        servicesCache.set(safeLocationId, nextServices);
         setServices(nextServices);
 
         if (nextServices.length > 0) {
-          setSelectedServiceId(nextServices[0].id);
-          setSelectedServiceName(nextServices[0].name);
+          setSelectedServiceId((current) => current ?? nextServices[0].id);
+          setSelectedServiceName((current) =>
+            current.trim().length > 0 ? current : nextServices[0].name
+          );
         }
       } catch (error) {
         if ((error as Error).name === "AbortError") {
@@ -119,6 +140,13 @@ export function WaitlistInlineCreate({
   useEffect(() => {
     if (!locationId) {
       setEmployees([]);
+      return;
+    }
+
+    const cachedEmployees = employeesCache.get(locationId);
+
+    if (cachedEmployees) {
+      setEmployees(cachedEmployees);
       return;
     }
 
@@ -151,6 +179,7 @@ export function WaitlistInlineCreate({
           name: String(item.name ?? ""),
         }));
 
+        employeesCache.set(safeLocationId, nextEmployees);
         setEmployees(nextEmployees);
       } catch (error) {
         if ((error as Error).name === "AbortError") {
@@ -167,41 +196,41 @@ export function WaitlistInlineCreate({
     return () => controller.abort();
   }, [locationId]);
 
-const canSave = useMemo(() => {
-  if (!locationId) {
-    return false;
-  }
-
-  if (saving) {
-    return false;
-  }
-
-  if (query.trim().length === 0) {
-    return false;
-  }
-
-  if (isUrgent) {
-    if (selectedEmployeeIds.length === 0) {
+  const canSave = useMemo(() => {
+    if (!locationId) {
       return false;
     }
 
-    if (note.trim().length === 0) {
+    if (saving) {
       return false;
     }
 
-    return true;
-  }
+    if (query.trim().length === 0) {
+      return false;
+    }
 
-  return selectedServiceName.trim().length > 0;
-}, [
-  isUrgent,
-  locationId,
-  note,
-  query,
-  saving,
-  selectedEmployeeIds,
-  selectedServiceName,
-]);
+    if (isUrgent) {
+      if (selectedEmployeeIds.length === 0) {
+        return false;
+      }
+
+      if (note.trim().length === 0) {
+        return false;
+      }
+
+      return true;
+    }
+
+    return selectedServiceName.trim().length > 0;
+  }, [
+    isUrgent,
+    locationId,
+    note,
+    query,
+    saving,
+    selectedEmployeeIds,
+    selectedServiceName,
+  ]);
 
   function handleServiceClick(service: ServiceOption) {
     setSelectedServiceId(service.id);
@@ -218,34 +247,26 @@ const canSave = useMemo(() => {
     });
   }
 
-function getTimePreference(): string[] | null {
-  const values: string[] = [];
+  function getTimePreference(): string[] | null {
+    const values: string[] = [];
 
-  if (asap) {
-    values.push("asap");
-  }
-
-  if (prefersMorning) {
-    values.push("morning");
-  }
-
-  if (prefersAfternoon) {
-    values.push("afternoon");
-  }
-
-  if (values.length === 0) {
-    return null;
-  }
-
-  return values;
-}
-
-  function getChipClassName(isActive: boolean): string {
-    if (isActive) {
-      return "border-blue-300 bg-blue-50 text-blue-700";
+    if (asap) {
+      values.push("asap");
     }
 
-    return "border-slate-200 bg-white text-slate-600";
+    if (prefersMorning) {
+      values.push("morning");
+    }
+
+    if (prefersAfternoon) {
+      values.push("afternoon");
+    }
+
+    if (values.length === 0) {
+      return null;
+    }
+
+    return values;
   }
 
   async function saveInlineItem() {
@@ -284,26 +305,26 @@ function getTimePreference(): string[] | null {
         throw new Error(data?.error || "No se pudo guardar la entrada");
       }
 
-const created: WaitlistRowItem = {
-  id: String(data.item.id),
-  customerName: String(data.item.customerName ?? trimmedName),
-  customerPhone: data.item.customerPhone
-    ? String(data.item.customerPhone)
-    : null,
-  serviceName: data.item.serviceName
-    ? String(data.item.serviceName)
-    : null,
-  note: data.item.note ? String(data.item.note) : null,
-  isUrgent: Boolean(data.item.isUrgent),
-  isNewCustomer,
-  createdAt: String(data.item.createdAt),
-  employees: Array.isArray(data.item.employees)
-    ? data.item.employees.map((employee: { id: string; name: string }) => ({
-        id: String(employee.id),
-        name: String(employee.name ?? ""),
-      }))
-    : [],
-};
+      const created: WaitlistRowItem = {
+        id: String(data.item.id),
+        customerName: String(data.item.customerName ?? trimmedName),
+        customerPhone: data.item.customerPhone
+          ? String(data.item.customerPhone)
+          : null,
+        serviceName: data.item.serviceName
+          ? String(data.item.serviceName)
+          : null,
+        note: data.item.note ? String(data.item.note) : null,
+        isUrgent: Boolean(data.item.isUrgent),
+        isNewCustomer,
+        createdAt: String(data.item.createdAt),
+        employees: Array.isArray(data.item.employees)
+          ? data.item.employees.map((employee: { id: string; name: string }) => ({
+              id: String(employee.id),
+              name: String(employee.name ?? ""),
+            }))
+          : [],
+      };
 
       onCreated(created);
     } catch (error) {
@@ -332,16 +353,16 @@ const created: WaitlistRowItem = {
     }
   }
 
-return (
-<div
-  className={[
-    "rounded-xl border bg-card p-3 shadow-sm transition-all duration-150",
-    isUrgent
-      ? "border-orange-300 shadow-[0_0_0_4px_rgba(251,146,60,0.12)]"
-      : "border-border",
-  ].join(" ")}
-  onKeyDown={handleFormKeyDown}
->
+  return (
+    <div
+      className={[
+        "rounded-xl border bg-card p-3 shadow-sm transition-all duration-150",
+        isUrgent
+          ? "border-orange-300 shadow-[0_0_0_4px_rgba(251,146,60,0.12)]"
+          : "border-border",
+      ].join(" ")}
+      onKeyDown={handleFormKeyDown}
+    >
       <div className="space-y-3">
         <WaitlistCustomerSearch
           companyId={companyId}
@@ -481,100 +502,99 @@ return (
           </div>
         ) : null}
 
-{isUrgent ? (
-  <div className="space-y-3 rounded-xl border border-border bg-background p-3">
-    <div>
-      <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-blue-700">
-        ¿Qué empleados pueden encargarse?
-      </p>
+        {isUrgent ? (
+          <div className="space-y-3 rounded-xl border border-border bg-background p-3">
+            <div>
+              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-blue-700">
+                ¿Qué empleados pueden encargarse?
+              </p>
 
-      <div className="flex flex-wrap gap-1.5">
-        {employees.map((employee) => {
-          const isActive = selectedEmployeeIds.includes(employee.id);
+              <div className="flex flex-wrap gap-1.5">
+                {employees.map((employee) => {
+                  const isActive = selectedEmployeeIds.includes(employee.id);
 
-          return (
-            <button
-              key={employee.id}
-              type="button"
-              onClick={() => handleEmployeeToggle(employee.id)}
-              className={[
-                "h-6 rounded-md border px-2.5 text-[11px] font-medium transition-all duration-150",
-                isActive
-                  ? "border-blue-600 bg-blue-600 text-white"
-                  : "border-border bg-background text-muted-foreground hover:border-blue-300 hover:text-foreground"
-              ].join(" ")}
-            >
-              {employee.name}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  </div>
-) : null}
+                  return (
+                    <button
+                      key={employee.id}
+                      type="button"
+                      onClick={() => handleEmployeeToggle(employee.id)}
+                      className={[
+                        "h-6 rounded-md border px-2.5 text-[11px] font-medium transition-all duration-150",
+                        isActive
+                          ? "border-blue-600 bg-blue-600 text-white"
+                          : "border-border bg-background text-muted-foreground hover:border-blue-300 hover:text-foreground",
+                      ].join(" ")}
+                    >
+                      {employee.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
-{!isUrgent ? (
-  <div className="space-y-3">
-    <div>
-      <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-        Disponibilidad
-      </p>
+        {!isUrgent ? (
+          <div className="space-y-3">
+            <div>
+              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Disponibilidad
+              </p>
 
-      <div className="flex flex-wrap gap-1.5">
-        <button
-          type="button"
-          onClick={() => setAsap((prev) => !prev)}
-          className={[
-            "h-6 rounded-md border px-3 text-[11px] font-medium transition-all duration-150",
-            asap
-              ? "border-blue-600 bg-blue-600 text-white"
-              : "border-border bg-background text-muted-foreground hover:border-blue-300",
-          ].join(" ")}
-        >
-          Cuanto antes
-        </button>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setAsap((prev) => !prev)}
+                  className={[
+                    "h-6 rounded-md border px-3 text-[11px] font-medium transition-all duration-150",
+                    asap
+                      ? "border-blue-600 bg-blue-600 text-white"
+                      : "border-border bg-background text-muted-foreground hover:border-blue-300",
+                  ].join(" ")}
+                >
+                  Cuanto antes
+                </button>
 
-        <button
-          type="button"
-          onClick={() => setPrefersMorning((prev) => !prev)}
-          className={[
-            "h-6 rounded-md border px-3 text-[11px] font-medium transition-all duration-150",
-            prefersMorning
-              ? "border-blue-600 bg-blue-600 text-white"
-              : "border-border bg-background text-muted-foreground hover:border-blue-300",
-          ].join(" ")}
-        >
-          Mañana
-        </button>
+                <button
+                  type="button"
+                  onClick={() => setPrefersMorning((prev) => !prev)}
+                  className={[
+                    "h-6 rounded-md border px-3 text-[11px] font-medium transition-all duration-150",
+                    prefersMorning
+                      ? "border-blue-600 bg-blue-600 text-white"
+                      : "border-border bg-background text-muted-foreground hover:border-blue-300",
+                  ].join(" ")}
+                >
+                  Mañana
+                </button>
 
-        <button
-          type="button"
-          onClick={() => setPrefersAfternoon((prev) => !prev)}
-          className={[
-            "h-6 rounded-md border px-3 text-[11px] font-medium transition-all duration-150",
-            prefersAfternoon
-              ? "border-blue-600 bg-blue-600 text-white"
-              : "border-border bg-background text-muted-foreground hover:border-blue-300",
-          ].join(" ")}
-        >
-          Tarde
-        </button>
-      </div>
-    </div>
-  </div>
-) : null}
+                <button
+                  type="button"
+                  onClick={() => setPrefersAfternoon((prev) => !prev)}
+                  className={[
+                    "h-6 rounded-md border px-3 text-[11px] font-medium transition-all duration-150",
+                    prefersAfternoon
+                      ? "border-blue-600 bg-blue-600 text-white"
+                      : "border-border bg-background text-muted-foreground hover:border-blue-300",
+                  ].join(" ")}
+                >
+                  Tarde
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <div>
-<input
-  value={note}
-  onChange={(event) => setNote(event.target.value)}
-  placeholder={isUrgent ? "Nota obligatoria para la urgencia" : "Nota corta opcional"}
-  className="h-8 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-slate-400 focus:border-blue-300"
-/>
+          <input
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            placeholder={isUrgent ? "Nota obligatoria para la urgencia" : "Nota corta opcional"}
+            className="h-8 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none placeholder:text-slate-400 focus:border-blue-300"
+          />
         </div>
 
         <div className="flex items-center justify-between gap-3">
-
           <div className="flex items-center gap-2">
             <button
               type="button"

@@ -1,42 +1,36 @@
 // app/api/slots/services/list/route.ts
-// app/api/slots/services/list/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const locationId = searchParams.get("locationId")?.trim() ?? "";
-    const companyIdFromQuery = searchParams.get("companyId")?.trim() ?? "";
+const locationId = searchParams.get("locationId")?.trim() ?? "";
 
-    let companyId = companyIdFromQuery;
+if (!locationId) {
+  return NextResponse.json(
+    { ok: false, error: "locationId is required." },
+    { status: 400 }
+  );
+}
 
-    if (!companyId && locationId) {
-      const location = await prisma.location.findUnique({
-        where: {
-          id: locationId,
-        },
-        select: {
-          companyId: true,
-        },
-      });
+const location = await prisma.location.findUnique({
+  where: {
+    id: locationId,
+  },
+  select: {
+    companyId: true,
+  },
+});
 
-      if (!location) {
-        return NextResponse.json(
-          { ok: false, error: "Location not found." },
-          { status: 404 }
-        );
-      }
+if (!location) {
+  return NextResponse.json(
+    { ok: false, error: "Location not found." },
+    { status: 404 }
+  );
+}
 
-      companyId = location.companyId;
-    }
-
-    if (!companyId) {
-      return NextResponse.json(
-        { ok: false, error: "companyId or locationId is required." },
-        { status: 400 }
-      );
-    }
+const companyId = location.companyId;
 
     const services = await prisma.slot_recovery_service.findMany({
       where: {

@@ -42,17 +42,14 @@ export function WaitlistCard({
   refreshKey = 0,
   onHeaderChange,
 }: Props) {
-  console.log("[WaitlistCard] render", { companyId, locationId, refreshKey });
 
   const [items, setItems] = useState<WaitlistRowItem[]>([]);
   const [loadingList, setLoadingList] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
-    console.log("[WaitlistCard] useEffect start", { locationId, refreshKey });
 
     if (!locationId) {
-      console.log("[WaitlistCard] no locationId");
       setItems([]);
       return;
     }
@@ -61,7 +58,6 @@ export function WaitlistCard({
     const controller = new AbortController();
 
     async function loadWaitlist() {
-      console.log("[WaitlistCard] loadWaitlist called", { safeLocationId });
 
       try {
         setLoadingList(true);
@@ -79,7 +75,6 @@ export function WaitlistCard({
         );
 
         const data = await response.json();
-        console.log("[waitlist:list:raw]", JSON.stringify(data, null, 2));
 
         if (!response.ok || !data?.ok || !Array.isArray(data.items)) {
           console.error("[WaitlistCard] invalid waitlist response", data);

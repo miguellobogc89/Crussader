@@ -47,14 +47,14 @@ function SlotsPageContent({
   const [showInvite, setShowInvite] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const effectiveCompanyId = bootstrapCompanyId ?? null;
-  const effectiveLocationId = bootstrapLocationId ?? null;
+const effectiveCompanyId = bootstrapCompanyId ?? null;
+const effectiveLocationId = bootstrapLocationId ?? null;
 
-  const shouldOpenManagementPanel =
-    selectedSlot?.slot.status === "pending" ||
-    selectedSlot?.slot.status === "fresh";
+const shouldOpenManagementPanel =
+  selectedSlot?.slot.status === "pending" ||
+  selectedSlot?.slot.status === "fresh";
 
-  useEffect(() => {
+useEffect(() => {
     if (!effectiveCompanyId || !selectedSlot || !shouldOpenManagementPanel) {
       setSlotTemplate(null);
       return;
@@ -99,6 +99,9 @@ function SlotsPageContent({
     return () => controller.abort();
   }, [effectiveCompanyId, selectedSlot, shouldOpenManagementPanel]);
 
+  if (!effectiveLocationId) {
+  return null;
+}
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -112,7 +115,7 @@ function SlotsPageContent({
               day,
               slot,
               services,
-              locationId: slotLocationId,
+              locationId: slotLocationId ?? effectiveLocationId,
             });
           }}
           refreshKey={refreshKey}
@@ -127,7 +130,7 @@ function SlotsPageContent({
           slot={selectedSlot.slot}
           services={selectedSlot.services}
           companyId={effectiveCompanyId}
-          locationId={selectedSlot.locationId ?? ""}
+          locationId={selectedSlot.locationId ?? effectiveLocationId}
           templateBody={slotTemplate?.body_preview ?? ""}
           companyName={companyName ?? ""}
           onSent={() => setRefreshKey((prev) => prev + 1)}
@@ -146,7 +149,7 @@ function SlotsPageContent({
       <NewCancellationModal
         open={showNewCancellation}
         onClose={() => setShowNewCancellation(false)}
-        locationId={effectiveLocationId ?? ""}
+        locationId={effectiveLocationId}
       />
 
       <SlotsInviteModal

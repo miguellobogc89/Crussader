@@ -1,12 +1,10 @@
 // app/api/slots/list/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { PrismaClient } from "@prisma/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
-
-const prisma = new PrismaClient();
 
 export async function GET(req: NextRequest) {
   try {
@@ -33,23 +31,37 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const companyId = searchParams.get("companyId");
-    const locationId = searchParams.get("locationId");
+    const locationId = searchParams.get("locationId")?.trim() ?? "";
 
-    if (!companyId) {
+    if (!locationId) {
       return NextResponse.json(
-        { ok: false, error: "companyId_required" },
+        { ok: false, error: "locationId_required" },
         { status: 400 }
       );
     }
 
     const isAdmin = (user.role ?? "").toLowerCase() === "system_admin";
 
+    const location = await prisma.location.findUnique({
+      where: { id: locationId },
+      select: {
+        id: true,
+        companyId: true,
+      },
+    });
+
+    if (!location) {
+      return NextResponse.json(
+        { ok: false, error: "invalid_location" },
+        { status: 400 }
+      );
+    }
+
     if (!isAdmin) {
-      const membership = await prisma.userCompany.findFirst({
+      const membership = await prisma.userLocation.findFirst({
         where: {
           userId: user.id,
-          companyId,
+          locationId,
         },
         select: { id: true },
       });
@@ -62,21 +74,12 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const whereClause: {
-      company_id: string;
-      location_id?: string;
-    } = {
-      company_id: companyId,
-    };
-
-    if (locationId) {
-      whereClause.location_id = locationId;
-    }
+    const companyId = location.companyId;
 
     await prisma.slot_recovery_slot.updateMany({
       where: {
         company_id: companyId,
-        ...(locationId ? { location_id: locationId } : {}),
+        location_id: locationId,
         starts_at: {
           lte: new Date(),
         },
@@ -92,7 +95,10 @@ export async function GET(req: NextRequest) {
     });
 
     const slots = await prisma.slot_recovery_slot.findMany({
-      where: whereClause,
+      where: {
+        company_id: companyId,
+        location_id: locationId,
+      },
       select: {
         id: true,
         company_id: true,
@@ -105,7 +111,6 @@ export async function GET(req: NextRequest) {
         manual_publish_required: true,
         published_at: true,
         recovered_at: true,
-        recovered_service_id: true,
         service_name: true,
         notes: true,
         target_customer_count: true,
@@ -117,14 +122,6 @@ export async function GET(req: NextRequest) {
           select: {
             id: true,
             name: true,
-          },
-        },
-        slot_recovery_service: {
-          select: {
-            id: true,
-            name: true,
-            price: true,
-            duration_min: true,
           },
         },
         Appointment_slot_recovery_slot_recovered_appointment_idToAppointment: {
@@ -175,7 +172,6 @@ export async function GET(req: NextRequest) {
 
         const recoveredAppointment =
           slot.Appointment_slot_recovery_slot_recovered_appointment_idToAppointment;
-        const recoveredService = slot.slot_recovery_service;
 
         return {
           id: slot.id,
@@ -197,22 +193,19 @@ export async function GET(req: NextRequest) {
           repliedCustomerCount: slot.replied_customer_count,
           bookedCustomerCount: slot.booked_customer_count,
           createdAt: slot.created_at,
-          recoveredServiceId:
-            slot.recovered_service_id ??
-            recoveredAppointment?.slotRecoveryServiceId ??
-            null,
-          recoveredServiceName:
-            recoveredAppointment?.serviceName ?? recoveredService?.name ?? null,
-          recoveredSoldAmount:
-            recoveredAppointment?.servicePrice != null
-              ? Number(recoveredAppointment.servicePrice)
-              : recoveredService?.price != null
-              ? Number(recoveredService.price)
-              : null,
-          recoveredServiceDurationMin:
-            recoveredAppointment?.serviceDurationMin ??
-            recoveredService?.duration_min ??
-            null,
+recoveredServiceId:
+  recoveredAppointment?.slotRecoveryServiceId ?? null,
+
+recoveredServiceName:
+  recoveredAppointment?.serviceName ?? null,
+
+recoveredSoldAmount:
+  recoveredAppointment?.servicePrice != null
+    ? Number(recoveredAppointment.servicePrice)
+    : null,
+
+recoveredServiceDurationMin:
+  recoveredAppointment?.serviceDurationMin ?? null,
           servicesCount: services.length,
           services,
         };
