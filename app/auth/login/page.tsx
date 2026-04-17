@@ -10,7 +10,7 @@ export default async function LoginPage() {
 
   // si intenta ir a /auth/login ya logueado, lo mandamos al dashboard
   if (session) {
-    redirect("/dashboard/home"); // o "/dashboard"
+    redirect("/dashboard/slots"); // o "/dashboard"
   }
 
   return (

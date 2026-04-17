@@ -204,7 +204,7 @@ export default function ConnectClient({
   // ✅ Caso 1: OK + ubicaciones → entramos directo
   useEffect(() => {
     if (ok && hasLocations) {
-      router.replace("/dashboard/home");
+      router.replace("/dashboard/slots");
     }
   }, [ok, hasLocations, router]);
 

@@ -8,6 +8,6 @@ export async function ensureOnboardingRedirect(userId: string) {
   });
 
   if (!user) return "/auth";
-  if (user.onboardingStatus === "COMPLETED") return "/dashboard/home";
+  if (user.onboardingStatus === "COMPLETED") return "/dashboard/slots";
   return "/dashboard/onboarding";
 }

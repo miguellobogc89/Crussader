@@ -223,7 +223,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const dash = new URL("/dashboard/home", req.url);
+    const dash = new URL("/dashboard/slots", req.url);
     const res = NextResponse.redirect(dash, 302);
 
     // ✅ Crea sesión NextAuth real (cookie)
@@ -236,7 +236,7 @@ export async function GET(req: NextRequest) {
 
     clearTempCookies(res);
 
-    console.log("[first-connect:callback] DONE -> /dashboard/home", {
+    console.log("[first-connect:callback] DONE -> /dashboard/slots", {
       email,
       userId: user.id,
       companyId,
