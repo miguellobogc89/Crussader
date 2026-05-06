@@ -2,28 +2,35 @@
 
 export type CalendarAppt = {
   id: string;
-  startAt: string; // ISO
-  endAt: string;   // ISO
+
+  locationId: string;
+
+  startAt: string;
+  endAt: string;
+
+  serviceId?: string | null;
   serviceName?: string | null;
   serviceColor?: string | null;
+
+  employeeId?: string | null;
   employeeName?: string | null;
+  employeeColor?: string | null;
+
+  resourceId?: string | null;
   resourceName?: string | null;
 
-  // 👇 añadidos para SchedulerCalendar
   status?: string | null;
-  serviceId?: string | null;
+
+  customerId?: string | null;
   customerName?: string | null;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
+
+  notes?: string | null;
+  source?: "internal" | "google";
+externalProvider?: string | null;
 };
 
-// Alias para compatibilidad
 export type Appointment = CalendarAppt;
 
 export type View = "day" | "threeDays" | "workingWeek" | "week" | "month";
-
-
-export type HolidayLite = {
-  id: string;
-  date: string;       // ISO
-  name: string;
-  scope?: string | null;
-};

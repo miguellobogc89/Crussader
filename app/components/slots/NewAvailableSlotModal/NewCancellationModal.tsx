@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import StandardCard from "@/app/components/crussader/UX/standardCard";
 import type { SelectedServiceItem } from "@/app/components/slots/modal/slotModal.types";
+import type { CancelledAppointmentItem } from "@/app/components/slots/CancelledAppointments/CancelledAppointmentsList";
 import { NewCancellationModalHeader } from "./NewCancellationModalHeader";
 import { NewCancellationModalForm } from "./NewCancellationModalForm";
 import { NewCancellationModalFooter } from "./NewCancellationModalFooter";
@@ -29,25 +30,23 @@ type NewCancellationModalProps = {
   open: boolean;
   onClose: () => void;
   locationId: string;
+  prefillAppointment?: CancelledAppointmentItem | null;
 };
 
 export function NewCancellationModal({
   open,
   onClose,
   locationId,
+  prefillAppointment = null,
 }: NewCancellationModalProps) {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
-  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeLite | null>(
-    null
-  );
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeLite | null>(null);
 
   const [dateValue, setDateValue] = useState("");
   const [startTimeValue, setStartTimeValue] = useState("");
   const [endTimeValue, setEndTimeValue] = useState("");
   const [notes, setNotes] = useState("");
-  const [selectedServices, setSelectedServices] = useState<
-    SelectedServiceItem[]
-  >([]);
+  const [selectedServices, setSelectedServices] = useState<SelectedServiceItem[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,17 +56,23 @@ export function NewCancellationModal({
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
 
   useEffect(() => {
-    console.log("[NewCancellationModal] open =", open);
-    console.log("[NewCancellationModal] locationId =", locationId);
-
     if (!open) {
       return;
     }
 
-    setDateValue(getTodayDateValue());
-    setStartTimeValue("17:00");
-    setEndTimeValue("17:30");
-    setNotes("");
+if (prefillAppointment) {
+  setDateValue(getDateValueFromISO(prefillAppointment.startAt));
+  setStartTimeValue(getTimeValueFromISO(prefillAppointment.startAt));
+  setEndTimeValue(getTimeValueFromISO(prefillAppointment.endAt));
+  setNotes("");
+  setSelectedEmployeeId(prefillAppointment.employeeId ?? "");
+} else {
+      setDateValue(getTodayDateValue());
+      setStartTimeValue("17:00");
+      setEndTimeValue("17:30");
+      setNotes("");
+    }
+
     setSelectedServices([]);
     setSelectedServiceIds([]);
     setSelectedEmployeeId("");
@@ -75,7 +80,7 @@ export function NewCancellationModal({
     setIsSubmitting(false);
     setCreated(false);
     setErrorText("");
-  }, [open, locationId]);
+  }, [open, locationId, prefillAppointment]);
 
   useEffect(() => {
     if (!open) {
@@ -110,16 +115,25 @@ export function NewCancellationModal({
         }
 
         const nextEmployees: EmployeeLite[] = Array.isArray(data?.employees)
-          ? data.employees.map((item: any) => {
-              return {
-                id: String(item.id),
-                name: String(item.name),
-                active: true,
-              };
-            })
+          ? data.employees.map((item: any) => ({
+              id: String(item.id),
+              name: String(item.name),
+              active: true,
+            }))
           : [];
 
         setEmployees(nextEmployees);
+
+        if (prefillAppointment?.employeeId) {
+  const foundEmployee = nextEmployees.find((employee) => {
+    return employee.id === prefillAppointment.employeeId;
+  });
+
+  if (foundEmployee) {
+    setSelectedEmployeeId(foundEmployee.id);
+    setSelectedEmployee(foundEmployee);
+  }
+}
 
         const stillExists = nextEmployees.some((employee) => {
           return employee.id === selectedEmployeeId;
@@ -179,26 +193,22 @@ export function NewCancellationModal({
     isSubmitting,
   ]);
 
-const handleServicesChange = useCallback(
-  (services: EmployeeServiceItem[], selectedIds: string[]) => {
-    const nextSelectedServices: SelectedServiceItem[] = services
-      .filter((service) => {
-        return selectedIds.includes(service.id);
-      })
-      .map((service) => {
-        return {
+  const handleServicesChange = useCallback(
+    (services: EmployeeServiceItem[], selectedIds: string[]) => {
+      const nextSelectedServices: SelectedServiceItem[] = services
+        .filter((service) => selectedIds.includes(service.id))
+        .map((service) => ({
           serviceId: service.id,
           serviceName: service.name,
           durationMin: service.durationMin,
           price: service.price,
-        };
-      });
+        }));
 
-    setSelectedServices(nextSelectedServices);
-    setSelectedServiceIds(selectedIds);
-  },
-  []
-);
+      setSelectedServices(nextSelectedServices);
+      setSelectedServiceIds(selectedIds);
+    },
+    []
+  );
 
   async function handleCreate() {
     setErrorText("");
@@ -240,6 +250,7 @@ const handleServicesChange = useCallback(
           serviceName: null,
           notes: notes.trim() || undefined,
           selectedServiceIds,
+          sourceAppointmentId: prefillAppointment?.id ?? null,
         }),
       });
 
@@ -322,4 +333,19 @@ const handleServicesChange = useCallback(
       ) : null}
     </AnimatePresence>
   );
+}
+
+function getDateValueFromISO(value: string): string {
+  const date = new Date(value);
+  return date.toLocaleDateString("en-CA");
+}
+
+function getTimeValueFromISO(value: string): string {
+  const date = new Date(value);
+
+  return new Intl.DateTimeFormat("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
 }

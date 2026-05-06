@@ -28,11 +28,11 @@ export async function GET(req: NextRequest) {
     redirectUri
   );
 
-  const scopes = [
-    "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
-    "https://www.googleapis.com/auth/calendar.app.created",
-    "https://www.googleapis.com/auth/calendar.freebusy",
-  ];
+const scopes = [
+  "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/calendar.events.readonly",
+  "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+];
 
   const state = JSON.stringify({
     redirect_after: returnTo,
@@ -40,6 +40,8 @@ export async function GET(req: NextRequest) {
     userId,
     accountEmail,
   });
+
+  console.log("[GOOGLE CALENDAR CONNECT] scopes usados:", scopes);
 
   const authUrl = client.generateAuthUrl({
     access_type: "offline",

@@ -190,13 +190,12 @@ useEffect(() => {
   return (
     <div className="flex h-full flex-col">
 
-      <div className="flex-1 overflow-hidden">
-        <motion.div
-          layout
-          className="flex h-full flex-col gap-2 overflow-y-auto px-3 py-3 xl:px-4 xl:py-4 xl2:gap-3"
-        >
+      <div className="relative flex-1 overflow-hidden">
+        <div className="pointer-events-none absolute left-0 right-0 top-0 z-10 h-6 bg-gradient-to-b from-white to-transparent" />
+        <div className="pointer-events-none absolute left-0 right-0 bottom-0 z-10 h-6 bg-gradient-to-t from-white to-transparent" />
+        <div className="flex h-full flex-col gap-2 overflow-y-auto px-3 py-3 xl:px-4 xl:py-4 xl2:gap-3">
 
-          <motion.div layout>
+          <div>
             <Button
               type="button"
               size="sm"
@@ -218,7 +217,7 @@ useEffect(() => {
                 </>
               )}
             </Button>
-          </motion.div>
+          </div>
           {isAdding ? (
             <WaitlistInlineCreate
               companyId={companyId}
@@ -256,7 +255,7 @@ useEffect(() => {
               ))}
             </AnimatePresence>
           )}
-        </motion.div>
+        </div>
       </div>
     </div>
   );

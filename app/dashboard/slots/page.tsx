@@ -9,6 +9,8 @@ import { SlotsGapControlPanel } from "@/app/components/slots/GapManagement/Slots
 import { NewCancellationModal } from "@/app/components/slots/NewAvailableSlotModal/NewCancellationModal";
 import { SlotsInviteModal } from "@/app/components/slots/SlotsInviteModal";
 import { SlotsPageShell } from "@/app/components/slots/SlotsPageShell";
+import { CreateSlotFromCancelledAppointmentModal } from "@/app/components/slots/CancelledAppointments/CreateSlotFromCancelledAppointmentModal";
+import type { CancelledAppointmentItem } from "@/app/components/slots/CancelledAppointments/CancelledAppointmentsList";
 import type {
   SlotItem,
   SelectedServiceItem,
@@ -42,19 +44,25 @@ function SlotsPageContent({
     locationId: string | null;
   } | null>(null);
 
+  const [selectedCancelledAppointment, setSelectedCancelledAppointment] =
+    useState<CancelledAppointmentItem | null>(null);
+
+  const [createdCancelledAppointmentId, setCreatedCancelledAppointmentId] =
+    useState<string | null>(null);
+
   const [slotTemplate, setSlotTemplate] = useState<SlotTemplateData | null>(null);
   const [showNewCancellation, setShowNewCancellation] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-const effectiveCompanyId = bootstrapCompanyId ?? null;
-const effectiveLocationId = bootstrapLocationId ?? null;
+  const effectiveCompanyId = bootstrapCompanyId ?? null;
+  const effectiveLocationId = bootstrapLocationId ?? null;
 
-const shouldOpenManagementPanel =
-  selectedSlot?.slot.status === "pending" ||
-  selectedSlot?.slot.status === "fresh";
+  const shouldOpenManagementPanel =
+    selectedSlot?.slot.status === "pending" ||
+    selectedSlot?.slot.status === "fresh";
 
-useEffect(() => {
+  useEffect(() => {
     if (!effectiveCompanyId || !selectedSlot || !shouldOpenManagementPanel) {
       setSlotTemplate(null);
       return;
@@ -66,14 +74,12 @@ useEffect(() => {
     async function fetchTemplate() {
       try {
         const response = await fetch(
-          `/api/slots/template?companyId=${encodeURIComponent(
-            safeCompanyId,
-          )}`,
+          `/api/slots/template?companyId=${encodeURIComponent(safeCompanyId)}`,
           {
             method: "GET",
             signal: controller.signal,
             cache: "no-store",
-          },
+          }
         );
 
         const data = await response.json();
@@ -100,15 +106,24 @@ useEffect(() => {
   }, [effectiveCompanyId, selectedSlot, shouldOpenManagementPanel]);
 
   if (!effectiveLocationId) {
-  return null;
-}
+    return null;
+  }
+
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <SlotsPageShell
           companyId={effectiveCompanyId}
           locationId={effectiveLocationId}
-          onNewCancellation={() => setShowNewCancellation(true)}
+          createdCancelledAppointmentId={createdCancelledAppointmentId}
+          onNewCancellation={(appointment) => {
+            if (appointment) {
+              setSelectedCancelledAppointment(appointment);
+              return;
+            }
+
+            setShowNewCancellation(true);
+          }}
           onInvite={() => setShowInvite(true)}
           onSlotClick={(day, slot, services, slotLocationId) => {
             setSelectedSlot({
@@ -150,6 +165,17 @@ useEffect(() => {
         open={showNewCancellation}
         onClose={() => setShowNewCancellation(false)}
         locationId={effectiveLocationId}
+      />
+
+      <CreateSlotFromCancelledAppointmentModal
+        open={Boolean(selectedCancelledAppointment)}
+        appointment={selectedCancelledAppointment}
+        locationId={effectiveLocationId}
+        onClose={() => setSelectedCancelledAppointment(null)}
+        onCreated={() => {
+          setCreatedCancelledAppointmentId(selectedCancelledAppointment?.id ?? null);
+          setSelectedCancelledAppointment(null);
+        }}
       />
 
       <SlotsInviteModal

@@ -9,12 +9,15 @@ import { SlotsListCard } from "./AvailableSlotsList";
 import { SlotsActivityFeedCard } from "./activity/SlotsActivityFeedCard";
 import type { SlotItem, SelectedServiceItem } from "./slots.types";
 import { WaitlistCard } from "./Waitlist/WaitlistCard";
+import { CancelledAppointmentsList } from "./CancelledAppointments/CancelledAppointmentsList";
 import StandardCard from "@/app/components/crussader/UX/standardCard";
+import type { CancelledAppointmentItem } from "./CancelledAppointments/CancelledAppointmentsList";
 
 type SlotsPageShellProps = {
   companyId: string | null;
   locationId: string | null;
-  onNewCancellation: () => void;
+  createdCancelledAppointmentId?: string | null;
+  onNewCancellation: (appointment?: CancelledAppointmentItem | null) => void;
   onInvite: () => void;
   onSlotClick: (
     day: string,
@@ -28,6 +31,7 @@ type SlotsPageShellProps = {
 export function SlotsPageShell({
   companyId,
   locationId,
+  createdCancelledAppointmentId = null,
   onNewCancellation,
   onSlotClick,
   refreshKey,
@@ -35,6 +39,7 @@ export function SlotsPageShell({
   const [slotsListHeader, setSlotsListHeader] = useState<React.ReactNode>(null);
   const [waitlistHeader, setWaitlistHeader] = useState<React.ReactNode>(null);
   const [activityHeader, setActivityHeader] = useState<React.ReactNode>(null);
+  const [cancelledHeader, setCancelledHeader] = useState<React.ReactNode>(null);
 
   const effectiveLocationId = locationId;
   const effectiveCompanyId = companyId;
@@ -57,7 +62,7 @@ export function SlotsPageShell({
 
         <div className="mr-2 flex shrink-0 items-center">
           <Button
-            onClick={onNewCancellation}
+            onClick={() => onNewCancellation(null)}
             className="h-9 rounded-xl bg-gradient-to-r from-[#1D4ED8] to-[#2563EB] px-3 text-sm font-medium text-white shadow-[0_8px_20px_rgba(37,99,235,0.35)] transition-all hover:shadow-[0_10px_24px_rgba(37,99,235,0.45)] lg:h-10 lg:px-4 xl:h-10 xl:px-4 xl2:h-11 xl2:px-5"
           >
             <Plus className="mr-2 h-4 w-4" />
@@ -67,7 +72,11 @@ export function SlotsPageShell({
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden pt-2 lg:pt-3 xl:pt-3 xl2:pt-6">
-        <div className="grid h-full min-h-0 grid-cols-[220px_minmax(0,1fr)_240px] gap-3 lg:grid-cols-[240px_minmax(0,1fr)_250px] lg:gap-4 xl:grid-cols-[260px_minmax(0,1fr)_270px] xl:gap-5 xl2:grid-cols-[340px_minmax(0,1fr)_300px] xl2:gap-6">
+<div className="grid h-full min-h-0 
+grid-cols-[220px_minmax(0,1fr)_300px] gap-3 
+lg:grid-cols-[240px_minmax(0,1fr)_330px] lg:gap-4 
+xl:grid-cols-[260px_minmax(0,1fr)_360px] xl:gap-5 
+xl2:grid-cols-[340px_minmax(0,1fr)_420px] xl2:gap-6">
           <StandardCard
             header={waitlistHeader}
             className="h-full min-h-0 overflow-hidden"
@@ -95,6 +104,22 @@ export function SlotsPageShell({
           </StandardCard>
 
           <div className="flex min-h-0 flex-col gap-3 overflow-hidden lg:gap-4 xl:gap-5 xl2:gap-6">
+            <StandardCard
+              header={cancelledHeader}
+              className="min-h-0 basis-[42%] overflow-hidden"
+            >
+            <CancelledAppointmentsList
+              companyId={effectiveCompanyId}
+              locationId={effectiveLocationId}
+              refreshKey={refreshKey}
+              createdAppointmentId={createdCancelledAppointmentId}
+              onHeaderChange={setCancelledHeader}
+              onCreateSlot={(appointment) => {
+                onNewCancellation(appointment);
+              }}
+            />
+            </StandardCard>
+
             <StandardCard
               header={activityHeader}
               className="min-h-0 flex-1 overflow-hidden"

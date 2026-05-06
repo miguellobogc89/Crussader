@@ -43,17 +43,13 @@ export async function GET(req: NextRequest) {
 
   try {
     const { tokens } = await client.getToken(code);
+    console.log("[GOOGLE CALENDAR CALLBACK] tokens.scope:", tokens.scope);
 
     const accessToken = typeof tokens.access_token === "string" ? tokens.access_token : null;
     const refreshToken = typeof tokens.refresh_token === "string" ? tokens.refresh_token : null;
     const expiresAtSec =
       typeof tokens.expiry_date === "number" ? Math.floor(tokens.expiry_date / 1000) : null;
-    const scopeStr =
-      Array.isArray((tokens as any).scope)
-        ? (tokens as any).scope.join(" ")
-        : typeof (tokens as any).scope === "string"
-        ? (tokens as any).scope
-        : null;
+    const scopeStr = tokens.scope || null;
 
     const provider = "google-calendar" as const;
 

@@ -55,7 +55,9 @@ export function SlotsActivityFeedCard({
         </p>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div className="pointer-events-none absolute left-0 right-0 top-0 z-10 h-6 bg-gradient-to-b from-white to-transparent" />
+        <div className="pointer-events-none absolute left-0 right-0 bottom-0 z-10 h-6 bg-gradient-to-t from-white to-transparent" />
         <ScrollArea className="h-full">
           <div className="px-3 pb-3 pt-3 xl:px-4 xl:pb-4 xl:pt-4 xl2:px-5 xl2:pb-5 xl2:pt-5">
             <div className="relative">

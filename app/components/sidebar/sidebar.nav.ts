@@ -26,6 +26,11 @@ export const NAV_ITEMS: SidebarNavItem[] = [
     icon: CalendarDays,
   },
   {
+    title: "Google Calendar",
+    href: "/dashboard/googleCalendar",
+    icon: CalendarDays,
+  },
+  {
     title: "Reseñas",
     href: "/dashboard/reviews",
     icon: MessageSquareText,

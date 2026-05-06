@@ -4,7 +4,7 @@
 import { useMemo } from "react";
 
 import BankHolidayCell from "@/app/components/calendar/calendar/BankHolidayCell";
-import CalendarHeaderRow from "@/app/components/calendar/calendar/Grid/CalendarHeaderRow";
+import CalendarHeaderRow from "@/app/components/calendar/calendar/grid/CalendarHeaderRow";
 import { fmtParts, localKeyTZ } from "./tz";
 
 import type { CalendarAppt, HolidayLite } from "./types";

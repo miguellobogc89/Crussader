@@ -1,7 +1,7 @@
 // app/api/slots/create/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +17,7 @@ type CreateSlotBody = {
   serviceName?: string | null;
   notes?: string;
   selectedServiceIds?: string[];
+  sourceAppointmentId?: string | null;
 };
 
 export async function POST(req: NextRequest) {
@@ -52,6 +53,10 @@ export async function POST(req: NextRequest) {
     const endsAtRaw = body.endsAt?.trim() ?? "";
     const serviceNameRaw = body.serviceName?.trim() ?? "";
     const notesRaw = body.notes?.trim() ?? "";
+    const sourceAppointmentId =
+      typeof body.sourceAppointmentId === "string"
+        ? body.sourceAppointmentId.trim()
+        : "";
 
     const selectedServiceIds = Array.isArray(body.selectedServiceIds)
       ? body.selectedServiceIds
@@ -178,6 +183,7 @@ export async function POST(req: NextRequest) {
         data: {
           company_id: location.companyId,
           location_id: location.id,
+          source_appointment_id: sourceAppointmentId || null,
           starts_at: startsAt,
           ends_at: endsAt,
           expires_at: startsAt,
@@ -274,12 +280,21 @@ export async function POST(req: NextRequest) {
         services: created.services,
       },
     });
-  } catch (e) {
-    console.error("[POST /api/slots/create]", e);
+    } catch (e) {
+      console.error("[POST /api/slots/create]", e);
 
-    return NextResponse.json(
-      { ok: false, error: "internal_error" },
-      { status: 500 }
-    );
-  }
+      if (e instanceof Prisma.PrismaClientKnownRequestError) {
+        if (e.code === "P2002") {
+          return NextResponse.json(
+            { ok: false, error: "slot_already_created_for_appointment" },
+            { status: 409 }
+          );
+        }
+      }
+
+      return NextResponse.json(
+        { ok: false, error: "internal_error" },
+        { status: 500 }
+      );
+    }
 }
