@@ -58,18 +58,23 @@ export default function CreateAppointmentModal({
   const [notes, setNotes] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-  if (!open) return;
+    if (!open) {
+      return;
+    }
 
-  if (initialDate) {
-    setDate(initialDate);
-  }
+    setError("");
 
-  if (initialTime) {
-    setTime(initialTime);
-  }
-}, [open, initialDate, initialTime]);
+    if (initialDate) {
+      setDate(initialDate);
+    }
+
+    if (initialTime) {
+      setTime(initialTime);
+    }
+  }, [open, initialDate, initialTime]);
 
   const selectedService = useMemo(() => {
     return services.find((service) => service.id === serviceId) ?? null;
@@ -80,21 +85,29 @@ export default function CreateAppointmentModal({
   }, [employees, employeeId]);
 
   useEffect(() => {
-    if (!open || !locationId || !companyId) return;
+    if (!open || !locationId || !companyId) {
+      return;
+    }
 
     async function loadOptions() {
       try {
+        const paramsServices = new URLSearchParams();
+        paramsServices.set("companyId", companyId);
+
+        if (employeeId) {
+          paramsServices.set("employeeId", employeeId);
+        }
+
+        const paramsEmployees = new URLSearchParams();
+        paramsEmployees.set("locationId", locationId);
+
+        if (serviceId) {
+          paramsEmployees.set("serviceId", serviceId);
+        }
+
         const [servicesRes, employeesRes] = await Promise.all([
-          fetch(
-            `/api/service?companyId=${companyId}&employeeId=${encodeURIComponent(
-              employeeId
-            )}`
-          ),
-          fetch(
-            `/api/employee?locationId=${locationId}&serviceId=${encodeURIComponent(
-              serviceId
-            )}`
-          ),
+          fetch(`/api/service?${paramsServices.toString()}`),
+          fetch(`/api/employee?${paramsEmployees.toString()}`),
         ]);
 
         const servicesJson = await servicesRes.json().catch(() => null);
@@ -108,12 +121,31 @@ export default function CreateAppointmentModal({
       }
     }
 
-    loadOptions();
+    void loadOptions();
   }, [open, locationId, companyId, serviceId, employeeId]);
 
   async function handleCreate() {
-    if (!customer || !date || !time) return;
-    if (!serviceId && !employeeId) return;
+    setError("");
+
+    if (!companyId || !locationId) {
+      setError("Falta empresa o clínica activa.");
+      return;
+    }
+
+    if (!customer) {
+      setError("Selecciona un cliente.");
+      return;
+    }
+
+    if (!date || !time) {
+      setError("Selecciona fecha y hora.");
+      return;
+    }
+
+    if (!serviceId && !employeeId) {
+      setError("Selecciona al menos un servicio o un empleado.");
+      return;
+    }
 
     setLoading(true);
 
@@ -139,7 +171,12 @@ export default function CreateAppointmentModal({
         }),
       });
 
-      if (!res.ok) return;
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok || !json?.ok) {
+        setError(json?.error || "No se pudo crear la cita.");
+        return;
+      }
 
       onClose();
       onCreated();
@@ -150,6 +187,9 @@ export default function CreateAppointmentModal({
       setDate("");
       setTime("");
       setNotes("");
+      setError("");
+    } catch {
+      setError("Error inesperado creando la cita.");
     } finally {
       setLoading(false);
     }
@@ -164,6 +204,12 @@ export default function CreateAppointmentModal({
       onClose={onClose}
     >
       <div className="space-y-4">
+        {error ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+            {error}
+          </div>
+        ) : null}
+
         <Field label="Cliente">
           <CustomerPicker companyId={companyId} value={customer} onChange={setCustomer} />
         </Field>
@@ -263,7 +309,7 @@ function CustomerPicker({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!companyId || query.trim().length < 2 || value) {
+    if (!companyId || value || !open) {
       setItems([]);
       return;
     }
@@ -272,24 +318,31 @@ function CustomerPicker({
       setLoading(true);
 
       try {
-        const res = await fetch(
-          `/api/customer?companyId=${companyId}&q=${encodeURIComponent(query)}`
-        );
+        const params = new URLSearchParams();
+        params.set("companyId", companyId);
 
+        if (query.trim()) {
+          params.set("q", query.trim());
+        }
+
+        const res = await fetch(`/api/customer?${params.toString()}`);
         const json = await res.json().catch(() => null);
+
         setItems(Array.isArray(json?.items) ? json.items : []);
       } catch {
         setItems([]);
       } finally {
         setLoading(false);
       }
-    }, 250);
+    }, 200);
 
     return () => window.clearTimeout(timeout);
-  }, [companyId, query, value]);
+  }, [companyId, query, value, open]);
 
   async function handleCreate() {
-    if (!companyId || !query.trim()) return;
+    if (!companyId || !query.trim()) {
+      return;
+    }
 
     const res = await fetch("/api/customer", {
       method: "POST",
@@ -346,32 +399,33 @@ function CustomerPicker({
         className="w-full rounded-xl border border-slate-200 px-3 py-2"
       />
 
-      {open && query.trim().length >= 2 ? (
+      {open ? (
         <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
           {loading ? (
             <p className="px-3 py-2 text-xs text-slate-500">Buscando...</p>
           ) : null}
 
-          {!loading && items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => {
-                onChange(item);
-                setQuery("");
-                setItems([]);
-                setOpen(false);
-              }}
-              className="block w-full px-3 py-2 text-left hover:bg-slate-50"
-            >
-              <p className="text-sm font-medium text-slate-900">{item.displayName}</p>
-              <p className="text-xs text-slate-500">
-                {[item.phone, item.email].filter(Boolean).join(" · ") || "Sin contacto"}
-              </p>
-            </button>
-          ))}
+          {!loading &&
+            items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  onChange(item);
+                  setQuery("");
+                  setItems([]);
+                  setOpen(false);
+                }}
+                className="block w-full px-3 py-2 text-left hover:bg-slate-50"
+              >
+                <p className="text-sm font-medium text-slate-900">{item.displayName}</p>
+                <p className="text-xs text-slate-500">
+                  {[item.phone, item.email].filter(Boolean).join(" · ") || "Sin contacto"}
+                </p>
+              </button>
+            ))}
 
-          {!loading && items.length === 0 ? (
+          {!loading && items.length === 0 && query.trim().length > 0 ? (
             <button
               type="button"
               onClick={handleCreate}
@@ -379,6 +433,12 @@ function CustomerPicker({
             >
               Crear cliente “{query.trim()}”
             </button>
+          ) : null}
+
+          {!loading && items.length === 0 && query.trim().length === 0 ? (
+            <p className="px-3 py-2 text-xs text-slate-500">
+              No hay clientes recientes
+            </p>
           ) : null}
         </div>
       ) : null}

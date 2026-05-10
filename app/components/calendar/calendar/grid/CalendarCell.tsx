@@ -1,4 +1,4 @@
-// app/components/calendar/calendar/grid/CalendarCell.tsx
+// app/components/calendar/calendar/Grid/CalendarCell.tsx
 "use client";
 
 type Props = {

@@ -432,7 +432,7 @@ export async function POST(req: Request) {
         ? status
         : AppointmentStatus.BOOKED;
 
-      return tx.appointment.create({
+      const appointment = await tx.appointment.create({
         data: {
           locationId,
           serviceId: null,
@@ -453,11 +453,23 @@ export async function POST(req: Request) {
         },
         select: {
           id: true,
+          locationId: true,
+          customerId: true,
           startAt: true,
           endAt: true,
           status: true,
         },
       });
+
+      await tx.slot_waitlist_entry.deleteMany({
+        where: {
+          location_id: appointment.locationId,
+          customer_id: appointment.customerId,
+          status: "active",
+        },
+      });
+
+      return appointment;
     });
 
     return NextResponse.json({

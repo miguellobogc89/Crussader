@@ -470,11 +470,54 @@ await logSlotActivity({
         fromPhone,
       });
 
-      await sendServiceSelectionToRecipient({
-        recipientId: matchedRecipient.id,
-        slotId: matchedRecipient.slot_recovery_slot_id,
-        toPhone: fromPhone,
+      const slotServices = await prisma.slot_recovery_slot_service.findMany({
+        where: {
+          slot_recovery_slot_id: matchedRecipient.slot_recovery_slot_id,
+        },
+        select: {
+          slot_recovery_service_id: true,
+        },
       });
+
+      if (slotServices.length <= 1) {
+        const singleServiceId =
+          slotServices[0]?.slot_recovery_service_id ?? null;
+
+        const result = await createAppointmentFromSlot({
+          slotId: matchedRecipient.slot_recovery_slot_id,
+          customerId: matchedRecipient.customer_id,
+          serviceId: singleServiceId,
+        });
+
+        if (result.ok) {
+          const slotData = await prisma.slot_recovery_slot.findUnique({
+            where: {
+              id: matchedRecipient.slot_recovery_slot_id,
+            },
+            select: {
+              starts_at: true,
+              Location: {
+                select: {
+                  title: true,
+                },
+              },
+            },
+          });
+
+          await sendSlotRecoveryConfirmation({
+            to: fromPhone,
+            serviceName: "tu cita",
+            startAt: slotData?.starts_at ?? new Date(),
+            locationName: slotData?.Location?.title ?? "",
+          });
+        }
+      } else {
+        await sendServiceSelectionToRecipient({
+          recipientId: matchedRecipient.id,
+          slotId: matchedRecipient.slot_recovery_slot_id,
+          toPhone: fromPhone,
+        });
+      }
     }
 
     let nextStatus = "replied";

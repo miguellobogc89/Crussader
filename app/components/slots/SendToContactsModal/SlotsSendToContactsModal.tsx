@@ -2,10 +2,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { useToast } from "@/app/components/ui/use-toast";
+import StandardModal from "@/app/components/crussader/StandardModal";
 import { SlotsCreateContactForm } from "./SlotsCreateContactForm";
 import { SlotsCustomerCluster } from "./SlotsCustomerCluster";
 import { SlotsCustomerPickerHeader } from "./SlotsCustomerPickerHeader";
@@ -51,9 +51,7 @@ function getCacheKey(companyId: string, slotId: string, query: string): string {
 function getCachedCustomers(cacheKey: string): CustomerListItem[] | null {
   const entry = customersCache.get(cacheKey);
 
-  if (!entry) {
-    return null;
-  }
+  if (!entry) return null;
 
   const isExpired = Date.now() - entry.cachedAt > CACHE_TTL_MS;
 
@@ -86,7 +84,6 @@ export function SlotsCustomersPickerModal({
   const [items, setItems] = useState<CustomerListItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
-
   const [expandedClusters, setExpandedClusters] = useState(
     DEFAULT_EXPANDED_CLUSTERS
   );
@@ -99,12 +96,10 @@ export function SlotsCustomersPickerModal({
   const [newPhone, setNewPhone] = useState("+34 ");
 
   function toggleCluster(cluster: CustomerCluster) {
-    setExpandedClusters((prev) => {
-      return {
-        ...prev,
-        [cluster]: !prev[cluster],
-      };
-    });
+    setExpandedClusters((prev) => ({
+      ...prev,
+      [cluster]: !prev[cluster],
+    }));
   }
 
   const fetchCustomers = useCallback(
@@ -118,13 +113,14 @@ export function SlotsCustomersPickerModal({
         params.set("q", searchValue.trim());
       }
 
-      const url = `/api/slots/customers/list?${params.toString()}`;
-
-      const response = await fetch(url, {
-        method: "GET",
-        signal,
-        cache: "no-store",
-      });
+      const response = await fetch(
+        `/api/slots/customers/list?${params.toString()}`,
+        {
+          method: "GET",
+          signal,
+          cache: "no-store",
+        }
+      );
 
       const data = await response.json();
 
@@ -132,24 +128,18 @@ export function SlotsCustomersPickerModal({
         throw new Error(data?.error || "No se pudieron cargar los clientes");
       }
 
-      if (Array.isArray(data.items)) {
-        const nextItems = data.items as CustomerListItem[];
-        const cacheKey = getCacheKey(companyId, slotId, searchValue);
+      const nextItems = Array.isArray(data.items)
+        ? (data.items as CustomerListItem[])
+        : [];
 
-        setCachedCustomers(cacheKey, nextItems);
-        setItems(nextItems);
-        return;
-      }
-
-      setItems([]);
+      setCachedCustomers(getCacheKey(companyId, slotId, searchValue), nextItems);
+      setItems(nextItems);
     },
     [companyId, slotId]
   );
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
     setShowAdd(false);
     setCreatingContact(false);
@@ -161,18 +151,13 @@ export function SlotsCustomersPickerModal({
   }, [open]);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
-    const nextIds = buildSmartSelectionIds(items);
-    setSelectedIds(nextIds);
+    setSelectedIds(buildSmartSelectionIds(items));
   }, [open, items]);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
     const controller = new AbortController();
     const cacheKey = getCacheKey(companyId, slotId, query);
@@ -189,9 +174,7 @@ export function SlotsCustomersPickerModal({
       try {
         await fetchCustomers(query, controller.signal);
       } catch (error) {
-        if (controller.signal.aborted) {
-          return;
-        }
+        if (controller.signal.aborted) return;
 
         console.error("SlotsCustomersPickerModal fetch error", error);
 
@@ -213,22 +196,14 @@ export function SlotsCustomersPickerModal({
     };
   }, [open, query, companyId, slotId, fetchCustomers]);
 
-  const filtered = useMemo(() => {
-    return filterCustomerItems(items, query);
-  }, [items, query]);
-
-  const groupedItems = useMemo(() => {
-    return getGroupedItems(filtered);
-  }, [filtered]);
+  const filtered = useMemo(() => filterCustomerItems(items, query), [items, query]);
+  const groupedItems = useMemo(() => getGroupedItems(filtered), [filtered]);
 
   const selectedCustomers = useMemo(() => {
     const selectedSet = new Set(selectedIds);
 
     return items.filter((item) => {
-      if (!item.customerId) {
-        return false;
-      }
-
+      if (!item.customerId) return false;
       return selectedSet.has(item.customerId);
     });
   }, [items, selectedIds]);
@@ -243,9 +218,7 @@ export function SlotsCustomersPickerModal({
       return;
     }
 
-    if (isHardBlocked(item.cluster)) {
-      return;
-    }
+    if (isHardBlocked(item.cluster)) return;
 
     setSelectedIds((current) => {
       if (current.includes(item.customerId)) {
@@ -265,27 +238,28 @@ export function SlotsCustomersPickerModal({
     });
   }
 
-  function handleClearSelection() {
-    setSelectedIds([]);
+  function resetAndClose() {
+    setQuery("");
+    setShowAdd(false);
+    setCreateError("");
+    onClose();
   }
 
-  function handleSmartSelection() {
-    const nextIds = buildSmartSelectionIds(items);
-    setSelectedIds(nextIds);
+  const selectedCount = selectedIds.length;
+  const totalCount = items.length;
+  const selectedSummary = buildSelectedSummary(selectedCount, totalCount);
+  const sendButtonLabel = buildSendButtonLabel(selectedCount);
 
-    if (nextIds.length === 0) {
-      toast({
-        title: "Sin candidatos",
-        description: "No hay contactos disponibles para sugerir",
-      });
-      return;
-    }
+  const addButtonDisabled = getCreateContactDisabled({
+    creatingContact,
+    newFirstName,
+    newPhone,
+  });
 
-    toast({
-      title: "Selección Inteligente aplicada",
-      description: `${nextIds.length} contactos sugeridos automáticamente`,
-    });
-  }
+  const sendDisabled = getSendDisabled({
+    selectedCount,
+    sending,
+  });
 
   async function handleCreateContact() {
     if (!newFirstName.trim()) {
@@ -304,9 +278,7 @@ export function SlotsCustomersPickerModal({
 
       const response = await fetch("/api/slots/customers/create", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           companyId,
           firstName: newFirstName,
@@ -333,10 +305,8 @@ export function SlotsCustomersPickerModal({
       if (!alreadyExists) {
         setItems((current) => {
           const next = [createdRow, ...current];
-
           setCachedCustomers(getCacheKey(companyId, slotId, query), next);
           setCachedCustomers(getCacheKey(companyId, slotId, ""), next);
-
           return next;
         });
       }
@@ -346,9 +316,7 @@ export function SlotsCustomersPickerModal({
       }
 
       setSelectedIds((current) => {
-        if (current.includes(createdRow.customerId)) {
-          return current;
-        }
+        if (current.includes(createdRow.customerId)) return current;
 
         if (current.length >= MAX_SELECTED_CONTACTS) {
           toast({
@@ -376,35 +344,22 @@ export function SlotsCustomersPickerModal({
   }
 
   async function handleSend() {
-    if (selectedIds.length === 0) {
-      return;
-    }
-
-    if (!companyId || !slotId) {
-      console.error("Missing companyId or slotId");
-      return;
-    }
+    if (selectedIds.length === 0) return;
 
     try {
       setSending(true);
 
-      const payload = {
-        companyId,
-        slotId,
-        customers: selectedCustomers.map((c) => {
-          return {
-            customerId: c.customerId,
-            phone: c.customer.phone,
-          };
-        }),
-      };
-
       const response = await fetch("/api/slots/send", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId,
+          slotId,
+          customers: selectedCustomers.map((c) => ({
+            customerId: c.customerId,
+            phone: c.customer.phone,
+          })),
+        }),
       });
 
       const data = await response.json();
@@ -413,10 +368,7 @@ export function SlotsCustomersPickerModal({
         throw new Error(data?.error || "Failed sending");
       }
 
-      if (onSent) {
-        onSent();
-      }
-
+      onSent?.();
       onClose();
     } catch (error) {
       console.error("[modal] send error", error);
@@ -425,127 +377,94 @@ export function SlotsCustomersPickerModal({
     }
   }
 
-  function resetAndClose() {
-    setQuery("");
-    setShowAdd(false);
-    setCreateError("");
-    onClose();
+  function handleSmartSelection() {
+    const nextIds = buildSmartSelectionIds(items);
+    setSelectedIds(nextIds);
+
+    toast({
+      title: nextIds.length ? "Selección inteligente aplicada" : "Sin candidatos",
+      description: nextIds.length
+        ? `${nextIds.length} contactos sugeridos automáticamente`
+        : "No hay contactos disponibles para sugerir",
+    });
   }
 
-  const selectedCount = selectedIds.length;
-  const totalCount = items.length;
-  const selectedSummary = buildSelectedSummary(selectedCount, totalCount);
-  const sendButtonLabel = buildSendButtonLabel(selectedCount);
-
-  const addButtonDisabled = getCreateContactDisabled({
-    creatingContact,
-    newFirstName,
-    newPhone,
-  });
-
-  const sendDisabled = getSendDisabled({
-    selectedCount,
-    sending,
-  });
-
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-black/30"
-            onClick={resetAndClose}
+    <StandardModal
+      open={open}
+      title="Seleccionar contactos"
+      onClose={resetAndClose}
+      footer={
+        <Button
+          onClick={handleSend}
+          disabled={sendDisabled}
+          className="h-11 w-full rounded-xl bg-crussader font-semibold text-white shadow-sm transition-all duration-150 hover:bg-crussader/90"
+        >
+          {sending && <Loader2 className="h-4 w-4 animate-spin" />}
+          {!sending && sendButtonLabel}
+        </Button>
+      }
+    >
+      <div className="flex h-[calc(100dvh-11rem)] min-h-0 flex-col sm:h-[68vh]">
+        <SlotsCustomerPickerHeader
+          query={query}
+          selectedSummary={selectedSummary}
+          selectedCount={selectedCount}
+          onQueryChange={setQuery}
+          onToggleAdd={() => {
+            setShowAdd(!showAdd);
+            setCreateError("");
+          }}
+          onClearSelection={() => setSelectedIds([])}
+          onSuggestSelection={handleSmartSelection}
+          onClose={resetAndClose}
+        />
+
+        <div className="px-1 pb-3">
+          <SlotsCreateContactForm
+            open={showAdd}
+            firstName={newFirstName}
+            lastName={newLastName}
+            phone={newPhone}
+            error={createError}
+            creating={creatingContact}
+            disabled={addButtonDisabled}
+            onFirstNameChange={setNewFirstName}
+            onLastNameChange={setNewLastName}
+            onPhoneChange={setNewPhone}
+            onSubmit={handleCreateContact}
           />
+        </div>
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ type: "spring", damping: 30, stiffness: 400 }}
-            className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-          >
-            <div
-              className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-border/60 bg-white"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <SlotsCustomerPickerHeader
-                query={query}
-                selectedSummary={selectedSummary}
-                selectedCount={selectedCount}
-                onQueryChange={setQuery}
-                onToggleAdd={() => {
-                  setShowAdd(!showAdd);
-                  setCreateError("");
-                }}
-                onClearSelection={handleClearSelection}
-                onSuggestSelection={handleSmartSelection}
-                onClose={resetAndClose}
-              />
+        <div className="min-h-0 flex-1 overflow-y-auto pb-2">
+          <div className="space-y-1">
+            {loading && items.length === 0 && (
+              <div className="flex justify-center py-10">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            )}
 
-              <div className="px-6 pb-3">
-                <SlotsCreateContactForm
-                  open={showAdd}
-                  firstName={newFirstName}
-                  lastName={newLastName}
-                  phone={newPhone}
-                  error={createError}
-                  creating={creatingContact}
-                  disabled={addButtonDisabled}
-                  onFirstNameChange={setNewFirstName}
-                  onLastNameChange={setNewLastName}
-                  onPhoneChange={setNewPhone}
-                  onSubmit={handleCreateContact}
+            {!loading && filtered.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No se encontraron contactos
+              </p>
+            )}
+
+            {filtered.length > 0 &&
+              CLUSTER_ORDER.map((clusterKey) => (
+                <SlotsCustomerCluster
+                  key={clusterKey}
+                  clusterKey={clusterKey}
+                  items={groupedItems[clusterKey]}
+                  isExpanded={expandedClusters[clusterKey]}
+                  selectedIds={selectedIds}
+                  onToggleCluster={toggleCluster}
+                  onToggleItem={handleToggleSelect}
                 />
-              </div>
-
-              <div className="h-[420px] overflow-y-auto px-6 pb-4">
-                <div className="space-y-1">
-                  {loading && items.length === 0 && (
-                    <div className="flex justify-center py-10">
-                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                    </div>
-                  )}
-
-                  {!loading && filtered.length === 0 && (
-                    <p className="py-8 text-center text-sm text-muted-foreground">
-                      No se encontraron contactos
-                    </p>
-                  )}
-
-                  {filtered.length > 0 &&
-                    CLUSTER_ORDER.map((clusterKey) => {
-                      return (
-                        <SlotsCustomerCluster
-                          key={clusterKey}
-                          clusterKey={clusterKey}
-                          items={groupedItems[clusterKey]}
-                          isExpanded={expandedClusters[clusterKey]}
-                          selectedIds={selectedIds}
-                          onToggleCluster={toggleCluster}
-                          onToggleItem={handleToggleSelect}
-                        />
-                      );
-                    })}
-                </div>
-              </div>
-
-              <div className="border-t border-border/50 px-6 py-4">
-                <Button
-                  onClick={handleSend}
-                  disabled={sendDisabled}
-                  className="h-11 w-full rounded-xl bg-crussader font-semibold text-white shadow-sm transition-all duration-150 hover:bg-crussader/90"
-                >
-                  {sending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {!sending && sendButtonLabel}
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+              ))}
+          </div>
+        </div>
+      </div>
+    </StandardModal>
   );
 }

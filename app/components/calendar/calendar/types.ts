@@ -27,8 +27,11 @@ export type CalendarAppt = {
   customerEmail?: string | null;
 
   notes?: string | null;
-  source?: "internal" | "google";
-externalProvider?: string | null;
+
+  source?: "internal" | "crussader" | "google";
+  externalProvider?: string | null;
+  externalCalendarId?: string | null;
+  externalEventId?: string | null;
 };
 
 export type Appointment = CalendarAppt;

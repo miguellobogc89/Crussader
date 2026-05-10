@@ -109,10 +109,10 @@ async function assertAppointmentAccess(id: string) {
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await context.params;
     const access = await assertAppointmentAccess(id);
 
     if (!access.appointment) {
@@ -391,9 +391,23 @@ export async function PATCH(
       }
     }
 
-    const updated = await prisma.appointment.update({
-      where: { id },
-      data: patch,
+    const updated = await prisma.$transaction(async (tx) => {
+      const appointment = await tx.appointment.update({
+        where: { id },
+        data: patch,
+      });
+
+      if (customerId !== undefined && customerId !== null) {
+        await tx.slot_waitlist_entry.deleteMany({
+          where: {
+            location_id: appointment.locationId,
+            customer_id: customerId,
+            status: "active",
+          },
+        });
+      }
+
+      return appointment;
     });
 
     return NextResponse.json({
@@ -412,10 +426,10 @@ export async function PATCH(
 
 export async function DELETE(
   _req: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await context.params;
     const access = await assertAppointmentAccess(id);
 
     if (!access.appointment) {

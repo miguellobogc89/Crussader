@@ -2,7 +2,7 @@
 "use client";
 
 import type { SlotDTO } from "@/hooks/slots/useSlots";
-import type { SlotItem, SelectedServiceItem } from "../slots.types";
+import type { SelectedServiceItem } from "../slots.types";
 import { formatTimeRange } from "../helpers/AvailableSlotsListHelpers";
 import {
   ServicePill,
@@ -26,7 +26,7 @@ type SlotsListCardItemProps = {
   slot: SlotDTO;
   onClick?: (
     day: string,
-    slot: SlotItem,
+    slot: SlotDTO,
     services: SelectedServiceItem[],
   ) => void;
 };
@@ -86,7 +86,7 @@ function getCardClass(slot: SlotDTO): string {
 
   if (effectiveStatus === "pending_publish" || effectiveStatus === "sent") {
     return [
-      "w-full rounded-xl border px-3 py-3 text-left transition-all duration-150 xl:px-3.5 xl:py-3.5 xl2:px-5 xl2:py-4",
+      "w-full rounded-xl border px-3 py-3 text-left transition-all duration-300 ease-out xl:px-3.5 xl:py-3.5 xl2:px-5 xl2:py-4",
       "border-[#BFDBFE] bg-white",
       "hover:border-[#93C5FD] hover:bg-[#F8FBFF]",
       "cursor-pointer",
@@ -96,7 +96,7 @@ function getCardClass(slot: SlotDTO): string {
 
   if (effectiveStatus === "recovered") {
     return [
-      "w-full rounded-xl border px-3 py-3 text-left transition-all duration-150 xl:px-3.5 xl:py-3.5 xl2:px-5 xl2:py-4",
+      "w-full rounded-xl border px-3 py-3 text-left transition-all duration-300 ease-out xl:px-3.5 xl:py-3.5 xl2:px-5 xl2:py-4",
       "border-[#D1FAE5] bg-white",
       "hover:border-[#A7F3D0] hover:bg-[#FAFFFC]",
       "cursor-pointer",
@@ -106,7 +106,7 @@ function getCardClass(slot: SlotDTO): string {
 
   if (effectiveStatus === "expired") {
     return [
-      "w-full rounded-xl border px-3 py-3 text-left transition-all duration-150 xl:px-3.5 xl:py-3.5 xl2:px-5 xl2:py-4",
+      "w-full rounded-xl border px-3 py-3 text-left transition-all duration-300 ease-out xl:px-3.5 xl:py-3.5 xl2:px-5 xl2:py-4",
       "border-[#E5E7EB] bg-[#FCFCFD]",
       "hover:border-[#D1D5DB] hover:bg-[#FAFAFA]",
       "cursor-pointer",
@@ -115,7 +115,7 @@ function getCardClass(slot: SlotDTO): string {
   }
 
   return [
-    "w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-3 text-left transition-all duration-150 xl:px-3.5 xl:py-3.5 xl2:px-5 xl2:py-4",
+    "w-full rounded-xl border border-[#E5E7EB] bg-white px-3 py-3 text-left transition-all duration-300 ease-out xl:px-3.5 xl:py-3.5 xl2:px-5 xl2:py-4",
     "hover:border-[#E5E7EB] hover:bg-white",
     "cursor-pointer",
     getLeftBorderClass(slot),
@@ -126,7 +126,6 @@ export function SlotsListCardItem({
   slot,
   onClick,
 }: SlotsListCardItemProps) {
-  const legacySlot = toLegacySlot(slot);
   const priceRange = getSlotPriceRange(slot);
   const selectedServices = toSelectedServices(slot);
   const visibleServices = resolveVisibleServices(slot);
@@ -142,7 +141,7 @@ export function SlotsListCardItem({
     <button
       type="button"
       onClick={() => {
-        onClick?.(dayLabel, legacySlot, selectedServices);
+        onClick?.(dayLabel, slot, selectedServices);
       }}
       className={getCardClass(slot)}
     >
@@ -180,6 +179,7 @@ export function SlotsListCardItem({
                   ? formatEuro(priceRange.max)
                   : undefined
               }
+              tone={isPending || isSent ? "blue" : "success"}
             />
           ) : null}
 

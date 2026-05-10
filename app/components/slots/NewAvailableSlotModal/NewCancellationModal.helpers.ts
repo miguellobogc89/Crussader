@@ -2,6 +2,7 @@
 export type EmployeeLite = {
   id: string;
   name: string;
+  color?: string | null;
   active: boolean;
 };
 

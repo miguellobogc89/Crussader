@@ -3,7 +3,7 @@
 
 import { useEffect, useRef } from "react";
 
-import CalendarCell from "./CalendarCell";
+import CalendarCell from "@/app/components/calendar/calendar/Grid/CalendarCell";
 import AppointmentBlock from "../../appointments/AppointmentBlock";
 import CurrentTimeLineFullSpan from "../CurrentTimeLineFullSpan";
 import HourGuides from "../HourGuides";
@@ -192,19 +192,20 @@ export default function CalendarGrid({
                         width: `calc(${itemLayout.widthPct}% - ${COL_GAP_PX}px)`,
                       }}
                     >
-<AppointmentBlock
-  id={appointment.id}
-  startAtISO={appointment.startAt}
-  serviceName={appointment.serviceName}
-  employeeName={appointment.employeeName}
-  employeeColor={appointment.employeeColor}
-  resourceName={appointment.resourceName}
-  serviceColor={appointment.serviceColor}
-  status={appointment.status}
-  onSelect={onAppointmentSelect}
-  customerName={appointment.customerName}
-source={appointment.source}
-/>
+                      <AppointmentBlock
+                        id={appointment.id}
+                        startAtISO={appointment.startAt}
+                        serviceName={appointment.serviceName}
+                        employeeName={appointment.employeeName}
+                        employeeColor={appointment.employeeColor}
+                        resourceName={appointment.resourceName}
+                        serviceColor={appointment.serviceColor}
+                        status={appointment.status}
+                        onSelect={onAppointmentSelect}
+                        customerName={appointment.customerName}
+                        customerPhone={appointment.customerPhone}
+                        source={appointment.source}
+                      />
                     </div>
                   );
                 })}

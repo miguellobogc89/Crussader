@@ -28,42 +28,34 @@ export function SlotsCustomerPickerHeader({
 }: Props) {
   return (
     <>
-      <div className="border-b border-border/50 px-6 pb-4 pt-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-semibold tracking-tight text-foreground">
-              Seleccionar contactos
-            </h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {selectedSummary}
-            </p>
-          </div>
 
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-muted"
-          >
-            <X className="h-4 w-4 text-muted-foreground" />
-          </button>
-        </div>
-      </div>
-
-      <div className="space-y-3 px-6 pb-3 pt-4">
-        <div className="flex gap-2">
+      <div className="space-y-3 border-b border-border/50 px-1 pb-3">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
             <Input
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
               placeholder="Buscar por nombre o teléfono..."
-              className="h-10 rounded-xl border-border/60 bg-muted/50 pl-10 text-sm"
+              className="h-10 rounded-xl border-border/60 bg-muted/50 pl-10 pr-10 text-sm"
             />
+
+            {query.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onQueryChange("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           <Button
             variant="outline"
             onClick={onToggleAdd}
-            className="h-10 shrink-0 rounded-xl border-crussader/30 px-3 text-crussader hover:bg-crussader/5"
+            className="h-10 shrink-0 rounded-xl border-crussader/30 px-3 text-crussader hover:bg-crussader/5 sm:w-auto"
           >
             <Plus className="mr-1 h-4 w-4" />
             Añadir

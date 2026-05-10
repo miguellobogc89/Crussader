@@ -29,6 +29,7 @@ type NewCancellationModalFormProps = {
   errorText: string;
   created: boolean;
   employees: EmployeeLite[];
+  servicesByEmployee: Record<string, EmployeeServiceItem[]>;
   selectedEmployeeId: string;
   onEmployeeSelect: (employee: EmployeeLite) => void;
   selectedServiceIds: string[];
@@ -51,13 +52,14 @@ export function NewCancellationModalForm({
   errorText,
   created,
   employees,
+  servicesByEmployee,
   selectedEmployeeId,
   onEmployeeSelect,
   selectedServiceIds,
   onServicesChange,
 }: NewCancellationModalFormProps) {
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4 px-4 pb-4 pt-0">
       <div className="space-y-2">
         <Label className="text-sm text-muted-foreground">Empleado</Label>
 
@@ -69,13 +71,14 @@ export function NewCancellationModalForm({
 
         <NewCancellationEmployeeServices
           employeeId={selectedEmployeeId}
+          services={servicesByEmployee[selectedEmployeeId] ?? []}
           selectedServiceIds={selectedServiceIds}
           onChange={onServicesChange}
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-        <div className="space-y-2 sm:col-span-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="space-y-2">
           <Label className="text-sm text-muted-foreground">Fecha</Label>
           <Input
             type="date"
@@ -85,8 +88,8 @@ export function NewCancellationModalForm({
           />
         </div>
 
-        <div className="space-y-2 sm:col-span-1">
-          <Label className="text-sm text-muted-foreground">Hora inicio</Label>
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground">Inicio</Label>
           <Input
             type="time"
             step={300}
@@ -96,8 +99,8 @@ export function NewCancellationModalForm({
           />
         </div>
 
-        <div className="space-y-2 sm:col-span-1">
-          <Label className="text-sm text-muted-foreground">Hora fin</Label>
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground">Fin</Label>
           <Input
             type="time"
             step={300}
@@ -107,15 +110,6 @@ export function NewCancellationModalForm({
           />
         </div>
 
-        <div className="space-y-2 sm:col-span-2">
-          <Label className="text-sm text-muted-foreground">Nota</Label>
-          <Input
-            value={notes}
-            onChange={(event) => onNotesChange(event.target.value)}
-            placeholder="Opcional"
-            className="h-10 rounded-xl border-0 bg-muted/50 focus-visible:ring-primary"
-          />
-        </div>
       </div>
 
       {errorText ? (

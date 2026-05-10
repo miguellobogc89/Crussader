@@ -11,10 +11,8 @@ import { SlotsInviteModal } from "@/app/components/slots/SlotsInviteModal";
 import { SlotsPageShell } from "@/app/components/slots/SlotsPageShell";
 import { CreateSlotFromCancelledAppointmentModal } from "@/app/components/slots/CancelledAppointments/CreateSlotFromCancelledAppointmentModal";
 import type { CancelledAppointmentItem } from "@/app/components/slots/CancelledAppointments/CancelledAppointmentsList";
-import type {
-  SlotItem,
-  SelectedServiceItem,
-} from "@/app/components/slots/slots.types";
+import type { SlotDTO } from "@/hooks/slots/useSlots";
+import type { SelectedServiceItem } from "@/app/components/slots/slots.types";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -37,12 +35,12 @@ function SlotsPageContent({
   bootstrapLocationId,
   companyName,
 }: SlotsPageContentProps) {
-  const [selectedSlot, setSelectedSlot] = useState<{
-    day: string;
-    slot: SlotItem;
-    services: SelectedServiceItem[];
-    locationId: string | null;
-  } | null>(null);
+const [selectedSlot, setSelectedSlot] = useState<{
+  day: string;
+  slot: SlotDTO;
+  services: SelectedServiceItem[];
+  locationId: string | null;
+} | null>(null);
 
   const [selectedCancelledAppointment, setSelectedCancelledAppointment] =
     useState<CancelledAppointmentItem | null>(null);
@@ -58,9 +56,9 @@ function SlotsPageContent({
   const effectiveCompanyId = bootstrapCompanyId ?? null;
   const effectiveLocationId = bootstrapLocationId ?? null;
 
-  const shouldOpenManagementPanel =
-    selectedSlot?.slot.status === "pending" ||
-    selectedSlot?.slot.status === "fresh";
+const shouldOpenManagementPanel =
+  selectedSlot?.slot.status === "pending_publish" ||
+  selectedSlot?.slot.status === "sent";
 
   useEffect(() => {
     if (!effectiveCompanyId || !selectedSlot || !shouldOpenManagementPanel) {
@@ -165,6 +163,7 @@ function SlotsPageContent({
         open={showNewCancellation}
         onClose={() => setShowNewCancellation(false)}
         locationId={effectiveLocationId}
+        onCreated={() => setRefreshKey((prev) => prev + 1)}
       />
 
       <CreateSlotFromCancelledAppointmentModal

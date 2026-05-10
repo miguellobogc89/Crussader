@@ -30,6 +30,10 @@ type AppointmentLite = {
   customerPhone: string | null;
   customerEmail: string | null;
   notes: string | null;
+  source?: "internal" | "crussader" | "google";
+  externalProvider?: string | null;
+  externalCalendarId?: string | null;
+  externalEventId?: string | null;
 };
 
 type Props = {
@@ -204,6 +208,10 @@ export default function CalendarView({
         customerPhone: item.customerPhone ?? null,
         customerEmail: item.customerEmail ?? null,
         notes: item.notes ?? null,
+        source: item.source ?? "internal",
+        externalProvider: item.externalProvider ?? null,
+        externalCalendarId: item.externalCalendarId ?? null,
+        externalEventId: item.externalEventId ?? null,
       })),
     ]);
   }, [locationId, range]);

@@ -155,8 +155,8 @@ export function SlotServiceSelector({
     durationMin: "",
   });
 
-  const hasMountedForSlotRef = useRef(false);
-  const lastSlotIdRef = useRef("");
+const lastSavedServicesSignatureRef = useRef("");
+const lastSlotIdRef = useRef("");
 
   useEffect(() => {
     if (!locationId) {
@@ -277,12 +277,14 @@ export function SlotServiceSelector({
     };
   }, [justAddedId]);
 
-  useEffect(() => {
-    if (lastSlotIdRef.current !== slotId) {
-      lastSlotIdRef.current = slotId;
-      hasMountedForSlotRef.current = false;
-    }
-  }, [slotId]);
+useEffect(() => {
+  if (lastSlotIdRef.current !== slotId) {
+    lastSlotIdRef.current = slotId;
+    lastSavedServicesSignatureRef.current = selectedServices
+      .map((service) => service.serviceId)
+      .join("|");
+  }
+}, [slotId, selectedServices]);
 
   useEffect(() => {
     if (!slotId) {
@@ -293,10 +295,13 @@ export function SlotServiceSelector({
       return;
     }
 
-    if (!hasMountedForSlotRef.current) {
-      hasMountedForSlotRef.current = true;
-      return;
-    }
+const nextSignature = selectedServices
+  .map((service) => service.serviceId)
+  .join("|");
+
+if (nextSignature === lastSavedServicesSignatureRef.current) {
+  return;
+}
 
     const timeout = window.setTimeout(async () => {
       try {
@@ -323,6 +328,8 @@ export function SlotServiceSelector({
         if (!response.ok || !data?.ok) {
           throw new Error(data?.error || "No se pudieron guardar los servicios.");
         }
+
+        lastSavedServicesSignatureRef.current = nextSignature;
 
         if (onSaved) {
           onSaved();

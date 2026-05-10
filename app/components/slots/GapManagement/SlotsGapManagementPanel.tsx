@@ -1,25 +1,21 @@
 // app/components/slots/GapManagement/SlotsGapManagementPanel.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Calendar, Clock, Percent, X } from "lucide-react";
+import { Calendar, Clock, X } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { GapWhatsAppPreview } from "@/app/components/slots/GapManagement/GapWhatsAppPreview";
 import { SlotsCustomersPickerModal } from "@/app/components/slots/SendToContactsModal/SlotsSendToContactsModal";
 import { SlotServiceSelector } from "@/app/components/slots/modal/SlotServiceSelector";
-import type {
-  SelectedServiceItem,
-  SlotItem,
-} from "@/app/components/slots/slots.types";
-
-type Promotion = "none" | "10" | "25";
+import type { SlotDTO } from "@/hooks/slots/useSlots";
+import type { SelectedServiceItem } from "@/app/components/slots/slots.types";
 
 type SlotsGapManagementPanelProps = {
   open: boolean;
   onClose: () => void;
   day: string;
-  slot: SlotItem | null;
+  slot: SlotDTO | null;
   services: SelectedServiceItem[];
   companyId: string;
   locationId: string;
@@ -29,50 +25,53 @@ type SlotsGapManagementPanelProps = {
   onServicesSaved?: () => void;
 };
 
-const promotionOptions: { value: Promotion; label: string; desc: string }[] = [
-  { value: "none", label: "Sin promo", desc: "Precio original" },
-  { value: "10", label: "–10%", desc: "Descuento ligero" },
-  { value: "25", label: "–25%", desc: "Oferta especial" },
-];
-
-function extractStartTime(slot: SlotItem | null): string {
-  if (!slot?.time) {
+function extractStartTime(slot: SlotDTO | null): string {
+  if (!slot?.startsAt) {
     return "17:00";
   }
 
-  if (slot.time.includes("-")) {
-    const parts = slot.time.split("-");
-    const firstPart = parts[0];
+  const date = new Date(slot.startsAt);
 
-    if (firstPart) {
-      return firstPart.trim();
-    }
-  }
-
-  return slot.time.trim();
+  return new Intl.DateTimeFormat("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
 }
 
-function extractEndTime(slot: SlotItem | null): string {
-  if (!slot?.time) {
+function extractEndTime(slot: SlotDTO | null): string {
+  if (!slot?.endsAt) {
     return "18:00";
   }
 
-  if (slot.time.includes("-")) {
-    const parts = slot.time.split("-");
-    const secondPart = parts[1];
+  const date = new Date(slot.endsAt);
 
-    if (secondPart) {
-      return secondPart.trim();
-    }
+  return new Intl.DateTimeFormat("es-ES", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function extractDate(slot: SlotDTO | null): string {
+  if (!slot?.startsAt) {
+    return "";
   }
 
-  return "18:00";
+  const date = new Date(slot.startsAt);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function buildLocalDateTime(date: string, time: string): string {
+  return `${date}T${time}:00`;
 }
 
 function normalizeDayLabel(day: string): string {
-  if (!day) {
-    return "";
-  }
+  if (!day) return "";
 
   const parts = day.split(",");
 
@@ -92,9 +91,7 @@ function normalizeDayLabel(day: string): string {
 }
 
 function getDayChipLabel(day: string): string {
-  if (!day) {
-    return "";
-  }
+  if (!day) return "";
 
   const normalized = normalizeDayLabel(day);
   const parsed = new Date(normalized);
@@ -121,16 +118,12 @@ function getDayChipLabel(day: string): string {
 function timeToMinutes(value: string): number {
   const parts = value.split(":");
 
-  if (parts.length < 2) {
-    return 0;
-  }
+  if (parts.length < 2) return 0;
 
   const hour = Number(parts[0]);
   const minute = Number(parts[1]);
 
-  if (Number.isNaN(hour) || Number.isNaN(minute)) {
-    return 0;
-  }
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return 0;
 
   return hour * 60 + minute;
 }
@@ -139,183 +132,9 @@ function getDurationMinutes(start: string, end: string): number {
   const startMinutes = timeToMinutes(start);
   const endMinutes = timeToMinutes(end);
 
-  if (endMinutes <= startMinutes) {
-    return 0;
-  }
+  if (endMinutes <= startMinutes) return 0;
 
   return endMinutes - startMinutes;
-}
-
-type RenderPanelArgs = {
-  open: boolean;
-  onClose: () => void;
-  dateLabel: string;
-  timeStart: string;
-  durationMinutes: number;
-  selectedServices: SelectedServiceItem[];
-  setSelectedServices: (services: SelectedServiceItem[]) => void;
-  handleServicesSaved: () => void;
-  locationId: string;
-  slotId: string;
-  promotion: Promotion;
-  setPromotion: (value: Promotion) => void;
-  handleOpenCustomersModal: () => void;
-  templateBody: string;
-  companyName: string;
-};
-
-function renderPanel({
-  open,
-  onClose,
-  dateLabel,
-  timeStart,
-  durationMinutes,
-  selectedServices,
-  setSelectedServices,
-  handleServicesSaved,
-  locationId,
-  slotId,
-  promotion,
-  setPromotion,
-  handleOpenCustomersModal,
-  templateBody,
-  companyName,
-}: RenderPanelArgs) {
-  if (!open) {
-    return null;
-  }
-
-  return (
-    <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-40 bg-foreground/10 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      <motion.div
-        initial={{ opacity: 0, x: 40 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: 40 }}
-        transition={{ type: "spring", damping: 30, stiffness: 300 }}
-        className="fixed right-0 top-0 bottom-0 z-50 flex w-full max-w-[440px] flex-col overflow-hidden bg-white shadow-[0_22px_60px_rgba(37,99,235,0.16)] sm:rounded-l-2xl"
-      >
-        <div className="flex items-center justify-between border-b border-border/50 px-6 pt-6 pb-4">
-          <div>
-            <h2 className="text-base font-semibold tracking-tight text-foreground">
-              Gestionar hueco
-            </h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Configura y envía este hueco
-            </p>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-muted active:scale-95"
-          >
-            <X className="h-4 w-4 text-muted-foreground" />
-          </button>
-        </div>
-
-        <div className="flex-1 space-y-6 overflow-auto px-6 py-5">
-          <div className="space-y-2.5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Fecha y hora
-            </p>
-
-            <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,0.7fr)_minmax(0,0.7fr)] gap-2">
-              <div className="flex h-12 items-center gap-2 rounded-2xl border border-border/70 bg-muted/40 px-4">
-                <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="truncate text-sm font-medium text-foreground">
-                  {dateLabel}
-                </span>
-              </div>
-
-              <div className="flex h-12 items-center gap-2 rounded-2xl border border-border/70 bg-muted/40 px-4">
-                <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="text-sm font-medium tabular-nums text-foreground">
-                  {timeStart}
-                </span>
-              </div>
-
-              <div className="flex h-12 items-center gap-2 rounded-2xl border border-border/70 bg-muted/40 px-4">
-                <span className="text-sm font-medium tabular-nums text-foreground">
-                  {durationMinutes} min
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <SlotServiceSelector
-            locationId={locationId}
-            slotId={slotId}
-            slotDurationMin={durationMinutes}
-            selectedServices={selectedServices}
-            onChange={setSelectedServices}
-            onSaved={handleServicesSaved}
-          />
-
-          <div className="space-y-2.5">
-            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <Percent className="h-3 w-3" />
-              Promoción
-            </p>
-
-            <div className="grid grid-cols-3 gap-2">
-              {promotionOptions.map((option) => {
-                const isActive = promotion === option.value;
-
-                let wrapperClass =
-                  "relative rounded-xl border-2 px-3 py-3 text-center transition-all duration-150 active:scale-[0.97] border-border/60 bg-muted/30 hover:border-border hover:bg-muted/60";
-                let titleClass = "text-sm font-bold text-foreground";
-                let descClass = "mt-0.5 text-[10px] text-muted-foreground";
-
-                if (isActive) {
-                  wrapperClass =
-                    "relative rounded-xl border-2 px-3 py-3 text-center transition-all duration-150 active:scale-[0.97] border-primary bg-primary/5 shadow-sm";
-                  titleClass = "text-sm font-bold text-primary";
-                  descClass = "mt-0.5 text-[10px] text-primary/80";
-                }
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setPromotion(option.value)}
-                    className={wrapperClass}
-                  >
-                    <p className={titleClass}>{option.label}</p>
-                    <p className={descClass}>{option.desc}</p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <GapWhatsAppPreview
-            services={selectedServices}
-            promotion={promotion}
-            day={dateLabel}
-            timeStart={timeStart}
-            templateBody={templateBody}
-            companyName={companyName}
-          />
-        </div>
-
-        <div className="border-t border-border/50 px-6 py-5">
-          <Button
-            onClick={handleOpenCustomersModal}
-            className="h-12 w-full rounded-xl bg-primary font-semibold text-primary-foreground shadow-primary-glow transition-all duration-150 hover:bg-primary/90 active:scale-[0.98]"
-          >
-            Avisar a clientes
-          </Button>
-        </div>
-      </motion.div>
-    </>
-  );
 }
 
 export function SlotsGapManagementPanel({
@@ -331,86 +150,290 @@ export function SlotsGapManagementPanel({
   onSent,
   onServicesSaved,
 }: SlotsGapManagementPanelProps) {
-  const normalizedDay = useMemo(() => {
-    return normalizeDayLabel(day);
-  }, [day]);
+  const normalizedDay = useMemo(() => normalizeDayLabel(day), [day]);
+  const dayChipLabel = useMemo(() => getDayChipLabel(day), [day]);
 
-  const dayChipLabel = useMemo(() => {
-    return getDayChipLabel(day);
-  }, [day]);
-
-  const [date, setDate] = useState(normalizedDay);
+  const [date, setDate] = useState(extractDate(slot));
   const [timeStart, setTimeStart] = useState(extractStartTime(slot));
   const [timeEnd, setTimeEnd] = useState(extractEndTime(slot));
-  const [selectedServices, setSelectedServices] =
-    useState<SelectedServiceItem[]>(services);
-  const [promotion, setPromotion] = useState<Promotion>("none");
+  const [selectedServices, setSelectedServices] = useState<
+    SelectedServiceItem[]
+  >([]);
   const [customersModalOpen, setCustomersModalOpen] = useState(false);
+
+  const [isSavingTime, setIsSavingTime] = useState(false);
+  const [timeSaveError, setTimeSaveError] = useState("");
+  const lastSavedTimeSignatureRef = useRef("");
 
   const durationMinutes = useMemo(() => {
     return getDurationMinutes(timeStart, timeEnd);
   }, [timeStart, timeEnd]);
 
   useEffect(() => {
-    setDate(normalizedDay);
-  }, [normalizedDay]);
-
-  useEffect(() => {
+    setDate(extractDate(slot));
     setTimeStart(extractStartTime(slot));
     setTimeEnd(extractEndTime(slot));
-    setPromotion("none");
-    setSelectedServices(services);
-  }, [slot, services]);
+    lastSavedTimeSignatureRef.current = `${extractDate(slot)}|${extractStartTime(slot)}|${extractEndTime(slot)}`;
+
+    if (!slot) {
+      setSelectedServices([]);
+      return;
+    }
+
+    const slotServices = Array.isArray(slot.services) ? slot.services : [];
+
+    const normalizedServices: SelectedServiceItem[] = slotServices.map(
+      (service) => {
+        return {
+          serviceId: service.id,
+          serviceName: service.name,
+          price: service.price,
+          durationMin: service.durationMin,
+        };
+      },
+    );
+
+    setSelectedServices(normalizedServices);
+  }, [slot]);
+
+  useEffect(() => {
+    if (!slot?.id) {
+      return;
+    }
+
+    if (!date || !timeStart || !timeEnd) {
+      return;
+    }
+
+    if (durationMinutes <= 0) {
+      return;
+    }
+
+    const nextSignature = `${date}|${timeStart}|${timeEnd}`;
+
+    if (nextSignature === lastSavedTimeSignatureRef.current) {
+      return;
+    }
+
+    const timeout = window.setTimeout(async () => {
+      try {
+        setIsSavingTime(true);
+        setTimeSaveError("");
+
+        const response = await fetch("/api/slots/update", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            slotId: slot.id,
+            startsAt: buildLocalDateTime(date, timeStart),
+            endsAt: buildLocalDateTime(date, timeEnd),
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data?.ok) {
+          throw new Error(data?.error || "No se pudo guardar la fecha.");
+        }
+
+        lastSavedTimeSignatureRef.current = nextSignature;
+
+        onServicesSaved?.();
+      } catch (error) {
+        console.error("[slots] autosave time error", error);
+        setTimeSaveError("No se pudo guardar la fecha.");
+      } finally {
+        setIsSavingTime(false);
+      }
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [slot?.id, date, timeStart, timeEnd, durationMinutes, onServicesSaved]);
 
   function handleOpenCustomersModal() {
-    if (!slot?.id) {
-      console.error("Missing slotId");
-      return;
-    }
-
-    if (!companyId) {
-      console.error("Missing companyId");
-      return;
-    }
+    if (!slot?.id) return;
+    if (!companyId) return;
 
     setCustomersModalOpen(true);
   }
 
+  function prefetchCustomersModal() {
+    if (!slot?.id || !companyId) return;
+
+    const params = new URLSearchParams();
+    params.set("companyId", companyId);
+    params.set("slotId", slot.id);
+    params.set("limit", "50");
+
+    fetch(`/api/slots/customers/list?${params.toString()}`, {
+      method: "GET",
+      cache: "no-store",
+    }).catch((error) => {
+      console.error("[slots] prefetch customers error", error);
+    });
+  }
+
   function handleServicesSaved() {
-    if (onServicesSaved) {
-      onServicesSaved();
-    }
+    onServicesSaved?.();
   }
 
   function handleSent() {
     setCustomersModalOpen(false);
     onClose();
-
-    if (onSent) {
-      onSent();
-    }
+    onSent?.();
   }
 
   return (
     <>
       <AnimatePresence>
-        {renderPanel({
-          open,
-          onClose,
-          dateLabel: dayChipLabel || date,
-          timeStart,
-          durationMinutes,
-          selectedServices,
-          setSelectedServices,
-          handleServicesSaved,
-          locationId,
-          slotId: slot?.id || "",
-          promotion,
-          setPromotion,
-          handleOpenCustomersModal,
-          templateBody,
-          companyName,
-        })}
+        {open ? (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-foreground/10 backdrop-blur-sm"
+              onClick={onClose}
+            />
+
+            <motion.div
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 40 }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed bottom-0 right-0 top-0 z-50 flex w-full max-w-[100vw] flex-col overflow-hidden bg-white shadow-[0_22px_60px_rgba(37,99,235,0.16)] sm:max-w-[420px] sm:rounded-l-2xl md:max-w-[440px] xl:max-w-[420px] xl2:max-w-[460px]"
+            >
+              <div className="flex items-center justify-between border-b border-border/50 px-4 pb-3 pt-4 sm:px-5 sm:pt-5 xl:px-5 xl:pb-4 xl2:px-6 xl2:pt-6">
+                <div>
+                  <h2 className="text-sm font-semibold tracking-tight text-foreground xl:text-base">
+                    Gestionar hueco
+                  </h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground xl:text-sm">
+                    Configura y envía este hueco
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-muted active:scale-95"
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+
+              <div className="flex-1 space-y-4 overflow-auto px-4 py-4 sm:px-5 xl:space-y-5 xl:px-5 xl:py-5 xl2:px-6 xl2:space-y-6">
+                <div className="rounded-2xl border border-[#DBEAFE] bg-white p-3 shadow-[0_10px_24px_rgba(37,99,235,0.08)] xl:p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-[#2563EB] xl:text-xs">
+                        Fecha y hora
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-500 xl:text-xs">
+                        Ajusta el hueco antes de avisar a clientes.
+                      </p>
+                    </div>
+
+                    {isSavingTime ? (
+                      <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                        Guardando...
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.35fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]">
+                    <label className="space-y-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Fecha
+                      </span>
+                      <div className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm transition-all duration-200 focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100">
+                        <input
+                          type="date"
+                          value={date}
+                          onChange={(event) => setDate(event.target.value)}
+                          className="h-full min-w-0 flex-1 bg-transparent text-xs font-semibold text-slate-800 outline-none xl:text-sm"
+                        />
+                      </div>
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Inicio
+                      </span>
+                      <div className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm transition-all duration-200 focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100">
+                        <input
+                          type="time"
+                          value={timeStart}
+                          onChange={(event) => setTimeStart(event.target.value)}
+                          className="h-full min-w-0 flex-1 bg-transparent text-xs font-semibold tabular-nums text-slate-800 outline-none xl:text-sm"
+                        />
+                      </div>
+                    </label>
+
+                    <label className="space-y-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Fin
+                      </span>
+                      <div className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm transition-all duration-200 focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100">
+                        <input
+                          type="time"
+                          value={timeEnd}
+                          onChange={(event) => setTimeEnd(event.target.value)}
+                          className="h-full min-w-0 flex-1 bg-transparent text-xs font-semibold tabular-nums text-slate-800 outline-none xl:text-sm"
+                        />
+                      </div>
+                    </label>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                      {durationMinutes} min
+                    </span>
+
+                    {timeSaveError ? (
+                      <span className="text-[11px] font-semibold text-rose-600">
+                        {timeSaveError}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <SlotServiceSelector
+                  locationId={locationId}
+                  slotId={slot?.id || ""}
+                  slotDurationMin={durationMinutes}
+                  selectedServices={selectedServices}
+                  onChange={setSelectedServices}
+                  onSaved={handleServicesSaved}
+                />
+
+                <GapWhatsAppPreview
+                  services={selectedServices}
+                  promotion="none"
+                  day={dayChipLabel || date}
+                  timeStart={timeStart}
+                  templateBody={templateBody}
+                  companyName={companyName}
+                />
+              </div>
+
+              <div className="border-t border-border/50 px-4 py-4 sm:px-5 xl:px-5 xl:py-5 xl2:px-6">
+                <Button
+                  onMouseEnter={prefetchCustomersModal}
+                  onFocus={prefetchCustomersModal}
+                  onClick={handleOpenCustomersModal}
+                  className="h-11 w-full rounded-xl bg-primary font-semibold text-primary-foreground shadow-primary-glow transition-all duration-300 ease-out hover:bg-primary/90 active:scale-[0.98] xl:h-12"
+                >
+                  Avisar a clientes
+                </Button>
+              </div>
+            </motion.div>
+          </>
+        ) : null}
       </AnimatePresence>
 
       <SlotsCustomersPickerModal

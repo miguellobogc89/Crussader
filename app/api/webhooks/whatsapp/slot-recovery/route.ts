@@ -22,6 +22,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  console.log("[WA][WEBHOOK][POST_RECEIVED]");
   const body = await req.json().catch(() => null);
 
   if (!body) {

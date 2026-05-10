@@ -64,6 +64,11 @@ export async function POST(request: NextRequest) {
             title: true,
           },
         },
+        Employee: {
+          select: {
+            name: true,
+          },
+        },
         slot_recovery_slot_service: {
           orderBy: {
             position: "asc",
@@ -80,12 +85,21 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    console.log("[WA][SLOT][SERVICES_RAW]", {
+  requestedSlotId: slotId,
+  loadedSlotId: slot?.id,
+  slotServicesCount: slot?.slot_recovery_slot_service.length,
+  slotServices: slot?.slot_recovery_slot_service,
+});
+
     if (!slot) {
       return NextResponse.json(
         { ok: false, error: "Slot not found" },
         { status: 404 },
       );
     }
+
+    
 
     if (slot.company_id !== companyId) {
       return NextResponse.json(
@@ -115,7 +129,7 @@ export async function POST(request: NextRequest) {
         company_id: companyId,
         customer_id: customer.customerId,
         status: "queued",
-        template_name: "slot_recovery_basic",
+        template_name: "slot_available_employee ",
       };
     });
 
@@ -126,34 +140,15 @@ export async function POST(request: NextRequest) {
 
     const businessName = slot.Location?.title || "tu negocio";
 
-    const serviceLines = slot.slot_recovery_slot_service.map((item) => {
-      const service = item.slot_recovery_service;
-      return `${service.name} ${service.price}€`;
-    });
-
-    const serviceName =
-      serviceLines.length > 0
-        ? `uno de estos servicios a elegir: ${serviceLines.join(" · ")}`
-        : "tu cita";
-
-    const firstService =
-      slot.slot_recovery_slot_service[0]?.slot_recovery_service ?? null;
-
-    let priceText = "Consultar precio";
-
-    if (
-      firstService &&
-      firstService.price !== null &&
-      firstService.price !== undefined
-    ) {
-      priceText = `${firstService.price}€`;
-    }
+    const specialistName =
+      slot.Employee?.name || "nuestro especialista";
 
     const date = new Date(slot.starts_at);
 
     const day = date.toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "2-digit",
+      weekday: "long",
+      day: "numeric",
+      month: "long",
     });
 
     const time = date.toLocaleTimeString("es-ES", {
@@ -183,9 +178,16 @@ export async function POST(request: NextRequest) {
           customer?.firstName ||
           "Cliente";
 
+          console.log("[WA][TEMPLATE][PARAMS]", {
+            templateName: "slot_available_employee ",
+            customerName,
+            businessName,
+            dateText: `${day} a las ${time}`,
+          });
+
         const result = await sendSlotRecoveryTemplate({
           to: record.phone,
-          templateName: "slot_recovery_basic",
+          templateName: "slot_available_employee ",
           language: "es",
           components: [
             {
@@ -201,15 +203,15 @@ export async function POST(request: NextRequest) {
                 },
                 {
                   type: "text",
-                  text: serviceName,
+                  text: day,
                 },
                 {
                   type: "text",
-                  text: `${day} a las ${time}`,
+                  text: time,
                 },
                 {
                   type: "text",
-                  text: priceText,
+                  text: specialistName,
                 },
               ],
             },

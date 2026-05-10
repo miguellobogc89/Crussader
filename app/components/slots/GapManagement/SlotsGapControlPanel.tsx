@@ -5,12 +5,13 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar, Clock, Send, Users, X } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
-import type { SlotItem } from "@/app/components/slots/slots.types";
+import type { SlotDTO } from "@/hooks/slots/useSlots";
+import { formatTimeRange } from "@/app/components/slots/helpers/AvailableSlotsListHelpers";
 
 type SlotsGapControlPanelProps = {
   open: boolean;
   onClose: () => void;
-  slot: SlotItem | null;
+  slot: SlotDTO | null;
 };
 
 export function SlotsGapControlPanel({
@@ -64,7 +65,7 @@ export function SlotsGapControlPanel({
                 <div className="mt-3 space-y-3">
                   <div className="flex items-center gap-2 text-sm text-foreground">
                     <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span>{slot?.time || "Sin hora"}</span>
+                    <span>{slot ? formatTimeRange(slot.startsAt, slot.endsAt) : "--:--"}</span>
                   </div>
 
                   <div className="flex items-center gap-2 text-sm text-foreground">

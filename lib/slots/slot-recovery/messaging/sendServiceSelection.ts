@@ -16,6 +16,16 @@ type SendServiceSelectionParams = {
   options: ServiceOption[];
 };
 
+function toWhatsAppButtonTitle(value: string): string {
+  const cleanValue = value.trim();
+
+  if (cleanValue.length <= 20) {
+    return cleanValue;
+  }
+
+  return cleanValue.slice(0, 20).trim();
+}
+
 export async function sendServiceSelection({
   to,
   options,
@@ -24,7 +34,7 @@ export async function sendServiceSelection({
 
   let payload: Record<string, unknown>;
 
-  if (options.length <= 3) {
+  if (false) {
     payload = {
       messaging_product: "whatsapp",
       to,
@@ -40,7 +50,7 @@ export async function sendServiceSelection({
               type: "reply",
               reply: {
                 id: option.id,
-                title: option.title,
+                title: toWhatsAppButtonTitle(option.title),
               },
             };
           }),
@@ -92,13 +102,19 @@ export async function sendServiceSelection({
 
   const data = await res.json();
 
-  if (!res.ok) {
-    throw new Error(
-      typeof data?.error?.message === "string"
-        ? data.error.message
-        : "whatsapp_service_selection_send_failed",
-    );
-  }
+if (!res.ok) {
+  console.error("[WA][SERVICE_SELECTION][ERROR][STATUS]", res.status);
+  console.error(
+    "[WA][SERVICE_SELECTION][ERROR][BODY]",
+    JSON.stringify(data, null, 2),
+  );
+
+  throw new Error(
+    typeof data?.error?.message === "string"
+      ? data.error.message
+      : "whatsapp_service_selection_send_failed",
+  );
+}
 
   return data;
 }

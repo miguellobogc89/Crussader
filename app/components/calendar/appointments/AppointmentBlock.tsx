@@ -13,7 +13,8 @@ type Props = {
   onSelect?: (id: string) => void;
   onEdit?: (id: string) => void;
   customerName?: string | null;
-source?: string | null;
+  customerPhone?: string | null;
+  source?: string | null;
 };
 
 // Sustituye STATUS_CONFIG por esto:
@@ -75,6 +76,7 @@ export default function AppointmentBlock({
   employeeColor,
   status,
   customerName,
+  customerPhone,
   source,
   onSelect,
   onEdit,
@@ -121,6 +123,12 @@ export default function AppointmentBlock({
         <div className="truncate text-[12px] font-semibold leading-tight text-slate-900">
           {source === "google" ? serviceName || "Evento Google" : serviceName}
         </div>
+
+        {customerName || customerPhone ? (
+          <div className="truncate text-[10px] font-medium leading-tight text-slate-700">
+            {[customerName, customerPhone].filter(Boolean).join(" · ")}
+          </div>
+        ) : null}
 
         <div className="flex min-w-0 flex-wrap gap-1">
           {employeeName ? (

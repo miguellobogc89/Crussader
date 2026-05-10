@@ -5,7 +5,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Clock3, RefreshCw, TrendingUp, ChevronRight } from "lucide-react";
 import { useSlots } from "@/hooks/slots/useSlots";
-import type { SlotItem, SelectedServiceItem } from "./slots.types";
+import type { SlotDTO } from "@/hooks/slots/useSlots";
+import type { SelectedServiceItem } from "./slots.types";
 import { SlotsListCardItem } from "./SlotsCardItem/SlotsListCardItem";
 import { getPendingPublishCount } from "./helpers/AvailableSlotsListHelpers";
 import {
@@ -18,7 +19,7 @@ type AvailableSlotsListProps = {
   refreshKey?: number;
   onSlotClick?: (
     day: string,
-    slot: SlotItem,
+    slot: SlotDTO,
     services: SelectedServiceItem[],
   ) => void;
   onHeaderChange?: (header: React.ReactNode) => void;

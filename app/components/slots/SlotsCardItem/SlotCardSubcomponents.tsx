@@ -11,9 +11,12 @@ type ServicePillProps = {
 
 export function ServicePill({ name, price }: ServicePillProps) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-md bg-[#F3F4F6] px-2 py-0.5 text-[10px] font-medium text-[#6B7280] xl:gap-1.5 xl:px-2.5 xl:py-1 xl:text-[11px] xl2:gap-2 xl2:text-xs">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-[#FAFAFA] px-2.5 py-1 text-[10px] font-medium text-[#52525B] shadow-sm xl:gap-2 xl:px-3 xl:text-[11px] xl2:text-xs">
       <span className="truncate">{name}</span>
-      <span className="font-semibold">{price}</span>
+
+      <span className="rounded-full bg-white px-1.5 py-[1px] font-semibold tabular-nums text-[#2563EB]">
+        {price}
+      </span>
     </span>
   );
 }
@@ -24,7 +27,7 @@ type EmployeePillProps = {
 
 export function EmployeePill({ name }: EmployeePillProps) {
   return (
-    <span className="inline-flex items-center rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2 py-0.5 text-[10px] font-semibold text-[#0B6CF4] xl:px-2.5 xl:py-1 xl:text-[11px] xl2:px-3 xl2:text-xs">
+    <span className="inline-flex items-center rounded-full border border-[#CBD5E1] bg-[#F8FAFC] px-2 py-0.5 text-[10px] font-semibold text-[#475569] xl:px-2.5 xl:py-1 xl:text-[11px] xl2:px-3 xl2:text-xs">
       {name}
     </span>
   );
@@ -33,11 +36,17 @@ export function EmployeePill({ name }: EmployeePillProps) {
 type PricePillProps = {
   min: string;
   max?: string;
+  tone?: "blue" | "success";
 };
 
-export function PricePill({ min, max }: PricePillProps) {
+export function PricePill({ min, max, tone = "success" }: PricePillProps) {
+  const className =
+    tone === "blue"
+      ? "inline-flex items-center rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[#0B6CF4] xl:px-2.5 xl:py-1 xl:text-[11px] xl2:px-3 xl2:text-xs"
+      : "inline-flex items-center rounded-full border border-[#DCFCE7] bg-[#F7FEFA] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[#166534] xl:px-2.5 xl:py-1 xl:text-[11px] xl2:px-3 xl2:text-xs";
+
   return (
-    <span className="inline-flex items-center rounded-full border border-[#DCFCE7] bg-[#F7FEFA] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[#166534] xl:px-2.5 xl:py-1 xl:text-[11px] xl2:px-3 xl2:text-xs">
+    <span className={className}>
       {min}
       {max && max !== min ? <> - {max}</> : null}
     </span>

@@ -26,16 +26,12 @@ export async function sendServiceSelectionToRecipient(
             select: {
               id: true,
               name: true,
+              price: true,
             },
           },
         },
       },
     },
-  });
-
-  console.log("[WA][SERVICE_SELECTION][RAW_SLOT_SERVICES]", {
-    slotId: params.slotId,
-    slotWithServices,
   });
 
   const availableServices = slotWithServices?.slot_recovery_slot_service ?? [];
@@ -48,16 +44,24 @@ export async function sendServiceSelectionToRecipient(
     };
   }
 
+  const selectionResult = await sendServiceSelection({
+    to: params.toPhone,
+    options: availableServices.map((item) => {
+      const service = item.slot_recovery_service;
 
-const selectionResult = await sendServiceSelection({
-  to: params.toPhone,
-  options: availableServices.map((item) => {
-    return {
-      id: `SERVICE_${item.slot_recovery_service.id}`,
-      title: item.slot_recovery_service.name,
-    };
-  }),
-});
+      let description = "Precio a consultar";
+
+      if (service.price !== null && service.price !== undefined) {
+        description = `${service.price}€`;
+      }
+
+      return {
+        id: `SERVICE_${service.id}`,
+        title: service.name,
+        description,
+      };
+    }),
+  });
 
   let selectionMessageId: string | null = null;
 

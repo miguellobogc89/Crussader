@@ -1,7 +1,7 @@
 // app/components/slots/NewAvailableSlotModal/EmployeeSelector.tsx
 "use client";
 
-import { UserRound, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import type { EmployeeLite } from "./NewCancellationModal.helpers";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +41,11 @@ export function EmployeeSelector({
                 : "border-border bg-white text-slate-700 hover:bg-muted/40"
             )}
           >
-            <UserRound className="h-3.5 w-3.5" />
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: employee.color || "#94A3B8" }}
+            />
+
             <span>{employee.name}</span>
 
             {isSelected ? <Check className="h-3.5 w-3.5" /> : null}

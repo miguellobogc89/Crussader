@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 type CreateAppointmentFromSlotParams = {
   slotId: string;
   customerId: string;
-  serviceId: string; // slot_recovery_service.id
+  serviceId?: string | null;
 };
 
 export async function createAppointmentFromSlot(
@@ -19,6 +19,7 @@ export async function createAppointmentFromSlot(
       id: true,
       company_id: true,
       location_id: true,
+      employee_id: true,
       starts_at: true,
       ends_at: true,
       recovered_appointment_id: true,
@@ -81,7 +82,15 @@ export async function createAppointmentFromSlot(
     };
   }
 
-  const slotService = await prisma.slot_recovery_service.findUnique({
+let slotService: {
+  id: string;
+  name: string;
+  price: any;
+  duration_min: number;
+} | null = null;
+
+if (params.serviceId) {
+  slotService = await prisma.slot_recovery_service.findUnique({
     where: {
       id: params.serviceId,
     },
@@ -97,6 +106,36 @@ export async function createAppointmentFromSlot(
     console.log("[APPOINTMENT][ERROR][SERVICE_NOT_FOUND]", params);
     return { ok: false };
   }
+}
+
+
+  const customer = await prisma.customer.findUnique({
+  where: {
+    id: params.customerId,
+  },
+  select: {
+    firstName: true,
+    lastName: true,
+    preferred_name: true,
+    whatsapp_name: true,
+    phone: true,
+    email: true,
+  },
+});
+
+let customerName = "Cliente";
+
+if (customer?.preferred_name) {
+  customerName = customer.preferred_name;
+} else if (customer?.whatsapp_name) {
+  customerName = customer.whatsapp_name;
+} else {
+  const fullName = `${customer?.firstName ?? ""} ${customer?.lastName ?? ""}`.trim();
+
+  if (fullName) {
+    customerName = fullName;
+  }
+}
 
   const appointment = await prisma.appointment.create({
     data: {
@@ -106,12 +145,15 @@ export async function createAppointmentFromSlot(
       endAt: slot.ends_at,
       status: "BOOKED",
       customerId: params.customerId,
-      employeeId: null,
+      customerName,
+      customerPhone: customer?.phone ?? null,
+      customerEmail: customer?.email ?? null,
+      employeeId: slot.employee_id,
       resourceId: null,
-      serviceName: slotService.name,
-      servicePrice: Number(slotService.price),
-      serviceDurationMin: slotService.duration_min,
-      slotRecoveryServiceId: slotService.id,
+      serviceName: slotService?.name ?? null,
+      servicePrice: slotService ? Number(slotService.price) : null,
+      serviceDurationMin: slotService?.duration_min ?? null,
+      slotRecoveryServiceId: slotService?.id ?? null,
       notes: "Created from slot_recovery",
     },
   });

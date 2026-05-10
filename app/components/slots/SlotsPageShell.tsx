@@ -7,7 +7,8 @@ import { Button } from "@/app/components/ui/button";
 import { SlotsStatsCard } from "./SlotsStatsCard";
 import { SlotsListCard } from "./AvailableSlotsList";
 import { SlotsActivityFeedCard } from "./activity/SlotsActivityFeedCard";
-import type { SlotItem, SelectedServiceItem } from "./slots.types";
+import type { SlotDTO } from "@/hooks/slots/useSlots";
+import type { SelectedServiceItem } from "./slots.types";
 import { WaitlistCard } from "./Waitlist/WaitlistCard";
 import { CancelledAppointmentsList } from "./CancelledAppointments/CancelledAppointmentsList";
 import StandardCard from "@/app/components/crussader/UX/standardCard";
@@ -21,7 +22,7 @@ type SlotsPageShellProps = {
   onInvite: () => void;
   onSlotClick: (
     day: string,
-    slot: SlotItem,
+    slot: SlotDTO,
     services: SelectedServiceItem[],
     locationId: string | null,
   ) => void;

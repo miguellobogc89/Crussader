@@ -51,7 +51,7 @@ export function SlotsCustomerListItem({
       </div>
 
       <div className="relative">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
           <span className="text-xs font-semibold text-muted-foreground">
             {getInitials(item)}
           </span>
@@ -64,7 +64,7 @@ export function SlotsCustomerListItem({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-medium text-foreground">
+          <p className="truncate text-xs font-semibold text-foreground sm:text-sm">
             {item.customer.displayName}
           </p>
 
@@ -81,7 +81,7 @@ export function SlotsCustomerListItem({
           )}
         </div>
 
-        <p className="text-xs tabular-nums text-muted-foreground">
+        <p className="text-[11px] tabular-nums text-muted-foreground sm:text-xs">
           {getFullPhone(item)}
         </p>
 
@@ -93,7 +93,7 @@ export function SlotsCustomerListItem({
       </div>
 
       {item.lastAppointmentAt && (
-        <div className="mr-2 flex flex-col items-start rounded-lg border border-border/50 bg-muted/50 px-2 py-1">
+        <div className="hidden mr-2 flex-col items-start rounded-lg border border-border/50 bg-muted/50 px-2 py-1 sm:flex">
           <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
             <Calendar className="h-3 w-3" />
             <span>{formatLastAppointmentDate(item.lastAppointmentAt)}</span>
@@ -108,7 +108,7 @@ export function SlotsCustomerListItem({
       )}
 
       <span
-        className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-semibold ${clusterConfig.badgeClassName}`}
+        className={`hidden shrink-0 rounded-md border px-2 py-0.5 text-[9px] font-semibold sm:inline-flex ${clusterConfig.badgeClassName}`}
       >
         {clusterConfig.label}
       </span>

@@ -97,12 +97,6 @@ const now = new Date();
 const startOfToday = new Date(now);
 startOfToday.setHours(0, 0, 0, 0);
 
-console.log("[cancelled appointments filter]", {
-  now: now.toISOString(),
-  startOfToday: startOfToday.toISOString(),
-  locationId,
-}); 
-
 const appointments = await prisma.appointment.findMany({
     where: {
         locationId,

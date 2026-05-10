@@ -2,13 +2,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import StandardCard from "@/app/components/crussader/UX/standardCard";
+import { Loader2 } from "lucide-react";
+import StandardModal from "@/app/components/crussader/StandardModal";
+import { Button } from "@/app/components/ui/button";
 import type { SelectedServiceItem } from "@/app/components/slots/modal/slotModal.types";
 import type { CancelledAppointmentItem } from "@/app/components/slots/CancelledAppointments/CancelledAppointmentsList";
-import { NewCancellationModalHeader } from "./NewCancellationModalHeader";
 import { NewCancellationModalForm } from "./NewCancellationModalForm";
-import { NewCancellationModalFooter } from "./NewCancellationModalFooter";
 import {
   buildIsoFromLocal,
   canSubmitSlotCreation,
@@ -26,10 +25,15 @@ type EmployeeServiceItem = {
   active: boolean;
 };
 
+type EmployeeServiceByEmployeeItem = EmployeeServiceItem & {
+  employeeId: string;
+};
+
 type NewCancellationModalProps = {
   open: boolean;
   onClose: () => void;
   locationId: string;
+  onCreated?: () => void;
   prefillAppointment?: CancelledAppointmentItem | null;
 };
 
@@ -37,6 +41,7 @@ export function NewCancellationModal({
   open,
   onClose,
   locationId,
+  onCreated,
   prefillAppointment = null,
 }: NewCancellationModalProps) {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
@@ -53,6 +58,9 @@ export function NewCancellationModal({
   const [created, setCreated] = useState(false);
   const [errorText, setErrorText] = useState("");
   const [employees, setEmployees] = useState<EmployeeLite[]>([]);
+  const [servicesByEmployee, setServicesByEmployee] = useState<
+    Record<string, EmployeeServiceItem[]>
+  >({});
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
 
   useEffect(() => {
@@ -114,13 +122,23 @@ if (prefillAppointment) {
           return;
         }
 
-        const nextEmployees: EmployeeLite[] = Array.isArray(data?.employees)
-          ? data.employees.map((item: any) => ({
-              id: String(item.id),
-              name: String(item.name),
-              active: true,
-            }))
-          : [];
+const nextEmployees: EmployeeLite[] = Array.isArray(data?.employees)
+  ? data.employees.map((item: any) => {
+      const name =
+        item.name ??
+        item.fullName ??
+        item.displayName ??
+        item.firstName ??
+        "Empleado";
+
+      return {
+        id: String(item.id),
+        name: String(name),
+        color: item.color ?? "#94A3B8",
+        active: true,
+      };
+    })
+  : [];
 
         setEmployees(nextEmployees);
 
@@ -167,7 +185,68 @@ if (prefillAppointment) {
     return () => {
       cancelled = true;
     };
-  }, [open, locationId, selectedEmployeeId]);
+  }, [open, locationId, prefillAppointment]);
+
+  useEffect(() => {
+    if (!open || !locationId) {
+      setServicesByEmployee({});
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadAllServices() {
+      try {
+        const response = await fetch(
+          `/api/slots/employees/services/list?locationId=${encodeURIComponent(locationId)}`,
+          {
+            method: "GET",
+            cache: "no-store",
+          }
+        );
+
+        const data = await response.json();
+
+        if (cancelled) {
+          return;
+        }
+
+        const rows: EmployeeServiceByEmployeeItem[] = Array.isArray(data?.services)
+          ? data.services
+          : [];
+
+        const grouped: Record<string, EmployeeServiceItem[]> = {};
+
+        rows.forEach((service) => {
+          if (!grouped[service.employeeId]) {
+            grouped[service.employeeId] = [];
+          }
+
+          grouped[service.employeeId].push({
+            id: service.id,
+            name: service.name,
+            durationMin: service.durationMin,
+            price: service.price,
+            active: service.active,
+          });
+        });
+
+        setServicesByEmployee(grouped);
+      } catch (error) {
+        console.error("[NewCancellationModal] loadAllServices", error);
+
+        if (!cancelled) {
+          setServicesByEmployee({});
+        }
+      }
+    }
+
+    loadAllServices();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, locationId]);
 
   const slotDurationMin = useMemo(() => {
     return getSlotDurationMinutes(dateValue, startTimeValue, endTimeValue);
@@ -263,6 +342,7 @@ if (prefillAppointment) {
       }
 
       setCreated(true);
+      onCreated?.();
       setIsSubmitting(false);
 
       window.setTimeout(() => {
@@ -275,64 +355,71 @@ if (prefillAppointment) {
     }
   }
 
-  return (
-    <AnimatePresence>
-      {open ? (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-foreground/10 backdrop-blur-sm"
-            onClick={onClose}
-          />
+return (
+  <StandardModal
+    open={open}
+    title="Crear hueco disponible"
+    onClose={onClose}
+    footer={
+      <div className="flex w-full items-center justify-between gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onClose}
+          disabled={isSubmitting}
+          className="h-10 rounded-xl"
+        >
+          Cancelar
+        </Button>
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ type: "spring", damping: 30, stiffness: 400 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          >
-            <StandardCard className="w-full max-w-3xl bg-white">
-              <div onClick={(event) => event.stopPropagation()}>
-                <NewCancellationModalHeader onClose={onClose} />
-
-                <NewCancellationModalForm
-                  employees={employees}
-                  selectedEmployeeId={selectedEmployeeId}
-                  onEmployeeSelect={(employee) => {
-                    setSelectedEmployeeId(employee.id);
-                    setSelectedEmployee(employee);
-                  }}
-                  selectedEmployee={selectedEmployee}
-                  dateValue={dateValue}
-                  startTimeValue={startTimeValue}
-                  endTimeValue={endTimeValue}
-                  notes={notes}
-                  onDateChange={setDateValue}
-                  onStartTimeChange={setStartTimeValue}
-                  onEndTimeChange={setEndTimeValue}
-                  onNotesChange={setNotes}
-                  errorText={errorText}
-                  created={created}
-                  selectedServiceIds={selectedServiceIds}
-                  onServicesChange={handleServicesChange}
-                />
-
-                <NewCancellationModalFooter
-                  isSubmitting={isSubmitting}
-                  created={created}
-                  disabled={!canSubmit || created}
-                  onSubmit={handleCreate}
-                />
-              </div>
-            </StandardCard>
-          </motion.div>
-        </>
-      ) : null}
-    </AnimatePresence>
-  );
+        <Button
+          type="button"
+          onClick={handleCreate}
+          disabled={!canSubmit || created}
+          className="h-10 gap-2 rounded-xl bg-crussader px-5 font-semibold text-white hover:bg-crussader/90"
+        >
+          <>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Creando
+              </>
+            ) : created ? (
+              "Hueco creado"
+            ) : (
+              "Crear hueco"
+            )}
+          </>
+        </Button>
+      </div>
+    }
+  >
+    <div className="max-h-[72dvh] overflow-y-auto pr-1">
+      <NewCancellationModalForm
+        employees={employees}
+        servicesByEmployee={servicesByEmployee}
+        selectedEmployeeId={selectedEmployeeId}
+        onEmployeeSelect={(employee) => {
+          setSelectedEmployeeId(employee.id);
+          setSelectedEmployee(employee);
+        }}
+        selectedEmployee={selectedEmployee}
+        dateValue={dateValue}
+        startTimeValue={startTimeValue}
+        endTimeValue={endTimeValue}
+        notes={notes}
+        onDateChange={setDateValue}
+        onStartTimeChange={setStartTimeValue}
+        onEndTimeChange={setEndTimeValue}
+        onNotesChange={setNotes}
+        errorText={errorText}
+        created={created}
+        selectedServiceIds={selectedServiceIds}
+        onServicesChange={handleServicesChange}
+      />
+    </div>
+  </StandardModal>
+);
 }
 
 function getDateValueFromISO(value: string): string {

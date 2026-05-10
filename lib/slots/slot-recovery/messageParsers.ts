@@ -60,13 +60,16 @@ export function normalizeReplyType(message: WaMessageItem): string | null {
   ) {
     const replyId = message.interactive.button_reply.id.trim().toUpperCase();
 
-    if (replyId === "BOOK") {
-      return "BOOK";
-    }
+  if (replyId === "BOOK" || replyId === "RESERVAR") {
+    return "BOOK";
+  }
 
-    if (replyId === "REJECT") {
-      return "REJECT";
-    }
+  if (
+    replyId === "REJECT" ||
+    replyId === "NO ME INTERESA"
+  ) {
+    return "REJECT";
+  }
 
     return replyId;
   }

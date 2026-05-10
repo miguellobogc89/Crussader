@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const template = await prisma.whatsapp_template.findFirst({
       where: {
         company_id: companyId,
-        template_name: "slot_recovery_basic",
+        template_name: "slot_available_employee ",
         status: "approved",
       },
       select: {
