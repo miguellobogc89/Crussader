@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   let redirectAfter =
     process.env.GOOGLE_CALENDAR_RETURN_URI ||
-    `${baseUrl}/dashboard/integrations-test-2`;
+    `${baseUrl}/dashboard/calendar`;
 
   let companyId: string | null = null;
   let userId: string | null = null;

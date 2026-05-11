@@ -157,6 +157,24 @@ export async function POST(req: NextRequest) {
     let imported = 0;
     const importedByCalendar: Record<string, number> = {};
 
+const employees = await prisma.employee.findMany({
+  where: {
+    active: true,
+    email: {
+      not: null,
+    },
+    locations: {
+      some: {
+        locationId,
+      },
+    },
+  },
+  select: {
+    id: true,
+    email: true,
+  },
+});
+
     for (const calendarId of calendarIds) {
       const configConnectionId = savedConnections[0].id;
 
@@ -216,6 +234,20 @@ export async function POST(req: NextRequest) {
 
         if (!startAt || !endAt) continue;
 
+        const attendees = Array.isArray(event.attendees) ? event.attendees : [];
+
+const matchedEmployee = employees.find((employee) => {
+  if (!employee.email) return false;
+
+  return attendees.some((attendee: any) => {
+    if (!attendee.email) return false;
+
+    return attendee.email.toLowerCase() === employee.email!.toLowerCase();
+  });
+});
+
+const employeeId = matchedEmployee?.id ?? null;
+
         await prisma.external_calendar_event.upsert({
           where: {
             provider_external_event_id_external_calendar_id: {
@@ -270,6 +302,7 @@ export async function POST(req: NextRequest) {
           },
           update: {
             locationId,
+            employeeId,
             startAt,
             endAt,
             status: AppointmentStatus.BOOKED,
@@ -280,6 +313,7 @@ export async function POST(req: NextRequest) {
           },
           create: {
             locationId,
+            employeeId,
             startAt,
             endAt,
             status: AppointmentStatus.BOOKED,

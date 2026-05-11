@@ -110,6 +110,7 @@ export type BootstrapData = {
 };
 
 const ACTIVE_LOCATION_COOKIE = "active_location_id";
+const ACTIVE_COMPANY_COOKIE = "active_company_id";
 
 export async function getBootstrapData(): Promise<BootstrapData> {
   const session = await getServerSession(authOptions);
@@ -291,17 +292,28 @@ export async function getBootstrapData(): Promise<BootstrapData> {
     reviewsAvg: l.reviewsAvg ? l.reviewsAvg.toString() : null,
   }));
 
-  const jar = await cookies();
-  const cookieLocationId = jar.get(ACTIVE_LOCATION_COOKIE)?.value ?? null;
+const jar = await cookies();
 
-  const allowedLocationIds = new Set(locations.map((l) => l.id));
+const cookieCompanyId = jar.get(ACTIVE_COMPANY_COOKIE)?.value ?? null;
+const cookieLocationId = jar.get(ACTIVE_LOCATION_COOKIE)?.value ?? null;
 
-  const activeLocation =
-    cookieLocationId && allowedLocationIds.has(cookieLocationId)
-      ? (locations.find((l) => l.id === cookieLocationId) || locations[0] || null)
-      : (locations[0] || null);
-    locations[0] ??
-    null;
+const allowedCompanyIds = new Set(companiesResolved.map((c) => c.id));
+
+const activeCompanyIdFromCookie =
+  cookieCompanyId && allowedCompanyIds.has(cookieCompanyId)
+    ? cookieCompanyId
+    : null;
+
+const locationsForActiveCompany = activeCompanyIdFromCookie
+  ? locations.filter((l) => l.companyId === activeCompanyIdFromCookie)
+  : locations;
+
+const allowedLocationIds = new Set(locationsForActiveCompany.map((l) => l.id));
+
+const activeLocation =
+  cookieLocationId && allowedLocationIds.has(cookieLocationId)
+    ? locationsForActiveCompany.find((l) => l.id === cookieLocationId) ?? null
+    : locationsForActiveCompany[0] ?? null;
 
   const activeLocationResolved = activeLocation
     ? {

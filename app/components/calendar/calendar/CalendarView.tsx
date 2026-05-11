@@ -38,8 +38,11 @@ type AppointmentLite = {
 
 type Props = {
   locationId: string | null;
+  selectedDate: Date;
+  onChangeSelectedDate: (date: Date) => void;
   onCellClick?: (cellId: string) => void;
   selectedCellId?: string | null;
+  visibleGoogleCalendarIds: string[];
 };
 
 function startOfWeekMon(d: Date) {
@@ -59,10 +62,12 @@ function addDays(d: Date, n: number) {
 
 export default function CalendarView({
   locationId,
+  selectedDate,
+  onChangeSelectedDate,
   onCellClick,
   selectedCellId,
+  visibleGoogleCalendarIds,
 }: Props) {
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const [view, setView] = useState<ToolbarView>("week");
   const [visibleStartHour, setVisibleStartHour] = useState(10);
   const [visibleEndHour, setVisibleEndHour] = useState(21);
@@ -220,31 +225,72 @@ export default function CalendarView({
     loadAppointments();
   }, [loadAppointments]);
 
-  useEffect(() => {
+useEffect(() => {
   if (!locationId) return;
 
-  const interval = setInterval(async () => {
-    await fetch("/api/integrations/google/calendar/sync", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        companyId: "cmfv7vjd30000i5xktjoncp48",
-        locationId,
-      }),
-    });
+  async function syncGoogleCalendarNow() {
+    try {
+      const response = await fetch("/api/integrations/google/calendar/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          companyId: "cmfv7vjd30000i5xktjoncp48",
+          locationId,
+        }),
+      });
 
-    await loadAppointments();
-  }, 30000);
+      if (!response.ok) {
+        console.warn("[google calendar sync] failed", response.status);
+        return;
+      }
 
-  return () => clearInterval(interval);
+      await loadAppointments();
+    } catch (error) {
+      console.warn("[google calendar sync] fetch failed", error);
+    }
+  }
+
+  void syncGoogleCalendarNow();
+
+  window.addEventListener(
+    "google-calendar:sync",
+    syncGoogleCalendarNow,
+  );
+
+  const interval = setInterval(() => {
+    void syncGoogleCalendarNow();
+  }, 10000);
+
+  return () => {
+    clearInterval(interval);
+
+    window.removeEventListener(
+      "google-calendar:sync",
+      syncGoogleCalendarNow,
+    );
+  };
 }, [locationId, loadAppointments]);
+
+const visibleAppointments = useMemo(() => {
+  return appointments.filter((appt) => {
+    if (appt.externalProvider !== "google-calendar") {
+      return true;
+    }
+
+    if (!appt.externalCalendarId) {
+      return false;
+    }
+
+    return visibleGoogleCalendarIds.includes(appt.externalCalendarId);
+  });
+}, [appointments, visibleGoogleCalendarIds]);
 
   const apptsByDay = useMemo(() => {
     const map = new Map<string, CalendarAppt[]>();
 
-    for (const appt of appointments) {
+    for (const appt of visibleAppointments) {
       const key = localKeyTZ(new Date(appt.startAt));
 
       if (!map.has(key)) {
@@ -262,14 +308,14 @@ export default function CalendarView({
     }
 
     return map;
-  }, [appointments]);
+  }, [visibleAppointments]);
 
   const apptsForMonth = useMemo(() => {
-    return [...appointments].sort(
+    return [...visibleAppointments].sort(
       (a, b) =>
         new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
     );
-  }, [appointments]);
+  }, [visibleAppointments]);
 
   const selectedAppointment = useMemo(() => {
     return appointments.find((appt) => appt.id === selectedAppointmentId) ?? null;
@@ -330,7 +376,7 @@ const selectedSlotDateTime = getSelectedSlotDateTime();
         view={view}
         onChangeView={handleChangeView}
         selectedDate={selectedDate}
-        onChangeDate={setSelectedDate}
+        onChangeDate={onChangeSelectedDate}
         onCellClick={onCellClick}
         selectedCellId={selectedCellId}
         onAppointmentSelect={setSelectedAppointmentId}

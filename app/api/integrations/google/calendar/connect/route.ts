@@ -30,8 +30,8 @@ export async function GET(req: NextRequest) {
 
 const scopes = [
   "https://www.googleapis.com/auth/calendar.readonly",
-  "https://www.googleapis.com/auth/calendar.events.readonly",
-  "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+  //"https://www.googleapis.com/auth/calendar.events.readonly",
+  //"https://www.googleapis.com/auth/calendar.calendarlist.readonly",
 ];
 
   const state = JSON.stringify({

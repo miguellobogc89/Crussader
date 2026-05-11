@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import CalendarView from "@/app/components/calendar/calendar/CalendarView";
-import StandardCard from "@/app/components/crussader/UX/standardCard";
+import CalendarSidebar from "@/app/components/calendar/calendar/sidebar/CalendarSidebar";
 
 type Props = {
   locationId: string | null;
@@ -11,22 +11,36 @@ type Props = {
 
 export default function CalendarShell({ locationId }: Props) {
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [visibleGoogleCalendarIds, setVisibleGoogleCalendarIds] = useState<
+    string[]
+  >([]);
 
   if (!locationId) {
     return null;
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden px-3 pb-3 pt-1 lg:px-4 lg:pb-4 xl:px-5 xl:pb-5 xl2:px-6 xl2:pb-6 xl2:pt-6">
-      <div className="min-h-0 flex-1 overflow-hidden">
-        <StandardCard className="flex h-full min-h-0 flex-col overflow-hidden">
-          <CalendarView
-            locationId={locationId}
-            onCellClick={setSelectedCellId}
-            selectedCellId={selectedCellId}
-          />
-        </StandardCard>
-      </div>
+    <div className="flex h-full min-h-0 w-full flex-1 overflow-hidden">
+      <aside className="hidden h-full w-[300px] shrink-0 border-r border-slate-200 bg-white xl:block">
+        <CalendarSidebar
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          visibleGoogleCalendarIds={visibleGoogleCalendarIds}
+          onChangeVisibleGoogleCalendarIds={setVisibleGoogleCalendarIds}
+        />
+      </aside>
+
+      <main className="h-full min-h-0 min-w-0 flex-1 overflow-hidden bg-white">
+        <CalendarView
+          locationId={locationId}
+          selectedDate={selectedDate}
+          onChangeSelectedDate={setSelectedDate}
+          onCellClick={setSelectedCellId}
+          selectedCellId={selectedCellId}
+          visibleGoogleCalendarIds={visibleGoogleCalendarIds}
+        />
+      </main>
     </div>
   );
 }

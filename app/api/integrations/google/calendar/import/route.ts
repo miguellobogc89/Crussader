@@ -50,16 +50,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "missing_selected_calendar_ids" }, { status: 400 });
   }
 
-  await prisma.external_calendar_connection.updateMany({
-  where: {
-    company_id: companyId,
-    provider: "google-calendar",
-  },
-  data: {
-    external_calendar_id: selectedCalendarIds.join(","),
-    last_synced_at: new Date(),
-  },
-});
+
 
   const dbUser = await prisma.user.findUnique({
     where: { email: session.user.email },
@@ -113,19 +104,50 @@ export async function POST(req: NextRequest) {
   const importedByCalendar: Record<string, number> = {};
 
   for (const calendarId of selectedCalendarIds) {
-    const configConnectionId = crypto.randomUUID();
+const existingConnection = await prisma.external_calendar_connection.findFirst({
+  where: {
+    user_id: dbUser.id,
+    company_id: companyId,
+    provider: "google-calendar",
+    external_calendar_id: calendarId,
+  },
+  select: {
+    id: true,
+  },
+});
 
-    await prisma.external_calendar_connection.upsert({
-      where: { id: configConnectionId },
-      update: {},
-      create: {
-        id: configConnectionId,
-        user_id: dbUser.id,
-        company_id: companyId,
-        provider: "google-calendar",
-        external_account_email: oauthConnection.accountEmail || session.user.email,
-      },
-    });
+const configConnectionId = existingConnection?.id || crypto.randomUUID();
+
+const calendarInfo = await calendar.calendarList.get({
+  calendarId,
+});
+
+const calendarName = calendarInfo.data.summary || calendarId;
+
+await prisma.external_calendar_connection.upsert({
+  where: {
+    id: configConnectionId,
+  },
+  update: {
+    external_account_email: oauthConnection.accountEmail || session.user.email,
+    external_calendar_id: calendarId,
+    sync_enabled: true,
+    external_calendar_name: calendarName,
+    last_synced_at: new Date(),
+    updated_at: new Date(),
+  },
+  create: {
+    id: configConnectionId,
+    user_id: dbUser.id,
+    company_id: companyId,
+    provider: "google-calendar",
+    external_account_email: oauthConnection.accountEmail || session.user.email,
+    external_calendar_id: calendarId,
+    sync_enabled: true,
+    external_calendar_name: calendarName,
+    last_synced_at: new Date(),
+  },
+});
 
 const eventsResult = await calendar.events.list({
   calendarId,

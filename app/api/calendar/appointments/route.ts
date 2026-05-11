@@ -127,12 +127,43 @@ export async function GET(req: Request) {
       );
     }
 
+    const activeGoogleCalendars = await prisma.external_calendar_connection.findMany({
+  where: {
+    company_id: location.companyId,
+    provider: "google-calendar",
+    sync_enabled: true,
+  },
+  select: {
+    external_calendar_id: true,
+  },
+});
+
+const activeGoogleCalendarIds = activeGoogleCalendars
+  .map((calendar) => calendar.external_calendar_id)
+  .filter((id): id is string => Boolean(id));
+
     const appointments = await prisma.appointment.findMany({
       where: {
         locationId,
         startAt: { lt: to },
         endAt: { gt: from },
         status: { in: ACTIVE_STATUSES },
+        OR: [
+          {
+            externalProvider: null,
+          },
+          {
+            externalProvider: {
+              not: "google-calendar",
+            },
+          },
+          {
+            externalProvider: "google-calendar",
+            externalCalendarId: {
+              in: activeGoogleCalendarIds,
+            },
+          },
+        ],
       },
       select: {
         id: true,
