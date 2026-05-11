@@ -11,6 +11,7 @@ type Props = {
   title: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  contentClassName?: string;
   primaryLabel?: string;
   onPrimary?: () => void;
   onClose: () => void;
@@ -21,6 +22,7 @@ export default function StandardModal({
   title,
   children,
   footer,
+  contentClassName,
   primaryLabel = "Aceptar",
   onPrimary,
   onClose,
@@ -41,11 +43,12 @@ export default function StandardModal({
           onMouseDown={onClose}
         >
           <motion.div
-            className="
-            relative flex h-[100dvh] w-full flex-col overflow-hidden
-            rounded-none bg-white shadow-2xl
-            sm:h-auto sm:max-h-[92vh] sm:max-w-[560px] sm:rounded-2xl
-            "
+            className={[
+              "relative flex h-[100dvh] w-full flex-col overflow-hidden",
+              "rounded-none bg-white shadow-2xl",
+              "sm:h-auto sm:max-h-[92vh] sm:max-w-[560px] sm:rounded-2xl",
+              contentClassName ?? "",
+            ].join(" ")}
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}

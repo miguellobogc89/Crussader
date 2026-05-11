@@ -115,6 +115,48 @@ function getDayChipLabel(day: string): string {
   return `${weekday}, ${dayNumber}/${monthNumber}`;
 }
 
+function getWhatsAppPreviewDayLabel(value: string): string {
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(today.getDate() + 1);
+
+  function isSameDay(a: Date, b: Date) {
+    return (
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate()
+    );
+  }
+
+  const weekday = new Intl.DateTimeFormat("es-ES", {
+    weekday: "long",
+  }).format(parsed);
+
+  const dayNumber = new Intl.DateTimeFormat("es-ES", {
+    day: "2-digit",
+  }).format(parsed);
+
+  const monthNumber = new Intl.DateTimeFormat("es-ES", {
+    month: "2-digit",
+  }).format(parsed);
+
+  if (isSameDay(parsed, today)) {
+    return `hoy ${weekday}, ${dayNumber}/${monthNumber}`;
+  }
+
+  if (isSameDay(parsed, tomorrow)) {
+    return `mañana ${weekday}, ${dayNumber}/${monthNumber}`;
+  }
+
+  return `${weekday}, ${dayNumber}/${monthNumber}`;
+}
+
 function timeToMinutes(value: string): number {
   const parts = value.split(":");
 
@@ -158,9 +200,13 @@ export function SlotsGapManagementPanel({
   const [timeEnd, setTimeEnd] = useState(extractEndTime(slot));
   const [selectedServices, setSelectedServices] = useState<
     SelectedServiceItem[]
-  >([]);
-  const [customersModalOpen, setCustomersModalOpen] = useState(false);
-
+  >(services);
+    const [customersModalOpen, setCustomersModalOpen] = useState(false);
+const [sendSummary, setSendSummary] = useState({
+  sent: 0,
+  rejected: 0,
+  notRead: 0,
+});
   const [isSavingTime, setIsSavingTime] = useState(false);
   const [timeSaveError, setTimeSaveError] = useState("");
   const lastSavedTimeSignatureRef = useRef("");
@@ -180,26 +226,53 @@ export function SlotsGapManagementPanel({
       return;
     }
 
-    const slotServices = Array.isArray(slot.services) ? slot.services : [];
+setSelectedServices(Array.isArray(services) ? services : []);
 
-    const normalizedServices: SelectedServiceItem[] = slotServices.map(
-      (service) => {
-        return {
-          serviceId: service.id,
-          serviceName: service.name,
-          price: service.price,
-          durationMin: service.durationMin,
-        };
-      },
-    );
+  }, [slot, services]);
 
-    setSelectedServices(normalizedServices);
-  }, [slot]);
+useEffect(() => {
+  const slotId = slot?.id ?? "";
+
+  if (!slotId) {
+    setSendSummary({
+      sent: 0,
+      rejected: 0,
+      notRead: 0,
+    });
+    return;
+  }
+
+  async function loadSummary() {
+    try {
+      const response = await fetch(
+        `/api/slots/send/summary?slotId=${encodeURIComponent(slotId)}`,
+        { cache: "no-store" }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data?.ok) {
+        return;
+      }
+
+      setSendSummary({
+        sent: Number(data.summary.sent ?? 0),
+        rejected: Number(data.summary.rejected ?? 0),
+        notRead: Number(data.summary.notRead ?? 0),
+      });
+    } catch (error) {
+      console.error("[summary fetch]", error);
+    }
+  }
+
+  void loadSummary();
+}, [slot?.id]);
 
   useEffect(() => {
     if (!slot?.id) {
       return;
     }
+    const slotId = slot.id;
 
     if (!date || !timeStart || !timeEnd) {
       return;
@@ -219,28 +292,28 @@ export function SlotsGapManagementPanel({
       try {
         setIsSavingTime(true);
         setTimeSaveError("");
+        const slotId = slot.id;
 
-        const response = await fetch("/api/slots/update", {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            slotId: slot.id,
-            startsAt: buildLocalDateTime(date, timeStart),
-            endsAt: buildLocalDateTime(date, timeEnd),
-          }),
-        });
+const response = await fetch("/api/slots/update", {
+  method: "PATCH",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    slotId,
+    startsAt: buildLocalDateTime(date, timeStart),
+    endsAt: buildLocalDateTime(date, timeEnd),
+  }),
+});
 
-        const data = await response.json();
+const data = await response.json();
 
-        if (!response.ok || !data?.ok) {
-          throw new Error(data?.error || "No se pudo guardar la fecha.");
-        }
+if (!response.ok || !data?.ok) {
+  throw new Error(data?.error || "No se pudo guardar la fecha.");
+}
 
         lastSavedTimeSignatureRef.current = nextSignature;
 
-        onServicesSaved?.();
       } catch (error) {
         console.error("[slots] autosave time error", error);
         setTimeSaveError("No se pudo guardar la fecha.");
@@ -414,11 +487,45 @@ export function SlotsGapManagementPanel({
                 <GapWhatsAppPreview
                   services={selectedServices}
                   promotion="none"
-                  day={dayChipLabel || date}
+                  day={date}
                   timeStart={timeStart}
                   templateBody={templateBody}
                   companyName={companyName}
+                  specialistName={slot?.employeeName ?? "nuestro especialista"}
                 />
+
+                <div className="rounded-2xl border border-[#DBEAFE] bg-white p-3 shadow-[0_10px_24px_rgba(37,99,235,0.08)] xl:p-4">
+  <div className="mb-3">
+    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#2563EB] xl:text-xs">
+      Estado de envíos
+    </p>
+  </div>
+
+  <div className="grid grid-cols-3 gap-2">
+    <div className="rounded-xl bg-slate-50 px-3 py-2 text-center">
+      <p className="text-[10px] text-slate-500">Enviados</p>
+      <p className="text-sm font-semibold text-slate-800">
+        {sendSummary.sent}
+      </p>
+    </div>
+
+    <div className="rounded-xl bg-slate-50 px-3 py-2 text-center">
+      <p className="text-[10px] text-slate-500">Pendientes</p>
+      <p className="text-sm font-semibold text-slate-800">
+        {sendSummary.notRead}
+      </p>
+    </div>
+
+
+    <div className="rounded-xl bg-rose-50 px-3 py-2 text-center">
+      <p className="text-[10px] text-rose-600">Rechazados</p>
+      <p className="text-sm font-semibold text-rose-700">
+        {sendSummary.rejected}
+      </p>
+    </div>
+
+  </div>
+</div>
               </div>
 
               <div className="border-t border-border/50 px-4 py-4 sm:px-5 xl:px-5 xl:py-5 xl2:px-6">

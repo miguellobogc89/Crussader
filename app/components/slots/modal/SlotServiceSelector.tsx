@@ -228,26 +228,6 @@ const lastSlotIdRef = useRef("");
     return () => controller.abort();
   }, [locationId]);
 
-  useEffect(() => {
-    if (!hasLoadedServices) {
-      return;
-    }
-
-    const compatibleIds = new Set(
-      services
-        .filter((service) => service.active !== false)
-        .filter((service) => service.durationMin <= slotDurationMin)
-        .map((service) => service.id),
-    );
-
-    const filteredSelectedServices = selectedServices.filter((service) => {
-      return compatibleIds.has(service.serviceId);
-    });
-
-    if (filteredSelectedServices.length !== selectedServices.length) {
-      onChange(filteredSelectedServices);
-    }
-  }, [hasLoadedServices, services, slotDurationMin, selectedServices, onChange]);
 
   useEffect(() => {
     if (!createSuccessText) {
@@ -278,13 +258,21 @@ const lastSlotIdRef = useRef("");
   }, [justAddedId]);
 
 useEffect(() => {
-  if (lastSlotIdRef.current !== slotId) {
-    lastSlotIdRef.current = slotId;
-    lastSavedServicesSignatureRef.current = selectedServices
-      .map((service) => service.serviceId)
-      .join("|");
+  if (!slotId) {
+    lastSlotIdRef.current = "";
+    lastSavedServicesSignatureRef.current = "";
+    return;
   }
-}, [slotId, selectedServices]);
+
+  if (lastSlotIdRef.current === slotId) {
+    return;
+  }
+
+  lastSlotIdRef.current = slotId;
+  lastSavedServicesSignatureRef.current = selectedServices
+    .map((service) => service.serviceId)
+    .join("|");
+}, [slotId]);
 
   useEffect(() => {
     if (!slotId) {
@@ -492,10 +480,10 @@ if (nextSignature === lastSavedServicesSignatureRef.current) {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="space-y-1">
+    <div className="rounded-2xl border border-[#DBEAFE] bg-white p-3 shadow-[0_10px_24px_rgba(37,99,235,0.08)] xl:p-4">
+      <div className="mb-3 space-y-1">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#2563EB] xl:text-xs">
             Servicios ofertados
           </p>
 
@@ -507,7 +495,7 @@ if (nextSignature === lastSavedServicesSignatureRef.current) {
           ) : null}
         </div>
 
-        <p className="text-xs text-muted-foreground">
+        <p className="mt-0.5 text-[11px] text-slate-500 xl:text-xs">
           Se muestran los servicios de la ubicación que caben en {slotDurationMin} min.
         </p>
       </div>
@@ -597,12 +585,12 @@ if (nextSignature === lastSavedServicesSignatureRef.current) {
                         {isHovered && !isNew ? (
                           <motion.button
                             type="button"
-                            initial={{ opacity: 0, scale: 0.5 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.5 }}
-                            transition={{ duration: 0.15 }}
+                            initial={{ opacity: 0, y: -2 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -2 }}
+                            transition={{ duration: 0.12, ease: "linear" }}
                             onClick={() => removeService(service.id)}
-                            className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow-sm transition-transform active:scale-90"
+                            className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow-sm transition-colors active:scale-95"
                           >
                             <X className="h-3 w-3" />
                           </motion.button>

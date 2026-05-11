@@ -13,19 +13,23 @@ function getDisplayName(customer: {
   preferred_name: string | null;
   whatsapp_name: string | null;
 }): string {
+  const fullName =
+    `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim();
+
+  if (fullName) {
+    return fullName;
+  }
+
   const preferredName = customer.preferred_name?.trim();
+
   if (preferredName) {
     return preferredName;
   }
 
   const whatsappName = customer.whatsapp_name?.trim();
+
   if (whatsappName) {
     return whatsappName;
-  }
-
-  const fullName = `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim();
-  if (fullName) {
-    return fullName;
   }
 
   return "Sin nombre";
@@ -92,6 +96,7 @@ type CustomerListItem = {
   lastResponseAt: Date | null;
   cooldownUntil: Date | null;
   lastAppointmentAt: Date | null;
+  nextAppointmentAt: Date | null;
   lastAppointmentServiceName: string | null;
   waitlist: WaitlistInfo | null;
   customer: {
@@ -450,38 +455,69 @@ export async function GET(request: NextRequest) {
       contactProfiles.map((profile) => [profile.customer_id, profile])
     );
 
-    let appointments: {
-      customerId: string | null;
-      startAt: Date;
-      serviceName: string | null;
-    }[] = [];
+let appointments: {
+  customerId: string | null;
+  startAt: Date;
+  serviceName: string | null;
+}[] = [];
 
-    if (slotLocationId) {
-      appointments = await prisma.appointment.findMany({
-        where: {
-          customerId: {
-            in: customerIds,
-          },
-          locationId: slotLocationId,
-          startAt: {
-            lt: new Date(),
-          },
-          status: {
-            in: ["COMPLETED", "BOOKED"],
-          },
-        },
-        orderBy: {
-          startAt: "desc",
-        },
-        select: {
-          customerId: true,
-          startAt: true,
-          serviceName: true,
-        },
-      });
-    }
+if (slotLocationId) {
+  appointments = await prisma.appointment.findMany({
+    where: {
+      customerId: {
+        in: customerIds,
+      },
+      locationId: slotLocationId,
+      startAt: {
+        lt: new Date(),
+      },
+      status: {
+        in: ["COMPLETED", "BOOKED"],
+      },
+    },
+    orderBy: {
+      startAt: "desc",
+    },
+    select: {
+      customerId: true,
+      startAt: true,
+      serviceName: true,
+    },
+  });
+}
 
-    const lastAppointmentByCustomerId = new Map<
+let nextAppointments: {
+  customerId: string | null;
+  startAt: Date;
+  serviceName: string | null;
+}[] = [];
+
+if (slotLocationId) {
+  nextAppointments = await prisma.appointment.findMany({
+    where: {
+      customerId: {
+        in: customerIds,
+      },
+      locationId: slotLocationId,
+      startAt: {
+        gte: new Date(),
+      },
+      status: {
+        in: ["PENDING", "BOOKED"],
+      },
+    },
+    orderBy: {
+      startAt: "asc",
+    },
+    select: {
+      customerId: true,
+      startAt: true,
+      serviceName: true,
+    },
+  });
+}
+
+const lastAppointmentByCustomerId = new Map<
       string,
       {
         startAt: Date;
@@ -504,6 +540,29 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const nextAppointmentByCustomerId = new Map<
+  string,
+  {
+    startAt: Date;
+    serviceName: string | null;
+  }
+>();
+
+for (const row of nextAppointments) {
+  if (!row.customerId) {
+    continue;
+  }
+
+  if (nextAppointmentByCustomerId.has(row.customerId)) {
+    continue;
+  }
+
+  nextAppointmentByCustomerId.set(row.customerId, {
+    startAt: row.startAt,
+    serviceName: row.serviceName,
+  });
+}
+
     const items: CustomerListItem[] = customers.map((row) => {
       const customer = row.customer;
       const profile = profileMap.get(row.customerId);
@@ -524,8 +583,9 @@ export async function GET(request: NextRequest) {
         lastResponseAt = profile.last_response_at;
       }
 
-      const hasAppointment = false;
       const lastAppointment = lastAppointmentByCustomerId.get(row.customerId) ?? null;
+      const nextAppointment = nextAppointmentByCustomerId.get(row.customerId) ?? null;
+      const hasAppointment = lastAppointment !== null;
 
       const cluster = getCluster({
         hasAppointment,
@@ -550,6 +610,8 @@ export async function GET(request: NextRequest) {
         lastResponseAt,
         cooldownUntil,
         lastAppointmentAt: lastAppointment?.startAt ?? null,
+        nextAppointmentAt: nextAppointment?.startAt ?? null,
+        nextAppointmentServiceName: nextAppointment?.serviceName ?? null,
         lastAppointmentServiceName: lastAppointment?.serviceName ?? null,
         waitlist: waitlistEntry
           ? {
@@ -596,6 +658,7 @@ export async function GET(request: NextRequest) {
           lastResponseAt: null,
           cooldownUntil: null,
           lastAppointmentAt: null,
+          nextAppointmentAt: null,
           lastAppointmentServiceName: null,
           waitlist: {
             id: entry.id,

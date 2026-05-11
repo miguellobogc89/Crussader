@@ -100,7 +100,7 @@ export function CancelledAppointmentsList({
         const data = await response.json();
 
         if (!response.ok || !data?.ok || !Array.isArray(data.items)) {
-          console.error("[CancelledAppointmentsList] invalid response", data);
+          setItems([]);
           return;
         }
 

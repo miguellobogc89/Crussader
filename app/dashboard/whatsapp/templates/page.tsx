@@ -80,7 +80,7 @@ export default function WhatsAppTemplatesPage() {
       selected={selected}
       selectedId={selectedId}
       onSelect={(id: string) => setSelectedId(id)}
-      onRefresh={refresh}
+      onRefresh={syncFromMeta}
       onSync={syncFromMeta}
       languages={languages}
       onToggleFavorite={toggleFavorite}

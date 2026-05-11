@@ -19,6 +19,8 @@ export type CustomerListItem = {
   lastResponseAt: string | null;
   cooldownUntil: string | null;
   lastAppointmentAt: string | null;
+  nextAppointmentAt: string | null;
+  nextAppointmentServiceName: string | null;
   lastAppointmentServiceName: string | null;
   waitlist: {
     id: string;
@@ -283,6 +285,8 @@ export function buildInlineCreatedRow(
     cooldownUntil: null,
     lastAppointmentAt: null,
     lastAppointmentServiceName: null,
+    nextAppointmentAt: null,
+nextAppointmentServiceName: null,
     waitlist: null,
     customer: {
       id: created.customer.id,
@@ -303,10 +307,6 @@ export function buildInlineCreatedRow(
 }
 
 export function isHardBlocked(cluster: CustomerCluster): boolean {
-  if (cluster === "has_appointment") {
-    return true;
-  }
-
   if (cluster === "do_not_notify") {
     return true;
   }

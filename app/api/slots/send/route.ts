@@ -85,12 +85,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log("[WA][SLOT][SERVICES_RAW]", {
-  requestedSlotId: slotId,
-  loadedSlotId: slot?.id,
-  slotServicesCount: slot?.slot_recovery_slot_service.length,
-  slotServices: slot?.slot_recovery_slot_service,
-});
+
 
     if (!slot) {
       return NextResponse.json(
@@ -178,12 +173,6 @@ export async function POST(request: NextRequest) {
           customer?.firstName ||
           "Cliente";
 
-          console.log("[WA][TEMPLATE][PARAMS]", {
-            templateName: "slot_available_employee ",
-            customerName,
-            businessName,
-            dateText: `${day} a las ${time}`,
-          });
 
         const result = await sendSlotRecoveryTemplate({
           to: record.phone,

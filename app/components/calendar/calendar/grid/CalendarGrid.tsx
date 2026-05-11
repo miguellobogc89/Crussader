@@ -3,7 +3,7 @@
 
 import { useEffect, useRef } from "react";
 
-import CalendarCell from "@/app/components/calendar/calendar/Grid/CalendarCell";
+import CalendarCell from "./CalendarCell";
 import AppointmentBlock from "../../appointments/AppointmentBlock";
 import CurrentTimeLineFullSpan from "../CurrentTimeLineFullSpan";
 import HourGuides from "../HourGuides";
@@ -58,8 +58,8 @@ export default function CalendarGrid({
   }
 
   return (
-    <div ref={scrollerRef} className="min-h-0 flex-1 overflow-auto">
-      <div className="relative min-w-[900px] overflow-hidden">
+    <div ref={scrollerRef} className="h-full min-h-0 flex-1 overflow-auto">
+      <div className="relative min-w-[900px]">
         <CurrentTimeLineFullSpan
           referenceDate={new Date()}
           START_HOUR={START_HOUR}
@@ -85,41 +85,61 @@ export default function CalendarGrid({
             style={{ height: HEADER_HEIGHT_PX }}
           />
 
-          {days.map((day) => {
-            const dayNumber = day.getDate();
+{days.map((day) => {
+  const today = new Date();
 
-            const dayLabel = day
-              .toLocaleDateString("es-ES", {
-                weekday: "short",
-              })
-              .replace(".", "")
-              .slice(0, 3)
-              .toUpperCase();
+  const isToday =
+    day.getFullYear() === today.getFullYear() &&
+    day.getMonth() === today.getMonth() &&
+    day.getDate() === today.getDate();
 
-            return (
-              <div
-                key={localKeyTZ(day)}
-                className="sticky top-0 z-20 flex items-center justify-center border-b border-r border-border bg-slate-50"
-                style={{ height: HEADER_HEIGHT_PX }}
-              >
-                <div className="flex items-start gap-2">
-                  <span
-                    className="leading-none text-[34px] font-bold text-slate-300"
-                    style={{
-                      fontFamily:
-                        '"Comic Sans MS", "Comic Sans", cursive',
-                    }}
-                  >
-                    {dayNumber}
-                  </span>
+  const dayNumber = day.getDate();
 
-                  <span className="pt-1 text-[11px] font-semibold tracking-widest text-slate-500">
-                    {dayLabel}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+  const dayLabel = day
+    .toLocaleDateString("es-ES", {
+      weekday: "short",
+    })
+    .replace(".", "")
+    .slice(0, 3)
+    .toUpperCase();
+
+  return (
+    <div
+      key={localKeyTZ(day)}
+      className={[
+        "sticky top-0 z-20 flex items-center justify-center border-b border-r border-slate-100 bg-white",
+        isToday ? "bg-blue-50/70" : "",
+      ].join(" ")}
+      style={{ height: HEADER_HEIGHT_PX }}
+    >
+      <div className="relative flex h-full w-full items-center justify-center">
+        <div className="flex items-start gap-2">
+          <span
+            className={[
+              "leading-none text-[38px] font-black tracking-tight",
+              isToday ? "text-blue-600" : "text-slate-300",
+            ].join(" ")}
+          >
+            {dayNumber}
+          </span>
+
+          <span
+            className={[
+              "pt-1.5 text-[11px] font-bold tracking-[0.22em]",
+              isToday ? "text-blue-600" : "text-slate-400",
+            ].join(" ")}
+          >
+            {dayLabel}
+          </span>
+        </div>
+
+        {isToday ? (
+          <div className="absolute bottom-0 h-1 w-14 rounded-t-full bg-blue-600" />
+        ) : null}
+      </div>
+    </div>
+  );
+})}
 
           <div className="flex flex-col">
             {hours.map((hour) => (

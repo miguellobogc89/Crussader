@@ -7,7 +7,12 @@ import BankHolidayCell from "@/app/components/calendar/calendar/BankHolidayCell"
 import CalendarHeaderRow from "@/app/components/calendar/calendar/grid/CalendarHeaderRow";
 import { fmtParts, localKeyTZ } from "./tz";
 
-import type { CalendarAppt, HolidayLite } from "./types";
+import type { CalendarAppt } from "./types";
+
+type HolidayLite = {
+  date: string | Date;
+  name: string;
+};
 
 type Props = {
   anchor: Date;

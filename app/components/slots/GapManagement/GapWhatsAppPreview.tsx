@@ -1,5 +1,4 @@
 // app/components/slots/GapManagement/GapWhatsAppPreview.tsx
-
 "use client";
 
 import { MessageSquare } from "lucide-react";
@@ -14,70 +13,79 @@ type GapWhatsAppPreviewProps = {
   timeStart: string;
   templateBody: string;
   companyName: string;
+  specialistName: string;
 };
 
-function getDiscountedPrice(price: number, promo: Promotion): number {
-  if (promo === "10") {
-    return Math.round(price * 0.9);
+function getWhatsAppDayText(value: string): string {
+  const parsed = new Date(`${value}T00:00:00`);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
   }
 
-  if (promo === "25") {
-    return Math.round(price * 0.75);
-  }
+  const today = new Date();
+  const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-  return price;
-}
+  const tomorrowDate = new Date(todayDate);
+  tomorrowDate.setDate(todayDate.getDate() + 1);
 
-function formatReadableDate(day: string, timeStart: string): string {
-  const date = new Date(day);
-
-  if (Number.isNaN(date.getTime())) {
-    return `${day} a las ${timeStart}`;
-  }
-
-  const formattedDay = new Intl.DateTimeFormat("es-ES", {
+  const weekday = new Intl.DateTimeFormat("es-ES", {
     weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(date);
+  }).format(parsed);
 
-  return `${formattedDay} a las ${timeStart}`;
+  const dayNumber = new Intl.DateTimeFormat("es-ES", {
+    day: "2-digit",
+  }).format(parsed);
+
+  const monthNumber = new Intl.DateTimeFormat("es-ES", {
+    month: "2-digit",
+  }).format(parsed);
+
+  const baseText = `${weekday}, ${dayNumber}/${monthNumber}`;
+
+  if (parsed.getTime() === todayDate.getTime()) {
+    return `hoy ${baseText}`;
+  }
+
+  if (parsed.getTime() === tomorrowDate.getTime()) {
+    return `mañana ${baseText}`;
+  }
+
+  const startOfWeek = new Date(todayDate);
+  startOfWeek.setDate(todayDate.getDate() - todayDate.getDay() + 1);
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+  if (parsed >= startOfWeek && parsed <= endOfWeek) {
+    return `este ${baseText}`;
+  }
+
+  return `el ${baseText}`;
 }
 
-function resolveServicesBlock(
-  services: SelectedServiceItem[],
-  promotion: Promotion,
-): { servicesText: string; firstPriceText: string } {
-  if (!Array.isArray(services) || services.length === 0) {
-    return {
-      servicesText: "tu cita",
-      firstPriceText: "",
-    };
-  }
+function renderWhatsAppText(text: string) {
+  const parts = text.split(/(\*[^*]+\*)/g);
 
-  const lines: string[] = [];
+  return parts.map((part, index) => {
+    if (part.startsWith("*") && part.endsWith("*")) {
+      return (
+        <strong key={index} className="font-semibold">
+          {part.slice(1, -1)}
+        </strong>
+      );
+    }
 
-  for (const service of services) {
-    const finalPrice = getDiscountedPrice(service.price, promotion);
-    lines.push(`- ${service.serviceName} ${finalPrice}€`);
-  }
-
-  const firstService = services[0];
-  const firstPrice = getDiscountedPrice(firstService.price, promotion);
-
-  return {
-    servicesText: `uno de estos servicios a elegir:\n${lines.join("\n")}`,
-    firstPriceText: `${firstPrice}€`,
-  };
+    return <span key={index}>{part}</span>;
+  });
 }
 
 function renderTemplate(
   templateBody: string,
-  services: SelectedServiceItem[],
-  promotion: Promotion,
   day: string,
   timeStart: string,
   companyName: string,
+  specialistName: string
 ): string {
   const template = templateBody.trim();
 
@@ -85,37 +93,31 @@ function renderTemplate(
     return "No hay plantilla disponible para este hueco.";
   }
 
-  const servicesBlock = resolveServicesBlock(services, promotion);
-
-  const readableDate = formatReadableDate(day, timeStart);
-
   let message = template;
 
-  message = message.replace(/\{\{1\}\}/g, "Cliente");
+  message = message.replace(/\{\{1\}\}/g, "Carlos");
   message = message.replace(/\{\{2\}\}/g, companyName);
-  message = message.replace(/\{\{3\}\}/g, servicesBlock.servicesText);
-  message = message.replace(/\{\{4\}\}/g, `\nel ${readableDate}\n`);
-  message = message.replace(/\{\{5\}\}/g, servicesBlock.firstPriceText);
+  message = message.replace(/\{\{3\}\}/g, getWhatsAppDayText(day));
+  message = message.replace(/\{\{4\}\}/g, timeStart);
+  message = message.replace(/\{\{5\}\}/g, specialistName);
 
   return message;
 }
 
 export function GapWhatsAppPreview({
-  services,
-  promotion,
   day,
   timeStart,
   templateBody,
   companyName,
+  specialistName,
 }: GapWhatsAppPreviewProps) {
-const message = renderTemplate(
-  templateBody,
-  services,
-  promotion,
-  day,
-  timeStart,
-  companyName,
-);
+  const message = renderTemplate(
+    templateBody,
+    day,
+    timeStart,
+    companyName,
+    specialistName
+  );
 
   return (
     <div className="space-y-2.5">
@@ -126,7 +128,7 @@ const message = renderTemplate(
 
       <div className="rounded-2xl border border-[#c6e6be] bg-[#e7f8e2] p-4 shadow-sm">
         <div className="whitespace-pre-line text-[13px] leading-relaxed text-gray-800">
-          {message}
+          {renderWhatsAppText(message)}
         </div>
 
         <div className="mt-3 border-t border-[#c6e6be] pt-2.5">
@@ -137,8 +139,6 @@ const message = renderTemplate(
             Reservar ahora
           </button>
         </div>
-
-  
       </div>
     </div>
   );

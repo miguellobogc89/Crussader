@@ -5,7 +5,7 @@ import CalendarRangeSelector from "./CalendarRangeSelector";
 import CalendarViewSelector, {
   CalendarToolbarView,
 } from "./CalendarViewSelector";
-import { Plus, Clock3 } from "lucide-react";
+import { Plus, Clock3, Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 
 type Props = {
@@ -29,12 +29,12 @@ export default function CalendarToolbar({
   onToday,
   onChangeView,
   onCreateAppointment,
-    visibleStartHour,
+  visibleStartHour,
   visibleEndHour,
   onChangeVisibleHours,
 }: Props) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex min-h-[72px] flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-white px-4 py-3">
       <CalendarRangeSelector
         rangeTitle={rangeTitle}
         onPrev={onPrev}
@@ -43,51 +43,60 @@ export default function CalendarToolbar({
       />
 
       <div className="flex items-center gap-3">
-<div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-  <Clock3 className="h-4 w-4 text-slate-500" />
+        <div className="flex h-9 items-center gap-2 rounded-2xl bg-slate-100 px-3">
+          <Clock3 className="h-4 w-4 text-slate-500" />
 
-  <select
-    value={visibleStartHour}
-    onChange={(e) =>
-      onChangeVisibleHours(
-        Number(e.target.value),
-        visibleEndHour
-      )
-    }
-    className="bg-transparent text-sm font-medium text-slate-700 outline-none"
-  >
-    {Array.from({ length: 24 }, (_, h) => (
-      <option key={h} value={h}>
-        {String(h).padStart(2, "0")}:00
-      </option>
-    ))}
-  </select>
+          <select
+            value={visibleStartHour}
+            onChange={(e) =>
+              onChangeVisibleHours(Number(e.target.value), visibleEndHour)
+            }
+            className="bg-transparent text-sm font-semibold text-slate-600 outline-none"
+          >
+            {Array.from({ length: 24 }, (_, h) => (
+              <option key={h} value={h}>
+                {String(h).padStart(2, "0")}:00
+              </option>
+            ))}
+          </select>
 
-  <span className="text-slate-400">-</span>
+          <span className="text-slate-400">-</span>
 
-  <select
-    value={visibleEndHour}
-    onChange={(e) =>
-      onChangeVisibleHours(
-        visibleStartHour,
-        Number(e.target.value)
-      )
-    }
-    className="bg-transparent text-sm font-medium text-slate-700 outline-none"
-  >
-    {Array.from({ length: 24 }, (_, h) => (
-      <option key={h} value={h}>
-        {String(h).padStart(2, "0")}:00
-      </option>
-    ))}
-  </select>
-</div>
+          <select
+            value={visibleEndHour}
+            onChange={(e) =>
+              onChangeVisibleHours(visibleStartHour, Number(e.target.value))
+            }
+            className="bg-transparent text-sm font-semibold text-slate-600 outline-none"
+          >
+            {Array.from({ length: 24 }, (_, h) => (
+              <option key={h} value={h}>
+                {String(h).padStart(2, "0")}:00
+              </option>
+            ))}
+          </select>
+        </div>
+
         <CalendarViewSelector view={view} onChangeView={onChangeView} />
+
+        <button
+          type="button"
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+
+        <button
+          type="button"
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+        </button>
 
         <Button
           type="button"
           onClick={onCreateAppointment}
-          className="rounded-xl bg-gradient-to-r from-[#1D4ED8] to-[#2563EB] px-4 text-sm font-medium text-white shadow-[0_8px_20px_rgba(37,99,235,0.35)] transition-all hover:shadow-[0_10px_24px_rgba(37,99,235,0.45)]"
+          className="h-10 rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(37,99,235,0.28)] transition-all hover:shadow-[0_12px_28px_rgba(37,99,235,0.38)]"
         >
           <Plus className="mr-2 h-4 w-4" />
           Nueva cita

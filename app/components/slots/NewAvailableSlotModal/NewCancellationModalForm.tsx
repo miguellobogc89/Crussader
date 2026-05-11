@@ -21,15 +21,15 @@ type NewCancellationModalFormProps = {
   dateValue: string;
   startTimeValue: string;
   endTimeValue: string;
-  notes: string;
   onDateChange: (value: string) => void;
   onStartTimeChange: (value: string) => void;
   onEndTimeChange: (value: string) => void;
-  onNotesChange: (value: string) => void;
   errorText: string;
   created: boolean;
   employees: EmployeeLite[];
   servicesByEmployee: Record<string, EmployeeServiceItem[]>;
+  slotDurationMin: number;
+  invalidServices: EmployeeServiceItem[];
   selectedEmployeeId: string;
   onEmployeeSelect: (employee: EmployeeLite) => void;
   selectedServiceIds: string[];
@@ -40,19 +40,18 @@ type NewCancellationModalFormProps = {
 };
 
 export function NewCancellationModalForm({
-  selectedEmployee,
   dateValue,
   startTimeValue,
   endTimeValue,
-  notes,
   onDateChange,
   onStartTimeChange,
   onEndTimeChange,
-  onNotesChange,
   errorText,
   created,
   employees,
   servicesByEmployee,
+  slotDurationMin,
+  invalidServices,
   selectedEmployeeId,
   onEmployeeSelect,
   selectedServiceIds,
@@ -60,23 +59,6 @@ export function NewCancellationModalForm({
 }: NewCancellationModalFormProps) {
   return (
     <div className="space-y-4 px-4 pb-4 pt-0">
-      <div className="space-y-2">
-        <Label className="text-sm text-muted-foreground">Empleado</Label>
-
-        <EmployeeSelector
-          employees={employees}
-          selectedEmployeeId={selectedEmployeeId}
-          onSelect={onEmployeeSelect}
-        />
-
-        <NewCancellationEmployeeServices
-          employeeId={selectedEmployeeId}
-          services={servicesByEmployee[selectedEmployeeId] ?? []}
-          selectedServiceIds={selectedServiceIds}
-          onChange={onServicesChange}
-        />
-      </div>
-
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="space-y-2">
           <Label className="text-sm text-muted-foreground">Fecha</Label>
@@ -109,8 +91,33 @@ export function NewCancellationModalForm({
             className="h-10 rounded-xl border-0 bg-muted/50 tabular-nums focus-visible:ring-primary"
           />
         </div>
-
       </div>
+
+      <div className="space-y-2">
+        <Label className="text-sm text-muted-foreground">Empleado</Label>
+
+        <EmployeeSelector
+          employees={employees}
+          selectedEmployeeId={selectedEmployeeId}
+          onSelect={onEmployeeSelect}
+        />
+
+        <NewCancellationEmployeeServices
+          employeeId={selectedEmployeeId}
+          services={servicesByEmployee[selectedEmployeeId] ?? []}
+          selectedServiceIds={selectedServiceIds}
+          invalidServiceIds={invalidServices.map((service) => {
+            return service.id;
+          })}
+          onChange={onServicesChange}
+        />
+      </div>
+
+      {invalidServices.length > 0 ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+          El hueco dura {slotDurationMin} min. Hay servicios seleccionados que no caben en esa duración.
+        </div>
+      ) : null}
 
       {errorText ? (
         <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">

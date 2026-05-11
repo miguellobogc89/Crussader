@@ -82,13 +82,14 @@ export default function WeekView({
                 const cellId = makeCellId(dayKey, hourIndex);
 
                 return (
-                  <CalendarCell
-                    key={cellId}
-                    cellId={cellId}
-                    isSelected={selectedCellId === cellId}
-                    onClick={onCellClick}
-                    onDoubleClick={onCellDoubleClick}
-                  />
+<CalendarCell
+  key={cellId}
+  cellId={cellId}
+  rowPx={ROW_PX}
+  isSelected={selectedCellId === cellId}
+  onClick={onCellClick}
+  onDoubleClick={onCellDoubleClick}
+/>
                 );
               })}
 

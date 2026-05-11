@@ -50,7 +50,6 @@ export function NewCancellationModal({
   const [dateValue, setDateValue] = useState("");
   const [startTimeValue, setStartTimeValue] = useState("");
   const [endTimeValue, setEndTimeValue] = useState("");
-  const [notes, setNotes] = useState("");
   const [selectedServices, setSelectedServices] = useState<SelectedServiceItem[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
 
@@ -61,30 +60,27 @@ export function NewCancellationModal({
   const [servicesByEmployee, setServicesByEmployee] = useState<
     Record<string, EmployeeServiceItem[]>
   >({});
-  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-if (prefillAppointment) {
-  setDateValue(getDateValueFromISO(prefillAppointment.startAt));
-  setStartTimeValue(getTimeValueFromISO(prefillAppointment.startAt));
-  setEndTimeValue(getTimeValueFromISO(prefillAppointment.endAt));
-  setNotes("");
-  setSelectedEmployeeId(prefillAppointment.employeeId ?? "");
-} else {
+    if (prefillAppointment) {
+      setDateValue(getDateValueFromISO(prefillAppointment.startAt));
+      setStartTimeValue(getTimeValueFromISO(prefillAppointment.startAt));
+      setEndTimeValue(getTimeValueFromISO(prefillAppointment.endAt));
+      setSelectedEmployeeId(prefillAppointment.employeeId ?? "");
+    } else {
       setDateValue(getTodayDateValue());
       setStartTimeValue("17:00");
       setEndTimeValue("17:30");
-      setNotes("");
+      setSelectedEmployeeId("");
     }
 
+    setSelectedEmployee(null);
     setSelectedServices([]);
     setSelectedServiceIds([]);
-    setSelectedEmployeeId("");
-    setSelectedEmployee(null);
     setIsSubmitting(false);
     setCreated(false);
     setErrorText("");
@@ -105,8 +101,6 @@ if (prefillAppointment) {
     let cancelled = false;
 
     async function loadEmployees() {
-      setIsLoadingEmployees(true);
-
       try {
         const response = await fetch(
           `/api/slots/employees/list?locationId=${encodeURIComponent(locationId)}`,
@@ -122,46 +116,35 @@ if (prefillAppointment) {
           return;
         }
 
-const nextEmployees: EmployeeLite[] = Array.isArray(data?.employees)
-  ? data.employees.map((item: any) => {
-      const name =
-        item.name ??
-        item.fullName ??
-        item.displayName ??
-        item.firstName ??
-        "Empleado";
+        const nextEmployees: EmployeeLite[] = Array.isArray(data?.employees)
+          ? data.employees.map((item: any) => {
+              const name =
+                item.name ??
+                item.fullName ??
+                item.displayName ??
+                item.firstName ??
+                "Empleado";
 
-      return {
-        id: String(item.id),
-        name: String(name),
-        color: item.color ?? "#94A3B8",
-        active: true,
-      };
-    })
-  : [];
+              return {
+                id: String(item.id),
+                name: String(name),
+                color: item.color ?? "#94A3B8",
+                active: true,
+              };
+            })
+          : [];
 
         setEmployees(nextEmployees);
 
         if (prefillAppointment?.employeeId) {
-  const foundEmployee = nextEmployees.find((employee) => {
-    return employee.id === prefillAppointment.employeeId;
-  });
+          const foundEmployee = nextEmployees.find((employee) => {
+            return employee.id === prefillAppointment.employeeId;
+          });
 
-  if (foundEmployee) {
-    setSelectedEmployeeId(foundEmployee.id);
-    setSelectedEmployee(foundEmployee);
-  }
-}
-
-        const stillExists = nextEmployees.some((employee) => {
-          return employee.id === selectedEmployeeId;
-        });
-
-        if (!stillExists) {
-          setSelectedEmployeeId("");
-          setSelectedEmployee(null);
-          setSelectedServices([]);
-          setSelectedServiceIds([]);
+          if (foundEmployee) {
+            setSelectedEmployeeId(foundEmployee.id);
+            setSelectedEmployee(foundEmployee);
+          }
         }
       } catch (error) {
         console.error("[NewCancellationModal] loadEmployees", error);
@@ -172,10 +155,6 @@ const nextEmployees: EmployeeLite[] = Array.isArray(data?.employees)
           setSelectedEmployee(null);
           setSelectedServices([]);
           setSelectedServiceIds([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingEmployees(false);
         }
       }
     }
@@ -252,6 +231,20 @@ const nextEmployees: EmployeeLite[] = Array.isArray(data?.employees)
     return getSlotDurationMinutes(dateValue, startTimeValue, endTimeValue);
   }, [dateValue, startTimeValue, endTimeValue]);
 
+  const selectedAvailableServices = useMemo(() => {
+    const employeeServices = servicesByEmployee[selectedEmployeeId] ?? [];
+
+    return employeeServices.filter((service) => {
+      return selectedServiceIds.includes(service.id);
+    });
+  }, [servicesByEmployee, selectedEmployeeId, selectedServiceIds]);
+
+  const invalidServices = useMemo(() => {
+    return selectedAvailableServices.filter((service) => {
+      return service.durationMin > slotDurationMin;
+    });
+  }, [selectedAvailableServices, slotDurationMin]);
+
   const canSubmit = useMemo(() => {
     return canSubmitSlotCreation({
       locationId,
@@ -275,13 +268,17 @@ const nextEmployees: EmployeeLite[] = Array.isArray(data?.employees)
   const handleServicesChange = useCallback(
     (services: EmployeeServiceItem[], selectedIds: string[]) => {
       const nextSelectedServices: SelectedServiceItem[] = services
-        .filter((service) => selectedIds.includes(service.id))
-        .map((service) => ({
-          serviceId: service.id,
-          serviceName: service.name,
-          durationMin: service.durationMin,
-          price: service.price,
-        }));
+        .filter((service) => {
+          return selectedIds.includes(service.id);
+        })
+        .map((service) => {
+          return {
+            serviceId: service.id,
+            serviceName: service.name,
+            durationMin: service.durationMin,
+            price: service.price,
+          };
+        });
 
       setSelectedServices(nextSelectedServices);
       setSelectedServiceIds(selectedIds);
@@ -291,6 +288,11 @@ const nextEmployees: EmployeeLite[] = Array.isArray(data?.employees)
 
   async function handleCreate() {
     setErrorText("");
+
+    if (invalidServices.length > 0) {
+      setErrorText("Hay servicios seleccionados que no caben en la duración del hueco.");
+      return;
+    }
 
     const validationError = validateSlotCreation({
       locationId,
@@ -327,7 +329,7 @@ const nextEmployees: EmployeeLite[] = Array.isArray(data?.employees)
           startsAt,
           endsAt,
           serviceName: null,
-          notes: notes.trim() || undefined,
+          notes: undefined,
           selectedServiceIds,
           sourceAppointmentId: prefillAppointment?.id ?? null,
         }),
@@ -355,30 +357,29 @@ const nextEmployees: EmployeeLite[] = Array.isArray(data?.employees)
     }
   }
 
-return (
-  <StandardModal
-    open={open}
-    title="Crear hueco disponible"
-    onClose={onClose}
-    footer={
-      <div className="flex w-full items-center justify-between gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onClose}
-          disabled={isSubmitting}
-          className="h-10 rounded-xl"
-        >
-          Cancelar
-        </Button>
+  return (
+    <StandardModal
+      open={open}
+      title="Crear hueco disponible"
+      onClose={onClose}
+      footer={
+        <div className="flex w-full items-center justify-between gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="h-10 rounded-xl"
+          >
+            Cancelar
+          </Button>
 
-        <Button
-          type="button"
-          onClick={handleCreate}
-          disabled={!canSubmit || created}
-          className="h-10 gap-2 rounded-xl bg-crussader px-5 font-semibold text-white hover:bg-crussader/90"
-        >
-          <>
+          <Button
+            type="button"
+            onClick={handleCreate}
+            disabled={!canSubmit || created || invalidServices.length > 0}
+            className="h-10 gap-2 rounded-xl bg-crussader px-5 font-semibold text-white hover:bg-crussader/90"
+          >
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -389,37 +390,36 @@ return (
             ) : (
               "Crear hueco"
             )}
-          </>
-        </Button>
+          </Button>
+        </div>
+      }
+    >
+      <div className="max-h-[72dvh] overflow-y-auto pr-1">
+        <NewCancellationModalForm
+          employees={employees}
+          servicesByEmployee={servicesByEmployee}
+          slotDurationMin={slotDurationMin}
+          invalidServices={invalidServices}
+          selectedEmployeeId={selectedEmployeeId}
+          onEmployeeSelect={(employee) => {
+            setSelectedEmployeeId(employee.id);
+            setSelectedEmployee(employee);
+          }}
+          selectedEmployee={selectedEmployee}
+          dateValue={dateValue}
+          startTimeValue={startTimeValue}
+          endTimeValue={endTimeValue}
+          onDateChange={setDateValue}
+          onStartTimeChange={setStartTimeValue}
+          onEndTimeChange={setEndTimeValue}
+          errorText={errorText}
+          created={created}
+          selectedServiceIds={selectedServiceIds}
+          onServicesChange={handleServicesChange}
+        />
       </div>
-    }
-  >
-    <div className="max-h-[72dvh] overflow-y-auto pr-1">
-      <NewCancellationModalForm
-        employees={employees}
-        servicesByEmployee={servicesByEmployee}
-        selectedEmployeeId={selectedEmployeeId}
-        onEmployeeSelect={(employee) => {
-          setSelectedEmployeeId(employee.id);
-          setSelectedEmployee(employee);
-        }}
-        selectedEmployee={selectedEmployee}
-        dateValue={dateValue}
-        startTimeValue={startTimeValue}
-        endTimeValue={endTimeValue}
-        notes={notes}
-        onDateChange={setDateValue}
-        onStartTimeChange={setStartTimeValue}
-        onEndTimeChange={setEndTimeValue}
-        onNotesChange={setNotes}
-        errorText={errorText}
-        created={created}
-        selectedServiceIds={selectedServiceIds}
-        onServicesChange={handleServicesChange}
-      />
-    </div>
-  </StandardModal>
-);
+    </StandardModal>
+  );
 }
 
 function getDateValueFromISO(value: string): string {

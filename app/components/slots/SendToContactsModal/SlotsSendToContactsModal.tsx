@@ -7,7 +7,7 @@ import { Button } from "@/app/components/ui/button";
 import { useToast } from "@/app/components/ui/use-toast";
 import StandardModal from "@/app/components/crussader/StandardModal";
 import { SlotsCreateContactForm } from "./SlotsCreateContactForm";
-import { SlotsCustomerCluster } from "./SlotsCustomerCluster";
+import { SlotsCustomerListItem } from "./SlotsCustomerListItem";
 import { SlotsCustomerPickerHeader } from "./SlotsCustomerPickerHeader";
 import {
   MAX_SELECTED_CONTACTS,
@@ -41,7 +41,15 @@ type CustomersCacheEntry = {
   cachedAt: number;
 };
 
-const CACHE_TTL_MS = 60_000;
+type CustomerTabId =
+  | "all"
+  | "available"
+  | "unavailable"
+  | "upcoming"
+  | "recent"
+  | "waitlist";
+
+const CACHE_TTL_MS = 0;
 const customersCache = new Map<string, CustomersCacheEntry>();
 
 function getCacheKey(companyId: string, slotId: string, query: string): string {
@@ -70,6 +78,18 @@ function setCachedCustomers(cacheKey: string, items: CustomerListItem[]): void {
   });
 }
 
+const customerTabs: Array<{
+  id: CustomerTabId;
+  label: string;
+}> = [
+  { id: "all", label: "Todos" },
+  { id: "available", label: "Disponibles" },
+  { id: "unavailable", label: "No disponibles" },
+  { id: "upcoming", label: "Cita próxima" },
+  { id: "recent", label: "Cita reciente" },
+  { id: "waitlist", label: "Lista espera" },
+];
+
 export function SlotsCustomersPickerModal({
   open,
   onClose,
@@ -84,6 +104,7 @@ export function SlotsCustomersPickerModal({
   const [items, setItems] = useState<CustomerListItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
+  const [activeTab, setActiveTab] = useState<CustomerTabId>("all");
   const [expandedClusters, setExpandedClusters] = useState(
     DEFAULT_EXPANDED_CLUSTERS
   );
@@ -147,14 +168,10 @@ export function SlotsCustomersPickerModal({
     setNewFirstName("");
     setNewLastName("");
     setNewPhone("+34 ");
+    setSelectedIds([]);
+    setActiveTab("all");
     setExpandedClusters(DEFAULT_EXPANDED_CLUSTERS);
   }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    setSelectedIds(buildSmartSelectionIds(items));
-  }, [open, items]);
 
   useEffect(() => {
     if (!open) return;
@@ -196,8 +213,67 @@ export function SlotsCustomersPickerModal({
     };
   }, [open, query, companyId, slotId, fetchCustomers]);
 
-  const filtered = useMemo(() => filterCustomerItems(items, query), [items, query]);
+  const filtered = useMemo(() => {
+    const base = filterCustomerItems(items, query);
+
+    if (activeTab === "all") {
+      return base;
+    }
+
+    if (activeTab === "available") {
+      return base.filter((item) => item.cluster === "available");
+    }
+
+    if (activeTab === "unavailable") {
+      return base.filter((item) => {
+        return (
+          item.cluster === "cooldown" ||
+          item.cluster === "has_appointment" ||
+          item.cluster === "do_not_notify"
+        );
+      });
+    }
+
+    if (activeTab === "upcoming") {
+      return base.filter((item) => Boolean(item.nextAppointmentAt));
+    }
+
+    if (activeTab === "recent") {
+      return base.filter((item) => item.cluster === "has_appointment");
+    }
+
+    if (activeTab === "waitlist") {
+      return base.filter((item) => Boolean(item.waitlist));
+    }
+
+    return base;
+  }, [items, query, activeTab]);
+
   const groupedItems = useMemo(() => getGroupedItems(filtered), [filtered]);
+
+  const tabCounts = useMemo(() => {
+    return {
+      all: items.length,
+      available: items.filter((item) => item.cluster === "available").length,
+      unavailable: items.filter((item) => {
+        return (
+          item.cluster === "cooldown" ||
+          item.cluster === "has_appointment" ||
+          item.cluster === "do_not_notify"
+        );
+      }).length,
+      upcoming: items.filter((item) => Boolean(item.nextAppointmentAt)).length,
+      recent: items.filter((item) => item.cluster === "has_appointment").length,
+      waitlist: items.filter((item) => Boolean(item.waitlist)).length,
+    };
+  }, [items]);
+
+  const tabsWithCounts = useMemo(() => {
+    return customerTabs.map((tab) => ({
+      ...tab,
+      count: tabCounts[tab.id],
+    }));
+  }, [tabCounts]);
 
   const selectedCustomers = useMemo(() => {
     const selectedSet = new Set(selectedIds);
@@ -393,6 +469,7 @@ export function SlotsCustomersPickerModal({
     <StandardModal
       open={open}
       title="Seleccionar contactos"
+      contentClassName="sm:max-w-[860px]"
       onClose={resetAndClose}
       footer={
         <Button
@@ -408,8 +485,10 @@ export function SlotsCustomersPickerModal({
       <div className="flex h-[calc(100dvh-11rem)] min-h-0 flex-col sm:h-[68vh]">
         <SlotsCustomerPickerHeader
           query={query}
-          selectedSummary={selectedSummary}
           selectedCount={selectedCount}
+          tabs={tabsWithCounts}
+          activeTab={activeTab}
+          onTabChange={(value) => setActiveTab(value as CustomerTabId)}
           onQueryChange={setQuery}
           onToggleAdd={() => {
             setShowAdd(!showAdd);
@@ -420,7 +499,7 @@ export function SlotsCustomersPickerModal({
           onClose={resetAndClose}
         />
 
-        <div className="px-1 pb-3">
+        <div className="px-1 pb-3 pt-3">
           <SlotsCreateContactForm
             open={showAdd}
             firstName={newFirstName}
@@ -450,18 +529,26 @@ export function SlotsCustomersPickerModal({
               </p>
             )}
 
-            {filtered.length > 0 &&
-              CLUSTER_ORDER.map((clusterKey) => (
-                <SlotsCustomerCluster
-                  key={clusterKey}
-                  clusterKey={clusterKey}
-                  items={groupedItems[clusterKey]}
-                  isExpanded={expandedClusters[clusterKey]}
-                  selectedIds={selectedIds}
-                  onToggleCluster={toggleCluster}
-                  onToggleItem={handleToggleSelect}
-                />
-              ))}
+{filtered.length > 0 && (
+  <div className="space-y-1">
+    {filtered.map((item) => {
+      let isSelected = false;
+
+      if (item.customerId) {
+        isSelected = selectedIds.includes(item.customerId);
+      }
+
+      return (
+        <SlotsCustomerListItem
+          key={item.id}
+          item={item}
+          isSelected={isSelected}
+          onToggle={handleToggleSelect}
+        />
+      );
+    })}
+  </div>
+)}
           </div>
         </div>
       </div>
