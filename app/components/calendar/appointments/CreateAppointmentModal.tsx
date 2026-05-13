@@ -1,30 +1,45 @@
 // app/components/calendar/appointments/CreateAppointmentModal.tsx
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  Loader2,
+  Search,
+  X,
+} from "lucide-react";
 import StandardModal from "@/app/components/crussader/StandardModal";
+import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
+import { Label } from "@/app/components/ui/label";
 import { useActiveCompanyResolved } from "@/app/providers/bootstrap-store";
+import { toast } from "@/app/components/ui/use-toast";
+import { cn } from "@/lib/utils";
+import CustomerPicker, {
+  type CustomerLite,
+} from "@/app/components/calendar/appointments/CustomerPicker";
 
 type ServiceLite = {
   id: string;
   name: string;
   durationMin?: number;
+  price?: number;
   priceCents?: number;
+  active?: boolean;
 };
 
 type EmployeeLite = {
   id: string;
   name: string;
-  role: string;
-  color: string;
-  isPrimary: boolean;
+  role?: string;
+  color?: string;
+  isPrimary?: boolean;
 };
 
-type CustomerLite = {
-  id: string;
-  displayName: string;
-  phone: string | null;
-  email: string | null;
+type EmployeeServiceItem = ServiceLite & {
+  employeeId: string;
 };
 
 type Props = {
@@ -35,6 +50,18 @@ type Props = {
   onClose: () => void;
   onCreated: () => void;
 };
+
+const FIELD_LABEL_CLASS =
+  "text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500";
+
+const INPUT_CLASS =
+  "h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100";
+
+const TEXTAREA_CLASS =
+  "min-h-[92px] w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100";
+
+const PICKER_BUTTON_CLASS =
+  "flex h-12 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-left text-sm shadow-sm transition hover:bg-slate-50";
 
 export default function CreateAppointmentModal({
   open,
@@ -49,6 +76,7 @@ export default function CreateAppointmentModal({
 
   const [services, setServices] = useState<ServiceLite[]>([]);
   const [employees, setEmployees] = useState<EmployeeLite[]>([]);
+  const [employeeServices, setEmployeeServices] = useState<EmployeeServiceItem[]>([]);
 
   const [serviceId, setServiceId] = useState("");
   const [customer, setCustomer] = useState<CustomerLite | null>(null);
@@ -56,9 +84,56 @@ export default function CreateAppointmentModal({
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
+  const [isUrgent, setIsUrgent] = useState(false);
+
+  const [serviceSearch, setServiceSearch] = useState("");
+  const [serviceDropdownOpen, setServiceDropdownOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  const [optionsLoaded, setOptionsLoaded] = useState(false);
   const [error, setError] = useState("");
+
+  const serviceDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  const selectedService = useMemo(() => {
+    return services.find((service) => service.id === serviceId) ?? null;
+  }, [services, serviceId]);
+
+  const compatibleEmployees = useMemo(() => {
+    if (!serviceId) {
+      return employees;
+    }
+
+    const compatibleEmployeeIds = new Set(
+      employeeServices
+        .filter((item) => item.id === serviceId)
+        .map((item) => item.employeeId)
+    );
+
+    return employees.filter((employee) => {
+      return compatibleEmployeeIds.has(employee.id);
+    });
+  }, [employees, employeeServices, serviceId]);
+
+  const filteredServices = useMemo(() => {
+    const query = serviceSearch.trim().toLowerCase();
+
+    if (!query) {
+      return services;
+    }
+
+    return services.filter((service) => {
+      return service.name.toLowerCase().includes(query);
+    });
+  }, [services, serviceSearch]);
+
+  const advisoryText = useMemo(() => {
+    if (isUrgent && !employeeId) {
+      return "Para una urgencia es recomendable asignar al menos un profesional.";
+    }
+
+    return "";
+  }, [isUrgent, employeeId]);
 
   useEffect(() => {
     if (!open) {
@@ -66,63 +141,166 @@ export default function CreateAppointmentModal({
     }
 
     setError("");
+    setLoading(false);
+    setOptionsLoaded(false);
+    setServiceDropdownOpen(false);
+    setServiceSearch("");
+    setIsUrgent(false);
 
-    if (initialDate) {
-      setDate(initialDate);
-    }
-
-    if (initialTime) {
-      setTime(initialTime);
-    }
+    setDate(initialDate ?? "");
+    setTime(initialTime ?? "");
+    setServiceId("");
+    setEmployeeId("");
+    setCustomer(null);
+    setNotes("");
   }, [open, initialDate, initialTime]);
-
-  const selectedService = useMemo(() => {
-    return services.find((service) => service.id === serviceId) ?? null;
-  }, [services, serviceId]);
-
-  const selectedEmployee = useMemo(() => {
-    return employees.find((employee) => employee.id === employeeId) ?? null;
-  }, [employees, employeeId]);
 
   useEffect(() => {
     if (!open || !locationId || !companyId) {
+      setServices([]);
+      setEmployees([]);
+      setEmployeeServices([]);
+      setOptionsLoaded(true);
       return;
     }
 
+    let cancelled = false;
+
     async function loadOptions() {
       try {
-        const paramsServices = new URLSearchParams();
-        paramsServices.set("companyId", companyId);
+        const servicesParams = new URLSearchParams();
+        servicesParams.set("companyId", companyId);
 
-        if (employeeId) {
-          paramsServices.set("employeeId", employeeId);
-        }
+        const employeesParams = new URLSearchParams();
+        employeesParams.set("locationId", locationId);
 
-        const paramsEmployees = new URLSearchParams();
-        paramsEmployees.set("locationId", locationId);
+        const employeeServicesParams = new URLSearchParams();
+        employeeServicesParams.set("locationId", locationId);
 
-        if (serviceId) {
-          paramsEmployees.set("serviceId", serviceId);
-        }
-
-        const [servicesRes, employeesRes] = await Promise.all([
-          fetch(`/api/service?${paramsServices.toString()}`),
-          fetch(`/api/employee?${paramsEmployees.toString()}`),
+        const [servicesRes, employeesRes, employeeServicesRes] = await Promise.all([
+          fetch(`/api/service?${servicesParams.toString()}`, {
+            method: "GET",
+            cache: "no-store",
+          }),
+          fetch(`/api/employee?${employeesParams.toString()}`, {
+            method: "GET",
+            cache: "no-store",
+          }),
+          fetch(
+            `/api/slots/employees/services/list?${employeeServicesParams.toString()}`,
+            {
+              method: "GET",
+              cache: "no-store",
+            }
+          ),
         ]);
 
         const servicesJson = await servicesRes.json().catch(() => null);
         const employeesJson = await employeesRes.json().catch(() => null);
+        const employeeServicesJson = await employeeServicesRes
+          .json()
+          .catch(() => null);
 
-        setServices(Array.isArray(servicesJson?.items) ? servicesJson.items : []);
-        setEmployees(Array.isArray(employeesJson?.items) ? employeesJson.items : []);
-      } catch {
-        setServices([]);
-        setEmployees([]);
+        if (cancelled) {
+          return;
+        }
+
+        const nextServices: ServiceLite[] = Array.isArray(servicesJson?.items)
+          ? servicesJson.items.map((item: any) => {
+              return {
+                id: String(item.id),
+                name: String(item.name ?? "Servicio"),
+                durationMin: Number(item.durationMin ?? item.duration_min ?? 0),
+                price: Number(item.price ?? item.price_cents ?? 0),
+                priceCents: Number(item.priceCents ?? item.price_cents ?? 0),
+                active: item.active ?? true,
+              };
+            })
+          : [];
+
+        const nextEmployees: EmployeeLite[] = Array.isArray(employeesJson?.items)
+          ? employeesJson.items.map((item: any) => {
+              return {
+                id: String(item.id),
+                name: String(item.name ?? item.fullName ?? "Empleado"),
+                role: item.role ?? "",
+                color: item.color ?? "#94A3B8",
+                isPrimary: Boolean(item.isPrimary),
+              };
+            })
+          : [];
+
+        const nextEmployeeServices: EmployeeServiceItem[] = Array.isArray(
+          employeeServicesJson?.services
+        )
+          ? employeeServicesJson.services.map((item: any) => {
+              return {
+                id: String(item.id),
+                name: String(item.name ?? "Servicio"),
+                employeeId: String(item.employeeId),
+                durationMin: Number(item.durationMin ?? 0),
+                price: Number(item.price ?? 0),
+                active: item.active ?? true,
+              };
+            })
+          : [];
+
+        setServices(nextServices);
+        setEmployees(nextEmployees);
+        setEmployeeServices(nextEmployeeServices);
+        setOptionsLoaded(true);
+      } catch (error) {
+        console.error("[CreateAppointmentModal] loadOptions", error);
+
+        if (!cancelled) {
+          setServices([]);
+          setEmployees([]);
+          setEmployeeServices([]);
+          setOptionsLoaded(true);
+        }
       }
     }
 
     void loadOptions();
-  }, [open, locationId, companyId, serviceId, employeeId]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, locationId, companyId]);
+
+  useEffect(() => {
+    if (!optionsLoaded || !serviceId || !employeeId) {
+      return;
+    }
+
+    const isStillCompatible = compatibleEmployees.some((employee) => {
+      return employee.id === employeeId;
+    });
+
+    if (!isStillCompatible) {
+      setEmployeeId("");
+    }
+  }, [optionsLoaded, serviceId, employeeId, compatibleEmployees]);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (!serviceDropdownRef.current) {
+        return;
+      }
+
+      if (serviceDropdownRef.current.contains(event.target as Node)) {
+        return;
+      }
+
+      setServiceDropdownOpen(false);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, []);
 
   async function handleCreate() {
     setError("");
@@ -142,16 +320,21 @@ export default function CreateAppointmentModal({
       return;
     }
 
-    if (!serviceId && !employeeId) {
-      setError("Selecciona al menos un servicio o un empleado.");
+    if (isUrgent && !employeeId) {
+      setError("Para marcar una cita como urgente, asigna un profesional.");
+      return;
+    }
+
+    const startAt = buildIsoFromLocal(date, time);
+
+    if (!startAt) {
+      setError("Fecha u hora no válidas.");
       return;
     }
 
     setLoading(true);
 
     try {
-      const startAt = new Date(`${date}T${time}`);
-
       const res = await fetch("/api/calendar/appointments", {
         method: "POST",
         headers: {
@@ -160,7 +343,7 @@ export default function CreateAppointmentModal({
         body: JSON.stringify({
           locationId,
           serviceId: serviceId || null,
-          startAt: startAt.toISOString(),
+          startAt,
           customerId: customer.id,
           customerName: customer.displayName,
           customerPhone: customer.phone,
@@ -168,16 +351,33 @@ export default function CreateAppointmentModal({
           employeeId: employeeId || null,
           notes: notes || null,
           status: "BOOKED",
+          isUrgent,
         }),
       });
 
       const json = await res.json().catch(() => null);
 
       if (!res.ok || !json?.ok) {
-        setError(json?.error || "No se pudo crear la cita.");
+        const message = json?.error || "No se pudo crear la cita.";
+        setError(message);
+
+        toast({
+          variant: "error",
+          title: "No se pudo crear la cita",
+          description: message,
+        });
+
+        setLoading(false);
         return;
       }
 
+      toast({
+        variant: "success",
+        title: "Cita creada",
+        description: "La cita se ha añadido correctamente al calendario.",
+      });
+
+      setLoading(false);
       onClose();
       onCreated();
 
@@ -187,10 +387,20 @@ export default function CreateAppointmentModal({
       setDate("");
       setTime("");
       setNotes("");
+      setIsUrgent(false);
       setError("");
-    } catch {
-      setError("Error inesperado creando la cita.");
-    } finally {
+    } catch (error) {
+      console.error("[CreateAppointmentModal] handleCreate", error);
+
+      const message = "Error inesperado creando la cita.";
+      setError(message);
+
+      toast({
+        variant: "error",
+        title: "No se pudo crear la cita",
+        description: message,
+      });
+
       setLoading(false);
     }
   }
@@ -199,330 +409,306 @@ export default function CreateAppointmentModal({
     <StandardModal
       open={open}
       title="Nueva cita"
-      primaryLabel={loading ? "Creando..." : "Crear cita"}
-      onPrimary={handleCreate}
       onClose={onClose}
+      footer={
+        <div className="flex w-full items-center justify-between gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={loading}
+            className="h-10 rounded-xl"
+          >
+            Cerrar
+          </Button>
+
+          <Button
+            type="button"
+            onClick={handleCreate}
+            disabled={loading || !optionsLoaded}
+            className="h-10 gap-2 rounded-xl bg-crussader px-5 font-semibold text-white hover:bg-crussader/90 disabled:opacity-60"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Creando
+              </>
+            ) : (
+              "Crear cita"
+            )}
+          </Button>
+        </div>
+      }
     >
-      <div className="space-y-4">
-        {error ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
-            {error}
+      {!optionsLoaded ? (
+        <div className="flex min-h-[320px] items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+        </div>
+      ) : (
+        <div className="space-y-3 px-4 pt-0">
+          {error ? (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Fecha">
+              <Input
+                type="date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+                className={INPUT_CLASS}
+              />
+            </Field>
+
+            <Field label="Hora">
+              <Input
+                type="time"
+                step={300}
+                value={time}
+                onChange={(event) => setTime(event.target.value)}
+                className={`${INPUT_CLASS} tabular-nums`}
+              />
+            </Field>
           </div>
-        ) : null}
 
-        <Field label="Cliente">
-          <CustomerPicker companyId={companyId} value={customer} onChange={setCustomer} />
-        </Field>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Cliente">
+              <CustomerPicker
+                companyId={companyId}
+                value={customer}
+                onChange={setCustomer}
+              />
+            </Field>
 
-        <Field label="Servicio">
-          <Picklist
-            valueLabel={selectedService?.name ?? ""}
-            placeholder="Seleccionar servicio"
-            emptyLabel="Sin servicio concreto"
-            onClear={() => setServiceId("")}
-          >
-            {services.map((service) => (
-              <PicklistItem
-                key={service.id}
-                onClick={() => setServiceId(service.id)}
-                selected={service.id === serviceId}
+            <Field label="Estado">
+              <div className={`${INPUT_CLASS} flex items-center text-slate-700`}>
+                Confirmada
+              </div>
+            </Field>
+          </div>
+
+          <Field label="Servicio">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <div ref={serviceDropdownRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setServiceDropdownOpen(true);
+                  }}
+                  className={PICKER_BUTTON_CLASS}
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-semibold text-slate-800">
+                      {selectedService?.name ?? "Seleccionar servicio"}
+                    </div>
+
+                    {selectedService?.durationMin ? (
+                      <div className="text-xs text-slate-500">
+                        {selectedService.durationMin} min
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="ml-3 flex shrink-0 items-center gap-2">
+                    {serviceId ? (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setServiceId("");
+                          setServiceSearch("");
+                        }}
+                        className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      >
+                        <X className="h-4 w-4" />
+                      </span>
+                    ) : null}
+
+                    <ChevronDown className="h-4 w-4 text-slate-400" />
+                  </div>
+                </button>
+
+                {serviceDropdownOpen ? (
+                  <div className="absolute z-50 mt-2 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                    <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
+                      <Search className="h-4 w-4 text-slate-400" />
+                      <input
+                        autoFocus
+                        value={serviceSearch}
+                        onChange={(event) => setServiceSearch(event.target.value)}
+                        placeholder="Buscar servicio..."
+                        className="h-8 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+                      />
+                    </div>
+
+                    <div className="max-h-52 overflow-y-auto p-2">
+                      {filteredServices.map((service) => {
+                        const isSelected = service.id === serviceId;
+
+                        return (
+                          <button
+                            key={service.id}
+                            type="button"
+                            onClick={() => {
+                              setServiceId(service.id);
+                              setServiceSearch("");
+                              setServiceDropdownOpen(false);
+                            }}
+                            className={cn(
+                              "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition",
+                              isSelected
+                                ? "bg-blue-50 text-blue-700"
+                                : "text-slate-700 hover:bg-slate-50"
+                            )}
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate font-semibold">
+                                {service.name}
+                              </div>
+
+                              {service.durationMin ? (
+                                <div className="text-xs text-slate-500">
+                                  {service.durationMin} min
+                                </div>
+                              ) : null}
+                            </div>
+
+                            {isSelected ? <Check className="h-4 w-4" /> : null}
+                          </button>
+                        );
+                      })}
+
+                      {filteredServices.length === 0 ? (
+                        <div className="px-3 py-4 text-sm text-slate-500">
+                          No hay servicios que coincidan.
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsUrgent((prev) => !prev)}
+                className={cn(
+                  "inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-5 text-sm font-bold transition",
+                  isUrgent
+                    ? "border-orange-300 bg-orange-50 text-orange-700 shadow-sm"
+                    : "border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
+                )}
               >
-                <span className="text-sm font-medium text-slate-900">
-                  {service.name}
-                </span>
-              </PicklistItem>
-            ))}
-          </Picklist>
-        </Field>
-
-        <Field label="Empleado">
-          <Picklist
-            valueLabel={selectedEmployee?.name ?? ""}
-            placeholder="Seleccionar empleado"
-            emptyLabel="Sin asignar"
-            onClear={() => setEmployeeId("")}
-          >
-            {employees.map((employee) => (
-              <PicklistItem
-                key={employee.id}
-                onClick={() => setEmployeeId(employee.id)}
-                selected={employee.id === employeeId}
-              >
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: employee.color || "#CBD5E1" }}
-                />
-                <div>
-                  <p className="text-sm font-medium text-slate-900">{employee.name}</p>
-                  <p className="text-xs text-slate-500">{employee.role}</p>
-                </div>
-              </PicklistItem>
-            ))}
-          </Picklist>
-        </Field>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Fecha">
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2"
-            />
+                <AlertTriangle className="h-4 w-4" />
+                Urgencia
+              </button>
+            </div>
           </Field>
 
-          <Field label="Hora">
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2"
+          <Field label={serviceId ? "Profesionales compatibles" : "Profesional recomendado"}>
+            <div className="flex flex-wrap gap-2">
+              {compatibleEmployees.map((employee) => {
+                const isSelected = employee.id === employeeId;
+
+                return (
+                  <button
+                    key={employee.id}
+                    type="button"
+                    onClick={() => {
+                      setEmployeeId(isSelected ? "" : employee.id);
+                    }}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                      isSelected
+                        ? "border-[#0B6CF4] bg-[#0B6CF4] text-white shadow-[0_2px_8px_rgba(11,108,244,0.25)]"
+                        : "border-border bg-white text-slate-700 hover:bg-muted/40"
+                    )}
+                  >
+                    <span
+                      className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-[10px] font-bold"
+                      style={{ backgroundColor: employee.color || "#94A3B8" }}
+                    >
+                      {getInitials(employee.name)}
+                    </span>
+
+                    <span>{employee.name}</span>
+
+                    {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
+                  </button>
+                );
+              })}
+
+              {compatibleEmployees.length === 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                  No hay profesionales disponibles para este servicio.
+                </div>
+              ) : null}
+            </div>
+          </Field>
+
+          {advisoryText ? (
+            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{advisoryText}</span>
+            </div>
+          ) : null}
+
+          <Field label="Notas">
+            <textarea
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Añadir notas adicionales..."
+              className={TEXTAREA_CLASS}
+              rows={3}
             />
           </Field>
         </div>
-
-        <Field label="Notas">
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2"
-            rows={3}
-          />
-        </Field>
-      </div>
+      )}
     </StandardModal>
   );
 }
 
-function CustomerPicker({
-  companyId,
-  value,
-  onChange,
-}: {
-  companyId: string;
-  value: CustomerLite | null;
-  onChange: (customer: CustomerLite | null) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [items, setItems] = useState<CustomerLite[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!companyId || value || !open) {
-      setItems([]);
-      return;
-    }
-
-    const timeout = window.setTimeout(async () => {
-      setLoading(true);
-
-      try {
-        const params = new URLSearchParams();
-        params.set("companyId", companyId);
-
-        if (query.trim()) {
-          params.set("q", query.trim());
-        }
-
-        const res = await fetch(`/api/customer?${params.toString()}`);
-        const json = await res.json().catch(() => null);
-
-        setItems(Array.isArray(json?.items) ? json.items : []);
-      } catch {
-        setItems([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 200);
-
-    return () => window.clearTimeout(timeout);
-  }, [companyId, query, value, open]);
-
-  async function handleCreate() {
-    if (!companyId || !query.trim()) {
-      return;
-    }
-
-    const res = await fetch("/api/customer", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        companyId,
-        firstName: query.trim(),
-        phone: null,
-        email: null,
-      }),
-    });
-
-    const json = await res.json().catch(() => null);
-
-    if (json?.ok && json.item) {
-      onChange(json.item);
-      setQuery("");
-      setItems([]);
-      setOpen(false);
-    }
-  }
-
-  if (value) {
-    return (
-      <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
-        <div>
-          <p className="text-sm font-medium text-slate-900">{value.displayName}</p>
-          <p className="text-xs text-slate-500">
-            {[value.phone, value.email].filter(Boolean).join(" · ") || "Sin contacto"}
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          className="text-sm font-medium text-red-500"
-        >
-          Cambiar
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative">
-      <input
-        value={query}
-        onFocus={() => setOpen(true)}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setOpen(true);
-        }}
-        placeholder="Buscar por nombre, teléfono o email"
-        className="w-full rounded-xl border border-slate-200 px-3 py-2"
-      />
-
-      {open ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
-          {loading ? (
-            <p className="px-3 py-2 text-xs text-slate-500">Buscando...</p>
-          ) : null}
-
-          {!loading &&
-            items.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => {
-                  onChange(item);
-                  setQuery("");
-                  setItems([]);
-                  setOpen(false);
-                }}
-                className="block w-full px-3 py-2 text-left hover:bg-slate-50"
-              >
-                <p className="text-sm font-medium text-slate-900">{item.displayName}</p>
-                <p className="text-xs text-slate-500">
-                  {[item.phone, item.email].filter(Boolean).join(" · ") || "Sin contacto"}
-                </p>
-              </button>
-            ))}
-
-          {!loading && items.length === 0 && query.trim().length > 0 ? (
-            <button
-              type="button"
-              onClick={handleCreate}
-              className="block w-full px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Crear cliente “{query.trim()}”
-            </button>
-          ) : null}
-
-          {!loading && items.length === 0 && query.trim().length === 0 ? (
-            <p className="px-3 py-2 text-xs text-slate-500">
-              No hay clientes recientes
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function Picklist({
-  valueLabel,
-  placeholder,
-  emptyLabel,
-  onClear,
+function Field({
+  label,
   children,
 }: {
-  valueLabel: string;
-  placeholder: string;
-  emptyLabel: string;
-  onClear: () => void;
-  children: ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left"
-      >
-        <span className={valueLabel ? "text-sm text-slate-900" : "text-sm text-slate-400"}>
-          {valueLabel || placeholder}
-        </span>
-        <span className="text-xs text-slate-400">▾</span>
-      </button>
-
-      {open ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
-          <button
-            type="button"
-            onClick={() => {
-              onClear();
-              setOpen(false);
-            }}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-slate-50"
-          >
-            <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
-            <span className="text-sm font-medium text-slate-700">{emptyLabel}</span>
-          </button>
-
-          <div onClick={() => setOpen(false)}>{children}</div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function PicklistItem({
-  selected,
-  onClick,
-  children,
-}: {
-  selected: boolean;
-  onClick: () => void;
+  label: string;
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left",
-        selected ? "bg-violet-50" : "hover:bg-slate-50",
-      ].join(" ")}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <label className="text-sm font-medium text-slate-700">{label}</label>
+    <div className="space-y-1.5">
+      <Label className={FIELD_LABEL_CLASS}>{label}</Label>
       {children}
     </div>
   );
+}
+
+function buildIsoFromLocal(dateValue: string, timeValue: string): string | null {
+  if (!dateValue || !timeValue) {
+    return null;
+  }
+
+  const date = new Date(`${dateValue}T${timeValue}:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString();
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+
+  if (parts.length === 0) {
+    return "P";
+  }
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }

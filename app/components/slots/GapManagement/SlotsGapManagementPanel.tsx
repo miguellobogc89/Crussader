@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { toast } from "@/app/components/ui/use-toast";
 import { Calendar, Clock, X } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { GapWhatsAppPreview } from "@/app/components/slots/GapManagement/GapWhatsAppPreview";
@@ -313,6 +314,12 @@ if (!response.ok || !data?.ok) {
 }
 
         lastSavedTimeSignatureRef.current = nextSignature;
+
+        toast({
+          variant: "success",
+          title: "Cambios guardados",
+          description: "La fecha y hora del hueco se han actualizado correctamente.",
+        });
 
       } catch (error) {
         console.error("[slots] autosave time error", error);

@@ -15,10 +15,9 @@ import {
 } from "@/app/components/slots/SlotsCardItem/SlotCardSubcomponents";
 import {
   formatEuro,
+  getEffectiveSlotStatus,
   getSlotPriceRange,
-  isRecoveredSlot,
   resolveVisibleServices,
-  toLegacySlot,
   toSelectedServices,
 } from "../helpers/slotsWeeklyCalendarItemHelpers";
 
@@ -31,40 +30,8 @@ type SlotsListCardItemProps = {
   ) => void;
 };
 
-function isExpiredSlot(slot: SlotDTO): boolean {
-  const recovered = isRecoveredSlot(slot);
-
-  if (recovered) {
-    return false;
-  }
-
-  if (slot.status === "expired" || slot.status === "cancelled") {
-    return true;
-  }
-
-  const startMs = new Date(slot.startsAt).getTime();
-
-  if (Number.isNaN(startMs)) {
-    return false;
-  }
-
-  return startMs <= Date.now();
-}
-
-function getEffectiveStatus(slot: SlotDTO): string {
-  if (isRecoveredSlot(slot)) {
-    return "recovered";
-  }
-
-  if (isExpiredSlot(slot)) {
-    return "expired";
-  }
-
-  return slot.status;
-}
-
 function getLeftBorderClass(slot: SlotDTO): string {
-  const effectiveStatus = getEffectiveStatus(slot);
+  const effectiveStatus = getEffectiveSlotStatus(slot);
 
   if (effectiveStatus === "pending_publish" || effectiveStatus === "sent") {
     return "border-l-[3px] border-l-[#60A5FA]";
@@ -82,7 +49,7 @@ function getLeftBorderClass(slot: SlotDTO): string {
 }
 
 function getCardClass(slot: SlotDTO): string {
-  const effectiveStatus = getEffectiveStatus(slot);
+  const effectiveStatus = getEffectiveSlotStatus(slot);
 
   if (effectiveStatus === "pending_publish" || effectiveStatus === "sent") {
     return [
@@ -131,7 +98,7 @@ export function SlotsListCardItem({
   const visibleServices = resolveVisibleServices(slot);
   const dayLabel = slot.startsAt;
 
-  const effectiveStatus = getEffectiveStatus(slot);
+  const effectiveStatus = getEffectiveSlotStatus(slot);
   const isPending = effectiveStatus === "pending_publish";
   const isSent = effectiveStatus === "sent";
   const isRecovered = effectiveStatus === "recovered";

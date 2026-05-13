@@ -31,6 +31,13 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    const interested = await prisma.slot_recovery_recipient.count({
+      where: {
+        slot_recovery_slot_id: slotId,
+        status: "booked",
+      },
+    });
+
     const sent = sends.length;
 
     const notRead = sends.filter((item) => {
@@ -41,6 +48,7 @@ export async function GET(req: NextRequest) {
       ok: true,
       summary: {
         sent,
+        interested,
         rejected,
         notRead,
       },

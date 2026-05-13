@@ -32,12 +32,17 @@ const GOOGLE_EVENT_COLORS: Record<string, string> = {
   "11": "#D50000",
 };
 
-const ACTIVE_STATUSES: AppointmentStatus[] = [
+const VISIBLE_STATUSES: AppointmentStatus[] = [
   AppointmentStatus.PENDING,
   AppointmentStatus.BOOKED,
   AppointmentStatus.COMPLETED,
   AppointmentStatus.CANCELLED,
   AppointmentStatus.NO_SHOW,
+];
+
+const BLOCKING_STATUSES: AppointmentStatus[] = [
+  AppointmentStatus.PENDING,
+  AppointmentStatus.BOOKED,
 ];
 
 async function getUserBySession() {
@@ -147,7 +152,7 @@ const activeGoogleCalendarIds = activeGoogleCalendars
         locationId,
         startAt: { lt: to },
         endAt: { gt: from },
-        status: { in: ACTIVE_STATUSES },
+        status: { in: VISIBLE_STATUSES  },
         OR: [
           {
             externalProvider: null,
@@ -170,6 +175,7 @@ const activeGoogleCalendarIds = activeGoogleCalendars
         locationId: true,
         serviceId: true,
         slotRecoveryServiceId: true,
+        isUrgent: true,
         startAt: true,
         endAt: true,
         status: true,
@@ -257,6 +263,7 @@ items: [
     externalProvider: appointment.externalProvider,
     externalCalendarId: appointment.externalCalendarId,
     externalEventId: appointment.externalEventId,
+    isUrgent: appointment.isUrgent,
   })),
 ],
     });
@@ -295,6 +302,7 @@ export async function POST(req: Request) {
       employeeId,
       resourceId,
       customerId,
+      isUrgent,
     } = body ?? {};
 
     if (!locationId || !startAt || !customerId) {
@@ -411,7 +419,7 @@ export async function POST(req: Request) {
           employeeId,
           startAt: { lt: end },
           endAt: { gt: start },
-          status: { in: ACTIVE_STATUSES },
+          status: { in: BLOCKING_STATUSES },
         },
         select: { id: true },
       });
@@ -431,7 +439,7 @@ export async function POST(req: Request) {
           resourceId,
           startAt: { lt: end },
           endAt: { gt: start },
-          status: { in: ACTIVE_STATUSES },
+          status: { in: BLOCKING_STATUSES },
         },
         select: { id: true },
       });
@@ -481,6 +489,7 @@ export async function POST(req: Request) {
           serviceName: service?.name ?? null,
           servicePrice: service ? Number(service.price) : null,
           serviceDurationMin: service?.duration_min ?? null,
+          isUrgent: Boolean(isUrgent),
         },
         select: {
           id: true,

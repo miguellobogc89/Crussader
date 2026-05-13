@@ -131,6 +131,9 @@ export async function GET(req: NextRequest) {
             servicePrice: true,
             serviceDurationMin: true,
             slotRecoveryServiceId: true,
+            customerName: true,
+            customerPhone: true,
+            customerEmail: true,
           },
         },
         slot_recovery_slot_service: {
@@ -206,6 +209,16 @@ recoveredSoldAmount:
 
 recoveredServiceDurationMin:
   recoveredAppointment?.serviceDurationMin ?? null,
+
+recoveredCustomerName:
+  recoveredAppointment?.customerName ?? null,
+
+recoveredCustomerPhone:
+  recoveredAppointment?.customerPhone ?? null,
+
+recoveredCustomerEmail:
+  recoveredAppointment?.customerEmail ?? null,
+  
           servicesCount: services.length,
           services,
         };

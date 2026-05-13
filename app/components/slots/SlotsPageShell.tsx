@@ -6,7 +6,6 @@ import { Plus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { SlotsStatsCard } from "./SlotsStatsCard";
 import { SlotsListCard } from "./AvailableSlotsList";
-import { SlotsActivityFeedCard } from "./activity/SlotsActivityFeedCard";
 import type { SlotDTO } from "@/hooks/slots/useSlots";
 import type { SelectedServiceItem } from "./slots.types";
 import { WaitlistCard } from "./Waitlist/WaitlistCard";
@@ -39,7 +38,6 @@ export function SlotsPageShell({
 }: SlotsPageShellProps) {
   const [slotsListHeader, setSlotsListHeader] = useState<React.ReactNode>(null);
   const [waitlistHeader, setWaitlistHeader] = useState<React.ReactNode>(null);
-  const [activityHeader, setActivityHeader] = useState<React.ReactNode>(null);
   const [cancelledHeader, setCancelledHeader] = useState<React.ReactNode>(null);
 
   const effectiveLocationId = locationId;
@@ -73,11 +71,7 @@ export function SlotsPageShell({
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden pt-2 lg:pt-3 xl:pt-3 xl2:pt-6">
-<div className="grid h-full min-h-0 
-grid-cols-[220px_minmax(0,1fr)_300px] gap-3 
-lg:grid-cols-[240px_minmax(0,1fr)_330px] lg:gap-4 
-xl:grid-cols-[260px_minmax(0,1fr)_360px] xl:gap-5 
-xl2:grid-cols-[340px_minmax(0,1fr)_420px] xl2:gap-6">
+        <div className="grid h-full min-h-0 grid-cols-[220px_minmax(0,1fr)_250px] gap-3 lg:grid-cols-[240px_minmax(0,1fr)_280px] lg:gap-4 xl:grid-cols-[260px_minmax(0,1fr)_320px] xl:gap-5 xl2:grid-cols-[340px_minmax(0,1fr)_380px] xl2:gap-6">
           <StandardCard
             header={waitlistHeader}
             className="h-full min-h-0 overflow-hidden"
@@ -104,11 +98,10 @@ xl2:grid-cols-[340px_minmax(0,1fr)_420px] xl2:gap-6">
             />
           </StandardCard>
 
-          <div className="flex min-h-0 flex-col gap-3 overflow-hidden lg:gap-4 xl:gap-5 xl2:gap-6">
-            <StandardCard
-              header={cancelledHeader}
-              className="min-h-0 basis-[42%] overflow-hidden"
-            >
+          <StandardCard
+            header={cancelledHeader}
+            className="h-full min-h-0 overflow-hidden"
+          >
             <CancelledAppointmentsList
               companyId={effectiveCompanyId}
               locationId={effectiveLocationId}
@@ -119,18 +112,7 @@ xl2:grid-cols-[340px_minmax(0,1fr)_420px] xl2:gap-6">
                 onNewCancellation(appointment);
               }}
             />
-            </StandardCard>
-
-            <StandardCard
-              header={activityHeader}
-              className="min-h-0 flex-1 overflow-hidden"
-            >
-              <SlotsActivityFeedCard
-                locationId={effectiveLocationId}
-                onHeaderChange={setActivityHeader}
-              />
-            </StandardCard>
-          </div>
+          </StandardCard>
         </div>
       </div>
     </div>

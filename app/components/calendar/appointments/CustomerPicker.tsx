@@ -104,7 +104,7 @@ export default function CustomerPicker({ companyId, value, onChange }: Props) {
     return (
       <div
         ref={rootRef}
-        className="flex min-h-[42px] items-center gap-2 rounded-xl border border-slate-200 px-3 py-2"
+        className="flex h-12 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 shadow-sm"
       >
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-semibold leading-4 text-slate-900 xl:text-sm">
@@ -142,7 +142,7 @@ export default function CustomerPicker({ companyId, value, onChange }: Props) {
           setOpen(true);
         }}
         placeholder="Buscar cliente"
-        className="w-full rounded-xl border border-slate-200 px-3 py-2 pr-9 text-[13px] xl:text-sm"
+        className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
       />
 
       {query.trim().length > 0 ? (

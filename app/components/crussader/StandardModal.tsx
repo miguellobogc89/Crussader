@@ -69,7 +69,7 @@ export default function StandardModal({
               </button>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-auto px-4 py-3 pb-24 xl:px-5 xl:py-4">
+            <div className="min-h-0 overflow-auto px-4 py-3 xl:px-5 xl:py-4">
               {children}
             </div>
 

@@ -34,6 +34,7 @@ type AppointmentLite = {
   externalProvider?: string | null;
   externalCalendarId?: string | null;
   externalEventId?: string | null;
+  isUrgent?: boolean;
 };
 
 type Props = {
@@ -217,6 +218,7 @@ export default function CalendarView({
         externalProvider: item.externalProvider ?? null,
         externalCalendarId: item.externalCalendarId ?? null,
         externalEventId: item.externalEventId ?? null,
+        isUrgent: Boolean(item.isUrgent),
       })),
     ]);
   }, [locationId, range]);

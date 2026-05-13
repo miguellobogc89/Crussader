@@ -463,6 +463,7 @@ model Appointment {
   externalCalendarId                                                          String?
   externalEventId                                                             String?
   externalColor                                                               String?
+  isUrgent                                                                    Boolean                     @default(false)
   createdByAgent                                                              Agent?                      @relation("AppointmentCreatedByAgent", fields: [createdByAgentId], references: [id])
   createdInSession                                                            AgentSession?               @relation("AppointmentCreatedInSession", fields: [createdInSessionId], references: [id])
   customer                                                                    Customer?                   @relation(fields: [customerId], references: [id])

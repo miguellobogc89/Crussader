@@ -137,6 +137,7 @@ export async function PATCH(
       customerEmail,
       serviceId,
       slotRecoveryServiceId,
+      isUrgent,
     } = body ?? {};
 
     const patch: Prisma.AppointmentUpdateInput = {};
@@ -230,6 +231,10 @@ export async function PATCH(
 
     if (notes !== undefined) {
       patch.notes = notes ?? null;
+    }
+
+    if (isUrgent !== undefined) {
+      patch.isUrgent = Boolean(isUrgent);
     }
 
     if (customerName !== undefined) {

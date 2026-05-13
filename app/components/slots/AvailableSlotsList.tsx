@@ -11,6 +11,7 @@ import { SlotsListCardItem } from "./SlotsCardItem/SlotsListCardItem";
 import { getPendingPublishCount } from "./helpers/AvailableSlotsListHelpers";
 import {
   formatEuro,
+  getEffectiveSlotStatus,
   getSlotPriceRange,
 } from "./helpers/slotsWeeklyCalendarItemHelpers";
 
@@ -149,19 +150,14 @@ export function SlotsListCard({
     const now = Date.now();
 
     for (const slot of slots) {
-      const slotStartMs = new Date(slot.startsAt).getTime();
-      const isRecovered =
-        Boolean(slot.recoveredAt) || slot.status === "recovered";
-      const isExpiredByStatus =
-        slot.status === "expired" || slot.status === "cancelled";
-      const isPast = slotStartMs < now && !isRecovered;
+      const effectiveStatus = getEffectiveSlotStatus(slot);
 
-      if (isRecovered) {
+      if (effectiveStatus === "recovered") {
         recoveredSlots.push(slot);
         continue;
       }
 
-      if (isExpiredByStatus || isPast) {
+      if (effectiveStatus === "expired") {
         expiredSlots.push(slot);
         continue;
       }

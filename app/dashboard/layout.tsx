@@ -11,6 +11,7 @@ import BootstrapProvider from "@/app/providers/BootstrapProvider";
 import { Toaster } from "@/app/components/ui/toaster";
 import RouteTransitionOverlay from "@/app/components/layouts/RouteTransitionOverlay";
 import DashboardRouteGuard from "@/app/dashboard/DashboardRouteGuard";
+import { RevenueRecoveryToastProvider } from "@/app/components/crussader/UX/RevenueRecoveryToast";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -50,23 +51,27 @@ export default async function DashboardLayout({
           </div>
         </div>
 
-        <div className={`app-root flex h-svh w-full ${inter.className}`}>
-          <AppSidebar />
+<RevenueRecoveryToastProvider>
+  <div className={`app-root flex h-svh w-full ${inter.className}`}>
+    <AppSidebar />
 
-          <div
-            className={[
-              "relative flex min-w-0 flex-1 overflow-y-auto overflow-x-hidden",
-              "h-[calc(100svh-3rem)] pt-12",
-              "md:h-svh md:pt-0",
-            ].join(" ")}
-          >
-            <RouteTransitionOverlay scope="container" />
+    <div
+      className={[
+        "relative flex min-w-0 flex-1 overflow-y-auto overflow-x-hidden",
+        "h-[calc(100svh-3rem)] pt-12",
+        "md:h-svh md:pt-0",
+      ].join(" ")}
+    >
+      <RouteTransitionOverlay scope="container" />
 
-            <main className="min-w-0 flex-1 bg-background">
-              <PageContainer>{children}</PageContainer>
-            </main>
-          </div>
-        </div>
+      <main className="min-w-0 flex-1 bg-background">
+        <PageContainer>{children}</PageContainer>
+      </main>
+    </div>
+  </div>
+
+  <Toaster />
+</RevenueRecoveryToastProvider>
 
         <Toaster />
 

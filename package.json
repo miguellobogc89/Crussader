@@ -117,6 +117,8 @@
     "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "15.5.0",
+    "knip": "^6.12.2",
+    "madge": "^8.0.0",
     "postcss": "^8.5.6",
     "prisma": "^6.17.1",
     "tailwindcss": "^3.4.17",

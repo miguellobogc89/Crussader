@@ -3,7 +3,7 @@
 
 import { useEffect, useRef } from "react";
 
-import CalendarCell from "./CalendarCell";
+import CalendarCell from "../Grid/CalendarCell";
 import AppointmentBlock from "../../appointments/AppointmentBlock";
 import CurrentTimeLineFullSpan from "../CurrentTimeLineFullSpan";
 import HourGuides from "../HourGuides";
@@ -215,6 +215,7 @@ export default function CalendarGrid({
                       <AppointmentBlock
                         id={appointment.id}
                         startAtISO={appointment.startAt}
+                        endAtISO={appointment.endAt}
                         serviceName={appointment.serviceName}
                         employeeName={appointment.employeeName}
                         employeeColor={appointment.employeeColor}

@@ -34,6 +34,9 @@ export type SlotDTO = {
   recoveredServiceName: string | null;
   recoveredSoldAmount: number | null;
   recoveredServiceDurationMin: number | null;
+  recoveredCustomerName: string | null;
+  recoveredCustomerPhone: string | null;
+  recoveredCustomerEmail: string | null;
 };
 
 type SlotsCacheEntry = {

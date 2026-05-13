@@ -1,9 +1,20 @@
 // app/components/calendar/appointments/AppointmentBlock.tsx
 "use client";
+import { useState } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Phone,
+  Sparkles,
+  User,
+  XCircle,
+} from "lucide-react";
 
 type Props = {
   id: string;
   startAtISO: string;
+  endAtISO?: string | null;
   serviceName?: string | null;
   employeeName?: string | null;
   resourceName?: string | null;
@@ -17,43 +28,42 @@ type Props = {
   source?: string | null;
 };
 
-// Sustituye STATUS_CONFIG por esto:
-
 const STATUS_CONFIG: Record<
   string,
   {
     label: string;
     className: string;
+    icon: typeof CheckCircle2;
   }
 > = {
   PENDING: {
     label: "Pendiente",
-    className:
-      "bg-blue-100 text-blue-700",
+    className: "text-amber-700",
+    icon: AlertCircle,
   },
 
   BOOKED: {
-    label: "Booked",
-    className:
-      "bg-blue-100 text-blue-700",
+    label: "Confirmada",
+    className: "text-emerald-700",
+    icon: CheckCircle2,
   },
 
   COMPLETED: {
-    label: "Realizada",
-    className:
-      "bg-slate-200 text-slate-700",
+    label: "Completada",
+    className: "text-sky-700",
+    icon: Sparkles,
   },
 
   CANCELLED: {
     label: "Cancelada",
-    className:
-      "bg-red-100 text-red-700",
+    className: "text-rose-700",
+    icon: XCircle,
   },
 
   NO_SHOW: {
     label: "No asistió",
-    className:
-      "bg-red-100 text-red-700",
+    className: "text-slate-700",
+    icon: XCircle,
   },
 };
 
@@ -69,6 +79,7 @@ function formatTime(value: string) {
 export default function AppointmentBlock({
   id,
   startAtISO,
+  endAtISO,
   serviceName,
   employeeName,
   resourceName,
@@ -82,67 +93,136 @@ export default function AppointmentBlock({
   onEdit,
 }: Props) {
   const color = employeeColor || serviceColor || "#0B6CF4";
-  const statusConfig = status
-  ? STATUS_CONFIG[status] ?? null
-  : null;
+  const normalizedStatus = status?.toUpperCase();
 
+  const statusConfig = normalizedStatus
+    ? STATUS_CONFIG[normalizedStatus] ?? null
+    : null;
 
+  const StatusIcon = statusConfig?.icon;
+  const isCancelled = normalizedStatus === "CANCELLED";
+
+  const visibleServiceName =
+    source === "google" ? serviceName || "Evento Google" : serviceName;
+    const baseBg = `color-mix(in srgb, ${color} 10%, white)`;
+    const hoverBg = `color-mix(in srgb, ${color} 5%, white)`;
+    const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <button
-      type="button"
-      onClick={() => onSelect?.(id)}
-      onDoubleClick={() => onEdit?.(id)}
-      className="h-full w-full cursor-pointer overflow-hidden rounded-xl border px-2 py-1.5 text-left transition-all hover:brightness-[0.98]"
-      style={{
-        borderColor: `${color}99`,
-        backgroundColor: `${color}22`,
-      }}
-    >
-      <div className="flex h-full flex-col gap-1">
-        <div className="flex items-start justify-between gap-2">
-          <span
-            className="text-[11px] font-bold leading-none"
-            style={{ color }}
-          >
-            {formatTime(startAtISO)}
-          </span>
+<button
+  type="button"
+  onClick={() => onSelect?.(id)}
+  onDoubleClick={() => onEdit?.(id)}
+  onMouseEnter={() => setIsHovered(true)}
+  onMouseLeave={() => setIsHovered(false)}
+  className="
+    h-full w-full cursor-pointer overflow-hidden rounded-xl
+    border-0 border-l-2 px-2 py-1.5 text-left
+    transition-colors
+    duration-100
+    ease-out
+    shadow-[1px_1px_2px_rgba(15,23,42,0.10)]
+  "
+  style={{
+    borderLeftColor: color,
+    backgroundColor: isHovered ? hoverBg : baseBg,
+  }}
+>
+      <div className="flex h-full flex-col overflow-hidden">
+        {/* Header */}
+        <div className="relative shrink-0 overflow-hidden pr-[92px]">
+          <div className="flex min-w-0 items-center gap-x-2">
+            <div
+              className={[
+                "flex shrink-0 items-center gap-1 text-[11px] font-semibold tabular-nums leading-none",
+                isCancelled ? "line-through decoration-[1px]" : "",
+              ].join(" ")}
+              style={{ color }}
+            >
+              <Clock className="h-3 w-3" strokeWidth={2.5} />
 
-{statusConfig ? (
-  <span
-    className={[
-      "rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide",
-      statusConfig.className,
-    ].join(" ")}
-  >
-    {statusConfig.label}
-  </span>
-) : null}
+              <span>
+                {formatTime(startAtISO)}
+                {endAtISO ? ` – ${formatTime(endAtISO)}` : ""}
+              </span>
+            </div>
+
+            <span className="text-slate-300">|</span>
+
+            <div
+              className={[
+                "truncate text-[12px] font-bold leading-tight text-slate-900",
+                isCancelled ? "line-through decoration-[1px]" : "",
+              ].join(" ")}
+            >
+              {visibleServiceName}
+            </div>
+          </div>
+
+          {statusConfig && StatusIcon ? (
+            <span
+              className={[
+                "absolute right-0 top-1/2 inline-flex -translate-y-1/2 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide shadow-sm",
+                statusConfig.className,
+              ].join(" ")}
+            >
+              <StatusIcon className="h-2.5 w-2.5" strokeWidth={2.5} />
+              {statusConfig.label}
+            </span>
+          ) : null}
         </div>
 
-        <div className="truncate text-[12px] font-semibold leading-tight text-slate-900">
-          {source === "google" ? serviceName || "Evento Google" : serviceName}
+        {/* Customer */}
+        <div className="mt-1 flex min-w-0 items-center gap-3">
+          {customerName ? (
+            <div className="flex min-w-0 items-center gap-1 text-[11px] text-slate-700">
+              <User className="h-3 w-3 shrink-0" strokeWidth={2.2} />
+
+              <span className="truncate font-medium">{customerName}</span>
+            </div>
+          ) : null}
+
+          {customerPhone ? (
+            <div className="flex min-w-0 items-center gap-1 text-[11px] tabular-nums text-slate-500">
+              <Phone className="h-3 w-3 shrink-0" strokeWidth={2.2} />
+
+              <span className="truncate">{customerPhone}</span>
+            </div>
+          ) : null}
         </div>
 
-        {customerName || customerPhone ? (
-          <div className="truncate text-[10px] font-medium leading-tight text-slate-700">
-            {[customerName, customerPhone].filter(Boolean).join(" · ")}
+        {/* Footer */}
+        {employeeName || resourceName ? (
+          <div className="mt-auto flex min-w-0 items-center gap-1.5 border-t border-slate-300/30 pt-1">
+            {employeeName ? (
+              <>
+                <div
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
+                  style={{
+                    backgroundColor: employeeColor || color,
+                  }}
+                >
+                  {employeeName
+                    .split(" ")
+                    .map((part) => part[0])
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase()}
+                </div>
+
+                <span className="truncate text-[11px] text-slate-600">
+                  {employeeName}
+                </span>
+              </>
+            ) : null}
+
+            {resourceName ? (
+              <span className="truncate text-[10px] text-slate-500">
+                · {resourceName}
+              </span>
+            ) : null}
           </div>
         ) : null}
-
-        <div className="flex min-w-0 flex-wrap gap-1">
-          {employeeName ? (
-            <span className="inline-flex max-w-full items-center rounded-md bg-white/75 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">
-              <span className="truncate">{employeeName}</span>
-            </span>
-          ) : null}
-
-          {resourceName ? (
-            <span className="inline-flex max-w-full items-center rounded-md bg-white/70 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
-              <span className="truncate">{resourceName}</span>
-            </span>
-          ) : null}
-        </div>
       </div>
     </button>
   );

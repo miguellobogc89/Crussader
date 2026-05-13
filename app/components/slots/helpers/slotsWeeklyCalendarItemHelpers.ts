@@ -14,6 +14,44 @@ export function isRecoveredSlot(slot: SlotDTO): boolean {
   return Boolean(slot.recoveredAt);
 }
 
+export type EffectiveSlotStatus =
+  | "pending_publish"
+  | "sent"
+  | "recovered"
+  | "expired"
+  | "cancelled"
+  | string;
+
+export function isExpiredSlot(slot: SlotDTO): boolean {
+  if (isRecoveredSlot(slot)) {
+    return false;
+  }
+
+  if (slot.status === "expired" || slot.status === "cancelled") {
+    return true;
+  }
+
+  const startMs = new Date(slot.startsAt).getTime();
+
+  if (Number.isNaN(startMs)) {
+    return false;
+  }
+
+  return startMs <= Date.now();
+}
+
+export function getEffectiveSlotStatus(slot: SlotDTO): EffectiveSlotStatus {
+  if (isRecoveredSlot(slot)) {
+    return "recovered";
+  }
+
+  if (isExpiredSlot(slot)) {
+    return "expired";
+  }
+
+  return slot.status;
+}
+
 export function formatEuro(value: number): string {
   return `${value}€`;
 }

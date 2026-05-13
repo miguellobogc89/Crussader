@@ -13,6 +13,9 @@ import { CreateSlotFromCancelledAppointmentModal } from "@/app/components/slots/
 import type { CancelledAppointmentItem } from "@/app/components/slots/CancelledAppointments/CancelledAppointmentsList";
 import type { SlotDTO } from "@/hooks/slots/useSlots";
 import type { SelectedServiceItem } from "@/app/components/slots/slots.types";
+import { getEffectiveSlotStatus } from "@/app/components/slots/helpers/slotsWeeklyCalendarItemHelpers";
+import { toast } from "@/app/components/ui/use-toast";
+import { SlotRecoveryToastListener } from "@/app/components/slots/SlotRecoveryToastListener";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -56,9 +59,13 @@ const [selectedSlot, setSelectedSlot] = useState<{
   const effectiveCompanyId = bootstrapCompanyId ?? null;
   const effectiveLocationId = bootstrapLocationId ?? null;
 
+const effectiveSlotStatus = selectedSlot
+  ? getEffectiveSlotStatus(selectedSlot.slot)
+  : null;
+
 const shouldOpenManagementPanel =
-  selectedSlot?.slot.status === "pending_publish" ||
-  selectedSlot?.slot.status === "sent";
+  effectiveSlotStatus === "pending_publish" ||
+  effectiveSlotStatus === "sent";
 
   useEffect(() => {
     if (!effectiveCompanyId || !selectedSlot || !shouldOpenManagementPanel) {
@@ -146,8 +153,18 @@ const shouldOpenManagementPanel =
           locationId={selectedSlot.locationId ?? effectiveLocationId}
           templateBody={slotTemplate?.body_preview ?? ""}
           companyName={companyName ?? ""}
-          onSent={() => setRefreshKey((prev) => prev + 1)}
-          onServicesSaved={() => setRefreshKey((prev) => prev + 1)}
+          onSent={() => {
+            setRefreshKey((prev) => prev + 1);
+
+            toast({
+              variant: "success",
+              title: "Clientes avisados",
+              description: "El hueco se ha enviado correctamente.",
+            });
+          }}
+          onServicesSaved={() => {
+            setRefreshKey((prev) => prev + 1);
+          }}
         />
       ) : null}
 
@@ -163,7 +180,15 @@ const shouldOpenManagementPanel =
         open={showNewCancellation}
         onClose={() => setShowNewCancellation(false)}
         locationId={effectiveLocationId}
-        onCreated={() => setRefreshKey((prev) => prev + 1)}
+        onCreated={() => {
+  setRefreshKey((prev) => prev + 1);
+
+  toast({
+    variant: "success",
+    title: "Hueco creado",
+    description: "El hueco disponible se ha creado correctamente.",
+  });
+}}
       />
 
       <CreateSlotFromCancelledAppointmentModal
@@ -172,15 +197,23 @@ const shouldOpenManagementPanel =
         locationId={effectiveLocationId}
         onClose={() => setSelectedCancelledAppointment(null)}
         onCreated={() => {
-          setCreatedCancelledAppointmentId(selectedCancelledAppointment?.id ?? null);
-          setSelectedCancelledAppointment(null);
-        }}
+  setCreatedCancelledAppointmentId(selectedCancelledAppointment?.id ?? null);
+  setSelectedCancelledAppointment(null);
+  setRefreshKey((prev) => prev + 1);
+
+  toast({
+    variant: "success",
+    title: "Hueco creado",
+    description: "La cita cancelada se ha convertido en un hueco disponible.",
+  });
+}}
       />
 
       <SlotsInviteModal
         open={showInvite}
         onClose={() => setShowInvite(false)}
       />
+      <SlotRecoveryToastListener locationId={effectiveLocationId} />
     </>
   );
 }
