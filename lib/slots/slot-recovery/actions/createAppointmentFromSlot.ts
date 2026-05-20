@@ -154,7 +154,7 @@ if (customer?.preferred_name) {
       servicePrice: slotService ? Number(slotService.price) : null,
       serviceDurationMin: slotService?.duration_min ?? null,
       slotRecoveryServiceId: slotService?.id ?? null,
-      notes: "Created from slot_recovery",
+      notes: "Creada desde la aplicación Crussader",
     },
   });
 
@@ -184,12 +184,7 @@ if (customer?.preferred_name) {
     },
   });
 
-  console.log("[APPOINTMENT][CREATED]", {
-    appointmentId: appointment.id,
-    slotId: params.slotId,
-    slotServiceId: params.serviceId,
-    customerId: params.customerId,
-  });
+
 
   return {
     ok: true,

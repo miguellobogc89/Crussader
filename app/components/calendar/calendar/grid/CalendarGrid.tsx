@@ -3,7 +3,7 @@
 
 import { useEffect, useRef } from "react";
 
-import CalendarCell from "../Grid/CalendarCell";
+import CalendarCell from "./CalendarCell";
 import AppointmentBlock from "../../appointments/AppointmentBlock";
 import CurrentTimeLineFullSpan from "../CurrentTimeLineFullSpan";
 import HourGuides from "../HourGuides";
@@ -199,7 +199,10 @@ export default function CalendarGrid({
 
                   if (!itemLayout) return null;
 
+
+
                   return (
+                    
                     <div
                       key={appointment.id}
                       className="absolute z-20"
@@ -212,6 +215,7 @@ export default function CalendarGrid({
                         width: `calc(${itemLayout.widthPct}% - ${COL_GAP_PX}px)`,
                       }}
                     >
+                      
                       <AppointmentBlock
                         id={appointment.id}
                         startAtISO={appointment.startAt}
@@ -226,9 +230,10 @@ export default function CalendarGrid({
                         customerName={appointment.customerName}
                         customerPhone={appointment.customerPhone}
                         source={appointment.source}
+                        hasRecoverySlot={appointment.hasRecoverySlot}
                       />
                     </div>
-                  );
+                  );  
                 })}
               </div>
             );

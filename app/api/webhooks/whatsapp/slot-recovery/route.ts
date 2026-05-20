@@ -22,7 +22,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  console.log("[WA][WEBHOOK][POST_RECEIVED]");
+  
   const body = await req.json().catch(() => null);
 
   if (!body) {
@@ -40,7 +40,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    console.log("[WA][WEBHOOK][DEBUG]", JSON.stringify(value, null, 2));
 
     await handleSlotRecoveryStatuses(value);
     await handleSlotRecoveryReplies(value);

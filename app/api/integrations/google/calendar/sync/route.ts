@@ -292,7 +292,7 @@ const employeeId = matchedEmployee?.id ?? null;
             ? GOOGLE_EVENT_COLORS[event.colorId] ?? "#4285F4"
             : "#4285F4";
 
-        await prisma.appointment.upsert({
+        const existingAppointment = await prisma.appointment.findUnique({
           where: {
             externalProvider_externalCalendarId_externalEventId: {
               externalProvider: "google-calendar",
@@ -300,32 +300,40 @@ const employeeId = matchedEmployee?.id ?? null;
               externalEventId: event.id,
             },
           },
-          update: {
-            locationId,
-            employeeId,
-            startAt,
-            endAt,
-            status: AppointmentStatus.BOOKED,
-            customerName: event.summary || null,
-            notes: event.description || null,
-            serviceName: event.summary || "Evento Google",
-            externalColor,
-          },
-          create: {
-            locationId,
-            employeeId,
-            startAt,
-            endAt,
-            status: AppointmentStatus.BOOKED,
-            customerName: event.summary || null,
-            notes: event.description || null,
-            serviceName: event.summary || "Evento Google",
-            externalProvider: "google-calendar",
-            externalCalendarId: calendarId,
-            externalEventId: event.id,
-            externalColor,
+          select: {
+            id: true,
           },
         });
+
+        if (existingAppointment) {
+          await prisma.appointment.update({
+            where: {
+              id: existingAppointment.id,
+            },
+            data: {
+              startAt,
+              endAt,
+              externalColor,
+            },
+          });
+        } else {
+          await prisma.appointment.create({
+            data: {
+              locationId,
+              employeeId,
+              startAt,
+              endAt,
+              status: AppointmentStatus.BOOKED,
+              customerName: event.summary || null,
+              notes: event.description || null,
+              serviceName: event.summary || "Evento Google",
+              externalProvider: "google-calendar",
+              externalCalendarId: calendarId,
+              externalEventId: event.id,
+              externalColor,
+            },
+          });
+        }
 
         imported += 1;
         importedByCalendar[calendarId] += 1;

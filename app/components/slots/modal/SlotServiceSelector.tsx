@@ -21,6 +21,7 @@ import type {
 
 type SlotServiceSelectorProps = {
   locationId: string;
+  employeeId?: string;
   slotId: string;
   slotDurationMin: number;
   selectedServices: SelectedServiceItem[];
@@ -28,7 +29,7 @@ type SlotServiceSelectorProps = {
   onSaved?: () => void;
 };
 
-const SERVICES_LIST_ENDPOINT = "/api/slots/services/list";
+const SERVICES_LIST_ENDPOINT = "/api/slots/employees/services/list";
 const SERVICES_CREATE_ENDPOINT = "/api/slots/services/create";
 
 function normalizePrice(value: string): number | null {
@@ -130,6 +131,7 @@ function buildSelectedSavedServices(
 
 export function SlotServiceSelector({
   locationId,
+  employeeId,
   slotId,
   slotDurationMin,
   selectedServices,
@@ -175,6 +177,9 @@ const lastSlotIdRef = useRef("");
 
         const params = new URLSearchParams();
         params.set("locationId", locationId);
+        if (employeeId) {
+          params.set("employeeId", employeeId);
+        }
 
         const response = await fetch(
           `${SERVICES_LIST_ENDPOINT}?${params.toString()}`,

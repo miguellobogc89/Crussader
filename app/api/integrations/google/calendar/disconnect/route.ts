@@ -29,33 +29,27 @@ export async function DELETE() {
     );
   }
 
-  await prisma.$transaction([
-    prisma.appointment.deleteMany({
-      where: {
-        externalProvider: "google-calendar",
-      },
-    }),
+await prisma.$transaction([
+  prisma.external_calendar_connection.updateMany({
+    where: {
+      user_id: dbUser.id,
+      provider: "google-calendar",
+    },
+    data: {
+      sync_enabled: false,
+    },
+  }),
 
-    prisma.external_calendar_event.deleteMany({
-      where: {
-        provider: "google-calendar",
-      },
-    }),
-
-    prisma.external_calendar_connection.deleteMany({
-      where: {
-        user_id: dbUser.id,
-        provider: "google-calendar",
-      },
-    }),
-
-    prisma.externalConnection.deleteMany({
-      where: {
-        userId: dbUser.id,
-        provider: "google-calendar",
-      },
-    }),
-  ]);
+  prisma.externalConnection.updateMany({
+    where: {
+      userId: dbUser.id,
+      provider: "google-calendar",
+    },
+    data: {
+      status: "disconnected",
+    },
+  }),
+]);
 
   return NextResponse.json({
     ok: true,

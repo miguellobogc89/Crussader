@@ -26,6 +26,16 @@ function toWhatsAppButtonTitle(value: string): string {
   return cleanValue.slice(0, 20).trim();
 }
 
+function toWhatsAppRowTitle(value: string): string {
+  const cleanValue = value.trim();
+
+  if (cleanValue.length <= 24) {
+    return cleanValue;
+  }
+
+  return cleanValue.slice(0, 24).trim();
+}
+
 export async function sendServiceSelection({
   to,
   options,
@@ -75,8 +85,8 @@ export async function sendServiceSelection({
               rows: options.map((option) => {
                 return {
                   id: option.id,
-                  title: option.title,
-                  description: option.description ?? "",
+                  title: toWhatsAppRowTitle(option.title),
+                  description: (option.description ?? "").slice(0, 72),
                 };
               }),
             },
@@ -86,10 +96,6 @@ export async function sendServiceSelection({
     };
   }
 
-  console.log(
-    "[WA][SERVICE_SELECTION][PAYLOAD]",
-    JSON.stringify(payload, null, 2),
-  );
 
   const res = await fetch(url, {
     method: "POST",

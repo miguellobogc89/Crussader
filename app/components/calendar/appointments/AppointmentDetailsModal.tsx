@@ -307,19 +307,7 @@ export default function AppointmentDetailsModal({
     };
   }, [open, locationId, companyId]);
 
-useEffect(() => {
-  if (!optionsLoaded || !serviceId || !employeeId) {
-    return;
-  }
 
-  const isStillCompatible = compatibleEmployees.some((employee) => {
-    return employee.id === employeeId;
-  });
-
-  if (!isStillCompatible) {
-    setEmployeeId("");
-  }
-}, [optionsLoaded, serviceId, employeeId, compatibleEmployees]);
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -424,6 +412,45 @@ useEffect(() => {
     }
   }
 
+  async function handleUpdateWithStatus(nextStatus: AppointmentStatusValue) {
+  setStatus(nextStatus);
+
+  if (!appointment || !dateValue || !timeValue) {
+    return;
+  }
+
+  const startAt = buildIsoFromLocal(dateValue, timeValue);
+
+  if (!startAt) {
+    return;
+  }
+
+  setLoading(true);
+
+  await fetch(`/api/calendar/appointments/${appointment.id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      startAt,
+      serviceId: serviceId || appointment.serviceId || null,
+      employeeId: employeeId || appointment.employeeId || null,
+      customerId: customer?.id ?? appointment.customerId ?? null,
+      customerName: customer?.displayName ?? appointment.customerName ?? null,
+      customerPhone: customer?.phone ?? appointment.customerPhone ?? null,
+      customerEmail: customer?.email ?? appointment.customerEmail ?? null,
+      notes: notes || appointment.notes || null,
+      status: nextStatus,
+      isUrgent,
+    }),
+  });
+
+  await onUpdated?.();
+  setLoading(false);
+  onClose();
+} 
+
   if (!appointment) {
     return null;
   }
@@ -457,7 +484,10 @@ footer={
 
     <button
       type="button"
-      onClick={onCancelAppointment}
+      onClick={() => {
+        setStatus("CANCELLED");
+        void handleUpdateWithStatus("CANCELLED");
+      }}
       disabled={loading}
       className="h-10 rounded-xl border border-red-200 px-4 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-60"
     >

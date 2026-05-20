@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { PrismaClient, LocationStatus, AppointmentStatus } from "@prisma/client";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { createGoogleEventForAppointment } from "@/lib/integrations/google-calendar/appointments";
 
 let prisma: PrismaClient;
 
@@ -194,6 +195,12 @@ const activeGoogleCalendarIds = activeGoogleCalendars
         externalEventId: true,
         externalColor: true,
 
+        slot_recovery_slot_slot_recovery_slot_source_appointment_idToAppointment: {
+          select: {
+            id: true,
+          },
+        },
+
         service: {
           select: {
             name: true,
@@ -214,10 +221,15 @@ const activeGoogleCalendarIds = activeGoogleCalendars
           },
         },
       },
-      orderBy: [{ startAt: "asc" }],
+      orderBy: [
+  { startAt: "asc" },
+  { endAt: "asc" },
+  { employeeId: "asc" },
+  { id: "asc" },
+],
     });
 
-
+    
 
     return NextResponse.json({
       ok: true,
@@ -264,6 +276,10 @@ items: [
     externalCalendarId: appointment.externalCalendarId,
     externalEventId: appointment.externalEventId,
     isUrgent: appointment.isUrgent,
+    hasRecoverySlot:
+      appointment
+        .slot_recovery_slot_slot_recovery_slot_source_appointment_idToAppointment
+        .length > 0,
   })),
 ],
     });
@@ -511,6 +527,8 @@ export async function POST(req: Request) {
 
       return appointment;
     });
+
+    await createGoogleEventForAppointment(created.id);
 
     return NextResponse.json({
       ok: true,

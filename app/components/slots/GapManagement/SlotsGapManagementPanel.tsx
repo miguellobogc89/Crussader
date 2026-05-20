@@ -482,14 +482,15 @@ if (!response.ok || !data?.ok) {
                   </div>
                 </div>
 
-                <SlotServiceSelector
-                  locationId={locationId}
-                  slotId={slot?.id || ""}
-                  slotDurationMin={durationMinutes}
-                  selectedServices={selectedServices}
-                  onChange={setSelectedServices}
-                  onSaved={handleServicesSaved}
-                />
+<SlotServiceSelector
+  locationId={locationId}
+  employeeId={slot?.employeeId || ""}
+  slotId={slot?.id || ""}
+  slotDurationMin={durationMinutes}
+  selectedServices={selectedServices}
+  onChange={setSelectedServices}
+  onSaved={handleServicesSaved}
+/>
 
                 <GapWhatsAppPreview
                   services={selectedServices}

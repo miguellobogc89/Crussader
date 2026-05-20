@@ -26,6 +26,7 @@ type Props = {
   customerName?: string | null;
   customerPhone?: string | null;
   source?: string | null;
+  hasRecoverySlot?: boolean;
 };
 
 const STATUS_CONFIG: Record<
@@ -89,17 +90,27 @@ export default function AppointmentBlock({
   customerName,
   customerPhone,
   source,
+  hasRecoverySlot,
   onSelect,
   onEdit,
 }: Props) {
   const color = employeeColor || serviceColor || "#0B6CF4";
   const normalizedStatus = status?.toUpperCase();
 
-  const statusConfig = normalizedStatus
-    ? STATUS_CONFIG[normalizedStatus] ?? null
-    : null;
+const statusConfig = normalizedStatus
+  ? STATUS_CONFIG[normalizedStatus] ?? null
+  : null;
 
-  const StatusIcon = statusConfig?.icon;
+const effectiveStatusConfig =
+  hasRecoverySlot && normalizedStatus === "CANCELLED"
+    ? {
+        label: "Convertida",
+        className: "text-sky-700",
+        icon: Sparkles,
+      }
+    : statusConfig;
+
+const StatusIcon = effectiveStatusConfig?.icon;
   const isCancelled = normalizedStatus === "CANCELLED";
 
   const visibleServiceName =
@@ -115,14 +126,14 @@ export default function AppointmentBlock({
   onDoubleClick={() => onEdit?.(id)}
   onMouseEnter={() => setIsHovered(true)}
   onMouseLeave={() => setIsHovered(false)}
-  className="
-    h-full w-full cursor-pointer overflow-hidden rounded-xl
-    border-0 border-l-2 px-2 py-1.5 text-left
-    transition-colors
-    duration-100
-    ease-out
-    shadow-[1px_1px_2px_rgba(15,23,42,0.10)]
-  "
+className="
+  h-[calc(100%-4px)] w-full translate-y-[2px] cursor-pointer overflow-hidden rounded-xl
+  border-0 border-l-2 px-2 py-1.5 text-left
+  transition-colors
+  duration-100
+  ease-out
+  shadow-[0_1px_3px_rgba(15,23,42,0.14)]
+"
   style={{
     borderLeftColor: color,
     backgroundColor: isHovered ? hoverBg : baseBg,
@@ -167,7 +178,9 @@ export default function AppointmentBlock({
               ].join(" ")}
             >
               <StatusIcon className="h-2.5 w-2.5" strokeWidth={2.5} />
-              {statusConfig.label}
+{hasRecoverySlot && normalizedStatus === "CANCELLED"
+  ? "Convertida"
+  : statusConfig.label}
             </span>
           ) : null}
         </div>

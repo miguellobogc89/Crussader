@@ -276,6 +276,8 @@ const calendarRows = useMemo<CalendarRow[]>(() => {
         fetchCalendars(),
         fetchConnectedCalendars(),
       ]);
+
+      onClose();
     } catch (err) {
       console.error("[GoogleCalendarModal] applyChanges error:", err);
     } finally {

@@ -29,8 +29,8 @@ export async function GET(req: NextRequest) {
   );
 
 const scopes = [
+  "https://www.googleapis.com/auth/calendar.app.created",
   "https://www.googleapis.com/auth/calendar.readonly",
-  //"https://www.googleapis.com/auth/calendar.events.readonly",
   //"https://www.googleapis.com/auth/calendar.calendarlist.readonly",
 ];
 
@@ -40,8 +40,6 @@ const scopes = [
     userId,
     accountEmail,
   });
-
-  console.log("[GOOGLE CALENDAR CONNECT] scopes usados:", scopes);
 
   const authUrl = client.generateAuthUrl({
     access_type: "offline",

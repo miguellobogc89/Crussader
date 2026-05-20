@@ -61,14 +61,7 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    console.log("[EMPLOYEES_API_DEBUG]", {
-  locationId,
-  companyId,
-  activeCompanyId:
-    companyId ??
-    "fallback-bootstrap",
-  whereClause,
-});
+
 
     const rows = await prisma.employee.findMany({
       where: whereClause,
@@ -156,10 +149,7 @@ joined_at: true,
       },
     });
 
-    console.log("[EMPLOYEES_API_ROWS]", {
-  count: rows.length,
-  ids: rows.map((e) => e.id),
-});
+
 
     const items = rows.map((e) => {
       const roles = e.roles.map((r) => ({

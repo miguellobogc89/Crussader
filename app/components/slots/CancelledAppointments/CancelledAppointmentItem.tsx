@@ -23,20 +23,13 @@ export function CancelledAppointmentRow({ item, onCreateSlot }: Props) {
             {formatTimeRange(item.startAt, item.endAt)}
           </div>
 
-          <div className="mt-0.5 truncate text-[12px] font-medium text-slate-800">
-            {item.customerName ?? item.title ?? "Cita cancelada"}
-          </div>
+<div className="mt-0.5 truncate text-[12px] font-semibold text-slate-900">
+  {item.employeeName ?? "Empleado no asignado"}
+</div>
 
-          <div className="mt-1 truncate text-[11px] text-muted-foreground">
-            {item.serviceName ?? "Servicio no identificado"}
-            {item.employeeName ? ` · ${item.employeeName}` : ""}
-          </div>
-
-          {item.notes ? (
-            <div className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
-              {item.notes}
-            </div>
-          ) : null}
+<div className="mt-1 truncate text-[11px] text-muted-foreground">
+  {item.serviceName ?? "Servicio no identificado"}
+</div>
         </div>
 
         <Button

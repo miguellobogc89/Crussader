@@ -35,6 +35,7 @@ type AppointmentLite = {
   externalCalendarId?: string | null;
   externalEventId?: string | null;
   isUrgent?: boolean;
+  hasRecoverySlot?: boolean;
 };
 
 type Props = {
@@ -188,39 +189,52 @@ export default function CalendarView({
     const json = await res.json().catch(() => null);
 
     if (!res.ok || !json?.ok) {
-      setAppointments([]);
+      console.warn("[calendar appointments] load failed", res.status);
       return;
     }
 
     const items: AppointmentLite[] = Array.isArray(json.items) ? json.items : [];
 
-    setAppointments([
-      ...items.map((item) => ({
-        id: item.id,
-        locationId: item.locationId,
-        startAt: item.startAt,
-        endAt: item.endAt,
-        serviceId: item.serviceId ?? null,
-        serviceName: item.serviceName ?? null,
-        serviceColor: item.serviceColor ?? null,
-        employeeId: item.employeeId ?? null,
-        employeeName: item.employeeName ?? null,
-        employeeColor: item.employeeColor ?? null,
-        resourceId: item.resourceId ?? null,
-        resourceName: item.resourceName ?? null,
-        status: item.status ?? null,
-        customerId: item.customerId ?? null,
-        customerName: item.customerName ?? null,
-        customerPhone: item.customerPhone ?? null,
-        customerEmail: item.customerEmail ?? null,
-        notes: item.notes ?? null,
-        source: item.source ?? "internal",
-        externalProvider: item.externalProvider ?? null,
-        externalCalendarId: item.externalCalendarId ?? null,
-        externalEventId: item.externalEventId ?? null,
-        isUrgent: Boolean(item.isUrgent),
-      })),
-    ]);
+    const nextAppointments: CalendarAppt[] = items.map((item) => ({
+      id: item.id,
+      locationId: item.locationId,
+      startAt: item.startAt,
+      endAt: item.endAt,
+      serviceId: item.serviceId ?? null,
+      serviceName: item.serviceName ?? null,
+      serviceColor: item.serviceColor ?? null,
+      employeeId: item.employeeId ?? null,
+      employeeName: item.employeeName ?? null,
+      employeeColor: item.employeeColor ?? null,
+      resourceId: item.resourceId ?? null,
+      resourceName: item.resourceName ?? null,
+      status: item.status ?? null,
+      customerId: item.customerId ?? null,
+      customerName: item.customerName ?? null,
+      customerPhone: item.customerPhone ?? null,
+      customerEmail: item.customerEmail ?? null,
+      notes: item.notes ?? null,
+      source: item.source ?? "internal",
+      externalProvider: item.externalProvider ?? null,
+      externalCalendarId: item.externalCalendarId ?? null,
+      externalEventId: item.externalEventId ?? null,
+      isUrgent: Boolean(item.isUrgent),
+      hasRecoverySlot: Boolean(item.hasRecoverySlot),
+    }));
+
+    setAppointments((prev) => {
+      const merged = new Map<string, CalendarAppt>();
+
+      for (const appt of prev) {
+        merged.set(appt.id, appt);
+      }
+
+      for (const appt of nextAppointments) {
+        merged.set(appt.id, appt);
+      }
+
+      return Array.from(merged.values());
+    });
   }, [locationId, range]);
 
   useEffect(() => {

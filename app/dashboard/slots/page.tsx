@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Inter } from "next/font/google";
 import PageShellNoScroll from "@/app/components/layouts/PageShellNoScroll";
 import { SlotsGapManagementPanel } from "@/app/components/slots/GapManagement/SlotsGapManagementPanel";
 import { SlotsGapControlPanel } from "@/app/components/slots/GapManagement/SlotsGapControlPanel";
@@ -16,10 +15,6 @@ import type { SelectedServiceItem } from "@/app/components/slots/slots.types";
 import { getEffectiveSlotStatus } from "@/app/components/slots/helpers/slotsWeeklyCalendarItemHelpers";
 import { toast } from "@/app/components/ui/use-toast";
 import { SlotRecoveryToastListener } from "@/app/components/slots/SlotRecoveryToastListener";
-
-const inter = Inter({
-  subsets: ["latin"],
-});
 
 type SlotTemplateData = {
   template_name: string;
@@ -220,22 +215,20 @@ const shouldOpenManagementPanel =
 
 export default function SlotsPage() {
   return (
-    <div className={`${inter.className} flex h-full min-h-0 overflow-hidden`}>
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <PageShellNoScroll
-          title="Gestión de huecos disponibles"
-          description="Recupera citas canceladas automáticamente con WhatsApp."
-          titleIconName="CalendarClock"
-        >
-          {({ bootstrapCompanyId, bootstrapLocationId, companyName }) => (
-            <SlotsPageContent
-              bootstrapCompanyId={bootstrapCompanyId ?? null}
-              bootstrapLocationId={bootstrapLocationId ?? null}
-              companyName={companyName ?? null}
-            />
-          )}
-        </PageShellNoScroll>
-      </div>
+    <div className="flex h-full min-h-0 overflow-hidden">
+      <PageShellNoScroll
+        title="Gestión de huecos disponibles"
+        description="Recupera citas canceladas automáticamente con WhatsApp."
+        titleIconName="CalendarClock"
+      >
+        {({ bootstrapCompanyId, bootstrapLocationId, companyName }) => (
+          <SlotsPageContent
+            bootstrapCompanyId={bootstrapCompanyId ?? null}
+            bootstrapLocationId={bootstrapLocationId ?? null}
+            companyName={companyName ?? null}
+          />
+        )}
+      </PageShellNoScroll>
     </div>
   );
 }

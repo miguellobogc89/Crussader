@@ -109,9 +109,9 @@ function resolveInitialLocation(data: BootstrapData): {
     const saved = localStorage.getItem("dashboard:locationId");
     const validSaved = !!saved && locations.some((location) => location.id === saved);
 
-    if (validSaved) {
-      defaultId = saved;
-    }
+if (validSaved && saved === serverLocationId) {
+  defaultId = saved;
+}
   }
 
   if (!defaultId && serverLocationId) {

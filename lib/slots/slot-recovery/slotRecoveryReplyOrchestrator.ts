@@ -108,21 +108,7 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
       continue;
     }
 
-    console.log("[WA][SLOT_RECOVERY][MATCHED_RECIPIENT]", {
-      recipientId: matchedRecipient.id,
-      slotId: matchedRecipient.slot_recovery_slot_id,
-      customerId: matchedRecipient.customer_id,
-      contextMessageId,
-      fromPhone,
-      replyType,
-      replyPayload,
-      repliedAt: safeRepliedAt,
-    });
 
-    console.log("[WA][REPLY_TYPE_DEBUG]", {
-  replyType,
-  replyPayload,
-});
 
     if (!isBookReply(replyType) && !selectedServiceId) {
       let nextStatus = "replied";

@@ -43,7 +43,6 @@ export async function GET(req: NextRequest) {
 
   try {
     const { tokens } = await client.getToken(code);
-    console.log("[GOOGLE CALENDAR CALLBACK] tokens.scope:", tokens.scope);
 
     const accessToken = typeof tokens.access_token === "string" ? tokens.access_token : null;
     const refreshToken = typeof tokens.refresh_token === "string" ? tokens.refresh_token : null;
@@ -67,6 +66,7 @@ export async function GET(req: NextRequest) {
           scope: scopeStr || undefined,
           companyId: companyId || undefined,
           accountEmail: accountEmail || undefined,
+          status: "active",
         },
       });
     } else {
@@ -80,6 +80,7 @@ export async function GET(req: NextRequest) {
           scope: scopeStr || undefined,
           companyId: companyId || undefined,
           accountEmail: accountEmail || undefined,
+          status: "active",
         },
       });
     }

@@ -217,6 +217,11 @@ const asideWidthClass = collapsed
             try {
               await setActiveCompanyCookieAction(companyId);
               await fetchFromApi();
+
+              console.log(
+  "[COMPANY_SWITCH]",
+  useBootstrapStore.getState().data
+);
               router.refresh();
             } catch (e) {
               console.error("[sidebar] switch company failed", e);

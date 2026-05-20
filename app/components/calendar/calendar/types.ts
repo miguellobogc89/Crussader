@@ -33,6 +33,7 @@ export type CalendarAppt = {
   externalCalendarId?: string | null;
   externalEventId?: string | null;
   isUrgent?: boolean;
+  hasRecoverySlot?: boolean;
 };
 
 export type Appointment = CalendarAppt;
