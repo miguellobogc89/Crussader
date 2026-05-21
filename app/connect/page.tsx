@@ -55,8 +55,8 @@ export default async function ConnectPage() {
   devLog("[connect/page] hasAnyLocation =", hasAnyLocation);
 
   if (hasAnyLocation?.id) {
-    devLog("[connect/page] redirect -> /dashboard/home");
-    redirect("/dashboard/home");
+    devLog("[connect/page] redirect -> /dashboard/slots");
+    redirect("/dashboard/slots");
   }
 
   devLog("[connect/page] no locations for user -> render ConnectClient");

@@ -7,7 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import { can } from "@/lib/permissions"; // ← NUEVO
 
-const ACTIVE_COOKIE = "active_company_id";
+const ACTIVE_COMPANY_COOKIE = "active_company_id";
+const ACTIVE_LOCATION_COOKIE = "active_location_id";
 
 export async function setActiveCompanyCookieAction(companyId: string) {
   const session = await getServerSession(authOptions);
@@ -35,13 +36,16 @@ export async function setActiveCompanyCookieAction(companyId: string) {
     if (!belongs) throw Object.assign(new Error("forbidden_company"), { status: 403 });
   }
 
-  const jar = await cookies();
-  jar.set(ACTIVE_COOKIE, companyId, {
-    path: "/",
-    sameSite: "lax",
-    httpOnly: false,
-    maxAge: 60 * 60 * 24 * 365,
-  });
+const jar = await cookies();
 
-  return true;
+jar.set(ACTIVE_COMPANY_COOKIE, companyId, {
+  path: "/",
+  sameSite: "lax",
+  httpOnly: false,
+  maxAge: 60 * 60 * 24 * 365,
+});
+
+jar.delete(ACTIVE_LOCATION_COOKIE);
+
+return true;
 }

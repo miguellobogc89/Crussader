@@ -1,8 +1,15 @@
 // app/dashboard/mybusiness/page.tsx
-"use client";
-
-import MyBusinessShell from "@/app/components/mybusiness/core/MyBusinessShell";
+import PageShellNoScroll from "@/app/components/layouts/PageShellNoScroll";
+import EmployeesPageClient from "@/app/components/mybusiness/employees/EmployeesPageClient";
 
 export default function MyBusinessPage() {
-  return <MyBusinessShell />;
+  return (
+    <PageShellNoScroll
+      title="My business"
+      description="Gestiona empleados, servicios y configuración operativa del negocio"
+      titleIconName="Building2"
+    >
+      <EmployeesPageClient />
+    </PageShellNoScroll>
+  );
 }

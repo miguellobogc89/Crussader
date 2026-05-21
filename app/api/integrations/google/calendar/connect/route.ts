@@ -28,11 +28,11 @@ export async function GET(req: NextRequest) {
     redirectUri
   );
 
-  const scopes = [
-    "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
-    "https://www.googleapis.com/auth/calendar.app.created",
-    "https://www.googleapis.com/auth/calendar.freebusy",
-  ];
+const scopes = [
+  "https://www.googleapis.com/auth/calendar.app.created",
+  "https://www.googleapis.com/auth/calendar.readonly",
+  //"https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+];
 
   const state = JSON.stringify({
     redirect_after: returnTo,

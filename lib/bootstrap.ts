@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import "server-only";
 
-/** Relación mínima para el Type de Location cuando cargamos por company */
+/** Relación mínima para el Type de Location cuando cargamos en bootstrap */
 type LocationTypeRel = {
   id: string;
   name: string;
@@ -30,7 +30,6 @@ export type BootstrapData = {
     companyId: string;
     role: "OWNER" | "ADMIN" | "MEMBER" | null;
   }>;
-  /** ✅ NUEVO: misma info pero con nombre resuelto */
   companiesResolved?: Array<{
     id: string;
     name: string;
@@ -45,12 +44,22 @@ export type BootstrapData = {
     country: string | null;
     website: string | null;
     brandColor: string | null;
-    reviewsAvg: string | null; // Decimal -> string
+    reviewsAvg: string | null;
     reviewsCount: number;
     lastSyncAt: Date | null;
   } | null;
-  /** ✅ NUEVO: alias cómodo para el cliente */
   activeCompanyResolved?: { id: string; name: string } | null;
+  activeLocationResolved?: {
+    id: string;
+    title: string;
+    companyId: string;
+  } | null;
+  sessionContext: {
+    userId: string;
+    userRole: "system_admin" | "org_admin" | "user" | "test";
+    companyId: string | null;
+    locationId: string | null;
+  };
   locations: Array<{
     id: string;
     companyId: string;
@@ -78,9 +87,9 @@ export type BootstrapData = {
     instagramUrl: string | null;
     facebookUrl: string | null;
     timezone: string | null;
-    latitude: string | null; // Decimal -> string
-    longitude: string | null; // Decimal -> string
-    reviewsAvg: string | null; // Decimal -> string
+    latitude: string | null;
+    longitude: string | null;
+    reviewsAvg: string | null;
     reviewsCount: number;
     lastSyncAt: Date | null;
     createdAt: Date;
@@ -100,15 +109,17 @@ export type BootstrapData = {
   }>;
 };
 
-const ACTIVE_COOKIE = "active_company_id";
+const ACTIVE_LOCATION_COOKIE = "active_location_id";
+const ACTIVE_COMPANY_COOKIE = "active_company_id";
 
-/** Carga única: usuario + empresas + (empresa activa por cookie/primera) + ubicaciones + conexiones */
 export async function getBootstrapData(): Promise<BootstrapData> {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? null;
-  if (!email) throw Object.assign(new Error("unauth"), { status: 401 });
 
-  // ---- Usuario
+  if (!email) {
+    throw Object.assign(new Error("unauth"), { status: 401 });
+  }
+
   const user = await prisma.user.findUnique({
     where: { email },
     select: {
@@ -122,13 +133,24 @@ export async function getBootstrapData(): Promise<BootstrapData> {
       onboardingStatus: true,
     },
   });
-  if (!user) throw Object.assign(new Error("no_user"), { status: 400 });
+
+  if (!user) {
+    throw Object.assign(new Error("no_user"), { status: 400 });
+  }
 
   const isAdmin = user.role === "system_admin" || user.role === "org_admin";
 
-  // ---- Empresas
-  let userCompanies: Array<{ companyId: string; role: "OWNER" | "ADMIN" | "MEMBER" | null }> = [];
-  let companiesResolved: Array<{ id: string; name: string; role: "OWNER" | "ADMIN" | "MEMBER" | null }> = [];
+  // Compatibilidad: seguimos exponiendo companies, pero ya no gobiernan el flujo.
+  let userCompanies: Array<{
+    companyId: string;
+    role: "OWNER" | "ADMIN" | "MEMBER" | null;
+  }> = [];
+
+  let companiesResolved: Array<{
+    id: string;
+    name: string;
+    role: "OWNER" | "ADMIN" | "MEMBER" | null;
+  }> = [];
 
   if (isAdmin) {
     const allCompanies = await prisma.company.findMany({
@@ -136,70 +158,50 @@ export async function getBootstrapData(): Promise<BootstrapData> {
       orderBy: { createdAt: "asc" },
     });
 
-    // compatibilidad: mismo shape antiguo
-    userCompanies = allCompanies.map((c) => ({ companyId: c.id, role: "ADMIN" }));
+    userCompanies = allCompanies.map((c) => ({
+      companyId: c.id,
+      role: "ADMIN",
+    }));
 
-    // dropdown: todas con nombre
-    companiesResolved = allCompanies.map((c) => ({ id: c.id, name: c.name, role: "ADMIN" }));
+    companiesResolved = allCompanies.map((c) => ({
+      id: c.id,
+      name: c.name,
+      role: "ADMIN",
+    }));
   } else {
-    userCompanies = await prisma.userCompany.findMany({
+    const rawUserCompanies = await prisma.userCompany.findMany({
       where: { userId: user.id },
       select: { companyId: true, role: true },
       orderBy: { createdAt: "asc" },
     });
 
-    const userCompaniesWithName = await prisma.userCompany.findMany({
+    userCompanies = rawUserCompanies;
+
+    const rawUserCompaniesWithName = await prisma.userCompany.findMany({
       where: { userId: user.id },
       select: {
         companyId: true,
         role: true,
-        Company: { select: { id: true, name: true } },
+        Company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
       orderBy: { createdAt: "asc" },
     });
 
-    companiesResolved = userCompaniesWithName.map((uc) => ({
+    companiesResolved = rawUserCompaniesWithName.map((uc) => ({
       id: uc.Company?.id ?? uc.companyId,
       name: uc.Company?.name ?? `Empresa ${uc.companyId.slice(0, 6)}…`,
       role: uc.role,
     }));
   }
 
-  // LEER cookie (no escribir aquí)
-  const jar = await cookies(); // ✅ En Next 15 es async
-  const cookieCompanyId = jar.get(ACTIVE_COOKIE)?.value ?? null;
-
-  // Preferimos cookie si pertenece al usuario; si no, la primera (admins: cualquier)
-  const allowedCompanyIds = new Set(userCompanies.map((uc) => uc.companyId));
-  const activeCompanyId =
-    (cookieCompanyId && allowedCompanyIds.has(cookieCompanyId) ? cookieCompanyId : null) ??
-    userCompanies[0]?.companyId ??
-    null;
-
-  // ---- Empresa activa (si hay)
-  const activeCompany = activeCompanyId
-    ? await prisma.company.findUnique({
-        where: { id: activeCompanyId },
-        select: {
-          id: true,
-          name: true,
-          logoUrl: true,
-          plan: true,
-          city: true,
-          country: true,
-          website: true,
-          brandColor: true,
-          reviewsAvg: true,
-          reviewsCount: true,
-          lastSyncAt: true,
-        },
-      })
-    : null;
-
-  // ---- Ubicaciones de la activa
-  const rawLocations = activeCompanyId
+  // Base nueva real: locations accesibles por user
+  const rawUserLocations = isAdmin
     ? await prisma.location.findMany({
-        where: { companyId: activeCompanyId },
         select: {
           id: true,
           companyId: true,
@@ -238,19 +240,118 @@ export async function getBootstrapData(): Promise<BootstrapData> {
         },
         orderBy: { createdAt: "asc" },
       })
-    : [];
+    : await prisma.userLocation.findMany({
+        where: { userId: user.id },
+        select: {
+          location: {
+            select: {
+              id: true,
+              companyId: true,
+              title: true,
+              slug: true,
+              status: true,
+              type: true,
+              address: true,
+              address2: true,
+              openingHours: true,
+              city: true,
+              region: true,
+              postalCode: true,
+              country: true,
+              countryCode: true,
+              phone: true,
+              email: true,
+              website: true,
+              googleName: true,
+              googlePlaceId: true,
+              googleLocationId: true,
+              googleAccountId: true,
+              externalConnectionId: true,
+              featuredImageUrl: true,
+              instagramUrl: true,
+              facebookUrl: true,
+              timezone: true,
+              latitude: true,
+              longitude: true,
+              reviewsAvg: true,
+              reviewsCount: true,
+              lastSyncAt: true,
+              createdAt: true,
+              updatedAt: true,
+              isFeatured: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      }).then((rows) => rows.map((row) => row.location));
 
-  const locations = rawLocations.map((l) => ({
+  const locations = rawUserLocations.map((l) => ({
     ...l,
     latitude: l.latitude ? l.latitude.toString() : null,
     longitude: l.longitude ? l.longitude.toString() : null,
     reviewsAvg: l.reviewsAvg ? l.reviewsAvg.toString() : null,
   }));
 
-  // ---- Conexiones externas (sin tokens)
-  const connections = activeCompanyId
+const jar = await cookies();
+
+const cookieCompanyId = jar.get(ACTIVE_COMPANY_COOKIE)?.value ?? null;
+const cookieLocationId = jar.get(ACTIVE_LOCATION_COOKIE)?.value ?? null;
+
+const allowedCompanyIds = new Set(companiesResolved.map((c) => c.id));
+
+const activeCompanyIdFromCookie =
+  cookieCompanyId && allowedCompanyIds.has(cookieCompanyId)
+    ? cookieCompanyId
+    : null;
+
+const locationsForActiveCompany = activeCompanyIdFromCookie
+  ? locations.filter((l) => l.companyId === activeCompanyIdFromCookie)
+  : locations;
+
+const allowedLocationIds = new Set(locationsForActiveCompany.map((l) => l.id));
+
+const activeLocation =
+  cookieLocationId && allowedLocationIds.has(cookieLocationId)
+    ? locationsForActiveCompany.find((l) => l.id === cookieLocationId) ?? null
+    : locationsForActiveCompany[0] ?? null;
+
+  const activeLocationResolved = activeLocation
+    ? {
+        id: activeLocation.id,
+        title: activeLocation.title,
+        companyId: activeLocation.companyId,
+      }
+    : null;
+
+  const activeCompany = activeLocation?.companyId
+    ? await prisma.company.findUnique({
+        where: { id: activeLocation.companyId },
+        select: {
+          id: true,
+          name: true,
+          logoUrl: true,
+          plan: true,
+          city: true,
+          country: true,
+          website: true,
+          brandColor: true,
+          reviewsAvg: true,
+          reviewsCount: true,
+          lastSyncAt: true,
+        },
+      })
+    : null;
+
+  const activeCompanyResolved = activeCompany
+    ? {
+        id: activeCompany.id,
+        name: activeCompany.name,
+      }
+    : null;
+
+  const connections = activeCompany?.id
     ? await prisma.externalConnection.findMany({
-        where: { companyId: activeCompanyId },
+        where: { companyId: activeCompany.id },
         select: {
           id: true,
           provider: true,
@@ -266,8 +367,12 @@ export async function getBootstrapData(): Promise<BootstrapData> {
       })
     : [];
 
-  // ✅ NUEVO: alias cómodo para el cliente
-  const activeCompanyResolved = activeCompany ? { id: activeCompany.id, name: activeCompany.name } : null;
+  const sessionContext = {
+    userId: user.id,
+    userRole: user.role,
+    companyId: activeCompany?.id ?? null,
+    locationId: activeLocation?.id ?? null,
+  };
 
   return {
     user: {
@@ -280,8 +385,8 @@ export async function getBootstrapData(): Promise<BootstrapData> {
       timezone: user.timezone ?? null,
       onboardingStatus: (user.onboardingStatus as any) ?? "PENDING",
     },
-    companies: userCompanies, // ← compat
-    companiesResolved, // ← con nombre (admins: todas)
+    companies: userCompanies,
+    companiesResolved,
     activeCompany: activeCompany
       ? {
           id: activeCompany.id,
@@ -292,12 +397,16 @@ export async function getBootstrapData(): Promise<BootstrapData> {
           country: activeCompany.country,
           website: activeCompany.website,
           brandColor: activeCompany.brandColor,
-          reviewsAvg: activeCompany.reviewsAvg ? activeCompany.reviewsAvg.toString() : null,
+          reviewsAvg: activeCompany.reviewsAvg
+            ? activeCompany.reviewsAvg.toString()
+            : null,
           reviewsCount: activeCompany.reviewsCount,
           lastSyncAt: activeCompany.lastSyncAt ?? null,
         }
       : null,
     activeCompanyResolved,
+    activeLocationResolved,
+    sessionContext,
     locations,
     connections,
   };

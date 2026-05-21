@@ -1,14 +1,16 @@
 // app/components/sidebar/sidebar.nav.ts
 import type { NavItem } from "@/app/components/sidebar/types";
 import {
-  Home,
-  MessageSquareText,
-  Building2,
+  LayoutDashboard,
   CalendarDays,
-  Target,
-  FlaskConical,
-  Shield,
+  MessageSquareText,
+  MessageCircleMore,
+  Star,
   MessagesSquare,
+  Settings,
+  Shield,
+  Users,
+  Briefcase,
 } from "lucide-react";
 
 export type SidebarNavItem = NavItem & {
@@ -18,47 +20,45 @@ export type SidebarNavItem = NavItem & {
 export const NAV_ITEMS: SidebarNavItem[] = [
   {
     title: "Inicio",
-    href: "/dashboard/home",
-    icon: Home,
+    href: "/dashboard/slots",
+    icon: LayoutDashboard,
   },
   {
-    title: "Reseñas",
-    href: "/dashboard/reviews",
-    icon: MessageSquareText,
-  },
-  {
-    title: "Mi negocio",
-    href: "/dashboard/mybusiness_old",
-    icon: Building2,
-  },
-  {
-    title: "Turnos de empleados",
+    title: "Calendario",
     href: "/dashboard/calendar",
     icon: CalendarDays,
   },
   {
-    title: "Labs",
-    href: "/dashboard/labs",
-    icon: FlaskConical,
+    title: "Reseñas",
+    href: "/dashboard/reviews",
+    icon: Star,
+  },
+  {
+    title: "Mi negocio",
+    href: "/dashboard/mybusiness",
+    icon: Briefcase,
+  },
+  {
+    title: "WhatsApp",
+    href: "/dashboard/whatsapp",
+    icon: MessageSquareText,
+  },
+  /*{
+    title: "Plantilla",
+    href: "/dashboard/mybusiness/staff",
+    icon: Briefcase,
+  },
+  {
+    title: "Clientes",
+    href: "/dashboard/mybusiness/clients",
+    icon: Users,
   },
 
   // Admin-only
-  {
-    title: "Leads",
-    href: "/dashboard/crm/lead",
-    icon: Target,
-    requiresAdmin: true,
-  },
-  {
-    title: "Mensajes",
-    href: "/dashboard/whatsapp",
-    icon: MessagesSquare,
-    requiresAdmin: true,
-  },
   {
     title: "Admin",
     href: "/dashboard/admin",
     icon: Shield,
     requiresAdmin: true,
-  },
+  },*/
 ];

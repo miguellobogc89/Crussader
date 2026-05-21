@@ -110,6 +110,7 @@ export default function TemplatesListPanel({
   onChangeFilters,
   languages,
   onRefresh,
+  onSync,
   onToggleFavorite,
 }: {
   items: WaTemplate[];
@@ -120,6 +121,7 @@ export default function TemplatesListPanel({
   onChangeFilters: (next: TemplateFilters) => void;
   languages: string[];
   onRefresh: () => void;
+  onSync: () => void | Promise<void>;
   onToggleFavorite: (templateId: string, next: boolean) => void;
 }) {
   const [openCats, setOpenCats] = useState<Record<TemplateCategory, boolean>>({
@@ -244,9 +246,10 @@ export default function TemplatesListPanel({
               type="button"
               variant="outline"
               size="icon"
-              onClick={onRefresh}
-              disabled={showEmptyLoading}
-              aria-label="Refrescar"
+              onClick={onSync}
+              disabled={loading}
+              aria-label="Sincronizar con Meta"
+              title="Sincronizar con Meta"
             >
               <RefreshCw className={["h-4 w-4", loading ? "animate-spin" : ""].join(" ")} />
             </Button>

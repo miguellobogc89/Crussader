@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronsLeft } from "lucide-react";
+import { PanelLeft  } from "lucide-react";
 
 export function Brand({
   collapsed,
@@ -21,7 +21,7 @@ export function Brand({
       <div
         className={[
           "flex items-center gap-2 py-3",
-          collapsed ? "px-2 justify-center" : "px-3 justify-between",
+          collapsed ? "justify-center px-2" : "justify-between px-3",
         ].join(" ")}
       >
         <div
@@ -31,14 +31,19 @@ export function Brand({
           onKeyDown={handleBrandKeyDown}
           className={[
             "flex items-center rounded-md",
-            collapsed ? "p-1 hover:bg-slate-800/60" : "",
-            collapsed ? "" : "gap-2",
+            collapsed ? "p-1 hover:bg-slate-800/60" : "ml-1 gap-2",
           ].join(" ")}
           title={collapsed ? "Expandir" : undefined}
         >
           <div className="flex h-8 w-8 items-center justify-center">
-            <img src="/logo/Logo 1-05.png" alt="Crussader logo" width={32} height={32} />
+            <img
+              src="/logo/Logo 1-05.png"
+              alt="Crussader logo"
+              width={32}
+              height={32}
+            />
           </div>
+
           {!collapsed && (
             <div className="leading-tight">
               <div className="text-md font-semibold text-white">Crussader</div>
@@ -50,11 +55,11 @@ export function Brand({
           <button
             type="button"
             onClick={() => setCollapsed(true)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-300 hover:text-white hover:bg-slate-800 transition-colors ml-auto"
+            className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
             aria-label="Contraer sidebar"
             title="Contraer"
           >
-            <ChevronsLeft className="h-5 w-5" />
+            <PanelLeft className="h-5 w-5" />
           </button>
         )}
       </div>

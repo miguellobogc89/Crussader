@@ -1,19 +1,35 @@
+// app/components/calendar/calendar/index.tsx
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import CalendarToolbar from "./header/CalendarToolbar";
+import type { CalendarToolbarView } from "./header/CalendarViewSelector";
+import CalendarGrid from "./grid/CalendarGrid";
+import MonthView from "./MonthView";
 
-import CalendarToolbar from "@/app/components/calendar/calendar/CalendarToolbar";
-import CalendarGrid from "@/app/components/calendar/calendar/CalendarGrid";
-import DayView from "@/app/components/calendar/calendar/DayView";
-import MonthView from "@/app/components/calendar/calendar/MonthView";
+import type { CalendarAppt } from "./types";
 
-import type { HolidayLite, CalendarAppt } from "@/app/components/calendar/calendar/types";
+type ToolbarView = CalendarToolbarView;
 
-type ToolbarView = "day" | "threeDays" | "workingWeek" | "week" | "month";
+const DEFAULT_START_HOUR = 10;
+const DEFAULT_END_HOUR = 21;
+const ROW_PX = 104;
 
-const START_HOUR = 0;
-const HOURS_COUNT = 24;
-const ROW_PX = 64;
+type Props = {
+  view: ToolbarView;
+  onChangeView: (v: ToolbarView) => void;
+  selectedDate: Date;
+  onChangeDate: (d: Date) => void;
+  onCellClick?: (cellId: string) => void;
+  selectedCellId?: string | null;
+  apptsByDay?: Map<string, CalendarAppt[]>;
+  apptsForMonth?: CalendarAppt[];
+  onAppointmentSelect?: (id: string) => void;
+  onCreateAppointment?: () => void;
+  visibleStartHour: number;
+visibleEndHour: number;
+onChangeVisibleHours: (startHour: number, endHour: number) => void;
+};
 
 function startOfWeekMon(d: Date) {
   const x = new Date(d);
@@ -30,80 +46,88 @@ function addDays(d: Date, n: number) {
   return x;
 }
 
-type ShiftEventLite = {
-  id: string;
-  employeeId: string | null;
-  locationId: string | null;
-  startAt: string; // ISO
-  endAt: string; // ISO
-  kind: string;
-  label: string | null;
-  templateId: string | null;
-};
-
-type Props = {
-  // ✅ ahora controlado desde CalendarView
-  view: ToolbarView;
-  onChangeView: (v: ToolbarView) => void;
-
-  selectedDate: Date;
-  onChangeDate: (d: Date) => void;
-
-  employeeNameById?: (id: string) => string;
-  employeeColorById?: (id: string) => string | null;
-
-  holidays?: HolidayLite[];
-
-  onCellClick?: (cellId: string) => void;
-  selectedCellId?: string | null;
-
-  apptsByDay?: Map<string, CalendarAppt[]>;
-  apptsForDay?: CalendarAppt[];
-  apptsForMonth?: CalendarAppt[];
-
-  shiftEvents?: ShiftEventLite[];
-};
-
 export default function CalendarOnly({
   view,
   onChangeView,
   selectedDate,
   onChangeDate,
-  employeeNameById,
-  employeeColorById,
-  holidays,
   onCellClick,
   selectedCellId,
   apptsByDay,
-  apptsForDay,
   apptsForMonth,
-  shiftEvents,
+  onAppointmentSelect,
+  onCreateAppointment,
+    visibleStartHour,
+  visibleEndHour,
+  onChangeVisibleHours,
+  
 }: Props) {
-  const weekStart = useMemo(() => startOfWeekMon(selectedDate), [selectedDate]);
+
+  const hoursCount = Math.max(
+    1,
+    visibleEndHour - visibleStartHour
+  );
+
+
+  const weekStart = useMemo(
+    () => startOfWeekMon(selectedDate),
+    [selectedDate]
+  );
 
   const days = useMemo(() => {
-    if (view === "day") return [new Date(selectedDate)];
-    if (view === "threeDays") return [addDays(selectedDate, 0), addDays(selectedDate, 1), addDays(selectedDate, 2)];
-    if (view === "workingWeek") {
-      const out: Date[] = [];
-      for (let i = 0; i < 5; i += 1) out.push(addDays(weekStart, i));
-      return out;
-    }
-    if (view === "week") {
-      const out: Date[] = [];
-      for (let i = 0; i < 7; i += 1) out.push(addDays(weekStart, i));
-      return out;
+    if (view === "day") {
+      return [new Date(selectedDate)];
     }
 
-    // month -> grid lo maneja MonthView (no usamos days)
+    if (view === "threeDays") {
+      return [
+        addDays(selectedDate, 0),
+        addDays(selectedDate, 1),
+        addDays(selectedDate, 2),
+      ];
+    }
+
+    if (view === "workingWeek") {
+      return Array.from({ length: 5 }, (_, i) => addDays(weekStart, i));
+    }
+
+    if (view === "week") {
+      return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+    }
+
     return [];
   }, [view, selectedDate, weekStart]);
 
-  const monthTitle = useMemo(() => {
-    const fmt = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" });
-    const s = fmt.format(selectedDate);
-    return s.charAt(0).toUpperCase() + s.slice(1);
-  }, [selectedDate]);
+  const rangeTitle = useMemo(() => {
+    const fmtMonth = new Intl.DateTimeFormat("es-ES", {
+      month: "long",
+      year: "numeric",
+    });
+
+    if (view === "month") {
+      const s = fmtMonth.format(selectedDate);
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+
+    if (view === "day") {
+      return selectedDate.toLocaleDateString("es-ES", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      });
+    }
+
+    const endDate = days[days.length - 1] ?? selectedDate;
+
+    return `${days[0]?.toLocaleDateString("es-ES", {
+      day: "numeric",
+      month: "short",
+    })} - ${endDate.toLocaleDateString("es-ES", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    })}`;
+  }, [view, selectedDate, days]);
 
   function goPrev() {
     if (view === "month") {
@@ -121,11 +145,6 @@ export default function CalendarOnly({
 
     if (view === "threeDays") {
       onChangeDate(addDays(selectedDate, -3));
-      return;
-    }
-
-    if (view === "workingWeek") {
-      onChangeDate(addDays(selectedDate, -7));
       return;
     }
 
@@ -151,96 +170,46 @@ export default function CalendarOnly({
       return;
     }
 
-    if (view === "workingWeek") {
-      onChangeDate(addDays(selectedDate, 7));
-      return;
-    }
-
     onChangeDate(addDays(selectedDate, 7));
   }
 
-  function goToday() {
-    onChangeDate(new Date());
-  }
-
-  function jumpToMonth(year: number, monthIndex: number) {
-    const d = new Date(selectedDate);
-    d.setFullYear(year);
-    d.setMonth(monthIndex);
-    d.setDate(1);
-    onChangeDate(d);
-  }
-
-  void employeeColorById;
-
-  const weekApptsByDay = apptsByDay ? apptsByDay : new Map<string, CalendarAppt[]>();
-  const dayAppts = apptsForDay ? apptsForDay : [];
-  const monthAppts = apptsForMonth ? apptsForMonth : [];
-  const safeShiftEvents = shiftEvents ? shiftEvents : [];
-
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <div className="shrink-0 px-3 py-2 border-b border-border bg-white">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 border-b border-border bg-white px-3 py-2">
         <CalendarToolbar
           view={view}
-          monthTitle={monthTitle}
-          selectedDate={selectedDate}
+          rangeTitle={rangeTitle}
           onPrev={goPrev}
           onNext={goNext}
-          onToday={goToday}
+          onToday={() => onChangeDate(new Date())}
           onChangeView={onChangeView}
-          onJumpToMonth={jumpToMonth}
+          onCreateAppointment={onCreateAppointment}
+          visibleStartHour={visibleStartHour}
+          visibleEndHour={visibleEndHour}
+          onChangeVisibleHours={onChangeVisibleHours}
         />
       </div>
 
-      <div className="flex-1 min-h-0 px-3 pb-3 pt-0 flex flex-col">
-        {view === "week" || view === "workingWeek" || view === "threeDays" ? (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-3">
+        {view !== "month" ? (
           <CalendarGrid
             days={days}
-            employeeNameById={employeeNameById}
-            START_HOUR={START_HOUR}
-            HOURS_COUNT={HOURS_COUNT}
+            START_HOUR={visibleStartHour}
+            HOURS_COUNT={hoursCount}
             ROW_PX={ROW_PX}
-            holidays={holidays}
             onCellClick={onCellClick}
             selectedCellId={selectedCellId}
-            onReachEnd={() => {
-              // en estas vistas, avanzar “bloque”
-              if (view === "threeDays") onChangeDate(addDays(selectedDate, 3));
-              if (view === "workingWeek") onChangeDate(addDays(selectedDate, 7));
-              if (view === "week") onChangeDate(addDays(selectedDate, 7));
-            }}
-            apptsByDay={weekApptsByDay}
-            shiftEvents={safeShiftEvents}
+            onAppointmentSelect={onAppointmentSelect}
+            apptsByDay={apptsByDay ?? new Map()}
           />
-        ) : null}
-
-        {view === "day" ? (
-          <div className="h-full min-h-0 overflow-auto">
-            <DayView
-              date={selectedDate}
-              appts={dayAppts}
-              START_HOUR={START_HOUR}
-              HOURS_COUNT={HOURS_COUNT}
-              ROW_PX={ROW_PX}
-              holidays={holidays}
-              onCellClick={onCellClick}
-              selectedCellId={selectedCellId}
-            />
-          </div>
-        ) : null}
-
-        {view === "month" ? (
-          <div className="h-full min-h-0 overflow-auto">
-            <MonthView
-              anchor={selectedDate}
-              appts={monthAppts}
-              holidays={holidays}
-              onCellClick={onCellClick}
-              selectedCellId={selectedCellId}
-            />
-          </div>
-        ) : null}
+        ) : (
+          <MonthView
+            anchor={selectedDate}
+            appts={apptsForMonth ?? []}
+            onCellClick={onCellClick}
+            selectedCellId={selectedCellId}
+          />
+        )}
       </div>
     </div>
   );

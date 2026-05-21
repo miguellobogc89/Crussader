@@ -13,6 +13,18 @@ const DEFAULT_FILTERS: TemplateFilters = {
   lang: "all",
 };
 
+type TemplatesShellProps = {
+  items: WaTemplate[];
+  loading: boolean;
+  selected: WaTemplate | null;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onRefresh: () => void | Promise<void>;
+  onSync: () => void | Promise<void>;
+  languages: string[];
+  onToggleFavorite: (templateId: string, next: boolean) => void | Promise<void>;
+};
+
 export default function TemplatesShell({
   items,
   loading,
@@ -20,18 +32,10 @@ export default function TemplatesShell({
   selectedId,
   onSelect,
   onRefresh,
+  onSync,
   languages,
   onToggleFavorite,
-}: {
-  items: WaTemplate[];
-  loading: boolean;
-  selected: WaTemplate | null;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  onRefresh: () => void;
-  languages: string[];
-  onToggleFavorite: (templateId: string, next: boolean) => void;
-}) {
+}: TemplatesShellProps) {
   const [filters, setFilters] = useState<TemplateFilters>(DEFAULT_FILTERS);
 
   const normalizedLangs = useMemo(() => {
@@ -51,6 +55,7 @@ export default function TemplatesShell({
           onChangeFilters={setFilters}
           languages={normalizedLangs}
           onRefresh={onRefresh}
+          onSync={onSync}
           onToggleFavorite={onToggleFavorite}
         />
 

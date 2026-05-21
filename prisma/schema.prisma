@@ -284,24 +284,34 @@ model KnowledgeItem {
 }
 
 model Employee {
-  id                  String                @id @default(cuid())
-  name                String
-  notes               String?
-  color               String?
-  active              Boolean               @default(true)
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  exceptions          Json?
-  openingHours        Json?
-  timezone            String                @default("Europe/Madrid")
-  job_title           String?               @db.VarChar(64)
-  appointments        Appointment[]
-  AppointmentEmployee AppointmentEmployee[]
-  locations           EmployeeLocation[]
-  roles               EmployeeRole[]
-  EmployeeShift       EmployeeShift[]
-  timeOffs            EmployeeTimeOff[]
-  ShiftEvent          ShiftEvent[]
+  id                           String                         @id @default(cuid())
+  name                         String
+  notes                        String?
+  color                        String?
+  active                       Boolean                        @default(true)
+  createdAt                    DateTime                       @default(now())
+  updatedAt                    DateTime                       @updatedAt
+  exceptions                   Json?
+  openingHours                 Json?
+  timezone                     String                         @default("Europe/Madrid")
+  job_title                    String?                        @db.VarChar(64)
+  title                        String?                        @db.VarChar(16)
+  first_name                   String?                        @db.VarChar(64)
+  last_name                    String?                        @db.VarChar(64)
+  email                        String?                        @db.VarChar(128)
+  phone                        String?                        @db.VarChar(32)
+  invited_at                   DateTime?                      @db.Timestamptz(6)
+  joined_at                    DateTime?                      @db.Timestamptz(6)
+  appointments                 Appointment[]
+  AppointmentEmployee          AppointmentEmployee[]
+  locations                    EmployeeLocation[]
+  roles                        EmployeeRole[]
+  EmployeeShift                EmployeeShift[]
+  timeOffs                     EmployeeTimeOff[]
+  ShiftEvent                   ShiftEvent[]
+  employee_service             employee_service[]
+  slot_recovery_slot           slot_recovery_slot[]
+  slot_waitlist_entry_employee slot_waitlist_entry_employee[]
 
   @@index([active])
 }
@@ -427,38 +437,53 @@ model Service {
 }
 
 model Appointment {
-  id                  String                @id @default(cuid())
-  locationId          String
-  serviceId           String
-  startAt             DateTime
-  endAt               DateTime
-  status              AppointmentStatus     @default(PENDING)
-  employeeId          String?
-  resourceId          String?
-  customerName        String?
-  customerPhone       String?
-  customerEmail       String?
-  notes               String?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  customerId          String?
-  createdByAgentId    String?
-  createdInSessionId  String?
-  cancellation_reason String?
-  createdByAgent      Agent?                @relation("AppointmentCreatedByAgent", fields: [createdByAgentId], references: [id])
-  createdInSession    AgentSession?         @relation("AppointmentCreatedInSession", fields: [createdInSessionId], references: [id])
-  customer            Customer?             @relation(fields: [customerId], references: [id])
-  employee            Employee?             @relation(fields: [employeeId], references: [id])
-  location            Location              @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  resource            Resource?             @relation(fields: [resourceId], references: [id])
-  service             Service               @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  AppointmentEmployee AppointmentEmployee[]
-  AppointmentResource AppointmentResource[]
+  id                                                                          String                      @id @default(cuid())
+  locationId                                                                  String
+  serviceId                                                                   String?
+  startAt                                                                     DateTime
+  endAt                                                                       DateTime
+  status                                                                      AppointmentStatus           @default(PENDING)
+  employeeId                                                                  String?
+  resourceId                                                                  String?
+  customerName                                                                String?
+  customerPhone                                                               String?
+  customerEmail                                                               String?
+  notes                                                                       String?
+  createdAt                                                                   DateTime                    @default(now())
+  updatedAt                                                                   DateTime                    @updatedAt
+  customerId                                                                  String?
+  createdByAgentId                                                            String?
+  createdInSessionId                                                          String?
+  cancellation_reason                                                         String?
+  serviceName                                                                 String?
+  servicePrice                                                                Float?
+  serviceDurationMin                                                          Int?
+  slotRecoveryServiceId                                                       String?
+  externalProvider                                                            String?
+  externalCalendarId                                                          String?
+  externalEventId                                                             String?
+  externalColor                                                               String?
+  isUrgent                                                                    Boolean                     @default(false)
+  createdByAgent                                                              Agent?                      @relation("AppointmentCreatedByAgent", fields: [createdByAgentId], references: [id])
+  createdInSession                                                            AgentSession?               @relation("AppointmentCreatedInSession", fields: [createdInSessionId], references: [id])
+  customer                                                                    Customer?                   @relation(fields: [customerId], references: [id])
+  employee                                                                    Employee?                   @relation(fields: [employeeId], references: [id])
+  location                                                                    Location                    @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  resource                                                                    Resource?                   @relation(fields: [resourceId], references: [id])
+  service                                                                     Service?                    @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  AppointmentEmployee                                                         AppointmentEmployee[]
+  AppointmentResource                                                         AppointmentResource[]
+  customer_service_interest                                                   customer_service_interest[]
+  slot_recovery_slot_slot_recovery_slot_recovered_appointment_idToAppointment slot_recovery_slot[]        @relation("slot_recovery_slot_recovered_appointment_idToAppointment")
+  slot_recovery_slot_slot_recovery_slot_source_appointment_idToAppointment    slot_recovery_slot[]        @relation("slot_recovery_slot_source_appointment_idToAppointment")
 
+  @@unique([externalProvider, externalCalendarId, externalEventId], map: "Appointment_external_google_unique")
   @@index([employeeId, startAt])
   @@index([locationId, startAt])
   @@index([createdByAgentId])
   @@index([createdInSessionId])
+  @@index([slotRecoveryServiceId])
+  @@index([externalProvider, externalEventId], map: "Appointment_external_event_idx")
 }
 
 model EmployeeTimeOff {
@@ -500,26 +525,33 @@ model ResourceTimeOff {
 }
 
 model Customer {
-  id                     String                   @id @default(cuid())
-  firstName              String
-  lastName               String
-  phone                  String                   @unique(map: "ux_customer_phone")
-  email                  String?
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
-  createdByAgentId       String?
-  createdInSessionId     String?
-  secondary_phone        String?
-  country_code           String?
-  secondary_country_code String?
-  whatsapp_name          String?
-  preferred_name         String?
-  appointments           Appointment[]
-  companies              CompanyCustomer[]
-  createdByAgent         Agent?                   @relation("CustomerCreatedByAgent", fields: [createdByAgentId], references: [id])
-  createdInSession       AgentSession?            @relation("CustomerCreatedInSession", fields: [createdInSessionId], references: [id])
-  agent_event            agent_event[]
-  messaging_conversation messaging_conversation[]
+  id                          String                        @id @default(cuid())
+  firstName                   String
+  lastName                    String
+  phone                       String                        @unique(map: "ux_customer_phone")
+  email                       String?
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime                      @default(now()) @updatedAt
+  createdByAgentId            String?
+  createdInSessionId          String?
+  secondary_phone             String?
+  country_code                String?
+  secondary_country_code      String?
+  whatsapp_name               String?
+  preferred_name              String?
+  appointments                Appointment[]
+  companies                   CompanyCustomer[]
+  createdByAgent              Agent?                        @relation("CustomerCreatedByAgent", fields: [createdByAgentId], references: [id])
+  createdInSession            AgentSession?                 @relation("CustomerCreatedInSession", fields: [createdInSessionId], references: [id])
+  agent_event                 agent_event[]
+  customer_contact_profile    customer_contact_profile[]
+  customer_service_interest   customer_service_interest[]
+  customer_slot_alert_profile customer_slot_alert_profile[]
+  messaging_conversation      messaging_conversation[]
+  slot_recovery_recipient     slot_recovery_recipient[]
+  slot_recovery_reply_event   slot_recovery_reply_event[]
+  slot_recovery_slot          slot_recovery_slot[]
+  slot_waitlist_entry         slot_waitlist_entry[]
 
   @@index([phone])
   @@index([createdInSessionId])
@@ -1453,6 +1485,7 @@ model ExternalConnection {
   status                   String                     @default("active")
   User                     User                       @relation(fields: [userId], references: [id])
   Location                 Location[]
+  external_calendar        external_calendar[]
   google_gbp_account       google_gbp_account[]
   google_gbp_location      google_gbp_location[]
   integration_installation integration_installation[]
@@ -1523,6 +1556,9 @@ model Company {
   agent_event                 agent_event[]
   billing_account             billing_account?
   company_phone_number        company_phone_number[]
+  customer_contact_profile    customer_contact_profile[]
+  customer_service_interest   customer_service_interest[]
+  customer_slot_alert_profile customer_slot_alert_profile[]
   discount_redemption         discount_redemption[]
   google_gbp_account          google_gbp_account[]
   google_gbp_location         google_gbp_location[]
@@ -1530,6 +1566,11 @@ model Company {
   integration_installation    integration_installation[]
   invoice                     invoice[]
   lead_interaction            lead_interaction[]
+  slot_recovery_recipient     slot_recovery_recipient[]
+  slot_recovery_reply_event   slot_recovery_reply_event[]
+  slot_recovery_service       slot_recovery_service[]
+  slot_recovery_slot          slot_recovery_slot[]
+  slot_waitlist_entry         slot_waitlist_entry[]
   subscription                subscription[]
   theme_candidate             theme_candidate[]
   themes                      themes[]
@@ -1660,6 +1701,7 @@ model Location {
   address_id                  String?                       @unique(map: "ux_location_address_id") @db.Uuid
   agentSessions               AgentSession[]
   appointments                Appointment[]
+  CalendarSettings            CalendarSettings?
   CompanyHoliday              CompanyHoliday[]
   employeeLinks               EmployeeLocation[]
   EmployeeShift               EmployeeShift[]
@@ -1682,9 +1724,12 @@ model Location {
   UserLocation                UserLocation[]
   WebchatSites                WebchatSite[]                 @relation("LocationToWebchatSite")
   company_phone_number        company_phone_number[]
+  customer_service_interest   customer_service_interest[]
   google_gbp_location         google_gbp_location[]
   google_gbp_reviews          google_gbp_reviews[]
   integration_installation    integration_installation[]
+  slot_recovery_slot          slot_recovery_slot[]
+  slot_waitlist_entry         slot_waitlist_entry[]
   theme_candidate             theme_candidate[]
   themes                      themes[]
   topic                       topic[]
@@ -2750,6 +2795,7 @@ model agent_cat_item {
   whatsapp_template_name      String?
   whatsapp_template_language  String?
   whatsapp_template_variables Json                     @default("[]")
+  delivery_mode               String                   @default("free_text")
   agent_cat_product           agent_cat_product        @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   agent_cat_product_item      agent_cat_product_item[]
   agent_event                 agent_event[]
@@ -2779,6 +2825,453 @@ model agent_cat_product_item {
   agent_cat_product agent_cat_product @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([product_id, item_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model customer_slot_alert_profile {
+  id                        String    @id @default(dbgenerated("('csap_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  company_id                String
+  customer_id               String
+  is_opted_in               Boolean   @default(false)
+  opt_in_status             String    @default("pending")
+  publication_mode          String    @default("manual")
+  whatsapp_enabled          Boolean   @default(true)
+  preferred_services        Json      @default("[]")
+  preferred_location_ids    Json      @default("[]")
+  preferred_weekdays        Json      @default("[]")
+  preferred_time_ranges     Json      @default("[]")
+  interests                 Json      @default("{}")
+  last_template_sent_at     DateTime? @db.Timestamptz(6)
+  template_sent_count_30d   Int       @default(0)
+  template_sent_count_total Int       @default(0)
+  last_response_at          DateTime? @db.Timestamptz(6)
+  average_response_minutes  Int?
+  last_opt_in_source        String?
+  consent_text_version      String?
+  consented_at              DateTime? @db.Timestamptz(6)
+  paused_at                 DateTime? @db.Timestamptz(6)
+  pause_reason              String?
+  notes                     String?
+  created_at                DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime  @default(now()) @db.Timestamptz(6)
+  Company                   Company   @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_customer_slot_alert_profile_company")
+  Customer                  Customer  @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_customer_slot_alert_profile_customer")
+
+  @@unique([company_id, customer_id], map: "ux_customer_slot_alert_profile_company_customer")
+  @@index([company_id], map: "idx_customer_slot_alert_profile_company")
+  @@index([customer_id], map: "idx_customer_slot_alert_profile_customer")
+  @@index([opt_in_status], map: "idx_customer_slot_alert_profile_opt_in_status")
+  @@index([publication_mode], map: "idx_customer_slot_alert_profile_publication_mode")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model slot_recovery_recipient {
+  id                        String                      @id @default(dbgenerated("('srr_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  slot_recovery_slot_id     String
+  company_id                String
+  customer_id               String
+  status                    String                      @default("queued")
+  template_name             String?
+  provider_message_id       String?
+  failure_reason            String?
+  sent_at                   DateTime?                   @db.Timestamptz(6)
+  delivered_at              DateTime?                   @db.Timestamptz(6)
+  read_at                   DateTime?                   @db.Timestamptz(6)
+  replied_at                DateTime?                   @db.Timestamptz(6)
+  booked_at                 DateTime?                   @db.Timestamptz(6)
+  payload                   Json                        @default("{}")
+  meta                      Json                        @default("{}")
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  reply_source              String?
+  reply_button_id           String?
+  reply_button_text         String?
+  reply_message_id          String?
+  reply_payload             Json                        @default("{}")
+  Company                   Company                     @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_recipient_company")
+  Customer                  Customer                    @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_recipient_customer")
+  slot_recovery_slot        slot_recovery_slot          @relation(fields: [slot_recovery_slot_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_recipient_slot")
+  slot_recovery_reply_event slot_recovery_reply_event[]
+
+  @@unique([slot_recovery_slot_id, customer_id], map: "ux_slot_recovery_recipient_slot_customer")
+  @@index([company_id], map: "idx_slot_recovery_recipient_company")
+  @@index([company_id, status], map: "idx_slot_recovery_recipient_company_status")
+  @@index([customer_id], map: "idx_slot_recovery_recipient_customer")
+  @@index([slot_recovery_slot_id], map: "idx_slot_recovery_recipient_slot")
+  @@index([status], map: "idx_slot_recovery_recipient_status")
+  @@index([reply_button_id], map: "idx_slot_recovery_recipient_reply_button_id")
+  @@index([reply_source], map: "idx_slot_recovery_recipient_reply_source")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model slot_recovery_slot {
+  id                                                                   String                       @id @default(dbgenerated("('srs_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  company_id                                                           String
+  location_id                                                          String
+  source_appointment_id                                                String?
+  recovered_appointment_id                                             String?
+  recovered_customer_id                                                String?
+  service_name                                                         String?
+  original_customer_name                                               String?
+  original_customer_phone                                              String?
+  starts_at                                                            DateTime                     @db.Timestamptz(6)
+  ends_at                                                              DateTime                     @db.Timestamptz(6)
+  expires_at                                                           DateTime                     @db.Timestamptz(6)
+  status                                                               String                       @default("pending_publish")
+  manual_publish_required                                              Boolean                      @default(true)
+  published_at                                                         DateTime?                    @db.Timestamptz(6)
+  recovered_at                                                         DateTime?                    @db.Timestamptz(6)
+  cancelled_at                                                         DateTime?                    @db.Timestamptz(6)
+  target_customer_count                                                Int                          @default(0)
+  sent_customer_count                                                  Int                          @default(0)
+  delivered_customer_count                                             Int                          @default(0)
+  replied_customer_count                                               Int                          @default(0)
+  booked_customer_count                                                Int                          @default(0)
+  cancellation_reason                                                  String?
+  notes                                                                String?
+  meta                                                                 Json                         @default("{}")
+  created_at                                                           DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                                                           DateTime                     @default(now()) @db.Timestamptz(6)
+  employee_id                                                          String?
+  recovered_service_id                                                 String?
+  customer_service_interest                                            customer_service_interest[]
+  slot_recovery_recipient                                              slot_recovery_recipient[]
+  slot_recovery_reply_event                                            slot_recovery_reply_event[]
+  Company                                                              Company                      @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_slot_company")
+  Employee                                                             Employee?                    @relation(fields: [employee_id], references: [id], onUpdate: NoAction, map: "fk_slot_recovery_slot_employee")
+  Location                                                             Location                     @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_slot_location")
+  Appointment_slot_recovery_slot_recovered_appointment_idToAppointment Appointment?                 @relation("slot_recovery_slot_recovered_appointment_idToAppointment", fields: [recovered_appointment_id], references: [id], onUpdate: NoAction, map: "fk_slot_recovery_slot_recovered_appointment")
+  Customer                                                             Customer?                    @relation(fields: [recovered_customer_id], references: [id], onUpdate: NoAction, map: "fk_slot_recovery_slot_recovered_customer")
+  slot_recovery_service                                                slot_recovery_service?       @relation(fields: [recovered_service_id], references: [id], onUpdate: NoAction, map: "fk_slot_recovery_slot_recovered_service")
+  Appointment_slot_recovery_slot_source_appointment_idToAppointment    Appointment?                 @relation("slot_recovery_slot_source_appointment_idToAppointment", fields: [source_appointment_id], references: [id], onUpdate: NoAction, map: "fk_slot_recovery_slot_source_appointment")
+  slot_recovery_slot_offer                                             slot_recovery_slot_offer[]
+  slot_recovery_slot_service                                           slot_recovery_slot_service[]
+
+  @@index([company_id], map: "idx_slot_recovery_slot_company")
+  @@index([company_id, status, starts_at], map: "idx_slot_recovery_slot_company_status_starts_at")
+  @@index([expires_at], map: "idx_slot_recovery_slot_expires_at")
+  @@index([location_id], map: "idx_slot_recovery_slot_location")
+  @@index([starts_at], map: "idx_slot_recovery_slot_starts_at")
+  @@index([status], map: "idx_slot_recovery_slot_status")
+  @@index([employee_id], map: "idx_slot_recovery_slot_employee")
+  @@index([recovered_service_id], map: "idx_slot_recovery_slot_recovered_service")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model slot_recovery_slot_offer {
+  id                       String                 @id @default(dbgenerated("('srso_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  slot_recovery_slot_id    String
+  slot_recovery_service_id String?
+  service_name             String
+  price_cents              Int                    @default(0)
+  price                    Decimal                @default(0) @db.Decimal(10, 2)
+  position                 Int                    @default(0)
+  is_selected              Boolean                @default(false)
+  created_at               DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime               @default(now()) @db.Timestamptz(6)
+  slot_recovery_slot       slot_recovery_slot     @relation(fields: [slot_recovery_slot_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_slot_offer_slot")
+  slot_recovery_service    slot_recovery_service? @relation(fields: [slot_recovery_service_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_srso_service")
+
+  @@unique([slot_recovery_slot_id, position], map: "ux_slot_recovery_slot_offer_slot_position")
+  @@index([slot_recovery_service_id], map: "idx_slot_recovery_slot_offer_service")
+  @@index([slot_recovery_slot_id], map: "idx_slot_recovery_slot_offer_slot")
+  @@index([slot_recovery_service_id], map: "idx_srso_service")
+}
+
+model slot_recovery_service {
+  id                         String                       @id @default(dbgenerated("('srsv_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  company_id                 String
+  name                       String
+  duration_min               Int
+  price                      Decimal                      @default(0) @db.Decimal(10, 2)
+  price_cents                Int                          @default(0)
+  active                     Boolean                      @default(true)
+  position                   Int                          @default(0)
+  meta                       Json                         @default("{}")
+  created_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime                     @default(now()) @db.Timestamptz(6)
+  service_id                 String?
+  customer_service_interest  customer_service_interest[]
+  employee_service           employee_service[]
+  Company                    Company                      @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_service_company")
+  slot_recovery_slot         slot_recovery_slot[]
+  slot_recovery_slot_offer   slot_recovery_slot_offer[]
+  slot_recovery_slot_service slot_recovery_slot_service[]
+  slot_waitlist_entry        slot_waitlist_entry[]
+
+  @@unique([company_id, name], map: "ux_slot_recovery_service_company_name")
+  @@index([company_id], map: "idx_slot_recovery_service_company")
+  @@index([company_id, active], map: "idx_slot_recovery_service_company_active")
+}
+
+model slot_recovery_slot_service {
+  id                       String                @id @default(dbgenerated("('srss_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  slot_recovery_slot_id    String
+  slot_recovery_service_id String
+  position                 Int                   @default(0)
+  created_at               DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime              @default(now()) @db.Timestamptz(6)
+  slot_recovery_service    slot_recovery_service @relation(fields: [slot_recovery_service_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_srss_service")
+  slot_recovery_slot       slot_recovery_slot    @relation(fields: [slot_recovery_slot_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_srss_slot")
+
+  @@unique([slot_recovery_slot_id, slot_recovery_service_id], map: "ux_srss_slot_service")
+  @@index([slot_recovery_service_id], map: "idx_srss_service")
+  @@index([slot_recovery_slot_id], map: "idx_srss_slot")
+}
+
+model slot_recovery_send {
+  id              String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  companyId       String
+  slotId          String
+  customerId      String
+  phone           String
+  status          String
+  createdAt       DateTime? @default(now()) @db.Timestamp(6)
+  meta_message_id String?
+  error_message   String?
+  sent_at         DateTime? @db.Timestamp(6)
+  delivered_at    DateTime? @db.Timestamp(6)
+  read_at         DateTime? @db.Timestamp(6)
+  failed_at       DateTime? @db.Timestamp(6)
+  replied_at      DateTime? @db.Timestamp(6)
+  reply_type      String?
+  reply_payload   String?
+}
+
+model slot_recovery_reply_event {
+  id                         String                      @id @default(dbgenerated("('srre_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  slot_recovery_slot_id      String
+  slot_recovery_recipient_id String
+  company_id                 String
+  customer_id                String
+  provider_message_id        String?
+  provider_reply_id          String?
+  reply_source               String                      @default("button")
+  button_id                  String?
+  button_text                String?
+  payload                    Json                        @default("{}")
+  meta                       Json                        @default("{}")
+  replied_at                 DateTime                    @default(now()) @db.Timestamptz(6)
+  created_at                 DateTime                    @default(now()) @db.Timestamptz(6)
+  customer_service_interest  customer_service_interest[]
+  Company                    Company                     @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_reply_event_company")
+  Customer                   Customer                    @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_reply_event_customer")
+  slot_recovery_recipient    slot_recovery_recipient     @relation(fields: [slot_recovery_recipient_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_reply_event_recipient")
+  slot_recovery_slot         slot_recovery_slot          @relation(fields: [slot_recovery_slot_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_slot_recovery_reply_event_slot")
+
+  @@index([button_id], map: "idx_slot_recovery_reply_event_button_id")
+  @@index([company_id, replied_at(sort: Desc)], map: "idx_slot_recovery_reply_event_company_replied_at")
+  @@index([customer_id], map: "idx_slot_recovery_reply_event_customer")
+  @@index([provider_message_id], map: "idx_slot_recovery_reply_event_provider_message_id")
+  @@index([slot_recovery_recipient_id], map: "idx_slot_recovery_reply_event_recipient")
+  @@index([slot_recovery_slot_id], map: "idx_slot_recovery_reply_event_slot")
+}
+
+model customer_contact_profile {
+  id                  String    @id @default(dbgenerated("('ccp_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  company_id          String
+  customer_id         String
+  is_contactable      Boolean   @default(true)
+  interaction_status  String    @default("active")
+  cooldown_until      DateTime? @db.Timestamptz(6)
+  last_notified_at    DateTime? @db.Timestamptz(6)
+  last_response_at    DateTime? @db.Timestamptz(6)
+  last_declined_at    DateTime? @db.Timestamptz(6)
+  last_ignored_at     DateTime? @db.Timestamptz(6)
+  last_booked_at      DateTime? @db.Timestamptz(6)
+  times_notified_7d   Int       @default(0)
+  times_notified_30d  Int       @default(0)
+  times_ignored_30d   Int       @default(0)
+  times_declined_30d  Int       @default(0)
+  manual_blocked      Boolean   @default(false)
+  manual_block_reason String?
+  notes               String?
+  meta                Json      @default("{}")
+  created_at          DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime  @default(now()) @db.Timestamptz(6)
+  Company             Company   @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_customer_contact_profile_company")
+  Customer            Customer  @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_customer_contact_profile_customer")
+
+  @@unique([company_id, customer_id], map: "ux_customer_contact_profile_company_customer")
+  @@index([company_id], map: "idx_customer_contact_profile_company")
+  @@index([company_id, is_contactable, manual_blocked], map: "idx_customer_contact_profile_contactable")
+  @@index([company_id, cooldown_until], map: "idx_customer_contact_profile_cooldown")
+  @@index([customer_id], map: "idx_customer_contact_profile_customer")
+  @@index([company_id, interaction_status], map: "idx_customer_contact_profile_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model customer_service_interest {
+  id                        String                     @id @default(dbgenerated("('csi_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  company_id                String
+  customer_id               String
+  location_id               String?
+  slot_recovery_slot_id     String?
+  slot_recovery_service_id  String?
+  appointment_id            String?
+  interest_type             String
+  source                    String                     @default("slot_recovery")
+  source_event_id           String?
+  created_at                DateTime                   @default(now()) @db.Timestamptz(6)
+  Appointment               Appointment?               @relation(fields: [appointment_id], references: [id], onUpdate: NoAction, map: "fk_csi_appointment")
+  Company                   Company                    @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_csi_company")
+  Customer                  Customer                   @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_csi_customer")
+  Location                  Location?                  @relation(fields: [location_id], references: [id], onUpdate: NoAction, map: "fk_csi_location")
+  slot_recovery_slot        slot_recovery_slot?        @relation(fields: [slot_recovery_slot_id], references: [id], onUpdate: NoAction, map: "fk_csi_slot")
+  slot_recovery_service     slot_recovery_service?     @relation(fields: [slot_recovery_service_id], references: [id], onUpdate: NoAction, map: "fk_csi_slot_recovery_service")
+  slot_recovery_reply_event slot_recovery_reply_event? @relation(fields: [source_event_id], references: [id], onUpdate: NoAction, map: "fk_csi_source_event")
+
+  @@unique([company_id, customer_id, slot_recovery_slot_id, slot_recovery_service_id, interest_type], map: "ux_csi_unique_interest")
+  @@index([company_id, customer_id], map: "idx_csi_company_customer")
+  @@index([created_at(sort: Desc)], map: "idx_csi_created_at")
+  @@index([customer_id], map: "idx_csi_customer")
+  @@index([interest_type], map: "idx_csi_interest_type")
+  @@index([slot_recovery_service_id], map: "idx_csi_service")
+  @@index([slot_recovery_slot_id], map: "idx_csi_slot")
+}
+
+model slot_recovery_activity {
+  id                    String    @id @default(dbgenerated("('sra_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  company_id            String
+  location_id           String
+  slot_recovery_slot_id String
+  event_type            String
+  title                 String
+  payload               Json?     @default("{}")
+  created_at            DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([company_id], map: "idx_sra_company")
+  @@index([created_at(sort: Desc)], map: "idx_sra_created_at")
+  @@index([location_id], map: "idx_sra_location")
+  @@index([slot_recovery_slot_id], map: "idx_sra_slot")
+}
+
+model slot_waitlist_entry {
+  id                           String                         @id @default(dbgenerated("('swe_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  company_id                   String
+  location_id                  String
+  customer_id                  String?
+  customer_name                String
+  customer_phone               String?
+  slot_recovery_service_id     String?
+  service_name                 String?
+  note                         String?
+  is_urgent                    Boolean                        @default(false)
+  status                       String                         @default("active")
+  expires_at                   DateTime?                      @db.Timestamptz(6)
+  resolved_at                  DateTime?                      @db.Timestamptz(6)
+  created_at                   DateTime                       @default(now()) @db.Timestamptz(6)
+  updated_at                   DateTime                       @default(now()) @db.Timestamptz(6)
+  time_preference              String[]
+  day_preference               String[]
+  Company                      Company                        @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_waitlist_company")
+  Customer                     Customer?                      @relation(fields: [customer_id], references: [id], onUpdate: NoAction, map: "fk_waitlist_customer")
+  Location                     Location                       @relation(fields: [location_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_waitlist_location")
+  slot_recovery_service        slot_recovery_service?         @relation(fields: [slot_recovery_service_id], references: [id], onUpdate: NoAction, map: "fk_waitlist_service")
+  slot_waitlist_entry_employee slot_waitlist_entry_employee[]
+
+  @@index([location_id, status, is_urgent, created_at(sort: Desc)], map: "idx_waitlist_active")
+  @@index([company_id], map: "idx_waitlist_company")
+  @@index([customer_id], map: "idx_waitlist_customer")
+  @@index([location_id], map: "idx_waitlist_location")
+  @@index([status], map: "idx_waitlist_status")
+}
+
+model employee_service {
+  id                    String                @id @default(dbgenerated("('esv_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  employee_id           String
+  service_id            String
+  created_at            DateTime?             @default(now()) @db.Timestamptz(6)
+  Employee              Employee              @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_employee")
+  slot_recovery_service slot_recovery_service @relation(fields: [service_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_service")
+
+  @@unique([employee_id, service_id], map: "ux_employee_service")
+}
+
+model slot_waitlist_entry_employee {
+  id                  String              @id @default(dbgenerated("('swee_'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 24))"))
+  waitlist_entry_id   String
+  employee_id         String
+  Employee            Employee            @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_waitlist_employee")
+  slot_waitlist_entry slot_waitlist_entry @relation(fields: [waitlist_entry_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_waitlist_entry")
+
+  @@unique([waitlist_entry_id, employee_id], map: "unique_waitlist_employee")
+  @@index([employee_id], map: "idx_waitlist_employee_employee")
+  @@index([waitlist_entry_id], map: "idx_waitlist_employee_entry")
+}
+
+model CalendarSettings {
+  id               String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  locationId       String   @unique
+  visibleStartHour Int      @default(10)
+  visibleEndHour   Int      @default(21)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now())
+  defaultView      String   @default("week")
+  Location         Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId])
+}
+
+model external_calendar_connection {
+  id                      String                    @id
+  user_id                 String
+  company_id              String
+  provider                String
+  external_account_email  String?
+  access_token            String?
+  refresh_token           String?
+  token_expiry            DateTime?                 @db.Timestamp(6)
+  created_at              DateTime                  @default(now()) @db.Timestamp(6)
+  updated_at              DateTime                  @default(now()) @db.Timestamp(6)
+  external_calendar_id    String?
+  external_calendar_name  String?
+  sync_enabled            Boolean                   @default(true)
+  last_synced_at          DateTime?                 @db.Timestamp(6)
+  external_calendar_event external_calendar_event[]
+}
+
+model external_calendar_event {
+  id                           String                       @id
+  connection_id                String
+  company_id                   String
+  location_id                  String?
+  provider                     String
+  external_calendar_id         String
+  external_event_id            String
+  title                        String?
+  description                  String?
+  start_at                     DateTime                     @db.Timestamp(6)
+  end_at                       DateTime                     @db.Timestamp(6)
+  timezone                     String?
+  status                       String?
+  raw_payload                  Json?
+  created_at                   DateTime                     @default(now()) @db.Timestamp(6)
+  updated_at                   DateTime                     @default(now()) @db.Timestamp(6)
+  external_calendar_connection external_calendar_connection @relation(fields: [connection_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([provider, external_event_id, external_calendar_id])
+}
+
+model external_calendar {
+  id                   String             @id
+  connection_id        String
+  company_id           String?
+  location_id          String?
+  provider             String
+  external_calendar_id String
+  name                 String
+  timezone             String?
+  purpose              String             @default("slot_recovery")
+  access_role          String?
+  is_primary           Boolean            @default(false)
+  is_app_created       Boolean            @default(false)
+  active               Boolean            @default(true)
+  created_at           DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime           @default(now()) @db.Timestamptz(6)
+  ExternalConnection   ExternalConnection @relation(fields: [connection_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([connection_id, external_calendar_id], map: "external_calendar_unique")
 }
 
 /// *

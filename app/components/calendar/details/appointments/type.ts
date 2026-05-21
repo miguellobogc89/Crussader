@@ -1,3 +1,4 @@
+//app/components/calendar/details/appointments/type.ts
 export type View = "day" | "week" | "month";
 
 export type CalendarAppt = {

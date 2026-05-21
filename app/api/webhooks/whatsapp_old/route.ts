@@ -1,4 +1,4 @@
-// app/api/webhooks/whatsapp/route.ts
+// app/api/webhooks/whatsapp_old/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { resolvePhoneNumber } from "@/lib/whatsapp/phoneNumbers/resolvePhoneNumber";

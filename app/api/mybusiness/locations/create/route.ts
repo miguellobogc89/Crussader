@@ -5,7 +5,6 @@ import { LocationStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
-// GET solo para probar rápido en navegador (opcional)
 export async function GET() {
   console.log("[locations/create][GET] endpoint reached");
   return NextResponse.json({ ok: true, message: "locations/create alive" });
@@ -18,7 +17,6 @@ export async function POST(req: NextRequest) {
     const session = (await getServerSession(authOptions)) as any;
 
     if (!session?.user?.id) {
-      console.error("[locations/create] no_session");
       return NextResponse.json(
         { ok: false, error: "no_session" },
         { status: 401 },
@@ -26,33 +24,12 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = session.user.id;
-    console.log("[locations/create] userId:", userId);
 
-    // 1) Última empresa del usuario en UserCompany
-    const userCompany = await prisma.userCompany.findFirst({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (!userCompany) {
-      console.error(
-        "[locations/create] no_company_for_user, userId:",
-        userId,
-      );
-      return NextResponse.json(
-        { ok: false, error: "no_company_for_user" },
-        { status: 400 },
-      );
-    }
-
-    const companyId = userCompany.companyId;
-    console.log("[locations/create] using companyId:", companyId);
-
-    // 2) Datos de la ubicación enviados desde el onboarding
     const body = await req.json();
     console.log("[locations/create] body:", body);
 
     const {
+      companyId,
       title,
       address,
       city,
@@ -62,6 +39,7 @@ export async function POST(req: NextRequest) {
       activityId,
       typeId,
     } = body as {
+      companyId?: string;
       title?: string;
       address?: string;
       city?: string;
@@ -72,11 +50,34 @@ export async function POST(req: NextRequest) {
       typeId?: string;
     };
 
+    if (!companyId) {
+      return NextResponse.json(
+        { ok: false, error: "missing_company_id" },
+        { status: 400 },
+      );
+    }
+
     if (!title) {
-      console.error("[locations/create] missing_title");
       return NextResponse.json(
         { ok: false, error: "missing_title" },
         { status: 400 },
+      );
+    }
+
+    const userCompany = await prisma.userCompany.findFirst({
+      where: {
+        userId,
+        companyId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!userCompany) {
+      return NextResponse.json(
+        { ok: false, error: "user_not_in_company" },
+        { status: 403 },
       );
     }
 
@@ -95,12 +96,22 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    console.log(
-      "[locations/create] created",
-      location.id,
-      "for company",
-      companyId,
-    );
+    await prisma.userLocation.upsert({
+      where: {
+        userId_locationId: {
+          userId,
+          locationId: location.id,
+        },
+      },
+      update: {
+        role: "MANAGER",
+      },
+      create: {
+        userId,
+        locationId: location.id,
+        role: "MANAGER",
+      },
+    });
 
     return NextResponse.json(
       {

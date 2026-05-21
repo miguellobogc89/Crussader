@@ -17,6 +17,7 @@ export type LocationLite = {
   city?: string | null;
   reviewsCount?: number | null;
   openingHours?: any | null;
+  companyId?: string | null;
 };
 
 export default function LocationSelector({
@@ -46,9 +47,8 @@ const rows = Array.isArray(boot.locations)
       title: String(l.title ?? "Sin nombre"),
       city: l.city ?? null,
       reviewsCount: l.reviewsCount ?? 0,
-
-      // ✅ NUEVO (la clave del tema)
       openingHours: l.openingHours ?? null,
+      companyId: l.companyId ? String(l.companyId) : null,
     }))
   : [];
 
@@ -148,9 +148,9 @@ const rows = Array.isArray(boot.locations)
     </button>
   );
 
-  if (!hasMoreOptions) {
-    return TriggerButton;
-  }
+if (!hasMoreOptions) {
+  return null;
+}
 
   return (
     <DropdownMenu>

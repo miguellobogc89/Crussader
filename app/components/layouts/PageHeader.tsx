@@ -3,20 +3,17 @@
 
 import { ReactNode } from "react";
 import PageTitle from "./PageTitle";
+import PageHeaderUserMenu from "./PageHeaderUserMenu";
+import { PAGE_HEADER_HEIGHT, PAGE_HEADER_PADDING } from "@/app/layout/config";
 
 type Props = {
   title: string;
   description?: string;
   titleIconName?: React.ComponentProps<typeof PageTitle>["iconName"];
   className?: string;
-  /** Contenido opcional alineado a la derecha (botón, actions, etc.) */
   rightSlot?: ReactNode;
 };
 
-/**
- * Cabecera superior fija sin márgenes: ocupa todo el ancho,
- * mantiene el formato de PageTitle, sin borde ni iconos laterales.
- */
 export default function PageHeader({
   title,
   description,
@@ -24,17 +21,19 @@ export default function PageHeader({
   className = "",
   rightSlot,
 }: Props) {
-  const hasRight = !!rightSlot;
-
   return (
     <header
       className={[
-        "w-full h-20 flex items-center bg-white px-4 sm:px-6 lg:px-8 border",
-        hasRight ? "justify-between gap-4" : "",
+        "w-full border-b border-slate-200 bg-white",
+        "flex items-center justify-between gap-3",
+        "h-12 px-3",
+        "md:h-[64px] md:px-4",
+        "xl:h-[66px] xl:px-5",
+        "xl2:h-18 xl2:px-8",
         className,
       ].join(" ")}
     >
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <PageTitle
           title={title}
           subtitle={description}
@@ -44,11 +43,11 @@ export default function PageHeader({
         />
       </div>
 
-      {hasRight && (
-        <div className="shrink-0 flex items-center justify-end">
-          {rightSlot}
-        </div>
-      )}
+      <div className="flex shrink-0 items-center gap-2 md:gap-3">
+        {rightSlot}
+
+        <PageHeaderUserMenu />
+      </div>
     </header>
   );
 }

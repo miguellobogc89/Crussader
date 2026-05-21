@@ -14,23 +14,26 @@ export default function PageBody({
 }) {
   const widthClasses =
     variant === "full"
-      ? "max-w-none w-full"
+      ? "w-full max-w-none"
       : variant === "narrow"
-      ? "max-w-2xl"
-      : "max-w-7xl";
+        ? "max-w-2xl"
+        : "max-w-7xl";
 
   return (
     <main
       role="main"
       className={[
-        "w-full mx-auto",
+        "flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden",
+        "mx-auto",
         widthClasses,
-        // padding horizontal + vertical responsivo
-        "px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8",
+        "px-4 py-4 sm:px-6 sm:py-6 lg:py-8 xl:px-8 xl2:px-8",
       ].join(" ")}
     >
-      {toolbar && <div className="mb-4">{toolbar}</div>}
-      {children}
+      {toolbar ? <div className="mb-4 shrink-0">{toolbar}</div> : null}
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {children}
+      </div>
     </main>
   );
 }

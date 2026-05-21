@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   let redirectAfter =
     process.env.GOOGLE_CALENDAR_RETURN_URI ||
-    `${baseUrl}/dashboard/integrations-test-2`;
+    `${baseUrl}/dashboard/calendar`;
 
   let companyId: string | null = null;
   let userId: string | null = null;
@@ -48,12 +48,7 @@ export async function GET(req: NextRequest) {
     const refreshToken = typeof tokens.refresh_token === "string" ? tokens.refresh_token : null;
     const expiresAtSec =
       typeof tokens.expiry_date === "number" ? Math.floor(tokens.expiry_date / 1000) : null;
-    const scopeStr =
-      Array.isArray((tokens as any).scope)
-        ? (tokens as any).scope.join(" ")
-        : typeof (tokens as any).scope === "string"
-        ? (tokens as any).scope
-        : null;
+    const scopeStr = tokens.scope || null;
 
     const provider = "google-calendar" as const;
 
@@ -71,6 +66,7 @@ export async function GET(req: NextRequest) {
           scope: scopeStr || undefined,
           companyId: companyId || undefined,
           accountEmail: accountEmail || undefined,
+          status: "active",
         },
       });
     } else {
@@ -84,6 +80,7 @@ export async function GET(req: NextRequest) {
           scope: scopeStr || undefined,
           companyId: companyId || undefined,
           accountEmail: accountEmail || undefined,
+          status: "active",
         },
       });
     }

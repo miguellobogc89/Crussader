@@ -16,7 +16,7 @@ import { Brand } from "@/app/components/sidebar/Brand";
 import { UserFooter } from "@/app/components/sidebar/UserFooter";
 import { Menu } from "lucide-react";
 import { BetaPlanCard } from "@/app/components/sidebar/BetaPlanCard";
-
+import { SidebarLocationSelector } from "@/app/components/sidebar/SidebarLocationSelector";
 import { NAV_ITEMS, type SidebarNavItem } from "@/app/components/sidebar/sidebar.nav";
 
 /* ======== util ======== */
@@ -47,25 +47,19 @@ export function AppSidebar() {
     bootstrap?.activeCompany?.name ??
     "Selecciona empresa";
 
-  // Desktop: expandida por defecto. En móvil se colapsa en el effect.
   const [collapsed, setCollapsed] = useState<boolean>(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-
-  // Para marcar optimistamente el item clicado
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
-  // Sincroniza estado por defecto en móvil sin tocar desktop
   useEffect(() => {
     if (isMobile) setCollapsed(true);
   }, [isMobile]);
 
-  // Limpia el pendingHref SOLO cuando la ruta ya coincide (navegación completada)
   useEffect(() => {
     if (!pendingHref) return;
     if (isActivePath(pathname, pendingHref)) setPendingHref(null);
   }, [pathname, pendingHref]);
 
-  // ===== admin flag
   const user = session?.user;
   const roleRaw = (user as any)?.role ?? (user as any)?.companyRole ?? "";
   const rolesArrRaw = (user as any)?.roles ?? [];
@@ -123,9 +117,10 @@ export function AppSidebar() {
     };
   }
 
-  const width = isOverlay ? "18rem" : collapsed ? "4rem" : "18rem";
+const asideWidthClass = collapsed
+  ? "w-16"
+  : "w-56 xl:w-60 xl2:w-64";
 
-  // Bloquear scroll cuando overlay móvil está abierto
   useEffect(() => {
     if (!isOverlay) return;
     const prev = document.body.style.overflow;
@@ -144,16 +139,14 @@ export function AppSidebar() {
     return () => window.removeEventListener("keydown", onKey);
   }, [isOverlay]);
 
-  // ---------- HEADER MÓVIL COLAPSADO ----------
-  // ✅ Importante: después de este return NO debe haber hooks.
   if (isMobile && collapsed) {
     return (
       <div
         data-topbar="true"
-        className="fixed top-0 inset-x-0 h-12 bg-slate-900 border-b border-slate-800 z-40 flex items-center justify-between px-3"
+        className="fixed inset-x-0 top-0 z-40 flex h-12 items-center justify-between border-b border-slate-800 bg-slate-900 px-3"
       >
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center overflow-hidden">
+          <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-slate-800">
             <Image
               src="/logo/logo.svg"
               alt="Crussader logo"
@@ -165,14 +158,14 @@ export function AppSidebar() {
           </div>
         </div>
 
-        <span className="text-slate-200 text-sm font-semibold tracking-wide">
+        <span className="text-sm font-semibold tracking-wide text-slate-200">
           Crussader
         </span>
 
         <button
           onClick={() => setCollapsed(false)}
           aria-label="Abrir menú"
-          className="inline-flex items-center justify-center h-9 w-9 rounded-lg hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-700"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-700"
         >
           <Menu className="h-5 w-5 text-slate-200" />
         </button>
@@ -182,7 +175,6 @@ export function AppSidebar() {
 
   const hasPending = pendingHref !== null;
 
-  // ✅ sin useMemo: evita hooks después del early return
   const visibleItems: SidebarNavItem[] = NAV_ITEMS.filter((it) => {
     if (it.requiresAdmin === true) return isAdmin;
     return true;
@@ -204,13 +196,13 @@ export function AppSidebar() {
         />
       )}
 
-      <aside
-        style={{ width }}
-        className={[
-          "h-svh shrink-0 border-r border-slate-800 bg-slate-900 text-slate-200 shadow-lg flex flex-col transition-[width] duration-300 ease-in-out",
-          isOverlay ? "fixed left-0 top-0 bottom-0 z-50" : "",
-        ].join(" ")}
-      >
+<aside
+  className={[
+    "h-svh shrink-0 border-r border-slate-800 bg-slate-900 text-slate-200 shadow-lg flex flex-col transition-[width] duration-300 ease-in-out",
+    asideWidthClass,
+    isOverlay ? "fixed left-0 top-0 bottom-0 z-50 w-56" : "",
+  ].join(" ")}
+>
         <Brand collapsed={collapsed} setCollapsed={setCollapsed} />
 
         <CompanySwitcher
@@ -225,6 +217,11 @@ export function AppSidebar() {
             try {
               await setActiveCompanyCookieAction(companyId);
               await fetchFromApi();
+
+              console.log(
+  "[COMPANY_SWITCH]",
+  useBootstrapStore.getState().data
+);
               router.refresh();
             } catch (e) {
               console.error("[sidebar] switch company failed", e);
@@ -232,7 +229,7 @@ export function AppSidebar() {
           }}
         />
 
-        <nav className="flex-1 overflow-y-auto px-2 py-2">
+        <nav className="flex-1 overflow-y-auto px-1.5 py-2 xl:px-2">
           {visibleItems.map((item) => {
             return (
               <SidebarItem
@@ -246,14 +243,15 @@ export function AppSidebar() {
           })}
         </nav>
 
-        <BetaPlanCard collapsed={collapsed} variant="beta" />
+        {/* <div className="px-1.5 pb-1.5 xl:px-2 xl:pb-2">
+          <BetaPlanCard collapsed={collapsed} variant="beta" />
+        </div> */}
 
-        <UserFooter
-          collapsed={collapsed}
-          userMenuOpen={userMenuOpen}
-          setUserMenuOpen={setUserMenuOpen}
-          onItemNavigate={onItemNavigate}
-        />
+        <div className="px-1.5 pb-1.5 xl:px-2 xl:pb-2">
+          <SidebarLocationSelector collapsed={collapsed} />
+        </div>
+
+
       </aside>
     </>
   );

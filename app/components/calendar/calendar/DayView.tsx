@@ -5,7 +5,12 @@ import BankHolidayCell from "@/app/components/calendar/calendar/BankHolidayCell"
 import CurrentTimeLineFullSpan from "./CurrentTimeLineFullSpan";
 import HourGuides from "./HourGuides";
 import { layoutDayAppts, COL_GAP_PX } from "./layout";
-import type { CalendarAppt, HolidayLite } from "./types";
+import type { CalendarAppt } from "./types";
+
+type HolidayLite = {
+  date: string | Date;
+  name: string;
+};
 import { localKeyTZ } from "./tz";
 
 type Props = {

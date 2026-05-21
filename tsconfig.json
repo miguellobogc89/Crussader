@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": ["dom", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -15,10 +15,11 @@
     "incremental": true,
     "plugins": [{ "name": "next" }],
 
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
     },
+
+    "ignoreDeprecations": "5.0",
 
     "forceConsistentCasingInFileNames": true,
     "allowSyntheticDefaultImports": true
@@ -35,7 +36,6 @@
   "exclude": [
     "node_modules",
     ".next",
-
     "lib/crussader-assistant/legacy",
     "lib/crussader-assistant/actions/_events_old",
     "lib/crussader-assistant/tests"

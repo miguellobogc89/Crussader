@@ -305,7 +305,7 @@ export async function buildBrainContextV1(companyId: string): Promise<{
         items: appointments.map((a) => ({
           id: a.id,
           locationId: a.locationId,
-          serviceId: a.serviceId,
+          serviceId: a.serviceId ?? "",
           startAt: iso(a.startAt),
           endAt: iso(a.endAt),
           status: a.status,
