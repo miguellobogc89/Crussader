@@ -8,16 +8,22 @@ export const slotRecoveryTexts = {
   },
 
   confirmation: {
-  build: (params: {
-    serviceName: string;
-    date: string;
-    time: string;
-    locationName: string;
-  }) => {
-      return `✅ *¡Cita confirmada!*\n
-Tu reserva para *${params.serviceName}* ha quedado registrada!
-Te esperamos en ${params.locationName} el *${params.date}*📅 a las *${params.time}*!
-¡Hasta pronto!`;;
+    build: (params: {
+      serviceName: string;
+      date: string;
+      time: string;
+      locationName: string;
+    }) => {
+      return [
+        "✅ *¡Cita confirmada!*",
+        "",
+        `💆 Servicio: *${params.serviceName}*`,
+        `📅 Fecha: *${params.date}*`,
+        `🕒 Hora: *${params.time}*`,
+        `📍 Clínica: *${params.locationName}*`,
+        "",
+        "Si necesitas cancelar tu cita, responde a este mensaje escribiendo *CANCELAR*.",
+      ].join("\n");
     },
   },
 

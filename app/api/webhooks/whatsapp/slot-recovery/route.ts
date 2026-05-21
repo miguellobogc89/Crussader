@@ -22,7 +22,6 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  
   const body = await req.json().catch(() => null);
 
   if (!body) {
@@ -30,19 +29,27 @@ export async function POST(req: Request) {
   }
 
   try {
-    const entry = Array.isArray(body.entry) ? body.entry[0] : null;
-    const changes = entry && Array.isArray(entry.changes) ? entry.changes : [];
-    const change = changes.length > 0 ? changes[0] : null;
-    const value: WaValue | null = change && change.value ? change.value : null;
+    const entries = Array.isArray(body.entry) ? body.entry : [];
 
+    for (const entry of entries) {
+      const changes = Array.isArray(entry?.changes) ? entry.changes : [];
 
-    if (!value) {
-      return NextResponse.json({ ok: true });
+      for (const change of changes) {
+        const value: WaValue | null = change?.value ? change.value : null;
+
+        if (!value) {
+          continue;
+        }
+
+        if (Array.isArray(value.statuses) && value.statuses.length > 0) {
+          await handleSlotRecoveryStatuses(value);
+        }
+
+        if (Array.isArray(value.messages) && value.messages.length > 0) {
+          await handleSlotRecoveryReplies(value);
+        }
+      }
     }
-
-
-    await handleSlotRecoveryStatuses(value);
-    await handleSlotRecoveryReplies(value);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

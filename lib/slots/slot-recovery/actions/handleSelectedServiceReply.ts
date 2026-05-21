@@ -72,7 +72,7 @@ export async function handleSelectedServiceReply(
     },
   });
 
-  if (recipientWithSlot) {
+  if (recipientWithSlot && recipientWithSlot.slot_recovery_slot) {
     await prisma.customer_service_interest.createMany({
       data: [
         {

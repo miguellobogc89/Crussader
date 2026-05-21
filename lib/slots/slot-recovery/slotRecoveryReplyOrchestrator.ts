@@ -18,6 +18,8 @@ import { createAppointmentFromSlot } from "./actions/createAppointmentFromSlot";
 import { sendSlotAlreadyTakenMessage } from "./messaging/sendSlotAlreadyTakenMessage";
 import { sendSlotRecoveryConfirmation } from "./messaging/sendSlotRecoveryConfirmation";
 import { logSlotActivity } from "@/lib/slots/slot-recovery/logSlotActivity";
+import { cancelAppointmentByWhatsapp } from "@/lib/slots/slot-recovery/actions/cancelAppointmentByWhatsapp";
+import { sendTextMessage } from "@/lib/whatsapp/sendTextMessage";
 
 function isBookReply(replyType: string): boolean {
   return replyType === "BOOK" || replyType === "RESERVAR";
@@ -39,12 +41,61 @@ function isDeclineReply(replyType: string): boolean {
   );
 }
 
+function getIncomingText(message: {
+  text?: {
+    body?: unknown;
+  };
+}): string {
+  if (typeof message.text?.body !== "string") {
+    return "";
+  }
+
+  return message.text.body.trim();
+}
+
+function isCancelText(text: string): boolean {
+  const normalized = text.toLowerCase().trim();
+
+  return (
+    normalized === "cancelar" ||
+    normalized === "cancel" ||
+    normalized === "anular" ||
+    normalized === "cancelar cita" ||
+    normalized === "anular cita"
+  );
+}
+
 export async function handleSlotRecoveryReplies(value: WaValue) {
   if (!Array.isArray(value.messages) || value.messages.length === 0) {
     return;
   }
 
   for (const message of value.messages) {
+
+        let incomingMessageId: string | null = null;
+
+    if (typeof message.id === "string" && message.id.trim() !== "") {
+      incomingMessageId = message.id.trim();
+    }
+
+    if (incomingMessageId) {
+      const alreadyProcessed = await prisma.slot_recovery_recipient.findFirst({
+        where: {
+          reply_message_id: incomingMessageId,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (alreadyProcessed) {
+        console.log("[WA][SLOT_RECOVERY][DUPLICATED_MESSAGE_IGNORED]", {
+          messageId: incomingMessageId,
+        });
+
+        continue;
+      }
+    }
     const replyType = normalizeReplyType(message);
     const selectedServiceId = getSelectedServiceId(replyType);
 
@@ -61,6 +112,35 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
     if (fromPhone === "") {
       continue;
     }
+
+    const incomingText = getIncomingText(message);
+
+if (isCancelText(incomingText)) {
+  const result = await cancelAppointmentByWhatsapp({
+    fromPhone,
+  });
+
+  if (result.ok) {
+    await sendTextMessage({
+      to: fromPhone,
+      text: "✅ Tu cita ha sido cancelada correctamente.",
+    });
+  } else {
+    await sendTextMessage({
+      to: fromPhone,
+      text: "No hemos encontrado ninguna cita futura activa asociada a este número.",
+    });
+  }
+
+  console.log("[WA][SLOT_RECOVERY][CANCEL_TEXT_DETECTED]", {
+    fromPhone,
+    messageId: incomingMessageId,
+    text: incomingText,
+    result,
+  });
+
+  continue;
+}
 
     const repliedAt = tsToDate(message.timestamp);
     let safeRepliedAt = repliedAt;
@@ -164,6 +244,8 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
         data: updateData,
       });
 
+
+
       await recomputeSlotCounters({
         slotId: matchedRecipient.slot_recovery_slot_id,
       });
@@ -207,11 +289,6 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
     }
 
     if (selectedServiceId) {
-      let incomingMessageId: string | null = null;
-
-      if (typeof message.id === "string" && message.id.trim() !== "") {
-        incomingMessageId = message.id;
-      }
 
       await handleSelectedServiceReply({
         recipientId: matchedRecipient.id,
@@ -257,6 +334,29 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
           },
         },
       });
+
+      if (result.ok) {
+        const slotData = await prisma.slot_recovery_slot.findUnique({
+          where: {
+            id: matchedRecipient.slot_recovery_slot_id,
+          },
+          select: {
+            starts_at: true,
+            Location: {
+              select: {
+                title: true,
+              },
+            },
+          },
+        });
+
+        await sendSlotRecoveryConfirmation({
+          to: fromPhone,
+          serviceName: replyPayload ?? "tu cita",
+          startAt: slotData?.starts_at ?? new Date(),
+          locationName: slotData?.Location?.title ?? "",
+        });
+      }
 
       await recomputeSlotCounters({
         slotId: matchedRecipient.slot_recovery_slot_id,
