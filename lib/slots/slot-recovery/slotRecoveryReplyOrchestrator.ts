@@ -138,9 +138,20 @@ for (const message of value.messages) {
   const replyType = normalizeReplyType(message);
   const selectedServiceId = getSelectedServiceId(replyType);
 
-  if (!replyType) {
-    continue;
-  }
+if (!replyType) {
+  await sendTextMessage({
+    to: fromPhone,
+    text: "Este número se usa solo para gestionar reservas y cancelaciones automáticas. Para cualquier consulta, contacta directamente con la clínica.",
+  });
+
+  console.log("[WA][SLOT_RECOVERY][UNKNOWN_MESSAGE_REPLIED]", {
+    fromPhone,
+    messageId: incomingMessageId,
+    text: incomingText,
+  });
+
+  continue;
+}
 
     const repliedAt = tsToDate(message.timestamp);
     let safeRepliedAt = repliedAt;
