@@ -71,6 +71,16 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
   }
 
 for (const message of value.messages) {
+  if (
+  message.type !== "text" &&
+  message.type !== "interactive"
+) {
+  console.log("[WA][SLOT_RECOVERY][IGNORED_MESSAGE_TYPE]", {
+    type: message.type,
+  });
+
+  continue;
+}
   let incomingMessageId: string | null = null;
 
   if (typeof message.id === "string" && message.id.trim() !== "") {

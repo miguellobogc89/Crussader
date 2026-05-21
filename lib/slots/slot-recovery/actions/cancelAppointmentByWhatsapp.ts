@@ -1,5 +1,6 @@
 // lib/slots/slot-recovery/actions/cancelAppointmentByWhatsapp.ts
 import { prisma } from "@/lib/prisma";
+import { recomputeSlotCounters } from "./recomputeSlotCounters";
 
 type Params = {
   fromPhone: string;
@@ -86,18 +87,55 @@ export async function cancelAppointmentByWhatsapp(params: Params) {
     };
   }
 
-  await prisma.appointment.update({
-    where: {
-      id: appointment.id,
-    },
-    data: {
-      status: "CANCELLED",
-      cancellation_reason: "Cancelada por el cliente desde WhatsApp",
-    },
-  });
+const slot = await prisma.slot_recovery_slot.findFirst({
+  where: {
+    recovered_appointment_id: appointment.id,
+  },
+  select: {
+    id: true,
+  },
+});
 
-  return {
-    ok: true,
-    appointment,
-  };
+await prisma.appointment.update({
+  where: {
+    id: appointment.id,
+  },
+  data: {
+    status: "CANCELLED",
+    cancellation_reason: "Cancelada por el cliente desde WhatsApp",
+  },
+});
+
+await prisma.slot_recovery_recipient.updateMany({
+  where: {
+    customer_id: customer.id,
+    slot_recovery_slot: {
+      recovered_appointment_id: appointment.id,
+    },
+  },
+  data: {
+    status: "cancelled",
+  },
+});
+
+await prisma.slot_recovery_slot.updateMany({
+  where: {
+    recovered_appointment_id: appointment.id,
+  },
+  data: {
+    status: "cancelled",
+    cancelled_at: new Date(),
+  },
+});
+
+if (slot) {
+  await recomputeSlotCounters({
+    slotId: slot.id,
+  });
 }
+
+        return {
+            ok: true,
+            appointment,
+        };
+        }
