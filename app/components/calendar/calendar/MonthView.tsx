@@ -4,7 +4,6 @@
 import { useMemo } from "react";
 
 import BankHolidayCell from "@/app/components/calendar/calendar/BankHolidayCell";
-import CalendarHeaderRow from "@/app/components/calendar/calendar/grid/CalendarHeaderRow";
 import { fmtParts, localKeyTZ } from "./tz";
 
 import type { CalendarAppt } from "./types";
@@ -101,15 +100,7 @@ return (
   <div className="relative h-full min-h-0 flex flex-col">
     {/* HEADER igual que Week */}
     <div className="sticky top-0 z-30 bg-slate-50">
-      <CalendarHeaderRow
-        days={weekdayHeaderDays}
-        fmtDay={new Intl.DateTimeFormat("es-ES", { weekday: "short" })}
-        isToday={() => false}
-        isHoliday={() => false}
-        holidayTitle={() => ""}
-        showHourGutter={false}
-        mode="weekday"
-      />
+
     </div>
 
     {/* BODY (sin borde externo para evitar doble con el header) */}
