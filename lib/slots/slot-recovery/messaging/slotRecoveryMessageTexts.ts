@@ -7,25 +7,22 @@ export const slotRecoveryTexts = {
     button: "Ver servicios",
   },
 
-  confirmation: {
-    build: (params: {
-      serviceName: string;
-      date: string;
-      time: string;
-      locationName: string;
-    }) => {
-      return [
-        "✅ *¡Cita confirmada!*",
-        "",
-        `💆 Servicio: *${params.serviceName}*`,
-        `📅 Fecha: *${params.date}*`,
-        `🕒 Hora: *${params.time}*`,
-        `📍 Clínica: *${params.locationName}*`,
-        "",
-        "Si necesitas cancelar tu cita, responde a este mensaje escribiendo *CANCELAR*.",
-      ].join("\n");
-    },
+confirmation: {
+  build: (params: {
+    serviceName: string;
+    date: string;
+    time: string;
+    locationName: string;
+  }) => {
+    return `✅ *¡Cita confirmada!*
+
+Tu reserva para *${params.serviceName}* ha quedado registrada!
+Te esperamos en ${params.locationName} el *${params.date}*📅 a las *${params.time}*!
+¡Hasta pronto!
+
+Si necesitas cancelar tu cita, responde escribiendo *CANCELAR*.`;
   },
+},
 
   slotAlreadyTaken: {
     text: "¡Uy! Llegaste por muy poco ⏳. Este hueco acaba de ser reservado por otro cliente.\n\nNo te preocupes, te avisaremos en cuanto se libere la próxima oportunidad. 🔔",

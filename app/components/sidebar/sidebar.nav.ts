@@ -4,6 +4,9 @@ import {
   LayoutDashboard,
   CalendarDays,
   MessageSquareText,
+  MessageCircleMore,
+  Star,
+  MessagesSquare,
   Settings,
   Shield,
   Users,
@@ -28,19 +31,19 @@ export const NAV_ITEMS: SidebarNavItem[] = [
   {
     title: "Reseñas",
     href: "/dashboard/reviews",
-    icon: MessageSquareText,
+    icon: Star,
   },
   {
     title: "Mi negocio",
     href: "/dashboard/mybusiness",
     icon: Briefcase,
   },
-  /*{
-    title: "Configuración",
-    href: "/dashboard/settings",
-    icon: Settings,
-  },
   {
+    title: "WhatsApp",
+    href: "/dashboard/whatsapp",
+    icon: MessageSquareText,
+  },
+  /*{
     title: "Plantilla",
     href: "/dashboard/mybusiness/staff",
     icon: Briefcase,

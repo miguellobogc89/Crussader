@@ -70,77 +70,77 @@ export async function handleSlotRecoveryReplies(value: WaValue) {
     return;
   }
 
-  for (const message of value.messages) {
+for (const message of value.messages) {
+  let incomingMessageId: string | null = null;
 
-        let incomingMessageId: string | null = null;
-
-    if (typeof message.id === "string" && message.id.trim() !== "") {
-      incomingMessageId = message.id.trim();
-    }
-
-    if (incomingMessageId) {
-      const alreadyProcessed = await prisma.slot_recovery_recipient.findFirst({
-        where: {
-          reply_message_id: incomingMessageId,
-        },
-        select: {
-          id: true,
-        },
-      });
-
-      if (alreadyProcessed) {
-        console.log("[WA][SLOT_RECOVERY][DUPLICATED_MESSAGE_IGNORED]", {
-          messageId: incomingMessageId,
-        });
-
-        continue;
-      }
-    }
-    const replyType = normalizeReplyType(message);
-    const selectedServiceId = getSelectedServiceId(replyType);
-
-    if (!replyType) {
-      continue;
-    }
-
-    let fromPhone = "";
-
-    if (typeof message.from === "string") {
-      fromPhone = message.from.trim();
-    }
-
-    if (fromPhone === "") {
-      continue;
-    }
-
-    const incomingText = getIncomingText(message);
-
-if (isCancelText(incomingText)) {
-  const result = await cancelAppointmentByWhatsapp({
-    fromPhone,
-  });
-
-  if (result.ok) {
-    await sendTextMessage({
-      to: fromPhone,
-      text: "✅ Tu cita ha sido cancelada correctamente.",
-    });
-  } else {
-    await sendTextMessage({
-      to: fromPhone,
-      text: "No hemos encontrado ninguna cita futura activa asociada a este número.",
-    });
+  if (typeof message.id === "string" && message.id.trim() !== "") {
+    incomingMessageId = message.id.trim();
   }
 
-  console.log("[WA][SLOT_RECOVERY][CANCEL_TEXT_DETECTED]", {
-    fromPhone,
-    messageId: incomingMessageId,
-    text: incomingText,
-    result,
-  });
+  if (incomingMessageId) {
+    const alreadyProcessed = await prisma.slot_recovery_recipient.findFirst({
+      where: {
+        reply_message_id: incomingMessageId,
+      },
+      select: {
+        id: true,
+      },
+    });
 
-  continue;
-}
+    if (alreadyProcessed) {
+      console.log("[WA][SLOT_RECOVERY][DUPLICATED_MESSAGE_IGNORED]", {
+        messageId: incomingMessageId,
+      });
+
+      continue;
+    }
+  }
+
+  let fromPhone = "";
+
+  if (typeof message.from === "string") {
+    fromPhone = message.from.trim();
+  }
+
+  if (fromPhone === "") {
+    continue;
+  }
+
+  const incomingText = getIncomingText(message);
+
+  if (isCancelText(incomingText)) {
+    const result = await cancelAppointmentByWhatsapp({
+      fromPhone,
+    });
+
+    if (result.ok) {
+      await sendTextMessage({
+        to: fromPhone,
+        text: "✅ Tu cita ha sido cancelada correctamente.",
+      });
+    } else {
+      await sendTextMessage({
+        to: fromPhone,
+        text: "No hemos encontrado ninguna cita futura activa asociada a este número.",
+      });
+    }
+
+    console.log("[WA][SLOT_RECOVERY][CANCEL_TEXT_DETECTED]", {
+      fromPhone,
+      messageId: incomingMessageId,
+      text: incomingText,
+      result,
+    });
+
+    continue;
+  }
+
+  const replyType = normalizeReplyType(message);
+  const selectedServiceId = getSelectedServiceId(replyType);
+
+  if (!replyType) {
+    continue;
+  }
 
     const repliedAt = tsToDate(message.timestamp);
     let safeRepliedAt = repliedAt;
