@@ -11,5 +11,5 @@ export default async function Home() {
   }
 
   // primera experiencia: conectar negocio
-  redirect("/connect");
+  redirect("/auth/login");
 }

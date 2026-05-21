@@ -12,7 +12,8 @@ type Props = {
   children: ReactNode;
   footer?: ReactNode;
   contentClassName?: string;
-  primaryLabel?: string;
+  primaryLabel?: ReactNode;
+  primaryDisabled?: boolean;
   onPrimary?: () => void;
   onClose: () => void;
 };
@@ -24,6 +25,7 @@ export default function StandardModal({
   footer,
   contentClassName,
   primaryLabel = "Aceptar",
+  primaryDisabled = false,
   onPrimary,
   onClose,
 }: Props) {
@@ -84,12 +86,13 @@ export default function StandardModal({
                     Cerrar
                   </Button>
 
-                  <Button
-                    onClick={onPrimary}
-                    className="h-9 rounded-xl bg-gradient-to-r from-[#1D4ED8] to-[#2563EB] px-5 text-[12px] text-white shadow-[0_8px_20px_rgba(37,99,235,0.35)] transition-all hover:shadow-[0_10px_24px_rgba(37,99,235,0.45)] xl:text-[13px]"
+<Button
+  onClick={onPrimary}
+  disabled={primaryDisabled}
+  className="h-9 rounded-xl bg-gradient-to-r from-[#1D4ED8] to-[#2563EB] px-5 text-[12px] text-white shadow-[0_8px_20px_rgba(37,99,235,0.35)] transition-all hover:shadow-[0_10px_24px_rgba(37,99,235,0.45)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-[0_8px_20px_rgba(37,99,235,0.35)] xl:text-[13px]"
 >
-                    {primaryLabel}
-                  </Button>
+  {primaryLabel}
+</Button>
                 </>
               )}
             </footer>

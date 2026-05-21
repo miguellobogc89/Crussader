@@ -6,6 +6,7 @@ import { Users, Wrench } from "lucide-react";
 import EmployeesTable from "../employees/EmployeesTable";
 import ServicesTable from "../services/ServicesTable";
 import MyBusinessDetailPanel from "./MyBusinessDetailPanel";
+import CreateMyBusinessItemModal from "./CreateMyBusinessItemModal";
 
 export type EmployeeItem = {
   id: string;
@@ -63,6 +64,7 @@ export default function MyBusinessWorkspace({ employees }: Props) {
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(
     null,
   );
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const derivedServices = useMemo<ServiceItem[]>(() => {
     const map = new Map<string, ServiceItem>();
@@ -278,7 +280,7 @@ export default function MyBusinessWorkspace({ employees }: Props) {
   </button>
 </div>
 
-            <button
+            <button onClick={() => setIsCreateModalOpen(true)}
               type="button"
               className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
             >
@@ -303,17 +305,27 @@ export default function MyBusinessWorkspace({ employees }: Props) {
           </div>
         </section>
 
-<MyBusinessDetailPanel
-  activeTab={activeTab}
-  employee={selectedEmployee}
-  service={selectedService}
-  employees={localEmployees}
-  services={services}
-  onUpdateEmployee={handleUpdateEmployee}
-  onUpdateService={handleUpdateService}
-  onToggleEmployeeService={handleToggleEmployeeService}
-/>
+        <MyBusinessDetailPanel
+          activeTab={activeTab}
+          employee={selectedEmployee}
+          service={selectedService}
+          employees={localEmployees}
+          services={services}
+          onUpdateEmployee={handleUpdateEmployee}
+          onUpdateService={handleUpdateService}
+          onToggleEmployeeService={handleToggleEmployeeService}
+        />
       </div>
+      {isCreateModalOpen && (
+<CreateMyBusinessItemModal
+  open={isCreateModalOpen}
+  type={activeTab}
+  onClose={() => setIsCreateModalOpen(false)}
+  onCreated={() => {
+    window.location.reload();
+  }}
+/>
+)}
     </div>
   );
 }
