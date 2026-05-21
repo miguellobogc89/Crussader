@@ -9,14 +9,14 @@ export const slotRecoveryTexts = {
 
 confirmation: {
   build: (params: {
-    serviceName: string;
+    serviceName?: string | null;
     date: string;
     time: string;
     locationName: string;
   }) => {
     return `✅ *¡Cita confirmada!*
 
-Tu reserva para *${params.serviceName}* ha quedado registrada!
+Tu reserva ha quedado registrada!
 Te esperamos en ${params.locationName} el *${params.date}*📅 a las *${params.time}*!
 ¡Hasta pronto!
 

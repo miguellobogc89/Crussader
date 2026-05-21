@@ -415,7 +415,7 @@ for (const message of value.messages) {
 
         await sendSlotRecoveryConfirmation({
           to: fromPhone,
-          serviceName: "tu cita",
+          serviceName: null,
           startAt: slotData?.starts_at ?? new Date(),
           locationName: slotData?.Location?.title ?? "",
         });

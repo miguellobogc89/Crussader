@@ -5,7 +5,7 @@ import { slotRecoveryTexts } from "./slotRecoveryMessageTexts";
 
 type Params = {
   to: string;
-  serviceName: string;
+  serviceName?: string | null;
   startAt: Date;
   locationName: string;
 };
