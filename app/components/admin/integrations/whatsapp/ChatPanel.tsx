@@ -185,7 +185,7 @@ export default function ChatPanel({
       className={["h-full w-full overflow-auto px-3 py-3 md:px-4 md:py-4", className].join(" ")}
     >
       {chatBuckets.length === 0 ? (
-        <div className="text-sm text-muted-foreground">Sin mensajes todavía.</div>
+        <div className="text-sm text-muted-foreground">Selecciona una conversación.</div>
       ) : (
         <div className="space-y-4">
           {chatBuckets.map((b) => (

@@ -3,9 +3,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import PageShell from "@/app/components/layouts/PageShell";
+import PageShellNoScroll from "@/app/components/layouts/PageShellNoScroll";
 import TabMenu, { type TabItem } from "@/app/components/crussader/navigation/TabMenu";
-import MainPannel from "@/app/components/crussader/UX/MainPannel";
 import { MessageCircle, LayoutTemplate, Settings } from "lucide-react";
 
 import type PageTitle from "@/app/components/layouts/PageTitle";
@@ -58,7 +57,7 @@ export default function WhatsAppLayout({ children }: { children: React.ReactNode
   const { title, description, icon } = PAGE_META[activeTab];
 
   return (
-    <PageShell
+    <PageShellNoScroll
       title={title}
       description={description}
       titleIconName={icon}
@@ -68,9 +67,9 @@ export default function WhatsAppLayout({ children }: { children: React.ReactNode
         </div>
       }
     >
-      <div className="-mx-4 -mt-4 sm:mx-0 sm:mt-0">
-        <MainPannel>{children}</MainPannel>
+      <div className="h-full min-h-0 w-full bg-transparent px-4 py-4 sm:px-6 lg:px-8">
+        {children}
       </div>
-    </PageShell>
+    </PageShellNoScroll>
   );
 }

@@ -198,9 +198,11 @@ export default function TemplatesAddDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button className="shrink-0">
+        <Button
+          className="h-9 shrink-0 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+        >
           <Plus className="mr-2 h-4 w-4" />
-          Añadir
+          Nueva Plantilla
         </Button>
       </DialogTrigger>
 

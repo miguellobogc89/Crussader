@@ -1,7 +1,7 @@
 // app/components/admin/integrations/whatsapp/WhatsappAdminShell.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useBootstrapStore } from "@/app/providers/bootstrap-store";
 
 import WhatsappAdminPanel, {
@@ -9,11 +9,9 @@ import WhatsappAdminPanel, {
   type DefaultTemplate,
 } from "@/app/components/admin/integrations/whatsapp/WhatsappAdminPanel";
 import { useWhatsAppChatEvents } from "@/app/components/admin/integrations/whatsapp/hooks/useWhatsAppChatEvents";
-import { useWhatsAppSystemTurns } from "@/app/components/admin/integrations/whatsapp/hooks/useWhatsAppSystemTurns";
 import type { ConversationContact } from "@/app/components/admin/integrations/whatsapp/ConversationHeader";
 import type { TemplateGroupKey } from "@/lib/whatsapp/templateGroups";
 import { toWaDigits } from "@/lib/whatsapp/configuration/phone";
-import ThinkingPanel from "@/app/components/admin/integrations/whatsapp/ThinkingPanel/ThinkingPanel";
 
 function fillTemplateVars(text: string, contact: ConversationContact | null) {
   let out = text;
@@ -89,12 +87,6 @@ export default function WhatsAppAdminShell({
     initialEvents,
   });
 
-  // ✅ system turns (hook)
-  const systemModel = useWhatsAppSystemTurns({
-    companyId,
-    conversationId: thread.conversationId,
-    pollMs: 2000,
-  });
 
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -216,17 +208,6 @@ export default function WhatsAppAdminShell({
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  // Pills de memoria: SOLO profile (hook ya lo calcula)
-  const memoryPills = useMemo(() => systemModel.memoryPills, [systemModel.memoryPills]);
-
-const rightPanel = (
-  <ThinkingPanel
-    memoryValues={memoryPills}
-    turns={systemModel.turns}
-    loading={systemModel.loading}
-    canFetch={systemModel.canFetch}
-  />
-);
 
   return (
     <WhatsappAdminPanel
@@ -290,7 +271,7 @@ const rightPanel = (
         sendQuickText(filled);
       }}
       onSend={handleSend}
-      rightPanel={rightPanel}
+      rightPanel={null}
     />
   );
 }
