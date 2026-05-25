@@ -37,11 +37,37 @@ function normalizeCategory(value: unknown): whatsapp_template_category {
 }
 
 function convertFriendlyVarsToMeta(body: string) {
-  return String(body || "")
-    .replaceAll("{{nombre_cliente}}", "{{1}}")
-    .replaceAll("{{fecha_cita}}", "{{2}}")
-    .replaceAll("{{hora_cita}}", "{{3}}")
-    .replaceAll("{{nombre_negocio}}", "{{4}}");
+  const examplesByFriendlyVar: Record<string, string> = {
+    nombre_cliente: "María",
+    fecha_cita: "19/03",
+    hora_cita: "17:30",
+    nombre_negocio: "Clínica Moderna",
+  };
+
+  const usedVars: string[] = [];
+
+  const metaText = String(body || "").replace(
+    /\{\{(nombre_cliente|fecha_cita|hora_cita|nombre_negocio)\}\}/g,
+    (_match, varName: string) => {
+      let index = usedVars.indexOf(varName);
+
+      if (index === -1) {
+        usedVars.push(varName);
+        index = usedVars.length - 1;
+      }
+
+      return `{{${index + 1}}}`;
+    }
+  );
+
+  const exampleValues = usedVars.map((varName) => {
+    return examplesByFriendlyVar[varName] ?? "Ejemplo";
+  });
+
+  return {
+    metaText,
+    exampleValues,
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -131,19 +157,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const metaBody = convertFriendlyVarsToMeta(bodyPreview);
+    const { metaText, exampleValues } = convertFriendlyVarsToMeta(bodyPreview);
 
     const metaPayload = {
       name: templateName,
       language,
       category: mapMetaCategory(category),
-      components: [
-        {
-          type: "BODY",
-          text: metaBody,
-        },
-      ],
+components: [
+  {
+    type: "BODY",
+    text: metaText,
+    example: {
+      body_text: [exampleValues],
+    },
+  },
+],
     };
+
+    console.log("CREATE_TEMPLATE_BODY", JSON.stringify(body, null, 2));
 
     const metaRes = await fetch(
       `https://graph.facebook.com/v21.0/${phone.waba_id}/message_templates`,

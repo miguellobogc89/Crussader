@@ -166,7 +166,13 @@ export default function TemplatesShell({
           </aside>
 
           <main className="min-h-0 bg-[#f8fafc]">
-            <TemplateDetailsPanel selected={selected} />
+            <TemplateDetailsPanel
+  selected={
+    selected && !selected.name.includes("hello_world")
+      ? selected
+      : visibleItems[0] ?? null
+  }
+/>
           </main>
         </div>
       </section>
