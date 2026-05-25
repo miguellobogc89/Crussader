@@ -14,9 +14,9 @@ export type QuickAction = {
 
 export const QUICK_ACTIONS: QuickAction[] = [
   { key: "confirmacion_cita", label: "Confirmación cita" },
-  { key: "solicitud_resena", label: "Solicitud reseña" },
+  //{ key: "solicitud_resena", label: "Solicitud reseña" },
   { key: "recordatorio_cita", label: "Recordatorio cita" },
-  { key: "post_cita", label: "¿Cómo ha ido la cita?" },
+  //{ key: "post_cita", label: "¿Cómo ha ido la cita?" },
 ];
 
 export function inferTemplateGroupKey(templateName: string): TemplateGroupKey {

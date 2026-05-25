@@ -38,25 +38,69 @@ function slugifyTemplateName(value: string) {
 const AVAILABLE_VARIABLES = [
   {
     key: "{{nombre_cliente}}",
-    label: "Nombre cliente",
-    description: "Nombre del cliente",
+    label: "Nombre del cliente",
   },
   {
     key: "{{fecha_cita}}",
-    label: "Fecha cita",
-    description: "Fecha de la cita",
+    label: "Fecha de la cita",
   },
   {
     key: "{{hora_cita}}",
-    label: "Hora cita",
-    description: "Hora de la cita",
+    label: "Hora de la cita",
   },
   {
     key: "{{nombre_negocio}}",
-    label: "Nombre negocio",
-    description: "Nombre del negocio",
+    label: "Nombre del negocio",
   },
 ];
+
+function validateTemplate(body: string) {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  const trimmed = body.trim();
+
+  if (!trimmed) {
+    errors.push("El contenido no puede estar vacío.");
+  }
+
+  const variables =
+    trimmed.match(/\{\{(.*?)\}\}/g) ?? [];
+
+  if (variables.length > 4) {
+    errors.push("Solo puedes usar hasta 4 variables.");
+  }
+
+  if (/^\s*\{\{.*?\}\}/.test(trimmed)) {
+    errors.push("La plantilla no puede empezar por una variable.");
+  }
+
+  if (/\{\{.*?\}\}\s*$/.test(trimmed)) {
+    errors.push("La plantilla no puede terminar en una variable.");
+  }
+
+  if (/ {4,}/.test(trimmed)) {
+    errors.push("No se permiten múltiples espacios seguidos.");
+  }
+
+  if (trimmed.length < 15) {
+    warnings.push("El mensaje es demasiado corto.");
+  }
+
+  if (
+    variables.length >= 3 &&
+    trimmed.length < 40
+  ) {
+    warnings.push(
+      "Hay demasiadas variables para tan poco texto."
+    );
+  }
+
+  return {
+    errors,
+    warnings,
+  };
+}
 
 export default function TemplatesAddDialog({
   onCreated,
@@ -76,6 +120,8 @@ export default function TemplatesAddDialog({
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<TemplateCategory>("marketing");
   const [bodyPreview, setBodyPreview] = useState("");
+  const validation = validateTemplate(bodyPreview);
+const canSave = validation.errors.length === 0;
 
   function resetForm() {
     setTitle("");
@@ -198,9 +244,11 @@ export default function TemplatesAddDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button className="shrink-0">
+        <Button
+          className="h-9 shrink-0 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+        >
           <Plus className="mr-2 h-4 w-4" />
-          Añadir
+          Nueva Plantilla
         </Button>
       </DialogTrigger>
 
@@ -245,9 +293,22 @@ export default function TemplatesAddDialog({
                 placeholder="Hola {{nombre_cliente}}, te recordamos tu cita el {{fecha_cita}} a las {{hora_cita}}."
                 className="min-h-[260px]"
               />
+{validation.errors.length > 0 ? (
+  <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+    {validation.errors.map((error) => (
+      <p key={error}>• {error}</p>
+    ))}
+  </div>
+) : validation.warnings.length > 0 ? (
+  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+    {validation.warnings.map((warning) => (
+      <p key={warning}>• {warning}</p>
+    ))}
+  </div>
+) : null}
               <TemplateMessagePreview body={bodyPreview} />
               <p className="text-xs text-muted-foreground">
-                Haz clic en una variable de la derecha para insertarla donde tengas el cursor.
+                Haz clic en una variable de la derecha para insertarla.
               </p>
             </div>
 
@@ -274,9 +335,6 @@ export default function TemplatesAddDialog({
                   <div className="mt-1 font-mono text-xs text-muted-foreground">
                     {item.key}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {item.description}
-                  </div>
                 </button>
               ))}
             </div>
@@ -292,9 +350,12 @@ export default function TemplatesAddDialog({
             Cerrar
           </Button>
 
-          <Button onClick={handleSave} disabled={saving || !companyId}>
-            {saving ? "Guardando..." : "Guardar"}
-          </Button>
+<Button
+  onClick={handleSave}
+  disabled={saving || !companyId || !canSave}
+>
+  {saving ? "Guardando..." : "Guardar"}
+</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

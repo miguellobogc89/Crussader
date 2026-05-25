@@ -101,77 +101,71 @@ export default function WhatsappAdminPanel(props: {
     rightPanel,
   } = props;
 
-  return (
-    <div className="h-[calc(100vh-180px)] min-h-[720px]">
-      <div className="grid h-full grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
-        <Card className="h-full overflow-hidden border-0 bg-transparent shadow-none">
-          <CardContent className="h-full p-0">
-            <div className="grid h-full grid-cols-1 lg:grid-cols-[360px_1fr]">
-              <CustomersListPanel
-                companyId={companyId}
-                selectedPhone={selectedPhone}
-                onSelectPhone={onSelectPhone}
-              />
+return (
+  <section className="h-[calc(100vh-180px)] min-h-[720px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="grid h-full grid-cols-1 lg:grid-cols-[360px_1fr]">
+      <aside className="min-h-0 border-r border-slate-200 bg-white">
+        <CustomersListPanel
+          companyId={companyId}
+          selectedPhone={selectedPhone}
+          onSelectPhone={onSelectPhone}
+        />
+      </aside>
 
-              <div className="flex h-full min-h-0 flex-col">
-                <ConversationHeader contact={selectedContact} />
+      <main className="flex min-h-0 flex-col bg-white">
+        <div className="h-[72px] shrink-0 border-b border-slate-200 bg-white">
+          <ConversationHeader contact={selectedContact} />
+        </div>
 
-                <ChatQuickActions
-                  defaults={tplDefaults}
-                  disabled={!selectedContact || sending || chatLoading || !selectedConversationId}
-                  onInsertTemplate={onInsertTemplate}
-                />
+        <div className="shrink-0 border-b border-slate-200 bg-white">
+          <ChatQuickActions
+            defaults={tplDefaults}
+            disabled={!selectedContact || sending || chatLoading || !selectedConversationId}
+            onInsertTemplate={onInsertTemplate}
+          />
+        </div>
 
-                <div className="relative flex-1 min-h-0">
-                  {chatLoading ? (
-                    <div className="h-full w-full p-4 text-sm text-muted-foreground">
-                      Cargando conversación...
-                    </div>
-                  ) : (
-                    <ChatPanel events={chatEvents} className="h-full" />
-                  )}
-
-                  <div className="pointer-events-none absolute bottom-4 left-0 right-0 flex justify-center px-4">
-                    {toast ? <Toast text={toast} onClose={() => setToast(null)} /> : null}
-                  </div>
-                </div>
-
-                <div className="border-t bg-white px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <Input
-                      value={body}
-                      onChange={(e) => setBody(e.target.value)}
-                      placeholder="Escribe un mensaje..."
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          if (!sending) onSend();
-                        }
-                      }}
-                      className="h-11 flex-1 rounded-xl border-0 bg-gray-100 px-4 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                    />
-
-                    <Button
-                      onClick={onSend}
-                      disabled={sending}
-                      className="h-11 rounded-xl bg-emerald-500 px-5 text-white hover:bg-emerald-600 disabled:opacity-60"
-                    >
-                      <SendHorizonal className="mr-2 h-4 w-4" />
-                      Enviar
-                    </Button>
-                  </div>
-                </div>
-              </div>
+        <div className="relative min-h-0 flex-1 bg-[#f5f7fb]">
+          {chatLoading ? (
+            <div className="h-full w-full p-4 text-sm text-muted-foreground">
+              Cargando conversación...
             </div>
-          </CardContent>
-        </Card>
+          ) : (
+            <ChatPanel events={chatEvents} className="h-full" />
+          )}
 
-        <Card className="h-full overflow-hidden">
-          <CardContent className="h-full p-0">
-            {rightPanel ? rightPanel : <div className="p-4 text-sm text-muted-foreground">Panel derecho</div>}
-          </CardContent>
-        </Card>
-      </div>
+          <div className="pointer-events-none absolute bottom-4 left-0 right-0 flex justify-center px-4">
+            {toast ? <Toast text={toast} onClose={() => setToast(null)} /> : null}
+          </div>
+        </div>
+
+        <div className="h-[76px] shrink-0 border-t border-slate-200 bg-white px-4 py-3">
+          <div className="flex h-full items-center gap-3">
+            <Input
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Escribe un mensaje..."
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (!sending) onSend();
+                }
+              }}
+              className="h-11 flex-1 rounded-xl border-0 bg-gray-100 px-4 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+            />
+
+            <Button
+              onClick={onSend}
+              disabled={sending}
+              className="h-11 rounded-xl bg-emerald-500 px-5 text-white hover:bg-emerald-600 disabled:opacity-60"
+            >
+              <SendHorizonal className="mr-2 h-4 w-4" />
+              Enviar
+            </Button>
+          </div>
+        </div>
+      </main>
     </div>
-  );
+  </section>
+);
 }
