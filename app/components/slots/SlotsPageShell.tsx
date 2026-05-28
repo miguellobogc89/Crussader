@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { SlotsStatsCard } from "./SlotsStatsCard";
-import { SlotsListCard } from "./AvailableSlotsList";
+import { SlotsListCard } from "./SlotsCardItem/AvailableSlotsList";
 import type { SlotDTO } from "@/hooks/slots/useSlots";
 import type { SelectedServiceItem } from "./slots.types";
 import { WaitlistCard } from "./Waitlist/WaitlistCard";

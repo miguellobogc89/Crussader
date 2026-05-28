@@ -1,29 +1,61 @@
+// app/components/slots/SlotsStatsCard.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { Euro, RefreshCw, TrendingUp } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Euro, RotateCcw, Send } from "lucide-react";
 
 type Props = {
   companyId: string | null;
   locationId?: string | null;
 };
 
+function AnimatedValue({ value }: { value: string | number }) {
+  const [pulse, setPulse] = useState(false);
+  const previousValue = useRef(value);
+
+  useEffect(() => {
+    if (previousValue.current === value) {
+      return;
+    }
+
+    previousValue.current = value;
+    setPulse(true);
+
+    const timeoutId = window.setTimeout(() => {
+      setPulse(false);
+    }, 320);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [value]);
+
+  return (
+    <span
+      className={[
+        "tabular-nums text-base font-semibold text-foreground transition-transform duration-300 ease-out",
+        pulse ? "scale-125" : "scale-100",
+      ].join(" ")}
+    >
+      {value}
+    </span>
+  );
+}
+
 export function SlotsStatsCard({ companyId, locationId }: Props) {
   const [recovered, setRecovered] = useState<number>(0);
   const [recoveredTotal, setRecoveredTotal] = useState<number>(0);
   const [recoveredAmount, setRecoveredAmount] = useState<number>(0);
-  const [bookingConversion, setBookingConversion] = useState<number>(0);
+  const [sentMessages, setSentMessages] = useState<number>(0);
 
   useEffect(() => {
     if (!locationId || !companyId) {
       setRecovered(0);
       setRecoveredTotal(0);
       setRecoveredAmount(0);
-      setBookingConversion(0);
+      setSentMessages(0);
       return;
     }
 
-    const controller = new AbortController();
+    let isMounted = true;
 
     const fetchKpis = async () => {
       try {
@@ -32,49 +64,50 @@ export function SlotsStatsCard({ companyId, locationId }: Props) {
         params.set("locationId", locationId);
 
         const res = await fetch(`/api/slots/kpis?${params.toString()}`, {
-          signal: controller.signal,
           cache: "no-store",
         });
 
         const data = await res.json();
 
+        if (!isMounted) {
+          return;
+        }
+
         if (!res.ok || !data?.ok) {
-          setRecovered(0);
-          setRecoveredTotal(0);
-          setRecoveredAmount(0);
-          setBookingConversion(0);
           return;
         }
 
         setRecovered(Number(data.kpis?.recovered ?? 0));
         setRecoveredTotal(Number(data.kpis?.recoveredTotal ?? 0));
         setRecoveredAmount(Number(data.kpis?.recoveredAmount ?? 0));
-        setBookingConversion(Number(data.kpis?.bookingConversion ?? 0));
-      } catch (error) {
-        if ((error as Error).name === "AbortError") {
-          return;
-        }
-
-        setRecovered(0);
-        setRecoveredTotal(0);
-        setRecoveredAmount(0);
-        setBookingConversion(0);
+        setSentMessages(Number(data.kpis?.sentMessages ?? 0));
+      } catch {
+        // No limpiamos los datos para evitar parpadeos.
       }
     };
 
     void fetchKpis();
 
-    return () => controller.abort();
+    const intervalId = window.setInterval(() => {
+      void fetchKpis();
+    }, 10000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
   }, [companyId, locationId]);
+
+  const formattedAmount = `${recoveredAmount.toLocaleString("es-ES", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}€`;
 
   const stats = [
     {
       id: "income",
       label: "Ingresos recuperados",
-      value: `${recoveredAmount.toLocaleString("es-ES", {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      })}€`,
+      value: formattedAmount,
       sub: "",
       Icon: Euro,
     },
@@ -83,15 +116,15 @@ export function SlotsStatsCard({ companyId, locationId }: Props) {
       label: "Huecos rescatados",
       value: recovered,
       sub: `de ${recoveredTotal}`,
-      Icon: RefreshCw,
+      Icon: RotateCcw,
     },
-    {
-      id: "booking-conversion",
-      label: "Tasa de conversión",
-      value: `${bookingConversion}%`,
-      sub: "de clientes contactados",
-      Icon: TrendingUp,
-    }
+{
+  id: "sent-messages",
+  label: "Invitaciones enviadas",
+  value: sentMessages,
+  sub: "este mes",
+  Icon: Send,
+}
   ];
 
   return (
@@ -111,9 +144,7 @@ export function SlotsStatsCard({ companyId, locationId }: Props) {
               </span>
 
               <div className="flex items-baseline gap-1">
-                <span className="tabular-nums text-base font-semibold text-foreground">
-                  {stat.value}
-                </span>
+                <AnimatedValue value={stat.value} />
 
                 {stat.sub ? (
                   <span className="text-[11px] text-muted-foreground">
