@@ -82,45 +82,47 @@ export async function GET(req: NextRequest) {
     });
 
     const recoveredSlots = await prisma.slot_recovery_slot.findMany({
-      where: {
-        company_id: location.companyId,
-        location_id: locationId,
-        OR: [{ status: "recovered" }, { recovered_at: { not: null } }],
-      },
-      select: {
-        id: true,
-        Appointment_slot_recovery_slot_recovered_appointment_idToAppointment: {
-          select: {
-            servicePrice: true,
-          },
-        },
-        slot_recovery_service: {
-          select: {
-            price: true,
-          },
-        },
-      },
+where: {
+  company_id: location.companyId,
+  location_id: locationId,
+  status: "recovered",
+},
+select: {
+  id: true,
+  Appointment_slot_recovery_slot_recovered_appointment_idToAppointment: {
+    select: {
+      servicePrice: true,
+    },
+  },
+  slot_recovery_service: {
+    select: {
+      price: true,
+    },
+  },
+},
     });
 
     const recovered = recoveredSlots.length;
 
-    const recoveredAmount = recoveredSlots.reduce((sum, slot) => {
-      const appointmentPrice =
-        slot.Appointment_slot_recovery_slot_recovered_appointment_idToAppointment
-          ?.servicePrice;
+const recoveredAmount = recoveredSlots.reduce((sum, slot) => {
+  const appointmentPrice =
+    slot.Appointment_slot_recovery_slot_recovered_appointment_idToAppointment
+      ?.servicePrice;
 
-      if (appointmentPrice != null) {
-        return sum + Number(appointmentPrice);
-      }
+  if (appointmentPrice != null) {
+    return sum + Number(appointmentPrice);
+  }
 
-      const fallbackPrice = slot.slot_recovery_service?.price;
 
-      if (fallbackPrice != null) {
-        return sum + Number(fallbackPrice);
-      }
 
-      return sum;
-    }, 0);
+  const fallbackPrice = slot.slot_recovery_service?.price;
+
+  if (fallbackPrice != null) {
+    return sum + Number(fallbackPrice);
+  }
+
+  return sum;
+}, 0);
 
     const sentRecipients = await prisma.slot_recovery_recipient.count({
       where: {
@@ -142,6 +144,21 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    const now = new Date();
+const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+const sentMessages = await prisma.slot_recovery_recipient.count({
+  where: {
+    company_id: location.companyId,
+    sent_at: {
+      gte: monthStart,
+    },
+    slot_recovery_slot: {
+      location_id: locationId,
+    },
+  },
+});
+
     const bookingConversion =
       sentRecipients > 0
         ? Math.round((bookedRecipients / sentRecipients) * 100)
@@ -154,6 +171,7 @@ export async function GET(req: NextRequest) {
         recoveredTotal: totalSlots,
         recoveredAmount,
         bookingConversion,
+        sentMessages,
       },
     });
   } catch (e) {
