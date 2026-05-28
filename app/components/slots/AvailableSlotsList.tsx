@@ -42,6 +42,10 @@ function getGroupLabel(groupKey: string): string {
   if (groupKey === "expired") {
     return "Vencido";
   }
+  
+  if (groupKey === "cancelled") {
+    return "Cancelados";
+  }
 
   const groupDate = new Date(`${groupKey}T00:00:00`);
   const today = new Date();
@@ -147,6 +151,7 @@ export function SlotsListCard({
     const dayGroups: Record<string, typeof slots> = {};
     const recoveredSlots: typeof slots = [];
     const expiredSlots: typeof slots = [];
+    const cancelledSlots: typeof slots = [];
     const now = Date.now();
 
     for (const slot of slots) {
@@ -157,10 +162,15 @@ export function SlotsListCard({
         continue;
       }
 
-      if (effectiveStatus === "expired") {
-        expiredSlots.push(slot);
-        continue;
-      }
+if (effectiveStatus === "cancelled") {
+  cancelledSlots.push(slot);
+  continue;
+}
+
+if (effectiveStatus === "expired") {
+  expiredSlots.push(slot);
+  continue;
+}
 
       const dayKey = getLocalDayKey(slot.startsAt);
 
@@ -202,6 +212,15 @@ export function SlotsListCard({
         }),
       ]);
     }
+
+    if (cancelledSlots.length > 0) {
+  trailingGroups.push([
+    "cancelled",
+    [...cancelledSlots].sort((a, b) => {
+      return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+    }),
+  ]);
+}
 
     return [...orderedDayGroups, ...trailingGroups];
   }, [slots]);
@@ -340,6 +359,7 @@ useEffect(() => {
                 const isToday = label === "Hoy";
                 const isExpired = groupKey === "expired";
                 const isRecovered = groupKey === "recovered";
+                const isCancelled = groupKey === "cancelled";
                 const isCollapsed = collapsedGroups[groupKey] === true;
 
                 return (
@@ -361,13 +381,15 @@ useEffect(() => {
                       <div
                         className={[
                           "text-[12px] font-semibold xl:text-[13px]",
-                          isToday
-                            ? "text-blue-600"
-                            : isExpired
-                            ? "text-slate-400"
-                            : isRecovered
-                            ? "text-emerald-600"
-                            : "text-slate-700",
+isToday
+  ? "text-blue-600"
+  : isCancelled
+  ? "text-pink-500"
+  : isExpired
+  ? "text-slate-400"
+  : isRecovered
+  ? "text-emerald-600"
+  : "text-slate-700",
                         ].join(" ")}
                       >
                         {label}

@@ -1,9 +1,9 @@
 // app/dashboard/appointmentManager/overview/page.tsx
 
-import AppointmentManagerGeneralStatus from "@/app/components/appointmentManager/AppointmentManagerGeneralStatus";
-import AppointmentManagerKpiCards from "@/app/components/appointmentManager/AppointmentManagerKpiCards";
-import AppointmentManagerUpcomingAppointments from "@/app/components/appointmentManager/AppointmentManagerUpcomingAppointments";
-import AppointmentManagerRecentActivity from "@/app/components/appointmentManager/AppointmentManagerRecentActivity";
+import AppointmentManagerGeneralStatus from "@/app-legacy/components-legacy/appointmentManager/AppointmentManagerGeneralStatus";
+import AppointmentManagerKpiCards from "@/app-legacy/components-legacy/appointmentManager/AppointmentManagerKpiCards";
+import AppointmentManagerUpcomingAppointments from "@/app-legacy/components-legacy/appointmentManager/AppointmentManagerUpcomingAppointments";
+import AppointmentManagerRecentActivity from "@/app-legacy/components-legacy/appointmentManager/AppointmentManagerRecentActivity";
 
 export default function AppointmentManagerOverviewPage() {
   return (

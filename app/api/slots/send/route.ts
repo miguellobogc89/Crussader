@@ -1,13 +1,85 @@
 // app/api/slots/send/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendSlotRecoveryTemplate } from "@/lib/slots/slot-recovery/messaging/sendSlotRecoveryTemplate";
-import { logSlotActivity } from "@/lib/slots/slot-recovery/logSlotActivity";
+import { resolvePhoneNumber } from "@/lib/whatsapp/phoneNumbers/resolvePhoneNumber";
+import { sendSlotRecoveryTemplate } from "@/lib/slots/messaging/sendSlotRecoveryTemplate";
+import { logSlotActivity } from "@/lib/slots/actions/logSlotActivity";
+
+
+type ConversationData = {
+  id: string;
+};
 
 type IncomingCustomer = {
   customerId?: string | null;
   phone?: string | null;
 };
+
+async function resolveInstallation(companyId: string) {
+  const inst = await prisma.integration_installation.findFirst({
+    where: {
+      provider: "whatsapp",
+      status: "active",
+      company_id: companyId,
+    },
+  });
+
+  if (!inst) {
+    return {
+      installation: null,
+      companyPhoneNumber: null,
+    };
+  }
+
+  const companyPhoneNumber = await prisma.company_phone_number.findFirst({
+    where: {
+      company_id: companyId,
+      status: "active",
+    },
+    orderBy: {
+      updated_at: "desc",
+    },
+  });
+
+  return {
+    installation: inst,
+    companyPhoneNumber,
+  };
+}
+
+async function upsertConversation(args: {
+  installationId: string;
+  contactExternalId: string;
+  contactPhoneE164?: string | null;
+  contactName?: string | null;
+  lastMessageAt?: Date | null;
+  companyPhoneNumberId: string;
+}) {
+  return prisma.messaging_conversation.upsert({
+    where: {
+      installation_id_contact_external_id: {
+        installation_id: args.installationId,
+        contact_external_id: args.contactExternalId,
+      },
+    },
+    create: {
+      installation_id: args.installationId,
+      contact_external_id: args.contactExternalId,
+      contact_phone_e164: args.contactPhoneE164 ?? null,
+      contact_name: args.contactName ?? null,
+      status: "open",
+      last_message_at: args.lastMessageAt ?? new Date(),
+      company_phone_number_id: args.companyPhoneNumberId,
+    },
+    update: {
+      contact_phone_e164: args.contactPhoneE164 ?? null,
+      contact_name: args.contactName ?? null,
+      last_message_at: args.lastMessageAt ?? new Date(),
+      updated_at: new Date(),
+      company_phone_number_id: args.companyPhoneNumberId,
+    },
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -173,10 +245,39 @@ export async function POST(request: NextRequest) {
           customer?.firstName ||
           "Cliente";
 
+          const templateName = "slot_available_employee";
+
+const templateParams = [
+  customerName,
+  businessName,
+  day,
+  time,
+  specialistName,
+];
+
+        const resolvedWhatsapp = await resolveInstallation(companyId);
+        const installation = resolvedWhatsapp.installation;
+        const companyPhoneNumber = resolvedWhatsapp.companyPhoneNumber;
+
+        if (!installation || !companyPhoneNumber) {
+          throw new Error("No active WhatsApp installation or phone number found");
+        }
+
+const contactPhone = `34${record.phone.replace(/[^\d]/g, "").replace(/^34/, "")}`;
+
+const conv = await upsertConversation({
+  installationId: installation.id,
+  contactExternalId: contactPhone,
+  contactPhoneE164: contactPhone,
+  contactName: customerName,
+  lastMessageAt: new Date(),
+  companyPhoneNumberId: companyPhoneNumber.id,
+});
+          console.log("[CHAT_DEBUG][CONV]", conv.id);
 
         const result = await sendSlotRecoveryTemplate({
           to: record.phone,
-          templateName: "slot_available_employee ",
+          templateName,
           language: "es",
           components: [
             {
@@ -209,6 +310,34 @@ export async function POST(request: NextRequest) {
 
         const messageId =
           result?.messages && result.messages[0] ? result.messages[0].id : null;
+
+await prisma.messaging_message.create({
+  data: {
+    conversation_id: conv.id,
+    provider_message_id: messageId,
+    direction: "out",
+    kind: "template",
+    text: null,
+    status: "sent",
+    provider_ts: new Date(),
+    payload: {
+      templateName,
+      templateParams,
+      meta: result,
+    },
+  },
+});
+          console.log("[CHAT_DEBUG][MESSAGE_CREATED]");
+
+          await prisma.messaging_conversation.update({
+            where: {
+              id: conv.id,
+            },
+            data: {
+              last_message_at: new Date(),
+              updated_at: new Date(),
+            },
+          });
 
         await prisma.slot_recovery_send.updateMany({
           where: {

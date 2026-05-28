@@ -19,6 +19,7 @@ export type EffectiveSlotStatus =
   | "sent"
   | "recovered"
   | "expired"
+  | "unfilled"
   | "cancelled"
   | string;
 
@@ -27,7 +28,11 @@ export function isExpiredSlot(slot: SlotDTO): boolean {
     return false;
   }
 
-  if (slot.status === "expired" || slot.status === "cancelled") {
+  if (slot.status === "cancelled") {
+    return false;
+  }
+
+  if (slot.status === "expired") {
     return true;
   }
 
@@ -41,6 +46,10 @@ export function isExpiredSlot(slot: SlotDTO): boolean {
 }
 
 export function getEffectiveSlotStatus(slot: SlotDTO): EffectiveSlotStatus {
+  if (slot.status === "cancelled") {
+    return "cancelled";
+  }
+
   if (isRecoveredSlot(slot)) {
     return "recovered";
   }
@@ -219,9 +228,9 @@ export function mapSlotStatus(slot: SlotDTO): SlotItem["status"] {
     return "fresh";
   }
 
-  if (slot.status === "expired" || slot.status === "cancelled") {
-    return "unfilled";
-  }
+if (slot.status === "expired") {
+  return "unfilled";
+}
 
   return "fresh";
 }

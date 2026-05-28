@@ -5,7 +5,7 @@ import EmployeesPageClient from "@/app/components/mybusiness/employees/Employees
 export default function MyBusinessPage() {
   return (
     <PageShellNoScroll
-      title="My business"
+      title="Mi negocio"
       description="Gestiona empleados, servicios y configuración operativa del negocio"
       titleIconName="Building2"
     >

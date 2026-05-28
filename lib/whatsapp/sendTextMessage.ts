@@ -8,22 +8,32 @@ type SendTextMessageParams = {
   text: string;
 };
 
-export async function sendTextMessage({
-  to,
-  text,
-}: SendTextMessageParams) {
+export async function sendTextMessage({ to, text }: SendTextMessageParams) {
+  if (!WHATSAPP_TOKEN) {
+    throw new Error("Missing WHATSAPP_PERMANENT_TOKEN");
+  }
+
+  if (!PHONE_NUMBER_ID) {
+    throw new Error("Missing WHATSAPP_PHONE_NUMBER_ID");
+  }
+
+  const cleanTo = to.trim();
+  const cleanText = text.trim();
+
+  if (!cleanTo || !cleanText) {
+    throw new Error("Missing WhatsApp recipient or text");
+  }
+
   const url = `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`;
 
   const payload = {
     messaging_product: "whatsapp",
-    to,
+    to: cleanTo,
     type: "text",
     text: {
-      body: text,
+      body: cleanText,
     },
   };
-
-  console.log("[WA][TEXT][PAYLOAD]", JSON.stringify(payload, null, 2));
 
   const res = await fetch(url, {
     method: "POST",
@@ -37,11 +47,13 @@ export async function sendTextMessage({
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(
-      typeof data?.error?.message === "string"
-        ? data.error.message
-        : "whatsapp_text_send_failed",
-    );
+    let message = "whatsapp_text_send_failed";
+
+    if (typeof data?.error?.message === "string") {
+      message = data.error.message;
+    }
+
+    throw new Error(message);
   }
 
   return data;

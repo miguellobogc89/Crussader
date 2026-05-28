@@ -1,7 +1,7 @@
 // app/dashboard/crussaderAssistant/chat/page.tsx
 "use client";
 
-import CrussaderAssistantShell from "@/app/components/crussaderAssistant/CrussaderAssistantShell";
+import CrussaderAssistantShell from "@/app-legacy/components-legacy/crussaderAssistant/CrussaderAssistantShell";
 import { useBootstrapStatus } from "@/app/providers/bootstrap-store";
 
 export const dynamic = "force-dynamic";

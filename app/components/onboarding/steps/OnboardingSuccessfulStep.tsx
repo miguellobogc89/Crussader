@@ -15,7 +15,7 @@ export function OnboardingSuccessfulStep() {
     }
 
     // Redirección final
-    window.location.href = "/dashboard/mybusiness";
+    window.location.href = "/dashboard/slots";
   }
 
   return (

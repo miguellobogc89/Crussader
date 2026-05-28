@@ -33,6 +33,10 @@ type SlotsListCardItemProps = {
 function getLeftBorderClass(slot: SlotDTO): string {
   const effectiveStatus = getEffectiveSlotStatus(slot);
 
+  if (effectiveStatus === "cancelled") {
+    return "border-l-[3px] border-l-pink-300";
+  }
+
   if (effectiveStatus === "pending_publish" || effectiveStatus === "sent") {
     return "border-l-[3px] border-l-[#60A5FA]";
   }
@@ -50,6 +54,16 @@ function getLeftBorderClass(slot: SlotDTO): string {
 
 function getCardClass(slot: SlotDTO): string {
   const effectiveStatus = getEffectiveSlotStatus(slot);
+
+if (effectiveStatus === "cancelled") {
+  return [
+    "w-full rounded-xl border px-3 py-3 text-left transition-all duration-300 ease-out xl:px-3.5 xl:py-3.5 xl2:px-5 xl2:py-4",
+    "border-pink-200 bg-pink-50",
+    "hover:border-pink-300 hover:bg-pink-50",
+    "cursor-pointer",
+    getLeftBorderClass(slot),
+  ].join(" ");
+}
 
   if (effectiveStatus === "pending_publish" || effectiveStatus === "sent") {
     return [
@@ -103,6 +117,7 @@ export function SlotsListCardItem({
   const isSent = effectiveStatus === "sent";
   const isRecovered = effectiveStatus === "recovered";
   const isExpired = effectiveStatus === "expired";
+  const isCancelled = effectiveStatus === "cancelled";
 
   return (
     <button
@@ -154,6 +169,7 @@ export function SlotsListCardItem({
           {isSent ? <SentBadge /> : null}
           {isRecovered ? <StatusDotLabel label="Recuperado" tone="success" /> : null}
           {isExpired ? <StatusDotLabel label="Vencido" tone="muted" /> : null}
+          {isCancelled ? <StatusDotLabel label="Cancelado" tone="muted" /> : null}
         </div>
       </div>
     </button>
