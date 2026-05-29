@@ -6,7 +6,6 @@ import {
   type ExtractedConcept,
 } from "@/app/server/concepts/extractConcepts";
 
-
 export const runtime = "nodejs";
 export const revalidate = 0;
 export async function GET(req: Request) {
