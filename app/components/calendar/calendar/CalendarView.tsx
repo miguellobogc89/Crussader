@@ -222,19 +222,7 @@ export default function CalendarView({
       hasRecoverySlot: Boolean(item.hasRecoverySlot),
     }));
 
-    setAppointments((prev) => {
-      const merged = new Map<string, CalendarAppt>();
-
-      for (const appt of prev) {
-        merged.set(appt.id, appt);
-      }
-
-      for (const appt of nextAppointments) {
-        merged.set(appt.id, appt);
-      }
-
-      return Array.from(merged.values());
-    });
+    setAppointments(nextAppointments);
   }, [locationId, range]);
 
   useEffect(() => {
