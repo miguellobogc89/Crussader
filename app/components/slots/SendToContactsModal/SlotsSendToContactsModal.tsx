@@ -1,31 +1,32 @@
 // app/components/slots/SendToContactsModal/SlotsSendToContactsModal.tsx
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { useToast } from "@/app/components/ui/use-toast";
 import StandardModal from "@/app/components/crussader/StandardModal";
 import { SlotsCreateContactForm } from "./SlotsCreateContactForm";
-import { SlotsCustomerListItem } from "./SlotsCustomerListItem";
+import type { CustomerTabId } from "./types";
+import { customerTabs } from "./constants/customerTabs";
 import { SlotsCustomerPickerHeader } from "./SlotsCustomerPickerHeader";
+import { useCreateSlotContact } from "./hooks/useCreateSlotContact";
+import { useSendSlotContacts } from "./hooks/useSendSlotContacts";
+import { SlotsCustomersList } from "./components/SlotsCustomersList";
 import {
   MAX_SELECTED_CONTACTS,
-  CLUSTER_ORDER,
   DEFAULT_EXPANDED_CLUSTERS,
-  buildInlineCreatedRow,
-  buildSelectedSummary,
-  buildSendButtonLabel,
   buildSmartSelectionIds,
   filterCustomerItems,
   getCreateContactDisabled,
-  getGroupedItems,
-  getSendDisabled,
   isHardBlocked,
-  type CreateCustomerResponseItem,
-  type CustomerCluster,
   type CustomerListItem,
 } from "@/app/components/slots/helpers/slotsCustomersPickerHelpers";
+import {
+  getCacheKey,
+  setCachedCustomers,
+  useSlotCustomers,
+} from "./hooks/useSlotCustomers";
 
 type SlotsCustomersPickerModalProps = {
   open: boolean;
@@ -36,59 +37,7 @@ type SlotsCustomersPickerModalProps = {
   onAddContact?: () => void;
 };
 
-type CustomersCacheEntry = {
-  items: CustomerListItem[];
-  cachedAt: number;
-};
 
-type CustomerTabId =
-  | "all"
-  | "available"
-  | "unavailable"
-  | "upcoming"
-  | "recent"
-  | "waitlist";
-
-const CACHE_TTL_MS = 0;
-const customersCache = new Map<string, CustomersCacheEntry>();
-
-function getCacheKey(companyId: string, slotId: string, query: string): string {
-  return `${companyId}::${slotId}::${query.trim().toLowerCase()}`;
-}
-
-function getCachedCustomers(cacheKey: string): CustomerListItem[] | null {
-  const entry = customersCache.get(cacheKey);
-
-  if (!entry) return null;
-
-  const isExpired = Date.now() - entry.cachedAt > CACHE_TTL_MS;
-
-  if (isExpired) {
-    customersCache.delete(cacheKey);
-    return null;
-  }
-
-  return entry.items;
-}
-
-function setCachedCustomers(cacheKey: string, items: CustomerListItem[]): void {
-  customersCache.set(cacheKey, {
-    items,
-    cachedAt: Date.now(),
-  });
-}
-
-const customerTabs: Array<{
-  id: CustomerTabId;
-  label: string;
-}> = [
-  { id: "all", label: "Todos" },
-  { id: "available", label: "Disponibles" },
-  { id: "unavailable", label: "No disponibles" },
-  { id: "upcoming", label: "Cita próxima" },
-  { id: "recent", label: "Cita reciente" },
-  { id: "waitlist", label: "Lista espera" },
-];
 
 export function SlotsCustomersPickerModal({
   open,
@@ -100,118 +49,60 @@ export function SlotsCustomersPickerModal({
   const { toast } = useToast();
 
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState<CustomerListItem[]>([]);
+
+  const {
+  loading,
+  items,
+  setItems,
+  fetchCustomers,
+} = useSlotCustomers({
+  open,
+  companyId,
+  slotId,
+  query,
+});
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [sending, setSending] = useState(false);
+  const [modalWarning, setModalWarning] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<CustomerTabId>("all");
-  const [expandedClusters, setExpandedClusters] = useState(
-    DEFAULT_EXPANDED_CLUSTERS
-  );
-
   const [showAdd, setShowAdd] = useState(false);
-  const [creatingContact, setCreatingContact] = useState(false);
-  const [createError, setCreateError] = useState("");
-  const [newFirstName, setNewFirstName] = useState("");
-  const [newLastName, setNewLastName] = useState("");
-  const [newPhone, setNewPhone] = useState("+34 ");
+  const {
+  creatingContact,
+  createError,
+  newFirstName,
+  newLastName,
+  newPhone,
+  setCreateError,
+  setNewFirstName,
+  setNewLastName,
+  setNewPhone,
+  handleCreateContact,
+} = useCreateSlotContact({
+  companyId,
+  slotId,
+  query,
+  items,
+  fetchCustomers,
+  setItems,
+  selectedIds,
+  setSelectedIds,
+  toast,
+  getCacheKey,
+  setCachedCustomers,
+});
 
-  function toggleCluster(cluster: CustomerCluster) {
-    setExpandedClusters((prev) => ({
-      ...prev,
-      [cluster]: !prev[cluster],
-    }));
-  }
+useEffect(() => {
+  if (!open) return;
 
-  const fetchCustomers = useCallback(
-    async (searchValue: string, signal?: AbortSignal) => {
-      const params = new URLSearchParams();
-      params.set("companyId", companyId);
-      params.set("slotId", slotId);
-      params.set("limit", "50");
+  setShowAdd(false);
+  setCreateError("");
+  setNewFirstName("");
+  setNewLastName("");
+  setNewPhone("+34 ");
+  setSelectedIds([]);
+  setActiveTab("all");
+}, [open]);
 
-      if (searchValue.trim()) {
-        params.set("q", searchValue.trim());
-      }
 
-      const response = await fetch(
-        `/api/slots/customers/list?${params.toString()}`,
-        {
-          method: "GET",
-          signal,
-          cache: "no-store",
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok || !data?.ok) {
-        throw new Error(data?.error || "No se pudieron cargar los clientes");
-      }
-
-      const nextItems = Array.isArray(data.items)
-        ? (data.items as CustomerListItem[])
-        : [];
-
-      setCachedCustomers(getCacheKey(companyId, slotId, searchValue), nextItems);
-      setItems(nextItems);
-    },
-    [companyId, slotId]
-  );
-
-  useEffect(() => {
-    if (!open) return;
-
-    setShowAdd(false);
-    setCreatingContact(false);
-    setCreateError("");
-    setNewFirstName("");
-    setNewLastName("");
-    setNewPhone("+34 ");
-    setSelectedIds([]);
-    setActiveTab("all");
-    setExpandedClusters(DEFAULT_EXPANDED_CLUSTERS);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const controller = new AbortController();
-    const cacheKey = getCacheKey(companyId, slotId, query);
-    const cachedItems = getCachedCustomers(cacheKey);
-
-    if (cachedItems) {
-      setItems(cachedItems);
-      setLoading(false);
-    } else {
-      setLoading(true);
-    }
-
-    async function run() {
-      try {
-        await fetchCustomers(query, controller.signal);
-      } catch (error) {
-        if (controller.signal.aborted) return;
-
-        console.error("SlotsCustomersPickerModal fetch error", error);
-
-        if (!cachedItems) {
-          setItems([]);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    const timeout = window.setTimeout(run, cachedItems ? 0 : 250);
-
-    return () => {
-      controller.abort();
-      window.clearTimeout(timeout);
-    };
-  }, [open, query, companyId, slotId, fetchCustomers]);
 
   const filtered = useMemo(() => {
     const base = filterCustomerItems(items, query);
@@ -224,15 +115,19 @@ export function SlotsCustomersPickerModal({
       return base.filter((item) => item.cluster === "available");
     }
 
-    if (activeTab === "unavailable") {
-      return base.filter((item) => {
-        return (
-          item.cluster === "cooldown" ||
-          item.cluster === "has_appointment" ||
-          item.cluster === "do_not_notify"
-        );
-      });
+if (activeTab === "unavailable") {
+  return base.filter((item) => {
+    if (item.waitlist) {
+      return false;
     }
+
+    return (
+      item.cluster === "cooldown" ||
+      item.cluster === "has_appointment" ||
+      item.cluster === "do_not_notify"
+    );
+  });
+}
 
     if (activeTab === "upcoming") {
       return base.filter((item) => Boolean(item.nextAppointmentAt));
@@ -249,19 +144,21 @@ export function SlotsCustomersPickerModal({
     return base;
   }, [items, query, activeTab]);
 
-  const groupedItems = useMemo(() => getGroupedItems(filtered), [filtered]);
-
   const tabCounts = useMemo(() => {
     return {
       all: items.length,
       available: items.filter((item) => item.cluster === "available").length,
-      unavailable: items.filter((item) => {
-        return (
-          item.cluster === "cooldown" ||
-          item.cluster === "has_appointment" ||
-          item.cluster === "do_not_notify"
-        );
-      }).length,
+unavailable: items.filter((item) => {
+  if (item.waitlist) {
+    return false;
+  }
+
+  return (
+    item.cluster === "cooldown" ||
+    item.cluster === "has_appointment" ||
+    item.cluster === "do_not_notify"
+  );
+}).length,
       upcoming: items.filter((item) => Boolean(item.nextAppointmentAt)).length,
       recent: items.filter((item) => item.cluster === "has_appointment").length,
       waitlist: items.filter((item) => Boolean(item.waitlist)).length,
@@ -284,6 +181,36 @@ export function SlotsCustomersPickerModal({
     });
   }, [items, selectedIds]);
 
+  const selectedAppointmentWarning = useMemo(() => {
+  const riskyCustomers = selectedCustomers.filter((item) => {
+    return item.cluster === "has_appointment";
+  });
+
+  if (riskyCustomers.length === 0) {
+    return null;
+  }
+
+  if (riskyCustomers.length === 1) {
+    return "1 paciente seleccionado ha tenido o tendrá cita próximamente con este especialista.";
+  }
+
+  return `${riskyCustomers.length} pacientes seleccionados han tenido o tendrán cita próximamente con este especialista.`;
+}, [selectedCustomers]);
+
+  const {
+  sending,
+  sendDisabled,
+  sendButtonLabel,
+  handleSend,
+} = useSendSlotContacts({
+  companyId,
+  slotId,
+  selectedIds,
+  selectedCustomers,
+  onSent,
+  onClose,
+});
+
   function handleToggleSelect(item: CustomerListItem) {
     if (!item.customerId) {
       toast({
@@ -301,16 +228,16 @@ export function SlotsCustomersPickerModal({
         return current.filter((id) => id !== item.customerId);
       }
 
-      if (current.length >= MAX_SELECTED_CONTACTS) {
-        toast({
-          title: "Límite alcanzado",
-          description:
-            "Límite de 10 alcanzado. Desmarca a alguien para añadir otro",
-        });
-        return current;
-      }
+if (current.length >= MAX_SELECTED_CONTACTS) {
+  setModalWarning(
+    "Has alcanzado el número máximo de pacientes a los que enviar este hueco."
+  );
 
-      return [...current, item.customerId];
+  return current;
+}
+
+setModalWarning(null);
+return [...current, item.customerId];
     });
   }
 
@@ -319,139 +246,17 @@ export function SlotsCustomersPickerModal({
     setShowAdd(false);
     setCreateError("");
     onClose();
+    setModalWarning(null);
   }
 
   const selectedCount = selectedIds.length;
-  const totalCount = items.length;
-  const selectedSummary = buildSelectedSummary(selectedCount, totalCount);
-  const sendButtonLabel = buildSendButtonLabel(selectedCount);
-
   const addButtonDisabled = getCreateContactDisabled({
     creatingContact,
     newFirstName,
     newPhone,
   });
 
-  const sendDisabled = getSendDisabled({
-    selectedCount,
-    sending,
-  });
 
-  async function handleCreateContact() {
-    if (!newFirstName.trim()) {
-      setCreateError("El nombre es obligatorio");
-      return;
-    }
-
-    if (!newPhone.trim()) {
-      setCreateError("El teléfono es obligatorio");
-      return;
-    }
-
-    try {
-      setCreatingContact(true);
-      setCreateError("");
-
-      const response = await fetch("/api/slots/customers/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyId,
-          firstName: newFirstName,
-          lastName: newLastName,
-          phone: newPhone,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data?.ok || !data?.item) {
-        throw new Error(data?.error || "No se pudo crear el contacto");
-      }
-
-      const createdRow = buildInlineCreatedRow(
-        companyId,
-        data.item as CreateCustomerResponseItem
-      );
-
-      const alreadyExists = items.some(
-        (item) => item.customerId === createdRow.customerId
-      );
-
-      if (!alreadyExists) {
-        setItems((current) => {
-          const next = [createdRow, ...current];
-          setCachedCustomers(getCacheKey(companyId, slotId, query), next);
-          setCachedCustomers(getCacheKey(companyId, slotId, ""), next);
-          return next;
-        });
-      }
-
-      if (alreadyExists) {
-        await fetchCustomers(query);
-      }
-
-      setSelectedIds((current) => {
-        if (current.includes(createdRow.customerId)) return current;
-
-        if (current.length >= MAX_SELECTED_CONTACTS) {
-          toast({
-            title: "Contacto creado",
-            description:
-              "Se creó el contacto, pero no se marcó porque ya hay 10 seleccionados",
-          });
-          return current;
-        }
-
-        return [...current, createdRow.customerId];
-      });
-
-      setNewFirstName("");
-      setNewLastName("");
-      setNewPhone("+34 ");
-      setShowAdd(false);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "No se pudo crear el contacto";
-      setCreateError(message);
-    } finally {
-      setCreatingContact(false);
-    }
-  }
-
-  async function handleSend() {
-    if (selectedIds.length === 0) return;
-
-    try {
-      setSending(true);
-
-      const response = await fetch("/api/slots/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyId,
-          slotId,
-          customers: selectedCustomers.map((c) => ({
-            customerId: c.customerId,
-            phone: c.customer.phone,
-          })),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data?.ok) {
-        throw new Error(data?.error || "Failed sending");
-      }
-
-      onSent?.();
-      onClose();
-    } catch (error) {
-      console.error("[modal] send error", error);
-    } finally {
-      setSending(false);
-    }
-  }
 
   function handleSmartSelection() {
     const nextIds = buildSmartSelectionIds(items);
@@ -511,46 +316,28 @@ export function SlotsCustomersPickerModal({
             onFirstNameChange={setNewFirstName}
             onLastNameChange={setNewLastName}
             onPhoneChange={setNewPhone}
-            onSubmit={handleCreateContact}
+            onSubmit={async () => {
+  await handleCreateContact();
+  setShowAdd(false);
+}}
           />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto pb-2">
-          <div className="space-y-1">
-            {loading && items.length === 0 && (
-              <div className="flex justify-center py-10">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            )}
+<SlotsCustomersList
+  loading={loading}
+  items={filtered}
+  selectedIds={selectedIds}
+  onToggleSelect={handleToggleSelect}
+/>
+</div>
 
-            {!loading && filtered.length === 0 && (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No se encontraron contactos
-              </p>
-            )}
-
-{filtered.length > 0 && (
-  <div className="space-y-1">
-    {filtered.map((item) => {
-      let isSelected = false;
-
-      if (item.customerId) {
-        isSelected = selectedIds.includes(item.customerId);
-      }
-
-      return (
-        <SlotsCustomerListItem
-          key={item.id}
-          item={item}
-          isSelected={isSelected}
-          onToggle={handleToggleSelect}
-        />
-      );
-    })}
+{(modalWarning || selectedAppointmentWarning) && (
+  <div className="mt-2 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm font-medium text-yellow-800">
+    {modalWarning || selectedAppointmentWarning}
   </div>
 )}
-          </div>
-        </div>
+        
       </div>
     </StandardModal>
   );

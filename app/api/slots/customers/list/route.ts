@@ -76,6 +76,7 @@ function getClusterOrder(
 type WaitlistInfo = {
   id: string;
   isUrgent: boolean;
+  serviceId: string | null;
   serviceName: string | null;
   note: string | null;
   createdAt: Date;
@@ -86,6 +87,8 @@ type CustomerListItem = {
   companyId: string;
   customerId: string | null;
   interestScore: number;
+  slotMatchScore: number;
+slotMatchLabel: string | null;
   linkedAt: Date;
   cluster: "available" | "cooldown" | "has_appointment" | "do_not_notify";
   hasAppointment: boolean;
@@ -117,6 +120,11 @@ type CustomerListItem = {
 };
 
 function compareCustomerListItems(a: CustomerListItem, b: CustomerListItem): number {
+  const slotMatchDiff = (b.slotMatchScore ?? 0) - (a.slotMatchScore ?? 0);
+
+if (slotMatchDiff !== 0) {
+  return slotMatchDiff;
+}
   const aIsUrgentWaitlist = a.waitlist?.isUrgent ? 1 : 0;
   const bIsUrgentWaitlist = b.waitlist?.isUrgent ? 1 : 0;
   if (aIsUrgentWaitlist !== bIsUrgentWaitlist) {
@@ -188,6 +196,7 @@ export async function GET(request: NextRequest) {
     }
 
     let slotLocationId = "";
+    let slotEmployeeId: string | null = null;
 
     if (slotId) {
       const slot = await prisma.slot_recovery_slot.findUnique({
@@ -198,6 +207,7 @@ export async function GET(request: NextRequest) {
           id: true,
           location_id: true,
           company_id: true,
+          employee_id: true,
         },
       });
 
@@ -207,6 +217,7 @@ export async function GET(request: NextRequest) {
           { status: 404 }
         );
       }
+      slotEmployeeId = slot.employee_id;
 
       if (slot.company_id !== companyId) {
         return NextResponse.json(
@@ -285,6 +296,7 @@ export async function GET(request: NextRequest) {
         service_name: string | null;
         note: string | null;
         created_at: Date;
+        slot_recovery_service_id: string | null;
       }
     >();
 
@@ -305,6 +317,7 @@ export async function GET(request: NextRequest) {
         service_name: entry.service_name,
         note: entry.note,
         created_at: entry.created_at,
+        slot_recovery_service_id: entry.slot_recovery_service_id,
       });
     }
 
@@ -394,6 +407,26 @@ export async function GET(request: NextRequest) {
       },
     });
 
+let targetServiceIds = slotServices.map((item) => item.slot_recovery_service_id);
+let targetMatchLabel = "Compatible con servicio del hueco";
+
+if (targetServiceIds.length === 0 && slotEmployeeId) {
+  const employeeServices = await prisma.employee_service.findMany({
+    where: {
+      employee_id: slotEmployeeId,
+    },
+    select: {
+      service_id: true,
+    },
+  });
+
+  targetServiceIds = employeeServices.map((item) => item.service_id);
+  targetMatchLabel = "Compatible con servicios del especialista";
+}
+
+const targetServiceIdSet = new Set(targetServiceIds);
+console.log("targetServiceIds", targetServiceIds);
+
     const serviceIds = slotServices.map((s) => s.slot_recovery_service_id);
 
     const interests = await prisma.customer_service_interest.findMany({
@@ -463,18 +496,23 @@ let appointments: {
 
 if (slotLocationId) {
   appointments = await prisma.appointment.findMany({
-    where: {
-      customerId: {
-        in: customerIds,
-      },
-      locationId: slotLocationId,
-      startAt: {
-        lt: new Date(),
-      },
-      status: {
-        in: ["COMPLETED", "BOOKED"],
-      },
-    },
+where: {
+  customerId: {
+    in: customerIds,
+  },
+  locationId: slotLocationId,
+  ...(slotEmployeeId
+    ? {
+        employeeId: slotEmployeeId,
+      }
+    : {}),
+  startAt: {
+    lt: new Date(),
+  },
+  status: {
+    in: ["COMPLETED", "BOOKED"],
+  },
+},
     orderBy: {
       startAt: "desc",
     },
@@ -494,18 +532,23 @@ let nextAppointments: {
 
 if (slotLocationId) {
   nextAppointments = await prisma.appointment.findMany({
-    where: {
-      customerId: {
-        in: customerIds,
-      },
-      locationId: slotLocationId,
-      startAt: {
-        gte: new Date(),
-      },
-      status: {
-        in: ["PENDING", "BOOKED"],
-      },
-    },
+where: {
+  customerId: {
+    in: customerIds,
+  },
+  locationId: slotLocationId,
+  ...(slotEmployeeId
+    ? {
+        employeeId: slotEmployeeId,
+      }
+    : {}),
+  startAt: {
+    gte: new Date(),
+  },
+  status: {
+    in: ["PENDING", "BOOKED"],
+  },
+},
     orderBy: {
       startAt: "asc",
     },
@@ -583,15 +626,31 @@ for (const row of nextAppointments) {
         lastResponseAt = profile.last_response_at;
       }
 
-      const lastAppointment = lastAppointmentByCustomerId.get(row.customerId) ?? null;
-      const nextAppointment = nextAppointmentByCustomerId.get(row.customerId) ?? null;
-      const hasAppointment = lastAppointment !== null;
+const lastAppointment = lastAppointmentByCustomerId.get(row.customerId) ?? null;
+const nextAppointment = nextAppointmentByCustomerId.get(row.customerId) ?? null;
 
-      const cluster = getCluster({
-        hasAppointment,
-        cooldownUntil,
-        manualBlocked,
-      });
+const now = new Date();
+const sevenDaysAgo = new Date(now);
+sevenDaysAgo.setDate(now.getDate() - 7);
+
+const sevenDaysFromNow = new Date(now);
+sevenDaysFromNow.setDate(now.getDate() + 7);
+
+let hasAppointment = false;
+
+if (lastAppointment && lastAppointment.startAt >= sevenDaysAgo) {
+  hasAppointment = true;
+}
+
+if (nextAppointment && nextAppointment.startAt <= sevenDaysFromNow) {
+  hasAppointment = true;
+}
+
+const cluster = getCluster({
+  hasAppointment,
+  cooldownUntil,
+  manualBlocked,
+});
 
       const waitlistEntry = waitlistByCustomerId.get(row.customerId) ?? null;
 
@@ -600,6 +659,16 @@ for (const row of nextAppointments) {
         companyId: row.companyId,
         customerId: row.customerId,
         interestScore: scoreMap.get(row.customerId) ?? 0,
+slotMatchScore:
+  waitlistEntry?.slot_recovery_service_id &&
+  targetServiceIdSet.has(waitlistEntry.slot_recovery_service_id)
+    ? 100
+    : 0,
+slotMatchLabel:
+  waitlistEntry?.slot_recovery_service_id &&
+  targetServiceIdSet.has(waitlistEntry.slot_recovery_service_id)
+    ? targetMatchLabel
+    : null,
         linkedAt: row.createdAt,
         cluster,
         hasAppointment,
@@ -620,6 +689,7 @@ for (const row of nextAppointments) {
               serviceName: waitlistEntry.service_name,
               note: waitlistEntry.note,
               createdAt: waitlistEntry.created_at,
+              serviceId: waitlistEntry.slot_recovery_service_id,
             }
           : null,
         customer: {
@@ -640,14 +710,27 @@ for (const row of nextAppointments) {
       };
     });
 
+
     const unlinkedWaitlistItems: CustomerListItem[] = waitlistEntries
       .filter((entry) => !entry.customer_id)
       .map((entry) => {
+
         return {
           id: entry.id,
           companyId,
           customerId: null,
           interestScore: 0,
+          
+          slotMatchScore:
+            entry.slot_recovery_service_id &&
+            targetServiceIdSet.has(entry.slot_recovery_service_id)
+              ? 100
+              : 0,
+          slotMatchLabel:
+            entry.slot_recovery_service_id &&
+            targetServiceIdSet.has(entry.slot_recovery_service_id)
+              ? targetMatchLabel
+              : null,
           linkedAt: entry.created_at,
           cluster: "available",
           hasAppointment: false,
@@ -666,6 +749,7 @@ for (const row of nextAppointments) {
             serviceName: entry.service_name,
             note: entry.note,
             createdAt: entry.created_at,
+            serviceId: entry.slot_recovery_service_id,
           },
           customer: {
             id: null,

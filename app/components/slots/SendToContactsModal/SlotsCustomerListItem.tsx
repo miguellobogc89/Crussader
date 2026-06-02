@@ -69,10 +69,16 @@ export function SlotsCustomerListItem({
     isDisabled,
   });
 
-  const checkboxClassName = getCheckboxClassName({
-    isSelected,
-    isCooldown,
-  });
+let checkboxClassName = getCheckboxClassName({
+  isSelected,
+  isCooldown,
+});
+
+if (isSelected && item.cluster === "has_appointment") {
+  checkboxClassName = checkboxClassName
+    .replace("bg-crussader", "bg-amber-700")
+    .replace("border-crussader", "border-amber-700");
+}
 
   const title = getItemTitle(item);
   const phone = getFullPhone(item);
@@ -96,9 +102,14 @@ return (
         </span>
       </div>
 
-      <span
-        className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${clusterConfig.dotClassName}`}
-      />
+<span
+  className={[
+    "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white",
+    isSelected && item.cluster === "has_appointment"
+      ? "bg-amber-700"
+      : clusterConfig.dotClassName,
+  ].join(" ")}
+/>
     </div>
 
     <div className="grid min-w-0 flex-1 grid-cols-[minmax(320px,max-content)_1fr] items-center gap-4">
