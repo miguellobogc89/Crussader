@@ -54,6 +54,7 @@ async function handleSave() {
         locationId,
         firstName,
         lastName,
+        displayName: trimmedName,
         phone: trimmedPhone,
       }),
     });

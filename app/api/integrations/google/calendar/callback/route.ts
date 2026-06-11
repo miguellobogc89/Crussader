@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { prisma } from "@/lib/prisma";
+import crypto from "crypto";
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
@@ -17,12 +18,14 @@ export async function GET(req: NextRequest) {
   let companyId: string | null = null;
   let userId: string | null = null;
   let accountEmail: string | null = null;
+  let locationId: string | null = null;
 
   if (stateParam) {
     try {
       const parsed = JSON.parse(stateParam);
       if (typeof parsed.redirect_after === "string") redirectAfter = parsed.redirect_after;
       if (typeof parsed.companyId === "string") companyId = parsed.companyId;
+      if (typeof parsed.locationId === "string") locationId = parsed.locationId;
       if (typeof parsed.userId === "string") userId = parsed.userId;
       if (typeof parsed.accountEmail === "string") accountEmail = parsed.accountEmail;
     } catch {}
@@ -84,6 +87,85 @@ export async function GET(req: NextRequest) {
         },
       });
     }
+
+    const savedConnection = await prisma.externalConnection.findUnique({
+  where: { userId_provider: { userId, provider } },
+});
+
+console.log("[Google Calendar Callback] companyId:", companyId);
+console.log("[Google Calendar Callback] locationId:", locationId);
+console.log("[Google Calendar Callback] savedConnection:", savedConnection?.id);
+
+if (savedConnection && companyId && locationId) {
+  client.setCredentials({
+    access_token: accessToken!,
+    refresh_token: refreshToken || undefined,
+    expiry_date: tokens.expiry_date || undefined,
+  });
+
+  const calendarApi = google.calendar({
+    version: "v3",
+    auth: client,
+  });
+
+  const calendarList = await calendarApi.calendarList.list();
+
+  let crussaderCalendar = calendarList.data.items?.find(
+    (item) => item.summary === "Crussader Calendar"
+  );
+
+  if (!crussaderCalendar) {
+    const created = await calendarApi.calendars.insert({
+      requestBody: {
+        summary: "Crussader Calendar",
+        timeZone: "Europe/Madrid",
+      },
+    });
+
+    crussaderCalendar = {
+      id: created.data.id!,
+      summary: created.data.summary || "Crussader Calendar",
+      timeZone: created.data.timeZone || "Europe/Madrid",
+      accessRole: "owner",
+      primary: false,
+    };
+  }
+
+  await prisma.external_calendar.upsert({
+    where: {
+      connection_id_external_calendar_id: {
+        connection_id: savedConnection.id,
+        external_calendar_id: crussaderCalendar.id!,
+      },
+    },
+    update: {
+      company_id: companyId,
+      location_id: locationId,
+      name: crussaderCalendar.summary || "Crussader Calendar",
+      timezone: crussaderCalendar.timeZone || "Europe/Madrid",
+      purpose: "crussader_mirror",
+      access_role: crussaderCalendar.accessRole || "owner",
+      is_primary: Boolean(crussaderCalendar.primary),
+      is_app_created: true,
+      active: true,
+    },
+    create: {
+      id: crypto.randomUUID(),
+      connection_id: savedConnection.id,
+      company_id: companyId,
+      location_id: locationId,
+      provider,
+      external_calendar_id: crussaderCalendar.id!,
+      name: crussaderCalendar.summary || "Crussader Calendar",
+      timezone: crussaderCalendar.timeZone || "Europe/Madrid",
+      purpose: "crussader_mirror",
+      access_role: crussaderCalendar.accessRole || "owner",
+      is_primary: Boolean(crussaderCalendar.primary),
+      is_app_created: true,
+      active: true,
+    },
+  });
+}
 
     return NextResponse.redirect(`${redirectAfter}?connected=google_calendar`);
   } catch (err) {

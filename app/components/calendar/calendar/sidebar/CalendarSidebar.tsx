@@ -7,11 +7,11 @@ import GoogleCalendarConnectionModal from "./GoogleCalendarConnectionModal";
 import ConnectedCalendarsList from "./ConnectedCalendarsList";
 
 type Props = {
+  companyId: string | null;
+  locationId: string | null;
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
-
   visibleGoogleCalendarIds: string[];
-
   onChangeVisibleGoogleCalendarIds: React.Dispatch<
     React.SetStateAction<string[]>
   >;
@@ -61,6 +61,8 @@ function isSameDay(a: Date, b: Date) {
 }
 
 export default function CalendarSidebar({
+  companyId,
+  locationId,
   selectedDate,
   onSelectDate,
   visibleGoogleCalendarIds,
@@ -75,12 +77,16 @@ export default function CalendarSidebar({
 
   async function fetchConnectedCalendars() {
     try {
-      const res = await fetch(
-        "/api/integrations/google/calendar/connected?companyId=cmfv7vjd30000i5xktjoncp48",
-        {
-          method: "GET",
-        },
-      );
+if (!companyId) {
+  return;
+}
+
+const res = await fetch(
+  `/api/integrations/google/calendar/connected?companyId=${encodeURIComponent(companyId)}`,
+  {
+    method: "GET",
+  },
+);
 
       const data = await res.json();
 
@@ -275,14 +281,16 @@ function toggleVisibleCalendar(calendarId: string) {
         </div>
       </div>
 
-      <GoogleCalendarConnectionModal
-        open={googleModalOpen}
-        onClose={() => {
-          setGoogleModalOpen(false);
-          void fetchGoogleStatus();
-          void fetchConnectedCalendars();
-        }}
-      />
+<GoogleCalendarConnectionModal
+  open={googleModalOpen}
+  companyId={companyId}
+  locationId={locationId}
+  onClose={() => {
+    setGoogleModalOpen(false);
+    void fetchGoogleStatus();
+    void fetchConnectedCalendars();
+  }}
+/>
     </>
   );
 }

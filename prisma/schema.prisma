@@ -561,12 +561,13 @@ model Customer {
 }
 
 model CompanyCustomer {
-  id         String   @id @default(cuid())
-  companyId  String
-  customerId String
-  createdAt  DateTime @default(now())
-  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  companyId   String
+  customerId  String
+  createdAt   DateTime @default(now())
+  displayName String?
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, customerId])
   @@index([customerId, companyId])
@@ -1699,6 +1700,7 @@ model Location {
   typeId                      String?
   exceptions                  Json?
   address_id                  String?                       @unique(map: "ux_location_address_id") @db.Uuid
+  isSinglePractitioner        Boolean                       @default(false)
   agentSessions               AgentSession[]
   appointments                Appointment[]
   CalendarSettings            CalendarSettings?

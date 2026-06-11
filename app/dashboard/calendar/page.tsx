@@ -10,6 +10,7 @@ import Spinner from "@/app/components/crussader/UX/Spinner";
 import {
   useActiveLocationId,
   useActiveLocationResolved,
+  useActiveCompanyResolved,
 } from "@/app/providers/bootstrap-store";
 
 export default function CalendarPage() {
@@ -18,6 +19,11 @@ export default function CalendarPage() {
 
   const bootstrapLocationId =
     activeLocationId ?? activeLocationResolved?.id ?? null;
+  
+  const activeCompanyResolved = useActiveCompanyResolved();
+
+  const bootstrapCompanyId =
+    activeCompanyResolved?.id ?? activeLocationResolved?.companyId ?? null;
 
   return (
     <SidebarProvider>
@@ -41,7 +47,10 @@ export default function CalendarPage() {
             }
           >
             <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
-              <CalendarShell locationId={bootstrapLocationId} />
+              <CalendarShell
+                locationId={bootstrapLocationId}
+                companyId={bootstrapCompanyId}
+              />
             </div>
           </Suspense>
         </div>

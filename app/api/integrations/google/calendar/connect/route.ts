@@ -18,9 +18,10 @@ export async function GET(req: NextRequest) {
     process.env.GOOGLE_CALENDAR_RETURN_URI ||
     `${baseUrl}/dashboard/integrations-test-2`;
 
-  const companyId = url.searchParams.get("companyId") || null;
-  const userId = (session?.user as any)?.id ?? null;
-  const accountEmail = session?.user?.email ?? null;
+const companyId = url.searchParams.get("companyId") || null;
+const locationId = url.searchParams.get("locationId") || null;
+const userId = (session?.user as any)?.id ?? null;
+const accountEmail = session?.user?.email ?? null;
 
   const client = new google.auth.OAuth2(
     process.env.GOOGLE_CALENDAR_CLIENT_ID!,
@@ -31,12 +32,14 @@ export async function GET(req: NextRequest) {
 const scopes = [
   "https://www.googleapis.com/auth/calendar.app.created",
   "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
   //"https://www.googleapis.com/auth/calendar.calendarlist.readonly",
 ];
 
   const state = JSON.stringify({
     redirect_after: returnTo,
     companyId,
+    locationId,
     userId,
     accountEmail,
   });

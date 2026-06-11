@@ -717,7 +717,7 @@ if (nextSignature === lastSavedServicesSignatureRef.current) {
                             exit={{ opacity: 0 }}
                             className="py-3 text-center text-sm text-muted-foreground"
                           >
-                            No se encontró "{search || "…"}"
+                            No se encontró {search || 'ningún servicio'}
                           </motion.p>
                         ) : null}
                       </AnimatePresence>

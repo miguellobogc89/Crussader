@@ -65,6 +65,7 @@ async function assertLocationAccess(userId: string, locationId: string) {
       id: true,
       companyId: true,
       status: true,
+      isSinglePractitioner: true,
     },
   });
 
@@ -122,6 +123,8 @@ export async function GET(req: Request) {
         { status: 403 }
       );
     }
+
+
 
     const from = new Date(fromISO);
     const to = new Date(toISO);
@@ -319,7 +322,10 @@ export async function POST(req: Request) {
       resourceId,
       customerId,
       isUrgent,
+      durationMin,
     } = body ?? {};
+
+    let resolvedEmployeeId = employeeId || null;
 
     if (!locationId || !startAt || !customerId) {
       return NextResponse.json(
@@ -328,12 +334,6 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!serviceId && !employeeId) {
-      return NextResponse.json(
-        { ok: false, error: "Debes seleccionar al menos servicio o empleado" },
-        { status: 400 }
-      );
-    }
 
     const location = await assertLocationAccess(user.id, locationId);
 
@@ -343,6 +343,37 @@ export async function POST(req: Request) {
         { status: 403 }
       );
     }
+
+    if (!resolvedEmployeeId && location.isSinglePractitioner) {
+  const onlyEmployee = await prisma.employeeLocation.findFirst({
+    where: {
+      locationId,
+      visibleInLocation: true,
+      employee: {
+        active: true,
+      },
+    },
+    select: {
+      employeeId: true,
+    },
+  });
+
+  if (!onlyEmployee) {
+    return NextResponse.json(
+      { ok: false, error: "No hay empleado disponible en esta clínica" },
+      { status: 409 }
+    );
+  }
+
+  resolvedEmployeeId = onlyEmployee.employeeId;
+}
+
+if (!serviceId && !resolvedEmployeeId) {
+  return NextResponse.json(
+    { ok: false, error: "Debes seleccionar al menos servicio o empleado" },
+    { status: 400 }
+  );
+}
 
     const start = new Date(startAt);
 
@@ -383,11 +414,11 @@ export async function POST(req: Request) {
       }
     }
 
-    if (employeeId) {
+    if (resolvedEmployeeId) {
       const employeeLocation = await prisma.employeeLocation.findFirst({
         where: {
           locationId,
-          employeeId,
+          employeeId: resolvedEmployeeId,
           visibleInLocation: true,
           employee: {
             active: true,
@@ -408,7 +439,7 @@ export async function POST(req: Request) {
       if (serviceId) {
         const canDoService = await prisma.employee_service.findFirst({
           where: {
-            employee_id: employeeId,
+            employee_id: resolvedEmployeeId,
             service_id: serviceId,
           },
           select: {
@@ -425,14 +456,25 @@ export async function POST(req: Request) {
       }
     }
 
-    const durationMin = service?.duration_min ?? 30;
-    const end = new Date(start.getTime() + durationMin * 60_000);
+const requestedDurationMin = Number(durationMin);
 
-    if (employeeId) {
+let finalDurationMin = service?.duration_min ?? 30;
+
+if (
+  Number.isFinite(requestedDurationMin) &&
+  requestedDurationMin >= 5 &&
+  requestedDurationMin <= 480
+) {
+  finalDurationMin = requestedDurationMin;
+}
+
+const end = new Date(start.getTime() + finalDurationMin * 60_000);
+
+    if (resolvedEmployeeId) {
       const clash = await prisma.appointment.findFirst({
         where: {
           locationId,
-          employeeId,
+          employeeId: resolvedEmployeeId,
           startAt: { lt: end },
           endAt: { gt: start },
           status: { in: BLOCKING_STATUSES },
@@ -495,7 +537,7 @@ export async function POST(req: Request) {
           startAt: start,
           endAt: end,
           status: safeStatus,
-          employeeId: employeeId || null,
+          employeeId: resolvedEmployeeId,
           resourceId: resourceId || null,
           customerId,
           customerName: customerName || null,
@@ -504,7 +546,7 @@ export async function POST(req: Request) {
           notes: notes || null,
           serviceName: service?.name ?? null,
           servicePrice: service ? Number(service.price) : null,
-          serviceDurationMin: service?.duration_min ?? null,
+          serviceDurationMin: finalDurationMin,
           isUrgent: Boolean(isUrgent),
         },
         select: {

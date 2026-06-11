@@ -27,10 +27,12 @@ type NewCancellationModalFormProps = {
   errorText: string;
   created: boolean;
   employees: EmployeeLite[];
+  isLoadingEmployees: boolean;
   servicesByEmployee: Record<string, EmployeeServiceItem[]>;
   slotDurationMin: number;
   invalidServices: EmployeeServiceItem[];
   selectedEmployeeId: string;
+  isSinglePractitioner: boolean;
   onEmployeeSelect: (employee: EmployeeLite) => void;
   selectedServiceIds: string[];
   onServicesChange: (
@@ -49,10 +51,12 @@ export function NewCancellationModalForm({
   errorText,
   created,
   employees,
+  isLoadingEmployees,
   servicesByEmployee,
   slotDurationMin,
   invalidServices,
   selectedEmployeeId,
+  isSinglePractitioner,
   onEmployeeSelect,
   selectedServiceIds,
   onServicesChange,
@@ -94,13 +98,19 @@ export function NewCancellationModalForm({
       </div>
 
       <div className="space-y-2">
-        <Label className="text-sm text-muted-foreground">Empleado</Label>
+{!isSinglePractitioner ? (
+  <>
+    <Label className="text-sm text-muted-foreground">Empleado</Label>
 
-        <EmployeeSelector
-          employees={employees}
-          selectedEmployeeId={selectedEmployeeId}
-          onSelect={onEmployeeSelect}
-        />
+{isLoadingEmployees ? null : (
+  <EmployeeSelector
+    employees={employees}
+    selectedEmployeeId={selectedEmployeeId}
+    onSelect={onEmployeeSelect}
+  />
+)}
+  </>
+) : null}
 
         <NewCancellationEmployeeServices
           employeeId={selectedEmployeeId}

@@ -11,8 +11,7 @@ import {
 
 import StandardModal from "@/app/components/crussader/StandardModal";
 
-const COMPANY_ID = "cmfv7vjd30000i5xktjoncp48";
-const LOCATION_ID = "cmkdnn4ve001ymtcs4hk8vtno";
+
 
 type CalendarItem = {
   id: string;
@@ -41,11 +40,15 @@ type CalendarRow = CalendarItem & {
 
 type Props = {
   open: boolean;
+  companyId: string | null;
+  locationId: string | null;
   onClose: () => void;
 };
 
 export default function GoogleCalendarConnectionModal({
   open,
+  companyId,
+  locationId,
   onClose,
 }: Props) {
   const [status, setStatus] = useState<GoogleStatus>({
@@ -183,7 +186,7 @@ const calendarRows = useMemo<CalendarRow[]>(() => {
 
   async function fetchConnectedCalendars() {
     const res = await fetch(
-      `/api/integrations/google/calendar/connected?companyId=${COMPANY_ID}`,
+      `/api/integrations/google/calendar/connected?companyId=${companyId}`,
     );
 
     const data = await res.json();
@@ -220,6 +223,8 @@ const calendarRows = useMemo<CalendarRow[]>(() => {
   }
 
   async function importCalendars(calendarIds: string[]) {
+
+
     const res = await fetch(
       "/api/integrations/google/calendar/import",
       {
@@ -228,8 +233,8 @@ const calendarRows = useMemo<CalendarRow[]>(() => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          companyId: COMPANY_ID,
-          locationId: LOCATION_ID,
+          companyId: companyId,
+          locationId,
           selectedCalendarIds: calendarIds,
         }),
       },
@@ -395,9 +400,14 @@ const calendarRows = useMemo<CalendarRow[]>(() => {
           ) : (
             <button
               type="button"
-              onClick={() => {
-                window.location.href = `/api/integrations/google/calendar/connect?companyId=${COMPANY_ID}`;
-              }}
+onClick={() => {
+  if (!companyId || !locationId) {
+    return;
+  }
+
+  window.location.href =
+    `/api/integrations/google/calendar/connect?companyId=${companyId}&locationId=${locationId}`;
+}}
               className="h-10 rounded-full border border-slate-300 px-5 text-sm font-medium text-slate-800 hover:bg-slate-50"
             >
               Conectar Google

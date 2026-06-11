@@ -39,6 +39,7 @@ type AppointmentLite = {
 };
 
 type Props = {
+  companyId: string | null;
   locationId: string | null;
   selectedDate: Date;
   onChangeSelectedDate: (date: Date) => void;
@@ -63,6 +64,7 @@ function addDays(d: Date, n: number) {
 }
 
 export default function CalendarView({
+  companyId,
   locationId,
   selectedDate,
   onChangeSelectedDate,
@@ -80,7 +82,7 @@ export default function CalendarView({
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   useEffect(() => {
-    if (!locationId) return;
+    if (!locationId || !companyId) return;
 
     const safeLocationId = locationId;
 
@@ -240,7 +242,7 @@ useEffect(() => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          companyId: "cmfv7vjd30000i5xktjoncp48",
+          companyId,
           locationId,
         }),
       });
@@ -275,7 +277,7 @@ useEffect(() => {
       syncGoogleCalendarNow,
     );
   };
-}, [locationId, loadAppointments]);
+}, [companyId, locationId, loadAppointments]);
 
 const visibleAppointments = useMemo(() => {
   return appointments.filter((appt) => {

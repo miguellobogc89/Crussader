@@ -7,9 +7,10 @@ import CalendarSidebar from "@/app/components/calendar/calendar/sidebar/Calendar
 
 type Props = {
   locationId: string | null;
+  companyId: string | null;
 };
 
-export default function CalendarShell({ locationId }: Props) {
+export default function CalendarShell({ locationId, companyId }: Props) {
   const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [visibleGoogleCalendarIds, setVisibleGoogleCalendarIds] = useState<
@@ -24,6 +25,8 @@ export default function CalendarShell({ locationId }: Props) {
     <div className="flex h-full min-h-0 w-full flex-1 overflow-hidden">
       <aside className="hidden h-full w-[300px] shrink-0 border-r border-slate-200 bg-white xl:block">
         <CalendarSidebar
+          companyId={companyId}
+          locationId={locationId}
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
           visibleGoogleCalendarIds={visibleGoogleCalendarIds}
@@ -34,6 +37,7 @@ export default function CalendarShell({ locationId }: Props) {
       <main className="h-full min-h-0 min-w-0 flex-1 overflow-hidden bg-white">
         <CalendarView
           locationId={locationId}
+          companyId={companyId}
           selectedDate={selectedDate}
           onChangeSelectedDate={setSelectedDate}
           onCellClick={setSelectedCellId}

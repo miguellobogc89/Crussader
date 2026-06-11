@@ -48,6 +48,29 @@ function getDisplayName(customer: {
   return "Sin nombre";
 }
 
+function buildCompanyDisplayName(params: {
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+}): string {
+  const fullName = `${params.firstName ?? ""} ${params.lastName ?? ""}`.trim();
+
+  if (fullName) {
+    return fullName;
+  }
+
+  if (params.email) {
+    return params.email;
+  }
+
+  if (params.phone) {
+    return params.phone;
+  }
+
+  return "Sin nombre";
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -302,12 +325,20 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    await prisma.companyCustomer.create({
-      data: {
-        companyId,
-        customerId: created.id,
-      },
-    });
+const companyDisplayName = buildCompanyDisplayName({
+  firstName,
+  lastName,
+  email,
+  phone,
+});
+
+await prisma.companyCustomer.create({
+  data: {
+    companyId,
+    customerId: created.id,
+    displayName: companyDisplayName,
+  },
+});
 
     return NextResponse.json({
       ok: true,

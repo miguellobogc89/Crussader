@@ -105,6 +105,7 @@ export async function POST(request: NextRequest) {
     const lastNameInput = cleanText(body.lastName);
     const email = cleanText(body.email);
     const rawPhone = cleanText(body.phone);
+    const companyDisplayNameInput = cleanText(body.displayName);
 
     if (!companyId) {
       return NextResponse.json(
@@ -130,6 +131,8 @@ export async function POST(request: NextRequest) {
     }
 
     const names = buildDisplayNames(firstNameInput, lastNameInput);
+    const companyDisplayName =
+  companyDisplayNameInput || `${names.firstName} ${names.lastName}`.trim();
 
     const existingCustomer = await prisma.customer.findUnique({
       where: {
@@ -180,19 +183,22 @@ export async function POST(request: NextRequest) {
       customerId = createdCustomer.id;
     }
 
-    await prisma.companyCustomer.upsert({
-      where: {
-        companyId_customerId: {
-          companyId,
-          customerId,
-        },
-      },
-      update: {},
-      create: {
-        companyId,
-        customerId,
-      },
-    });
+const companyCustomer = await prisma.companyCustomer.upsert({
+  where: {
+    companyId_customerId: {
+      companyId,
+      customerId,
+    },
+  },
+  update: {
+    displayName: companyDisplayName,
+  },
+  create: {
+    companyId,
+    customerId,
+    displayName: companyDisplayName,
+  },
+});
 
     const customer = await prisma.customer.findUnique({
       where: {
@@ -221,10 +227,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const displayName =
-      customer.preferred_name?.trim() ||
-      customer.whatsapp_name?.trim() ||
-      `${customer.firstName} ${customer.lastName}`.trim();
+const displayName =
+  companyCustomer.displayName?.trim() ||
+  customer.preferred_name?.trim() ||
+  customer.whatsapp_name?.trim() ||
+  `${customer.firstName} ${customer.lastName}`.trim();
 
     return NextResponse.json({
       ok: true,

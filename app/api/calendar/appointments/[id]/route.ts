@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { updateGoogleEventForAppointment } from "@/lib/integrations/google-calendar/appointments";
 import {
   PrismaClient,
   Prisma,
@@ -414,6 +415,8 @@ export async function PATCH(
 
       return appointment;
     });
+
+    await updateGoogleEventForAppointment(updated.id);
 
     return NextResponse.json({
       ok: true,

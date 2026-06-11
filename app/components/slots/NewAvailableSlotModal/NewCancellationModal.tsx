@@ -35,6 +35,7 @@ type NewCancellationModalProps = {
   locationId: string;
   onCreated?: () => void;
   prefillAppointment?: CancelledAppointmentItem | null;
+  isSinglePractitioner?: boolean;
 };
 
 export function NewCancellationModal({
@@ -43,6 +44,7 @@ export function NewCancellationModal({
   locationId,
   onCreated,
   prefillAppointment = null,
+  isSinglePractitioner = false,
 }: NewCancellationModalProps) {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeLite | null>(null);
@@ -56,10 +58,11 @@ export function NewCancellationModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [created, setCreated] = useState(false);
   const [errorText, setErrorText] = useState("");
-  const [employees, setEmployees] = useState<EmployeeLite[]>([]);
-  const [servicesByEmployee, setServicesByEmployee] = useState<
-    Record<string, EmployeeServiceItem[]>
-  >({});
+const [employees, setEmployees] = useState<EmployeeLite[]>([]);
+const [loadingEmployees, setLoadingEmployees] = useState(false);
+const [servicesByEmployee, setServicesByEmployee] = useState<
+  Record<string, EmployeeServiceItem[]>
+>({});
 
   useEffect(() => {
     if (!open) {
@@ -101,6 +104,7 @@ export function NewCancellationModal({
     let cancelled = false;
 
     async function loadEmployees() {
+      setLoadingEmployees(true);
       try {
         const response = await fetch(
           `/api/slots/employees/list?locationId=${encodeURIComponent(locationId)}`,
@@ -136,6 +140,12 @@ export function NewCancellationModal({
 
         setEmployees(nextEmployees);
 
+        if (!prefillAppointment?.employeeId && nextEmployees.length === 1) {
+          setSelectedEmployeeId(nextEmployees[0].id);
+          setSelectedEmployee(nextEmployees[0]);
+        }
+
+
         if (prefillAppointment?.employeeId) {
           const foundEmployee = nextEmployees.find((employee) => {
             return employee.id === prefillAppointment.employeeId;
@@ -155,6 +165,10 @@ export function NewCancellationModal({
           setSelectedEmployee(null);
           setSelectedServices([]);
           setSelectedServiceIds([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingEmployees(false);
         }
       }
     }
@@ -401,6 +415,8 @@ export function NewCancellationModal({
           slotDurationMin={slotDurationMin}
           invalidServices={invalidServices}
           selectedEmployeeId={selectedEmployeeId}
+          isSinglePractitioner={isSinglePractitioner}
+          isLoadingEmployees={loadingEmployees}
           onEmployeeSelect={(employee) => {
             setSelectedEmployeeId(employee.id);
             setSelectedEmployee(employee);

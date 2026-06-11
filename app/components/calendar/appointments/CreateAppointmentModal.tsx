@@ -78,12 +78,13 @@ export default function CreateAppointmentModal({
   const [employees, setEmployees] = useState<EmployeeLite[]>([]);
   const [employeeServices, setEmployeeServices] = useState<EmployeeServiceItem[]>([]);
 
-  const [serviceId, setServiceId] = useState("");
-  const [customer, setCustomer] = useState<CustomerLite | null>(null);
-  const [employeeId, setEmployeeId] = useState("");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
-  const [notes, setNotes] = useState("");
+const [serviceId, setServiceId] = useState("");
+const [customer, setCustomer] = useState<CustomerLite | null>(null);
+const [employeeId, setEmployeeId] = useState("");
+const [date, setDate] = useState("");
+const [time, setTime] = useState("");
+const [durationMin, setDurationMin] = useState(60);
+const [notes, setNotes] = useState("");
   const [isUrgent, setIsUrgent] = useState(false);
 
   const [serviceSearch, setServiceSearch] = useState("");
@@ -98,6 +99,12 @@ export default function CreateAppointmentModal({
   const selectedService = useMemo(() => {
     return services.find((service) => service.id === serviceId) ?? null;
   }, [services, serviceId]);
+
+  useEffect(() => {
+  if (selectedService?.durationMin) {
+    setDurationMin(selectedService.durationMin);
+  }
+}, [selectedService]);
 
   const compatibleEmployees = useMemo(() => {
     if (!serviceId) {
@@ -149,6 +156,7 @@ export default function CreateAppointmentModal({
 
     setDate(initialDate ?? "");
     setTime(initialTime ?? "");
+    setDurationMin(30);
     setServiceId("");
     setEmployeeId("");
     setCustomer(null);
@@ -245,10 +253,15 @@ export default function CreateAppointmentModal({
             })
           : [];
 
-        setServices(nextServices);
-        setEmployees(nextEmployees);
-        setEmployeeServices(nextEmployeeServices);
-        setOptionsLoaded(true);
+setServices(nextServices);
+setEmployees(nextEmployees);
+setEmployeeServices(nextEmployeeServices);
+
+if (nextEmployees.length === 1) {
+  setEmployeeId(nextEmployees[0].id);
+}
+
+setOptionsLoaded(true);
       } catch (error) {
         console.error("[CreateAppointmentModal] loadOptions", error);
 
@@ -344,6 +357,7 @@ export default function CreateAppointmentModal({
           locationId,
           serviceId: serviceId || null,
           startAt,
+          durationMin,
           customerId: customer.id,
           customerName: customer.displayName,
           customerPhone: customer.phone,
@@ -462,15 +476,28 @@ export default function CreateAppointmentModal({
               />
             </Field>
 
-            <Field label="Hora">
-              <Input
-                type="time"
-                step={300}
-                value={time}
-                onChange={(event) => setTime(event.target.value)}
-                className={`${INPUT_CLASS} tabular-nums`}
-              />
-            </Field>
+<Field label="Hora">
+  <Input
+    type="time"
+    step={300}
+    value={time}
+    onChange={(event) => setTime(event.target.value)}
+    className={`${INPUT_CLASS} tabular-nums`}
+  />
+</Field>
+
+<Field label="Duración">
+  <select
+    value={durationMin}
+    onChange={(event) => setDurationMin(Number(event.target.value))}
+    className={INPUT_CLASS}
+  >
+    <option value={30}>30 min</option>
+    <option value={45}>45 min</option>
+    <option value={60}>60 min</option>
+    <option value={90}>90 min</option>
+  </select>
+</Field>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
