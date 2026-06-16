@@ -492,9 +492,9 @@ setOptionsLoaded(true);
     onChange={(event) => setDurationMin(Number(event.target.value))}
     className={INPUT_CLASS}
   >
-    <option value={30}>30 min</option>
-    <option value={45}>45 min</option>
-    <option value={60}>60 min</option>
+    <option value={30}>60 min</option>
+    <option value={45}>30 min</option>
+    <option value={60}>45 min</option>
     <option value={90}>90 min</option>
   </select>
 </Field>

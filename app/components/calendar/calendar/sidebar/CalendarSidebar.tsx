@@ -77,37 +77,38 @@ export default function CalendarSidebar({
 
   async function fetchConnectedCalendars() {
     try {
-if (!companyId) {
-  return;
-}
+      if (!companyId) {
+        return;
+      }
 
-const res = await fetch(
-  `/api/integrations/google/calendar/connected?companyId=${encodeURIComponent(companyId)}`,
-  {
-    method: "GET",
-  },
-);
+      const res = await fetch(
+        `/api/integrations/google/calendar/connected?companyId=${encodeURIComponent(
+          companyId
+        )}`,
+        {
+          method: "GET",
+        }
+      );
 
       const data = await res.json();
 
-    if (data.ok && Array.isArray(data.calendars)) {
-  setCalendars(data.calendars);
+      if (data.ok && Array.isArray(data.calendars)) {
+        setCalendars(data.calendars);
 
-  const nextIds = data.calendars
-    .map(
-      (calendar: ConnectedCalendarItem) =>
-        calendar.external_calendar_id,
-    )
-    .filter((id: string | null): id is string => Boolean(id));
+        const nextIds = data.calendars
+          .map((calendar: ConnectedCalendarItem) => {
+            return calendar.external_calendar_id;
+          })
+          .filter((id: string | null): id is string => Boolean(id));
 
-  onChangeVisibleGoogleCalendarIds((current) => {
-    if (current.length === 0) {
-      return nextIds;
-    }
+        onChangeVisibleGoogleCalendarIds((current) => {
+          if (current.length === 0) {
+            return nextIds;
+          }
 
-    return current.filter((id) => nextIds.includes(id));
-  });
-}
+          return current.filter((id) => nextIds.includes(id));
+        });
+      }
     } catch (error) {
       console.error("[CalendarSidebar] fetch connected calendars error", error);
     }
@@ -171,33 +172,33 @@ const res = await fetch(
       };
     });
 
-function toggleVisibleCalendar(calendarId: string) {
-  onChangeVisibleGoogleCalendarIds((current) => {
-    if (current.includes(calendarId)) {
-      return current.filter((id) => id !== calendarId);
-    }
+  function toggleVisibleCalendar(calendarId: string) {
+    onChangeVisibleGoogleCalendarIds((current) => {
+      if (current.includes(calendarId)) {
+        return current.filter((id) => id !== calendarId);
+      }
 
-    return [...current, calendarId];
-  });
-}
+      return [...current, calendarId];
+    });
+  }
 
   const hasGoogleAccountConnected = googleStatus.connected;
 
   return (
     <>
       <div className="flex h-full flex-col overflow-hidden bg-white">
-        <div className="border-b border-slate-200 px-4 py-4">
-          <h2 className="text-sm font-semibold capitalize text-slate-900">
+        <div className="border-b border-slate-200 px-3 py-2 2xl:px-4 2xl:py-3">
+          <h2 className="text-xs font-semibold capitalize text-slate-900 2xl:text-sm">
             {monthLabel}
           </h2>
         </div>
 
-        <div className="px-3 py-4">
-          <div className="mb-2 grid grid-cols-7 gap-1">
+        <div className="px-2.5 py-3 2xl:px-3 2xl:py-4">
+          <div className="mb-1.5 grid grid-cols-7 gap-1 2xl:mb-2">
             {["L", "M", "X", "J", "V", "S", "D"].map((day) => (
               <div
                 key={day}
-                className="flex h-8 items-center justify-center text-[11px] font-semibold text-slate-400"
+                className="flex h-6 items-center justify-center text-[10px] font-semibold text-slate-400 2xl:h-8 2xl:text-[11px]"
               >
                 {day}
               </div>
@@ -216,7 +217,7 @@ function toggleVisibleCalendar(calendarId: string) {
                   type="button"
                   onClick={() => onSelectDate(day)}
                   className={[
-                    "flex h-9 items-center justify-center rounded-xl text-sm font-medium transition-colors",
+                    "flex h-7 items-center justify-center rounded-lg text-xs font-medium transition-colors 2xl:h-9 2xl:rounded-xl 2xl:text-sm",
                     isSelected ? "bg-blue-600 text-white shadow-sm" : "",
                     !isSelected && isTodayDay ? "bg-blue-50 text-blue-700" : "",
                     !isSelected && !isTodayDay
@@ -237,41 +238,43 @@ function toggleVisibleCalendar(calendarId: string) {
           onToggleCalendar={toggleVisibleCalendar}
         />
 
-        <div className="mt-auto p-4">
+        <div className="mt-auto p-3 2xl:p-4">
           <button
             type="button"
             onClick={() => setGoogleModalOpen(true)}
-            className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 transition-colors hover:bg-slate-50"
+            className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 transition-colors hover:bg-slate-50 2xl:rounded-2xl 2xl:px-4 2xl:py-3"
           >
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl">
+            <div className="flex items-center gap-2 2xl:gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg 2xl:h-11 2xl:w-11 2xl:rounded-xl">
                 <Image
                   src="/icon/google_calendar.webp"
                   alt=""
                   width={30}
                   height={30}
-                  className="h-[30px] w-[30px]"
+                  className="h-[22px] w-[22px] 2xl:h-[30px] 2xl:w-[30px]"
                 />
               </div>
 
-              <div className="flex flex-col items-start">
-                <span className="text-sm font-semibold text-slate-900">
+              <div className="flex min-w-0 flex-col items-start">
+                <span className="text-xs font-semibold text-slate-900 2xl:text-sm">
                   Google Calendar
                 </span>
 
                 <span
                   className={[
-                    "text-xs font-medium",
+                    "text-[11px] font-medium 2xl:text-xs",
                     hasGoogleAccountConnected
                       ? "text-emerald-600"
                       : "text-slate-400",
                   ].join(" ")}
                 >
-                  {hasGoogleAccountConnected ? "Cuenta conectada" : "No conectado"}
+                  {hasGoogleAccountConnected
+                    ? "Cuenta conectada"
+                    : "No conectado"}
                 </span>
 
                 {googleStatus.accountEmail ? (
-                  <span className="max-w-[180px] truncate text-[11px] text-slate-400">
+                  <span className="max-w-[145px] truncate text-[10px] text-slate-400 2xl:max-w-[180px] 2xl:text-[11px]">
                     {googleStatus.accountEmail}
                   </span>
                 ) : null}
@@ -281,16 +284,16 @@ function toggleVisibleCalendar(calendarId: string) {
         </div>
       </div>
 
-<GoogleCalendarConnectionModal
-  open={googleModalOpen}
-  companyId={companyId}
-  locationId={locationId}
-  onClose={() => {
-    setGoogleModalOpen(false);
-    void fetchGoogleStatus();
-    void fetchConnectedCalendars();
-  }}
-/>
+      <GoogleCalendarConnectionModal
+        open={googleModalOpen}
+        companyId={companyId}
+        locationId={locationId}
+        onClose={() => {
+          setGoogleModalOpen(false);
+          void fetchGoogleStatus();
+          void fetchConnectedCalendars();
+        }}
+      />
     </>
   );
 }

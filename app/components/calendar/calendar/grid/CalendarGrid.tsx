@@ -37,8 +37,8 @@ export default function CalendarGrid({
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
   const canvasHeight = HOURS_COUNT * ROW_PX;
-  const HEADER_HEIGHT_PX = 80;
-  const HOUR_COL_PX = 84;
+const HEADER_HEIGHT_PX = 56;
+const HOUR_COL_PX = 64;
 
   const hours = Array.from(
     { length: HOURS_COUNT },
@@ -59,7 +59,7 @@ export default function CalendarGrid({
 
   return (
     <div ref={scrollerRef} className="h-full min-h-0 flex-1 overflow-auto">
-      <div className="relative min-w-[900px]">
+      <div className="relative w-full min-w-0">
         <CurrentTimeLineFullSpan
           referenceDate={new Date()}
           START_HOUR={START_HOUR}
@@ -113,10 +113,10 @@ export default function CalendarGrid({
       style={{ height: HEADER_HEIGHT_PX }}
     >
       <div className="relative flex h-full w-full items-center justify-center">
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-1.5 2xl:gap-2">
           <span
             className={[
-              "leading-none text-[38px] font-black tracking-tight",
+              "leading-none text-[26px] font-black tracking-tight 2xl:text-[38px]",
               isToday ? "text-blue-600" : "text-slate-300",
             ].join(" ")}
           >
@@ -125,7 +125,7 @@ export default function CalendarGrid({
 
           <span
             className={[
-              "pt-1.5 text-[11px] font-bold tracking-[0.22em]",
+              "pt-0.5 text-[10px] font-bold tracking-[0.16em] 2xl:pt-1.5 2xl:text-[11px] 2xl:tracking-[0.22em]",
               isToday ? "text-blue-600" : "text-slate-400",
             ].join(" ")}
           >
@@ -134,7 +134,7 @@ export default function CalendarGrid({
         </div>
 
         {isToday ? (
-          <div className="absolute bottom-0 h-1 w-14 rounded-t-full bg-blue-600" />
+          <div className="absolute bottom-0 h-0.5 w-10 rounded-t-full bg-blue-600 2xl:h-1 2xl:w-14" />
         ) : null}
       </div>
     </div>
@@ -145,7 +145,7 @@ export default function CalendarGrid({
             {hours.map((hour) => (
               <div
                 key={hour}
-                className="flex items-start justify-end border-r border-border pr-2 pt-1 text-xs font-medium text-slate-600"
+                className="flex items-start justify-end border-r border-border pr-1.5 pt-1 text-[11px] font-medium text-slate-600 2xl:pr-2 2xl:text-xs"
                 style={{ height: ROW_PX }}
               >
                 {String(hour).padStart(2, "0")}:00

@@ -77,7 +77,7 @@ const [servicesByEmployee, setServicesByEmployee] = useState<
     } else {
       setDateValue(getTodayDateValue());
       setStartTimeValue("17:00");
-      setEndTimeValue("17:30");
+      setEndTimeValue("18:00");
       setSelectedEmployeeId("");
     }
 

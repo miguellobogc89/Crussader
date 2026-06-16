@@ -23,7 +23,7 @@ export default function CalendarShell({ locationId, companyId }: Props) {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-1 overflow-hidden">
-      <aside className="hidden h-full w-[300px] shrink-0 border-r border-slate-200 bg-white xl:block">
+      <aside className="hidden h-full w-[240px] shrink-0 border-r border-slate-200 bg-white lg:block">
         <CalendarSidebar
           companyId={companyId}
           locationId={locationId}
@@ -34,7 +34,7 @@ export default function CalendarShell({ locationId, companyId }: Props) {
         />
       </aside>
 
-      <main className="h-full min-h-0 min-w-0 flex-1 overflow-hidden bg-white">
+      <main className="h-full min-h-0 w-0 flex-1 overflow-hidden bg-white">
         <CalendarView
           locationId={locationId}
           companyId={companyId}

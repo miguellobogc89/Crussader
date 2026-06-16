@@ -1,3 +1,4 @@
+// app/components/calendar/calendar/header/CalendarToolbar.tsx
 "use client";
 
 import { useState } from "react";
@@ -39,8 +40,8 @@ export default function CalendarToolbar({
   >(null);
 
   return (
-    <div className="flex min-h-[64px] items-center justify-between gap-3 border-b border-slate-100 bg-white px-3 py-2 lg:px-4 lg:py-3">
-      <div className="min-w-0 overflow-hidden max-[1100px]:max-w-[150px]">
+    <div className="flex min-h-[48px] items-center justify-between gap-2 bg-white px-2 py-1.5 2xl:min-h-[64px] 2xl:gap-3 2xl:px-4 2xl:py-3">
+      <div className="min-w-0 flex-1 overflow-visible">
         <CalendarRangeSelector
           rangeTitle={rangeTitle}
           onPrev={onPrev}
@@ -49,9 +50,9 @@ export default function CalendarToolbar({
         />
       </div>
 
-      <div className="flex min-w-0 shrink-0 items-center gap-2 lg:gap-3">
-        <div className="flex h-8 items-center gap-1.5 rounded-xl bg-slate-100 px-2 lg:h-9 lg:gap-2 lg:px-3">
-          <Clock3 className="h-3.5 w-3.5 text-slate-500 lg:h-4 lg:w-4" />
+      <div className="flex shrink-0 items-center gap-1.5 2xl:gap-3">
+        <div className="flex h-7 items-center gap-1 rounded-lg bg-slate-100 px-1.5 2xl:h-9 2xl:gap-2 2xl:rounded-xl 2xl:px-3">
+          <Clock3 className="h-3 w-3 text-slate-500 2xl:h-4 2xl:w-4" />
 
           <HourDropdown
             value={visibleStartHour}
@@ -63,7 +64,7 @@ export default function CalendarToolbar({
             }}
           />
 
-          <span className="text-xs text-slate-400 lg:text-sm">-</span>
+          <span className="text-[11px] text-slate-400 2xl:text-sm">-</span>
 
           <HourDropdown
             value={visibleEndHour}
@@ -81,9 +82,9 @@ export default function CalendarToolbar({
         <Button
           type="button"
           onClick={onCreateAppointment}
-          className="h-8 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-3 text-xs font-semibold text-white shadow-[0_8px_18px_rgba(37,99,235,0.24)] transition-all hover:shadow-[0_10px_22px_rgba(37,99,235,0.32)] lg:h-9 lg:px-4 lg:text-sm"
+          className="h-7 rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 px-2 text-[11px] font-semibold text-white shadow-[0_6px_14px_rgba(37,99,235,0.20)] transition-all hover:shadow-[0_8px_18px_rgba(37,99,235,0.28)] 2xl:h-9 2xl:rounded-xl 2xl:px-4 2xl:text-sm"
         >
-          <Plus className="mr-1.5 h-3.5 w-3.5 lg:mr-2 lg:h-4 lg:w-4" />
+          <Plus className="mr-1 h-3 w-3 2xl:mr-2 2xl:h-4 2xl:w-4" />
           Nueva cita
         </Button>
       </div>
