@@ -67,7 +67,7 @@ export async function DELETE() {
       data: {
         status: "CANCELLED",
         cancellation_reason: "Desconectado de Google Calendar",
-        updated_at: new Date(),
+        updatedAt: new Date(),
       },
     }),
 

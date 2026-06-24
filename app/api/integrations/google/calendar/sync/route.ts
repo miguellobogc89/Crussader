@@ -273,7 +273,6 @@ const employeeId = matchedEmployee?.id ?? null;
             },
           },
           update: {
-            connection_id: configConnectionId,
             company_id: companyId,
             location_id: locationId,
             title: event.summary || "Evento sin título",
@@ -287,7 +286,6 @@ const employeeId = matchedEmployee?.id ?? null;
           },
           create: {
             id: crypto.randomUUID(),
-            connection_id: configConnectionId,
             company_id: companyId,
             location_id: locationId,
             provider: "google-calendar",
