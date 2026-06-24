@@ -192,33 +192,7 @@ if (!savedCalendar) {
   continue;
 }
 
-const configConnection = await prisma.external_calendar_connection.upsert({
-  where: {
-    id: savedCalendar.id,
-  },
-  update: {
-    user_id: dbUser.id,
-    company_id: companyId,
-    provider: "google-calendar",
-    external_account_email: dbUser.email,
-    external_calendar_id: calendarId,
-    external_calendar_name: null,
-    sync_enabled: true,
-    updated_at: new Date(),
-  },
-  create: {
-    id: savedCalendar.id,
-    user_id: dbUser.id,
-    company_id: companyId,
-    provider: "google-calendar",
-    external_account_email: dbUser.email,
-    external_calendar_id: calendarId,
-    external_calendar_name: null,
-    sync_enabled: true,
-  },
-});
-
-const configConnectionId = configConnection.id;
+const configConnectionId = oauthConnection.id;
 
       const eventsResult = await calendar.events.list({
         calendarId,
@@ -419,14 +393,16 @@ const employeeId = matchedEmployee?.id ?? null;
       });
     }
 
-    await prisma.external_calendar_connection.updateMany({
+    await prisma.external_calendar.updateMany({
       where: {
+        connection_id: oauthConnection.id,
         company_id: companyId,
         provider: "google-calendar",
-        sync_enabled: true,
+        purpose: "google_context",
+        active: true,
       },
       data: {
-        last_synced_at: new Date(),
+        updated_at: new Date(),
       },
     });
 

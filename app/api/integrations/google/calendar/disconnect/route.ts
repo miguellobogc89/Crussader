@@ -45,17 +45,6 @@ export async function DELETE() {
   }
 
   await prisma.$transaction([
-    prisma.external_calendar_connection.updateMany({
-      where: {
-        user_id: dbUser.id,
-        provider: "google-calendar",
-      },
-      data: {
-        sync_enabled: false,
-        updated_at: new Date(),
-      },
-    }),
-
     prisma.external_calendar.updateMany({
       where: {
         connection_id: connection.id,
