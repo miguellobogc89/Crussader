@@ -50,17 +50,20 @@ if (!connection?.access_token || !connection.refresh_token) {
   return null;
 }
 
-const storedCalendar = await prisma.external_calendar_connection.findFirst({
+const storedCalendar = await prisma.external_calendar.findFirst({
   where: {
+    connection_id: connection.id,
     company_id: appointment.location.companyId,
+    location_id: appointment.locationId,
     provider: "google-calendar",
-    sync_enabled: true,
+    purpose: "crussader_mirror",
+    active: true,
     external_calendar_id: {
-      not: null,
+      not: "",
     },
   },
   orderBy: {
-    created_at: "desc",
+    updated_at: "desc",
   },
 });
 

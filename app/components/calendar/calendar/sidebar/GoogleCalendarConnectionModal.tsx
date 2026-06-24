@@ -1,41 +1,14 @@
 // app/components/calendar/calendar/sidebar/GoogleCalendarConnectionModal.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import {
-  CalendarDays,
-  Check,
-  Loader2,
-  LogOut,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { CalendarDays, Loader2, LogOut } from "lucide-react";
 
 import StandardModal from "@/app/components/crussader/StandardModal";
-
-
-
-type CalendarItem = {
-  id: string;
-  summary: string;
-  primary: boolean;
-  accessRole?: string;
-  backgroundColor?: string | null;
-};
-
-type ConnectedCalendar = {
-  id: string;
-  external_calendar_id: string | null;
-  external_calendar_name: string | null;
-  external_account_email: string | null;
-};
 
 type GoogleStatus = {
   connected: boolean;
   accountEmail: string | null;
-};
-
-type CalendarRow = CalendarItem & {
-  connected: boolean;
-  connectedConnectionId: string | null;
 };
 
 type Props = {
@@ -47,8 +20,6 @@ type Props = {
 
 export default function GoogleCalendarConnectionModal({
   open,
-  companyId,
-  locationId,
   onClose,
 }: Props) {
   const [status, setStatus] = useState<GoogleStatus>({
@@ -56,237 +27,37 @@ export default function GoogleCalendarConnectionModal({
     accountEmail: null,
   });
 
-  const [calendars, setCalendars] = useState<CalendarItem[]>([]);
-  const [connectedCalendars, setConnectedCalendars] = useState<
-    ConnectedCalendar[]
-  >([]);
-
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [disconnectingGoogle, setDisconnectingGoogle] = useState(false);
-
-const calendarRows = useMemo<CalendarRow[]>(() => {
-  const rowsFromGoogle = calendars.map((calendar) => {
-    const connectedCalendar = connectedCalendars.find((item) => {
-      return item.external_calendar_id === calendar.id;
-    });
-
-    return {
-      ...calendar,
-      connected: Boolean(connectedCalendar),
-      connectedConnectionId: connectedCalendar?.id || null,
-    };
-  });
-
-  const missingConnectedRows = connectedCalendars
-    .filter((connectedCalendar) => {
-      return !calendars.some((calendar) => {
-        return calendar.id === connectedCalendar.external_calendar_id;
-      });
-    })
-    .map((connectedCalendar) => {
-      return {
-        id: connectedCalendar.external_calendar_id || connectedCalendar.id,
-        summary:
-          connectedCalendar.external_calendar_name || "Calendario conectado",
-        primary: false,
-        accessRole: "writer",
-        backgroundColor: "#1a73e8",
-        connected: true,
-        connectedConnectionId: connectedCalendar.id,
-      };
-    });
-
-  return [...rowsFromGoogle, ...missingConnectedRows];
-}, [calendars, connectedCalendars]);
-
-  const selectedRows = useMemo(() => {
-    return calendarRows.filter((row) => {
-      return selectedIds.includes(row.id);
-    });
-  }, [calendarRows, selectedIds]);
-
-  const importCount = selectedRows.filter((row) => {
-    return !row.connected;
-  }).length;
-
-  const disconnectCount = selectedRows.filter((row) => {
-    return row.connected;
-  }).length;
 
   useEffect(() => {
     if (!open) {
       return;
     }
 
-    void hydrateModal();
+    void fetchGoogleStatus();
   }, [open]);
 
-  async function hydrateModal() {
+  async function fetchGoogleStatus() {
     try {
       setLoading(true);
-      setSelectedIds([]);
 
-      const connected = await fetchGoogleStatus();
+      const res = await fetch("/api/integrations/google/calendar/status");
+      const data = await res.json();
 
-      if (!connected) {
-        setCalendars([]);
-        setConnectedCalendars([]);
-        return;
-      }
+      setStatus({
+        connected: Boolean(data.connected),
+        accountEmail: data.connection?.accountEmail || null,
+      });
+    } catch (error) {
+      console.error("[GoogleCalendarModal] fetch status error:", error);
 
-      await Promise.all([
-        fetchCalendars(),
-        fetchConnectedCalendars(),
-      ]);
-    } catch (err) {
-      console.error("[GoogleCalendarModal] hydrateModal error:", err);
+      setStatus({
+        connected: false,
+        accountEmail: null,
+      });
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function fetchGoogleStatus() {
-    const res = await fetch(
-      "/api/integrations/google/calendar/status",
-    );
-
-    const data = await res.json();
-
-    const connected = Boolean(data.connected);
-
-    setStatus({
-      connected,
-      accountEmail: data.connection?.accountEmail || null,
-    });
-
-    return connected;
-  }
-
-  async function fetchCalendars() {
-    const res = await fetch(
-      "/api/integrations/google/calendar/calendars",
-    );
-
-    const data = await res.json();
-
-    if (!data.ok || !Array.isArray(data.calendars)) {
-      setCalendars([]);
-      return;
-    }
-
-    const selectable = data.calendars.filter((cal: CalendarItem) => {
-      return ["owner", "writer"].includes(cal.accessRole || "");
-    });
-
-    setCalendars(selectable);
-  }
-
-  async function fetchConnectedCalendars() {
-    const res = await fetch(
-      `/api/integrations/google/calendar/connected?companyId=${companyId}`,
-    );
-
-    const data = await res.json();
-
-    if (data.ok && Array.isArray(data.calendars)) {
-      setConnectedCalendars(data.calendars);
-      return;
-    }
-
-    setConnectedCalendars([]);
-  }
-
-  function toggleCalendar(calendarId: string) {
-    setSelectedIds((current) => {
-      if (current.includes(calendarId)) {
-        return current.filter((id) => id !== calendarId);
-      }
-
-      return [...current, calendarId];
-    });
-  }
-
-  async function disconnectCalendar(connectionId: string) {
-    const res = await fetch(
-      `/api/integrations/google/calendar/connected/${connectionId}`,
-      {
-        method: "DELETE",
-      },
-    );
-
-    const data = await res.json();
-
-    return Boolean(data.ok);
-  }
-
-  async function importCalendars(calendarIds: string[]) {
-
-
-    const res = await fetch(
-      "/api/integrations/google/calendar/import",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          companyId: companyId,
-          locationId,
-          selectedCalendarIds: calendarIds,
-        }),
-      },
-    );
-
-    const data = await res.json();
-
-    return Boolean(data.ok);
-  }
-
-  async function applyChanges() {
-    if (selectedRows.length === 0) {
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      const toImport = selectedRows
-        .filter((row) => !row.connected)
-        .map((row) => row.id);
-
-      const toDisconnect = selectedRows.filter((row) => {
-        return row.connected && row.connectedConnectionId;
-      });
-
-      if (toImport.length > 0) {
-        await importCalendars(toImport);
-      }
-
-      if (toDisconnect.length > 0) {
-        await Promise.all(
-          toDisconnect.map((row) => {
-            return disconnectCalendar(
-              row.connectedConnectionId as string,
-            );
-          }),
-        );
-      }
-
-      setSelectedIds([]);
-
-      await Promise.all([
-        fetchCalendars(),
-        fetchConnectedCalendars(),
-      ]);
-
-      onClose();
-    } catch (err) {
-      console.error("[GoogleCalendarModal] applyChanges error:", err);
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -294,30 +65,22 @@ const calendarRows = useMemo<CalendarRow[]>(() => {
     try {
       setDisconnectingGoogle(true);
 
-      const res = await fetch(
-        "/api/integrations/google/calendar/disconnect",
-        {
-          method: "DELETE",
-        },
-      );
+      const res = await fetch("/api/integrations/google/calendar/disconnect", {
+        method: "DELETE",
+      });
 
       const data = await res.json();
 
       if (data.ok) {
-        
         setStatus({
           connected: false,
           accountEmail: null,
         });
 
-        setCalendars([]);
-        setConnectedCalendars([]);
-        setSelectedIds([]);
-
         onClose();
       }
-    } catch (err) {
-      console.error("[GoogleCalendarModal] disconnectGoogle error:", err);
+    } catch (error) {
+      console.error("[GoogleCalendarModal] disconnect google error:", error);
     } finally {
       setDisconnectingGoogle(false);
     }
@@ -327,179 +90,60 @@ const calendarRows = useMemo<CalendarRow[]>(() => {
     <StandardModal
       open={open}
       title="Google Calendar"
-      contentClassName="sm:max-w-[760px]"
+      contentClassName="sm:max-w-[440px]"
+      hideFooter
       onClose={onClose}
-      footer={
-        status.connected ? (
-          <div className="flex w-full items-center justify-between">
-            <p className="text-sm text-slate-500">
-              {selectedIds.length} seleccionado(s)
-            </p>
-
-            <button
-              type="button"
-              onClick={applyChanges}
-              disabled={selectedIds.length === 0 || saving}
-              className="inline-flex h-11 items-center gap-2 rounded-full bg-blue-600 px-6 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40"
-            >
-              {saving ? (
-                <Loader2
-                  size={16}
-                  className="animate-spin"
-                />
-              ) : null}
-
-              {importCount > 0 && disconnectCount > 0
-                ? "Aplicar cambios"
-                : disconnectCount > 0
-                  ? "Desconectar"
-                  : "Importar"}
-            </button>
-          </div>
-        ) : null
-      }
     >
-      <div className="px-1">
-        <div className="flex items-center justify-between px-4 pb-4">
-          <div className="flex items-center gap-4">
-            <div className="flex size-11 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-              <CalendarDays size={22} />
-            </div>
-
-            <div>
-              <h3 className="text-base font-semibold text-slate-950">
-                Calendarios disponibles
-              </h3>
-
-              <p className="text-sm text-slate-500">
-                {status.connected
-                  ? status.accountEmail
-                  : "Conecta Google Calendar"}
-              </p>
-            </div>
+      <div className="space-y-5 px-1 py-1">
+        <div className="flex items-start gap-3 rounded-2xl bg-slate-50 p-3 xl:p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 xl:h-11 xl:w-11">
+            <CalendarDays size={22} />
           </div>
 
-          {status.connected ? (
-            <button
-              type="button"
-              onClick={disconnectGoogle}
-              disabled={disconnectingGoogle}
-              className="inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium text-slate-600 hover:bg-slate-100"
-            >
-              {disconnectingGoogle ? (
-                <Loader2
-                  size={16}
-                  className="animate-spin"
-                />
-              ) : (
-                <LogOut size={16} />
-              )}
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-slate-950 xl:text-base">
+              Cuenta de Google Calendar
+            </h3>
 
-              Desconectar Google
-            </button>
-          ) : (
-            <button
-              type="button"
-onClick={() => {
-  if (!companyId || !locationId) {
-    return;
-  }
-
-  window.location.href =
-    `/api/integrations/google/calendar/connect?companyId=${companyId}&locationId=${locationId}`;
-}}
-              className="h-10 rounded-full border border-slate-300 px-5 text-sm font-medium text-slate-800 hover:bg-slate-50"
-            >
-              Conectar Google
-            </button>
-          )}
+            {loading ? (
+              <p className="mt-1 flex items-center gap-2 text-xs text-slate-500 xl:text-sm">
+                <Loader2 size={14} className="animate-spin" />
+                Comprobando conexión...
+              </p>
+            ) : (
+              <p className="mt-1 truncate text-xs text-slate-500 xl:text-sm">
+                {status.connected
+                  ? status.accountEmail || "Cuenta conectada"
+                  : "No hay ninguna cuenta conectada"}
+              </p>
+            )}
+          </div>
         </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-20 text-sm text-slate-500">
-            <Loader2
-              size={18}
-              className="mr-2 animate-spin"
-            />
-            Cargando calendarios...
-          </div>
-        ) : null}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
 
-        {!loading && status.connected ? (
-          <div>
-            {calendarRows.map((calendar) => {
-              const selected = selectedIds.includes(calendar.id);
+          <button
+            type="button"
+            onClick={disconnectGoogle}
+            disabled={!status.connected || loading || disconnectingGoogle}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {disconnectingGoogle ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <LogOut size={16} />
+            )}
 
-              return (
-                <button
-                  key={calendar.id}
-                  type="button"
-                  onClick={() => toggleCalendar(calendar.id)}
-                  className="flex w-full items-center gap-4 px-4 py-4 text-left hover:bg-slate-50"
-                >
-                  <div
-                    className="size-4 shrink-0 rounded"
-                    style={{
-                      backgroundColor:
-                        calendar.backgroundColor || "#1a73e8",
-                    }}
-                  />
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-[15px] font-medium text-slate-950">
-                        {calendar.summary}
-                      </p>
-
-                      {calendar.primary ? (
-                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                          Principal
-                        </span>
-                      ) : null}
-
-                      {calendar.connected ? (
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                          Conectado
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                          No conectado
-                        </span>
-                      )}
-                    </div>
-
-                    <p className="truncate text-sm text-slate-500">
-                      {calendar.id}
-                    </p>
-                  </div>
-
-                  <div
-                    className={[
-                      "flex size-6 items-center justify-center rounded-full border transition-all",
-                      selected
-                        ? "border-blue-600 bg-blue-600 text-white"
-                        : "border-slate-300 bg-white text-transparent",
-                    ].join(" ")}
-                  >
-                    <Check size={14} />
-                  </div>
-                </button>
-              );
-            })}
-
-            {calendarRows.length === 0 ? (
-              <div className="py-16 text-center text-sm text-slate-500">
-                No hay calendarios disponibles.
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {!loading && !status.connected ? (
-          <div className="py-16 text-center text-sm text-slate-500">
-            Conecta Google para cargar tus calendarios.
-          </div>
-        ) : null}
+            Desconectar
+          </button>
+        </div>
       </div>
     </StandardModal>
   );

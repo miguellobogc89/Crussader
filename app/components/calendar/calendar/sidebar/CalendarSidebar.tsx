@@ -4,7 +4,9 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import GoogleCalendarConnectionModal from "./GoogleCalendarConnectionModal";
-import ConnectedCalendarsList from "./ConnectedCalendarsList";
+import ConnectedCalendarsList from "./SidebarCalendarsList";
+import MiniCalendar from "./MiniCalendar";
+import { CheckCircle2 } from "lucide-react";
 
 type Props = {
   companyId: string | null;
@@ -23,6 +25,10 @@ type ConnectedCalendarItem = {
   external_calendar_name: string | null;
   external_account_email: string | null;
   last_synced_at: string | null;
+  purpose?: string | null;
+  background_color?: string | null;
+  foreground_color?: string | null;
+  color_id?: string | null;
 };
 
 type GoogleConnectionStatus = {
@@ -34,31 +40,9 @@ type VisibleCalendarItem = {
   id: string;
   name: string;
   color?: string | null;
+  purpose?: string | null;
   visible: boolean;
 };
-
-function startOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function startOfCalendarGrid(date: Date) {
-  const first = startOfMonth(date);
-  const day = first.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-
-  const start = new Date(first);
-  start.setDate(first.getDate() + diff);
-
-  return start;
-}
-
-function isSameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
 
 export default function CalendarSidebar({
   companyId,
@@ -122,54 +106,81 @@ export default function CalendarSidebar({
 
       const data = await res.json();
 
-      setGoogleStatus({
+      const nextStatus = {
         connected: Boolean(data.connected),
         accountEmail: data.connection?.accountEmail || null,
-      });
+      };
+
+      setGoogleStatus(nextStatus);
+
+      return nextStatus;
     } catch (error) {
       console.error("[CalendarSidebar] fetch google status error", error);
 
-      setGoogleStatus({
+      const fallbackStatus = {
         connected: false,
         accountEmail: null,
-      });
+      };
+
+      setGoogleStatus(fallbackStatus);
+
+      return fallbackStatus;
     }
   }
 
+  async function syncGoogleCalendars() {
+    try {
+      if (!companyId || !locationId) {
+        return;
+      }
+
+      await fetch("/api/integrations/google/calendar/sync-calendars", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          companyId,
+          locationId,
+        }),
+      });
+    } catch (error) {
+      console.error("[CalendarSidebar] sync calendars error", error);
+    }
+  }
+
+async function loadCalendars() {
+  const status = await fetchGoogleStatus();
+
+  if (!status.connected) {
+    setCalendars([]);
+    onChangeVisibleGoogleCalendarIds([]);
+    return;
+  }
+
+  await syncGoogleCalendars();
+  await fetchConnectedCalendars();
+}
+
   useEffect(() => {
-    void fetchGoogleStatus();
-    void fetchConnectedCalendars();
-  }, []);
-
-  const today = new Date();
-
-  const monthLabel = selectedDate.toLocaleDateString("es-ES", {
-    month: "long",
-    year: "numeric",
-  });
-
-  const gridStart = startOfCalendarGrid(selectedDate);
-
-  const days = Array.from({ length: 42 }, (_, i) => {
-    const d = new Date(gridStart);
-    d.setDate(gridStart.getDate() + i);
-    return d;
-  });
+    void loadCalendars();
+  }, [companyId, locationId]);
 
   const visibleCalendars: VisibleCalendarItem[] = calendars
     .filter((calendar) => Boolean(calendar.external_calendar_id))
     .map((calendar) => {
       const calendarId = calendar.external_calendar_id as string;
 
-      return {
-        id: calendarId,
-        name:
-          calendar.external_calendar_name ||
-          calendar.external_account_email ||
-          "Calendario sin nombre",
-        color: null,
-        visible: visibleGoogleCalendarIds.includes(calendarId),
-      };
+return {
+  id: calendarId,
+  name:
+    calendar.external_calendar_name ||
+    calendar.external_account_email ||
+    "Calendario sin nombre",
+  color: calendar.background_color || null,
+  purpose: calendar.purpose || null,
+  visible: visibleGoogleCalendarIds.includes(calendarId),
+};
     });
 
   function toggleVisibleCalendar(calendarId: string) {
@@ -187,51 +198,10 @@ export default function CalendarSidebar({
   return (
     <>
       <div className="flex h-full flex-col overflow-hidden bg-white">
-        <div className="border-b border-slate-200 px-3 py-2 xl2:px-4 xl2:py-3">
-          <h2 className="text-xs font-semibold capitalize text-slate-900 xl2:text-sm">
-            {monthLabel}
-          </h2>
-        </div>
-
-        <div className="px-2.5 py-3 xl2:px-3 xl2:py-4">
-          <div className="mb-1.5 grid grid-cols-7 gap-1 xl2:mb-2">
-            {["L", "M", "X", "J", "V", "S", "D"].map((day) => (
-              <div
-                key={day}
-                className="flex h-6 items-center justify-center text-[10px] font-semibold text-slate-400 xl2:h-8 xl2:text-[11px]"
-              >
-                {day}
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-1">
-            {days.map((day) => {
-              const isTodayDay = isSameDay(day, today);
-              const isSelected = isSameDay(day, selectedDate);
-              const isCurrentMonth = day.getMonth() === selectedDate.getMonth();
-
-              return (
-                <button
-                  key={day.toISOString()}
-                  type="button"
-                  onClick={() => onSelectDate(day)}
-                  className={[
-                    "flex h-7 items-center justify-center rounded-lg text-xs font-medium transition-colors xl2:h-9 xl2:rounded-xl xl2:text-sm",
-                    isSelected ? "bg-blue-600 text-white shadow-sm" : "",
-                    !isSelected && isTodayDay ? "bg-blue-50 text-blue-700" : "",
-                    !isSelected && !isTodayDay
-                      ? "text-slate-700 hover:bg-slate-100"
-                      : "",
-                    !isCurrentMonth ? "opacity-35" : "",
-                  ].join(" ")}
-                >
-                  {day.getDate()}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <MiniCalendar
+          selectedDate={selectedDate}
+          onSelectDate={onSelectDate}
+        />
 
         <ConnectedCalendarsList
           calendars={visibleCalendars}
@@ -241,7 +211,20 @@ export default function CalendarSidebar({
         <div className="mt-auto p-3 xl2:p-4">
           <button
             type="button"
-            onClick={() => setGoogleModalOpen(true)}
+            onClick={() => {
+              if (!hasGoogleAccountConnected) {
+                if (!companyId || !locationId) {
+                  return;
+                }
+
+                window.location.href =
+                  `/api/integrations/google/calendar/connect?companyId=${companyId}&locationId=${locationId}`;
+
+                return;
+              }
+
+              setGoogleModalOpen(true);
+            }}
             className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 transition-colors hover:bg-slate-50 xl2:rounded-xl2 xl2:px-4 xl2:py-3"
           >
             <div className="flex items-center gap-2 xl2:gap-3">
@@ -256,28 +239,19 @@ export default function CalendarSidebar({
               </div>
 
               <div className="flex min-w-0 flex-col items-start">
-                <span className="text-xs font-semibold text-slate-900 xl2:text-sm">
+                <span className="flex max-w-full items-center gap-1.5 text-xs font-semibold text-slate-900 xl2:text-sm">
                   Google Calendar
+
+                  {hasGoogleAccountConnected ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                  ) : null}
                 </span>
 
-                <span
-                  className={[
-                    "text-[11px] font-medium xl2:text-xs",
-                    hasGoogleAccountConnected
-                      ? "text-emerald-600"
-                      : "text-slate-400",
-                  ].join(" ")}
-                >
+                <span className="block max-w-[135px] truncate text-[11px] font-medium text-slate-400 xl2:max-w-[180px] xl2:text-xs">
                   {hasGoogleAccountConnected
-                    ? "Cuenta conectada"
+                    ? googleStatus.accountEmail || "Cuenta conectada"
                     : "No conectado"}
                 </span>
-
-                {googleStatus.accountEmail ? (
-                  <span className="max-w-[145px] truncate text-[10px] text-slate-400 xl2:max-w-[180px] xl2:text-[11px]">
-                    {googleStatus.accountEmail}
-                  </span>
-                ) : null}
               </div>
             </div>
           </button>
@@ -290,8 +264,7 @@ export default function CalendarSidebar({
         locationId={locationId}
         onClose={() => {
           setGoogleModalOpen(false);
-          void fetchGoogleStatus();
-          void fetchConnectedCalendars();
+          void loadCalendars();
         }}
       />
     </>

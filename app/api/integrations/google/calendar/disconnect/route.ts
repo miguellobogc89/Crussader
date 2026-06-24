@@ -29,29 +29,73 @@ export async function DELETE() {
     );
   }
 
-await prisma.$transaction([
-  prisma.external_calendar_connection.updateMany({
-    where: {
-      user_id: dbUser.id,
-      provider: "google-calendar",
-    },
-    data: {
-      sync_enabled: false,
-    },
-  }),
-
-  prisma.externalConnection.updateMany({
+  const connection = await prisma.externalConnection.findFirst({
     where: {
       userId: dbUser.id,
       provider: "google-calendar",
     },
-    data: {
-      status: "disconnected",
-    },
-  }),
-]);
+    select: { id: true },
+  });
+
+  if (!connection) {
+    return NextResponse.json({
+      ok: true,
+      message: "not_connected",
+    });
+  }
+
+  await prisma.$transaction([
+    prisma.external_calendar_connection.updateMany({
+      where: {
+        user_id: dbUser.id,
+        provider: "google-calendar",
+      },
+      data: {
+        sync_enabled: false,
+        updated_at: new Date(),
+      },
+    }),
+
+    prisma.external_calendar.updateMany({
+      where: {
+        connection_id: connection.id,
+        provider: "google-calendar",
+        purpose: "google_context",
+      },
+      data: {
+        active: false,
+        updated_at: new Date(),
+      },
+    }),
+
+    prisma.appointment.updateMany({
+      where: {
+        externalProvider: "google-calendar",
+        externalCalendarId: {
+          not: null,
+        },
+      },
+      data: {
+        status: "CANCELLED",
+        cancellation_reason: "Desconectado de Google Calendar",
+        updated_at: new Date(),
+      },
+    }),
+
+    prisma.externalConnection.updateMany({
+      where: {
+        userId: dbUser.id,
+        provider: "google-calendar",
+      },
+      data: {
+        status: "disconnected",
+        updatedAt: new Date(),
+      },
+    }),
+  ]);
 
   return NextResponse.json({
     ok: true,
+    message: "google_calendar_disconnected",
   });
 }

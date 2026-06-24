@@ -136,11 +136,12 @@ export async function GET(req: Request) {
       );
     }
 
-    const activeGoogleCalendars = await prisma.external_calendar_connection.findMany({
+const activeGoogleCalendars = await prisma.external_calendar.findMany({
   where: {
     company_id: location.companyId,
+    location_id: locationId,
     provider: "google-calendar",
-    sync_enabled: true,
+    active: true,
   },
   select: {
     external_calendar_id: true,

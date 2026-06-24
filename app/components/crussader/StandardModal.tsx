@@ -12,6 +12,7 @@ type Props = {
   children: ReactNode;
   footer?: ReactNode;
   contentClassName?: string;
+  hideFooter?: boolean;
   primaryLabel?: ReactNode;
   primaryDisabled?: boolean;
   onPrimary?: () => void;
@@ -24,6 +25,7 @@ export default function StandardModal({
   children,
   footer,
   contentClassName,
+  hideFooter = false,
   primaryLabel = "Aceptar",
   primaryDisabled = false,
   onPrimary,
@@ -75,27 +77,29 @@ export default function StandardModal({
               {children}
             </div>
 
-            <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 xl:px-5 xl:py-4">
-              {footer ?? (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={onClose}
-                    className="h-9 text-[12px] xl:text-[13px]"
-                  >
-                    Cerrar
-                  </Button>
+            {!hideFooter ? (
+              <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 xl:px-5 xl:py-4">
+                {footer ?? (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={onClose}
+                      className="h-9 text-[12px] xl:text-[13px]"
+                    >
+                      Cerrar
+                    </Button>
 
-<Button
-  onClick={onPrimary}
-  disabled={primaryDisabled}
-  className="h-9 rounded-xl bg-gradient-to-r from-[#1D4ED8] to-[#2563EB] px-5 text-[12px] text-white shadow-[0_8px_20px_rgba(37,99,235,0.35)] transition-all hover:shadow-[0_10px_24px_rgba(37,99,235,0.45)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-[0_8px_20px_rgba(37,99,235,0.35)] xl:text-[13px]"
->
-  {primaryLabel}
-</Button>
-                </>
-              )}
-            </footer>
+                    <Button
+                      onClick={onPrimary}
+                      disabled={primaryDisabled}
+                      className="h-9 rounded-xl bg-gradient-to-r from-[#1D4ED8] to-[#2563EB] px-5 text-[12px] text-white shadow-[0_8px_20px_rgba(37,99,235,0.35)] transition-all hover:shadow-[0_10px_24px_rgba(37,99,235,0.45)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-[0_8px_20px_rgba(37,99,235,0.35)] xl:text-[13px]"
+                    >
+                      {primaryLabel}
+                    </Button>
+                  </>
+                )}
+              </footer>
+            ) : null}
           </motion.div>
         </motion.div>
       ) : null}

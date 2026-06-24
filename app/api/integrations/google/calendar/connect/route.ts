@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   const returnTo =
     process.env.GOOGLE_CALENDAR_RETURN_URI ||
-    `${baseUrl}/dashboard/integrations-test-2`;
+    `${baseUrl}/dashboard/calendar`;
 
 const companyId = url.searchParams.get("companyId") || null;
 const locationId = url.searchParams.get("locationId") || null;
@@ -30,10 +30,8 @@ const accountEmail = session?.user?.email ?? null;
   );
 
 const scopes = [
-  "https://www.googleapis.com/auth/calendar.app.created",
-  "https://www.googleapis.com/auth/calendar.readonly",
-  "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
-  //"https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+  "https://www.googleapis.com/auth/calendar",
+  "https://www.googleapis.com/auth/userinfo.email",
 ];
 
   const state = JSON.stringify({
@@ -41,7 +39,6 @@ const scopes = [
     companyId,
     locationId,
     userId,
-    accountEmail,
   });
 
   const authUrl = client.generateAuthUrl({

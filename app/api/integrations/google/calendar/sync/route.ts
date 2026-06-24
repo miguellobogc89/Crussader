@@ -53,7 +53,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    let body: any = {};
+
+try {
+  body = await req.json();
+} catch {
+  body = {};
+}
 
     const companyId = typeof body.companyId === "string" ? body.companyId : null;
     const locationId = typeof body.locationId === "string" ? body.locationId : null;
@@ -91,6 +97,7 @@ export async function POST(req: NextRequest) {
       },
       orderBy: { createdAt: "desc" },
       select: {
+        id: true,
         access_token: true,
         refresh_token: true,
         expires_at: true,
@@ -104,33 +111,34 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const savedConnections = await prisma.external_calendar_connection.findMany({
-      where: {
-        company_id: companyId,
-        provider: "google-calendar",
-        sync_enabled: true,
-        external_calendar_id: {
-          not: null,
-        },
-      },
-      select: {
-        id: true,
-        external_calendar_id: true,
-      },
-    });
+const savedCalendars = await prisma.external_calendar.findMany({
+  where: {
+    company_id: companyId,
+    location_id: locationId,
+    provider: "google-calendar",
+    purpose: "google_context",
+    active: true,
+    external_calendar_id: {
+      not: "",
+    },
+  },
+  select: {
+    id: true,
+    external_calendar_id: true,
+  },
+});
 
-    const calendarIds = savedConnections
-      .flatMap((conn) => conn.external_calendar_id?.split(",") ?? [])
-      .map((id) => id.trim())
-      .filter((id) => id.length > 0);
+const calendarIds = savedCalendars
+  .map((calendar) => calendar.external_calendar_id)
+  .filter((id): id is string => Boolean(id));
 
-    if (calendarIds.length === 0) {
-      return NextResponse.json({
-        ok: true,
-        message: "no_google_calendars_configured",
-        imported: 0,
-      });
-    }
+if (calendarIds.length === 0) {
+  return NextResponse.json({
+    ok: true,
+    message: "no_google_calendars_configured",
+    imported: 0,
+  });
+}
 
     const client = new google.auth.OAuth2(
       process.env.GOOGLE_CALENDAR_CLIENT_ID,
@@ -176,7 +184,41 @@ const employees = await prisma.employee.findMany({
 });
 
     for (const calendarId of calendarIds) {
-      const configConnectionId = savedConnections[0].id;
+      const savedCalendar = savedCalendars.find((calendar) => {
+  return calendar.external_calendar_id === calendarId;
+});
+
+if (!savedCalendar) {
+  continue;
+}
+
+const configConnection = await prisma.external_calendar_connection.upsert({
+  where: {
+    id: savedCalendar.id,
+  },
+  update: {
+    user_id: dbUser.id,
+    company_id: companyId,
+    provider: "google-calendar",
+    external_account_email: dbUser.email,
+    external_calendar_id: calendarId,
+    external_calendar_name: null,
+    sync_enabled: true,
+    updated_at: new Date(),
+  },
+  create: {
+    id: savedCalendar.id,
+    user_id: dbUser.id,
+    company_id: companyId,
+    provider: "google-calendar",
+    external_account_email: dbUser.email,
+    external_calendar_id: calendarId,
+    external_calendar_name: null,
+    sync_enabled: true,
+  },
+});
+
+const configConnectionId = configConnection.id;
 
       const eventsResult = await calendar.events.list({
         calendarId,
@@ -314,6 +356,7 @@ const employeeId = matchedEmployee?.id ?? null;
               startAt,
               endAt,
               externalColor,
+              updatedAt: new Date(),
             },
           });
         } else {
