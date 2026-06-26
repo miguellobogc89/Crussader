@@ -9,17 +9,18 @@ import type { CalendarAppt } from "@/app/components/calendar/calendar/types";
 import { useActiveCompanyResolved } from "@/app/providers/bootstrap-store";
 import { toast } from "@/app/components/ui/use-toast";
 import { cn } from "@/lib/utils";
-import CustomerPicker, {
-  type CustomerLite,
-} from "@/app/components/calendar/appointments/CustomerPicker";
+import {
+  CustomerPicker,
+  type CustomerPickerValue as CustomerLite,
+} from "@/app/components/crussader/UX/inputs/CustomerPicker";
 import {
   ModalFormField,
   ModalTextarea,
   SearchablePicker,
-  MODAL_INPUT_CLASS,
 } from "@/app/components/crussader/UX/inputs";
 import { DatePicker } from "@/app/components/crussader/UX/inputs/DatePicker";
 import { TimeSelector } from "@/app/components/crussader/UX/inputs/TimeSelector";
+import { Picklist } from "@/app/components/crussader/UX/inputs/Picklist";
 import {
   buildAppointmentOptionsParams,
   buildIsoFromLocal,
@@ -64,11 +65,12 @@ export default function AppointmentDetailsModal({
   const [services, setServices] = useState<ServiceLite[]>([]);
   const [employees, setEmployees] = useState<EmployeeLite[]>([]);
   const [employeeServices, setEmployeeServices] = useState<EmployeeServiceItem[]>([]);
+  const [customers, setCustomers] = useState<CustomerLite[]>([]);
 
   const [serviceId, setServiceId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [customer, setCustomer] = useState<CustomerLite | null>(null);
-  const [status, setStatus] = useState<AppointmentStatusValue>("BOOKED");
+  const [status, setStatus] = useState<AppointmentStatusValue>("PENDING");
   const [dateValue, setDateValue] = useState("");
   const [timeValue, setTimeValue] = useState("");
   const [notes, setNotes] = useState("");
@@ -150,6 +152,8 @@ export default function AppointmentDetailsModal({
       setServices([]);
       setEmployees([]);
       setEmployeeServices([]);
+      setCustomers([]);
+      setOptionsLoaded(true);
       return;
     }
 
@@ -160,25 +164,48 @@ export default function AppointmentDetailsModal({
         const { servicesUrl, employeesUrl, employeeServicesUrl } =
           buildAppointmentOptionsParams({ companyId, locationId });
 
-        const [servicesRes, employeesRes, employeeServicesRes] = await Promise.all([
-          fetch(servicesUrl, { method: "GET", cache: "no-store" }),
-          fetch(employeesUrl, { method: "GET", cache: "no-store" }),
-          fetch(employeeServicesUrl, { method: "GET", cache: "no-store" }),
-        ]);
+        const customersParams = new URLSearchParams();
+        customersParams.set("companyId", companyId);
+
+        const [servicesRes, employeesRes, employeeServicesRes, customersRes] =
+          await Promise.all([
+            fetch(servicesUrl, { method: "GET", cache: "no-store" }),
+            fetch(employeesUrl, { method: "GET", cache: "no-store" }),
+            fetch(employeeServicesUrl, { method: "GET", cache: "no-store" }),
+            fetch(`/api/customer?${customersParams.toString()}`, {
+              method: "GET",
+              cache: "no-store",
+            }),
+          ]);
 
         const servicesJson = await servicesRes.json().catch(() => null);
         const employeesJson = await employeesRes.json().catch(() => null);
         const employeeServicesJson = await employeeServicesRes
           .json()
           .catch(() => null);
+        const customersJson = await customersRes.json().catch(() => null);
 
         if (cancelled) {
           return;
         }
 
+        const nextCustomers: CustomerLite[] = Array.isArray(customersJson?.items)
+          ? customersJson.items.map((item: any) => {
+              return {
+                id: String(item.id),
+                displayName: String(
+                  item.displayName ?? item.name ?? "Cliente sin nombre"
+                ),
+                phone: item.phone ?? null,
+                email: item.email ?? null,
+              };
+            })
+          : [];
+
         setServices(mapServicesResponse(servicesJson));
         setEmployees(mapEmployeesResponse(employeesJson));
         setEmployeeServices(mapEmployeeServicesResponse(employeeServicesJson));
+        setCustomers(nextCustomers);
         setOptionsLoaded(true);
       } catch (error) {
         console.error("[AppointmentDetailsModal] loadOptions", error);
@@ -187,6 +214,7 @@ export default function AppointmentDetailsModal({
           setServices([]);
           setEmployees([]);
           setEmployeeServices([]);
+          setCustomers([]);
           setOptionsLoaded(true);
         }
       }
@@ -344,7 +372,13 @@ export default function AppointmentDetailsModal({
       onClose={onClose}
       footer={
         <div className="flex w-full items-center justify-between gap-3">
-          <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="h-10 rounded-xl">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={loading}
+            className="h-10 rounded-xl"
+          >
             Cerrar
           </Button>
 
@@ -391,7 +425,7 @@ export default function AppointmentDetailsModal({
             </div>
           ) : null}
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <ModalFormField label="Fecha">
               <DatePicker value={dateValue} onChange={setDateValue} />
             </ModalFormField>
@@ -399,34 +433,36 @@ export default function AppointmentDetailsModal({
             <ModalFormField label="Hora">
               <TimeSelector value={timeValue} onChange={setTimeValue} />
             </ModalFormField>
+
+            <ModalFormField label="Estado">
+              <Picklist
+                value={status}
+                options={STATUS_OPTIONS}
+                className={cn(
+                  status === "CANCELLED" &&
+                    "border-rose-200 bg-rose-50 text-rose-700 focus:ring-rose-100"
+                )}
+                onChange={(nextValue) => {
+                  if (nextValue === "") {
+                    return;
+                  }
+
+                  setStatus(nextValue);
+                }}
+              />
+            </ModalFormField>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <ModalFormField label="Cliente">
-              <CustomerPicker companyId={companyId} value={customer} onChange={setCustomer} />
+              <CustomerPicker
+                value={customer}
+                customers={customers}
+                onChange={setCustomer}
+              />
             </ModalFormField>
 
-            <ModalFormField label="Estado">
-              <select
-                value={status}
-                onChange={(event) => setStatus(event.target.value as AppointmentStatusValue)}
-                className={cn(
-                  MODAL_INPUT_CLASS,
-                  status === "CANCELLED" &&
-                    "border-rose-200 bg-rose-50 text-rose-700 focus:border-rose-300 focus:ring-rose-100"
-                )}
-              >
-                {STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </ModalFormField>
-          </div>
-
-          <ModalFormField label="Servicio">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <ModalFormField label="Servicio">
               <SearchablePicker
                 value={serviceId}
                 items={availableServicePickerItems}
@@ -438,57 +474,66 @@ export default function AppointmentDetailsModal({
                     : "No hay servicios que coincidan."
                 }
                 fallbackLabel={appointment.serviceName}
-                fallbackDescription={selectedService?.durationMin ? `${selectedService.durationMin} min` : null}
+                fallbackDescription={
+                  selectedService?.durationMin
+                    ? `${selectedService.durationMin} min`
+                    : null
+                }
                 onChange={setServiceId}
               />
+            </ModalFormField>
+          </div>
 
-              <button
-                type="button"
-                onClick={() => setIsUrgent((prev) => !prev)}
-                className={cn(
-                  "inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-5 text-sm font-bold transition",
-                  isUrgent
-                    ? "border-orange-300 bg-orange-50 text-orange-700 shadow-sm"
-                    : "border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
-                )}
-              >
-                <AlertTriangle className="h-4 w-4" />
-                Urgencia
-              </button>
-            </div>
-          </ModalFormField>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <ModalFormField label={serviceId ? "Profesionales compatibles" : "Profesional recomendado"}>
+              <div className="flex flex-wrap gap-2">
+                {compatibleEmployees.map((employee) => {
+                  const isSelected = employee.id === employeeId;
 
-          <ModalFormField label={serviceId ? "Profesionales compatibles" : "Profesional recomendado"}>
-            <div className="flex flex-wrap gap-2">
-              {compatibleEmployees.map((employee) => {
-                const isSelected = employee.id === employeeId;
+                  return (
+                    <button
+                      key={employee.id}
+                      type="button"
+                      onClick={() => handleEmployeeClick(employee, isSelected)}
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                        isSelected
+                          ? "border-[#0B6CF4] bg-[#0B6CF4] text-white shadow-[0_2px_8px_rgba(11,108,244,0.25)]"
+                          : "border-border bg-white text-slate-700 hover:bg-muted/40"
+                      )}
+                    >
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: employee.color || "#94A3B8" }}
+                      />
+                      <span>{employee.name}</span>
+                      {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
+                    </button>
+                  );
+                })}
 
-                return (
-                  <button
-                    key={employee.id}
-                    type="button"
-                    onClick={() => handleEmployeeClick(employee, isSelected)}
-                    className={cn(
-                      "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
-                      isSelected
-                        ? "border-[#0B6CF4] bg-[#0B6CF4] text-white shadow-[0_2px_8px_rgba(11,108,244,0.25)]"
-                        : "border-border bg-white text-slate-700 hover:bg-muted/40"
-                    )}
-                  >
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: employee.color || "#94A3B8" }} />
-                    <span>{employee.name}</span>
-                    {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
-                  </button>
-                );
-              })}
+                {compatibleEmployees.length === 0 ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                    No hay profesionales disponibles para este servicio.
+                  </div>
+                ) : null}
+              </div>
+            </ModalFormField>
 
-              {compatibleEmployees.length === 0 ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                  No hay profesionales disponibles para este servicio.
-                </div>
-              ) : null}
-            </div>
-          </ModalFormField>
+            <button
+              type="button"
+              onClick={() => setIsUrgent((prev) => !prev)}
+              className={cn(
+                "mt-[22px] inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-5 text-sm font-bold transition",
+                isUrgent
+                  ? "border-orange-300 bg-orange-50 text-orange-700 shadow-sm"
+                  : "border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
+              )}
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Urgencia
+            </button>
+          </div>
 
           {advisoryText ? (
             <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
