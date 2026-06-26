@@ -1,19 +1,14 @@
 // app/components/calendar/appointments/AppointmentDetailsModal.tsx
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Check,
-  ChevronDown,
   Loader2,
-  Search,
-  X,
 } from "lucide-react";
 import StandardModal from "@/app/components/crussader/StandardModal";
 import { Button } from "@/app/components/ui/button";
-import { Input } from "@/app/components/ui/input";
-import { Label } from "@/app/components/ui/label";
 import type { CalendarAppt } from "@/app/components/calendar/calendar/types";
 import { useActiveCompanyResolved } from "@/app/providers/bootstrap-store";
 import { toast } from "@/app/components/ui/use-toast";
@@ -21,6 +16,14 @@ import { cn } from "@/lib/utils";
 import CustomerPicker, {
   type CustomerLite,
 } from "@/app/components/calendar/appointments/CustomerPicker";
+import {
+  ModalFormField,
+  ModalTextInput,
+  ModalTextarea,
+  SearchablePicker,
+  MODAL_INPUT_CLASS,
+  type SearchablePickerItem,
+} from "@/app/components/crussader/UX/inputs";
 
 type ServiceLite = {
   id: string;
@@ -60,18 +63,6 @@ const STATUS_OPTIONS: {
   { value: "CANCELLED", label: "Cancelada" },
 ];
 
-const FIELD_LABEL_CLASS =
-  "text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500";
-
-const INPUT_CLASS =
-  "h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100";
-
-const TEXTAREA_CLASS =
-  "min-h-[92px] w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100";
-
-const PICKER_BUTTON_CLASS =
-  "flex h-12 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-left text-sm shadow-sm transition hover:bg-slate-50";
-
 type Props = {
   open: boolean;
   appointment: CalendarAppt | null;
@@ -105,14 +96,9 @@ export default function AppointmentDetailsModal({
   const [notes, setNotes] = useState("");
   const [isUrgent, setIsUrgent] = useState(false);
 
-  const [serviceSearch, setServiceSearch] = useState("");
-  const [serviceDropdownOpen, setServiceDropdownOpen] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState("");
   const [optionsLoaded, setOptionsLoaded] = useState(false);
-
-  const serviceDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const isGoogleAppointment =
     appointment?.source === "google" ||
@@ -140,17 +126,15 @@ export default function AppointmentDetailsModal({
     });
   }, [employees, employeeServices, serviceId]);
 
-  const filteredServices = useMemo(() => {
-    const query = serviceSearch.trim().toLowerCase();
-
-    if (!query) {
-      return services;
-    }
-
-    return services.filter((service) => {
-      return service.name.toLowerCase().includes(query);
+  const servicePickerItems = useMemo<SearchablePickerItem[]>(() => {
+    return services.map((service) => {
+      return {
+        id: service.id,
+        label: service.name,
+        description: service.durationMin ? `${service.durationMin} min` : null,
+      };
     });
-  }, [services, serviceSearch]);
+  }, [services]);
 
   const advisoryText = useMemo(() => {
     if (isUrgent && !employeeId) {
@@ -171,8 +155,6 @@ export default function AppointmentDetailsModal({
 
     setErrorText("");
     setLoading(false);
-    setServiceDropdownOpen(false);
-    setServiceSearch("");
     setIsUrgent(Boolean(appointment.isUrgent));
     setOptionsLoaded(false);
 
@@ -308,26 +290,6 @@ export default function AppointmentDetailsModal({
   }, [open, locationId, companyId]);
 
 
-
-  useEffect(() => {
-    function handlePointerDown(event: MouseEvent) {
-      if (!serviceDropdownRef.current) {
-        return;
-      }
-
-      if (serviceDropdownRef.current.contains(event.target as Node)) {
-        return;
-      }
-
-      setServiceDropdownOpen(false);
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-    };
-  }, []);
 
   async function handleUpdate() {
     setErrorText("");
@@ -525,43 +487,42 @@ footer={
         ) : null}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Fecha">
-<Input
+          <ModalFormField label="Fecha">
+<ModalTextInput
   type="date"
   value={dateValue}
   onChange={(event) => setDateValue(event.target.value)}
-  className={INPUT_CLASS}
 />
-          </Field>
+          </ModalFormField>
 
-          <Field label="Hora">
-<Input
+          <ModalFormField label="Hora">
+<ModalTextInput
   type="time"
   step={300}
   value={timeValue}
   onChange={(event) => setTimeValue(event.target.value)}
-  className={`${INPUT_CLASS} tabular-nums`}
+  className="tabular-nums"
 />
-          </Field>
+          </ModalFormField>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Cliente">
+          <ModalFormField label="Cliente">
             <CustomerPicker
               companyId={companyId}
               value={customer}
               onChange={setCustomer}
             />
-          </Field>
+          </ModalFormField>
 
-          <Field label="Estado">
+          <ModalFormField label="Estado">
 <select
   value={status}
   onChange={(event) => {
     setStatus(event.target.value as AppointmentStatusValue);
   }}
   className={cn(
-    INPUT_CLASS,
+    MODAL_INPUT_CLASS,
     status === "CANCELLED" &&
       "border-rose-200 bg-rose-50 text-rose-700 focus:border-rose-300 focus:ring-rose-100"
   )}
@@ -574,112 +535,21 @@ footer={
                 );
               })}
             </select>
-          </Field>
+          </ModalFormField>
         </div>
 
-        <Field label="Servicio">
+        <ModalFormField label="Servicio">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <div ref={serviceDropdownRef} className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setServiceDropdownOpen(true);
-                }}
-                className={PICKER_BUTTON_CLASS}
-              >
-                <div className="min-w-0">
-                  <div className="truncate font-semibold text-slate-800">
-                    {selectedService?.name ??
-                      appointment.serviceName ??
-                      "Seleccionar servicio"}
-                  </div>
-
-                  {selectedService?.durationMin ? (
-                    <div className="text-xs text-slate-500">
-                      {selectedService.durationMin} min
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="ml-3 flex shrink-0 items-center gap-2">
-                  {serviceId ? (
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setServiceId("");
-                        setServiceSearch("");
-                      }}
-                      className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                    >
-                      <X className="h-4 w-4" />
-                    </span>
-                  ) : null}
-
-                  <ChevronDown className="h-4 w-4 text-slate-400" />
-                </div>
-              </button>
-
-              {serviceDropdownOpen ? (
-                <div className="absolute z-50 mt-2 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                  <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
-                    <Search className="h-4 w-4 text-slate-400" />
-                    <input
-                      autoFocus
-                      value={serviceSearch}
-                      onChange={(event) => setServiceSearch(event.target.value)}
-                      placeholder="Buscar servicio..."
-                      className="h-8 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-                    />
-                  </div>
-
-                  <div className="max-h-52 overflow-y-auto p-2">
-                    {filteredServices.map((service) => {
-                      const isSelected = service.id === serviceId;
-
-                      return (
-                        <button
-                          key={service.id}
-                          type="button"
-                          onClick={() => {
-                            setServiceId(service.id);
-                            setServiceSearch("");
-                            setServiceDropdownOpen(false);
-                          }}
-                          className={cn(
-                            "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition",
-                            isSelected
-                              ? "bg-blue-50 text-blue-700"
-                              : "text-slate-700 hover:bg-slate-50"
-                          )}
-                        >
-                          <div className="min-w-0">
-                            <div className="truncate font-semibold">
-                              {service.name}
-                            </div>
-
-                            {service.durationMin ? (
-                              <div className="text-xs text-slate-500">
-                                {service.durationMin} min
-                              </div>
-                            ) : null}
-                          </div>
-
-                          {isSelected ? <Check className="h-4 w-4" /> : null}
-                        </button>
-                      );
-                    })}
-
-                    {filteredServices.length === 0 ? (
-                      <div className="px-3 py-4 text-sm text-slate-500">
-                        No hay servicios que coincidan.
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-            </div>
+            <SearchablePicker
+              value={serviceId}
+              items={servicePickerItems}
+              placeholder="Seleccionar servicio"
+              searchPlaceholder="Buscar servicio..."
+              emptyText="No hay servicios que coincidan."
+              fallbackLabel={appointment.serviceName}
+              fallbackDescription={selectedService?.durationMin ? `${selectedService.durationMin} min` : null}
+              onChange={setServiceId}
+            />
 
             <button
               type="button"
@@ -695,9 +565,9 @@ footer={
               Urgencia
             </button>
           </div>
-        </Field>
+        </ModalFormField>
 
-        <Field label={serviceId ? "Profesionales compatibles" : "Profesional recomendado"}>
+        <ModalFormField label={serviceId ? "Profesionales compatibles" : "Profesional recomendado"}>
           <div className="flex flex-wrap gap-2">
             {compatibleEmployees.map((employee) => {
               const isSelected = employee.id === employeeId;
@@ -734,7 +604,7 @@ footer={
               </div>
             ) : null}
           </div>
-        </Field>
+        </ModalFormField>
 
         {advisoryText ? (
           <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -743,33 +613,17 @@ footer={
           </div>
         ) : null}
 
-        <Field label="Notas">
-<textarea
+        <ModalFormField label="Notas">
+<ModalTextarea
   value={notes}
   onChange={(event) => setNotes(event.target.value)}
   placeholder="Añadir notas adicionales..."
-  className={TEXTAREA_CLASS}
   rows={3}
 />
-        </Field>
+        </ModalFormField>
       </div>
       )}
     </StandardModal>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label className={FIELD_LABEL_CLASS}>{label}</Label>
-      {children}
-    </div>
   );
 }
 
