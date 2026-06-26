@@ -61,9 +61,10 @@ export default function CreateAppointmentModal({
   const [services, setServices] = useState<ServiceLite[]>([]);
   const [employees, setEmployees] = useState<EmployeeLite[]>([]);
   const [employeeServices, setEmployeeServices] = useState<EmployeeServiceItem[]>([]);
-const [customers, setCustomers] = useState<CustomerLite[]>([]);
+  const [customers, setCustomers] = useState<CustomerLite[]>([]);
   const [serviceId, setServiceId] = useState("");
   const [customer, setCustomer] = useState<CustomerLite | null>(null);
+  const [status, setStatus] = useState("PENDING");
   const [employeeId, setEmployeeId] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -124,6 +125,7 @@ const [customers, setCustomers] = useState<CustomerLite[]>([]);
     setServiceId("");
     setEmployeeId("");
     setCustomer(null);
+    setStatus("PENDING");
     setNotes("");
   }, [initialDate, initialTime, open]);
 
@@ -142,12 +144,19 @@ const [customers, setCustomers] = useState<CustomerLite[]>([]);
       try {
         const { servicesUrl, employeesUrl, employeeServicesUrl } =
           buildAppointmentOptionsParams({ companyId, locationId });
+          const customersParams = new URLSearchParams();
+          customersParams.set("companyId", companyId);
 
-        const [servicesRes, employeesRes, employeeServicesRes] = await Promise.all([
-          fetch(servicesUrl, { method: "GET", cache: "no-store" }),
-          fetch(employeesUrl, { method: "GET", cache: "no-store" }),
-          fetch(employeeServicesUrl, { method: "GET", cache: "no-store" }),
-        ]);
+        const [servicesRes, employeesRes, employeeServicesRes, customersRes] =
+          await Promise.all([
+            fetch(servicesUrl, { method: "GET", cache: "no-store" }),
+            fetch(employeesUrl, { method: "GET", cache: "no-store" }),
+            fetch(employeeServicesUrl, { method: "GET", cache: "no-store" }),
+            fetch(`/api/customer?${customersParams.toString()}`, {
+              method: "GET",
+              cache: "no-store",
+            }),
+          ]);
 
         const servicesJson = await servicesRes.json().catch(() => null);
         const employeesJson = await employeesRes.json().catch(() => null);
@@ -155,16 +164,31 @@ const [customers, setCustomers] = useState<CustomerLite[]>([]);
           .json()
           .catch(() => null);
 
+        const customersJson = await customersRes.json().catch(() => null);
+
         if (cancelled) {
           return;
         }
-        const [customers, setCustomers] = useState<CustomerLite[]>([]);
 
         const nextEmployees = mapEmployeesResponse(employeesJson);
+
+        const nextCustomers: CustomerLite[] = Array.isArray(customersJson?.items)
+  ? customersJson.items.map((item: any) => {
+      return {
+        id: String(item.id),
+        displayName: String(
+          item.displayName ?? item.name ?? "Cliente sin nombre"
+        ),
+        phone: item.phone ?? null,
+        email: item.email ?? null,
+      };
+    })
+  : [];
 
         setServices(mapServicesResponse(servicesJson));
         setEmployees(nextEmployees);
         setEmployeeServices(mapEmployeeServicesResponse(employeeServicesJson));
+        setCustomers(nextCustomers);
 
         if (nextEmployees.length === 1) {
           setEmployeeId(nextEmployees[0].id);
@@ -178,6 +202,7 @@ const [customers, setCustomers] = useState<CustomerLite[]>([]);
           setServices([]);
           setEmployees([]);
           setEmployeeServices([]);
+          setCustomers([]);
           setOptionsLoaded(true);
         }
       }
@@ -245,6 +270,7 @@ const [customers, setCustomers] = useState<CustomerLite[]>([]);
           serviceId: serviceId || null,
           startAt,
           durationMin,
+          status,
           customerId: customer.id,
           customerName: customer.displayName,
           customerPhone: customer.phone,
@@ -385,11 +411,22 @@ const [customers, setCustomers] = useState<CustomerLite[]>([]);
               />
             </ModalFormField>
 
-            <ModalFormField label="Estado">
-              <div className={`${MODAL_INPUT_CLASS} flex items-center text-slate-700`}>
-                Confirmada
-              </div>
-            </ModalFormField>
+<ModalFormField label="Estado">
+  <Picklist
+    value={status}
+    options={[
+      { value: "PENDING", label: "Pendiente" },
+      { value: "CONFIRMED", label: "Confirmada" },
+    ]}
+    onChange={(nextValue) => {
+      if (nextValue === "") {
+        return;
+      }
+
+      setStatus(nextValue);
+    }}
+  />
+</ModalFormField>
           </div>
 
           <ModalFormField label="Servicio">
@@ -424,7 +461,7 @@ const [customers, setCustomers] = useState<CustomerLite[]>([]);
             </div>
           </ModalFormField>
 
-          <ModalFormField label={serviceId ? "Profesionales compatibles" : "Profesional recomendado"}>
+          <ModalFormField label={serviceId ? "Profesionales compatibles" : "Selecciona un empleado"}>
             <div className="flex flex-wrap gap-2">
               {compatibleEmployees.map((employee) => {
                 const isSelected = employee.id === employeeId;
