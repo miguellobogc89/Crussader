@@ -29,11 +29,6 @@ export const NAV_ITEMS: SidebarNavItem[] = [
     icon: CalendarDays,
   },
   {
-    title: "Reseñas",
-    href: "/dashboard/reviews",
-    icon: Star,
-  },
-  {
     title: "Mi negocio",
     href: "/dashboard/mybusiness",
     icon: Briefcase,
