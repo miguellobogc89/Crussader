@@ -2,11 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  Check,
-  Loader2,
-} from "lucide-react";
+import { AlertTriangle, Check, Loader2 } from "lucide-react";
 import StandardModal from "@/app/components/crussader/StandardModal";
 import { Button } from "@/app/components/ui/button";
 import type { CalendarAppt } from "@/app/components/calendar/calendar/types";
@@ -18,50 +14,32 @@ import CustomerPicker, {
 } from "@/app/components/calendar/appointments/CustomerPicker";
 import {
   ModalFormField,
-  ModalTextInput,
   ModalTextarea,
   SearchablePicker,
   MODAL_INPUT_CLASS,
-  type SearchablePickerItem,
 } from "@/app/components/crussader/UX/inputs";
-
-type ServiceLite = {
-  id: string;
-  name: string;
-  durationMin?: number;
-  price?: number;
-  active?: boolean;
-};
-
-type EmployeeLite = {
-  id: string;
-  name: string;
-  role?: string;
-  color?: string;
-  isPrimary?: boolean;
-};
-
-type EmployeeServiceItem = ServiceLite & {
-  employeeId: string;
-};
-
-type AppointmentStatusValue =
-  | "PENDING"
-  | "BOOKED"
-  | "COMPLETED"
-  | "CANCELLED"
-  | "NO_SHOW";
-
-const STATUS_OPTIONS: {
-  value: AppointmentStatusValue;
-  label: string;
-}[] = [
-  { value: "PENDING", label: "Pendiente" },
-  { value: "BOOKED", label: "Confirmada" },
-  { value: "COMPLETED", label: "Completada" },
-  { value: "NO_SHOW", label: "No asistió" },
-  { value: "CANCELLED", label: "Cancelada" },
-];
+import { DatePicker } from "@/app/components/crussader/UX/inputs/DatePicker";
+import { TimeSelector } from "@/app/components/crussader/UX/inputs/TimeSelector";
+import {
+  buildAppointmentOptionsParams,
+  buildIsoFromLocal,
+  buildServicePickerItems,
+  getAvailableServicePickerItems,
+  getCompatibleEmployees,
+  getDateValueFromISO,
+  getSelectedService,
+  getTimeValueFromISO,
+  isServiceAvailableForEmployee,
+  mapEmployeeServicesResponse,
+  mapEmployeesResponse,
+  mapServicesResponse,
+  normalizeStatus,
+  STATUS_OPTIONS,
+  type AppointmentStatusValue,
+  type EmployeeLite,
+  type EmployeeServiceItem,
+  type ServiceLite,
+} from "./AppointmentModal.helpers";
 
 type Props = {
   open: boolean;
@@ -107,34 +85,24 @@ export default function AppointmentDetailsModal({
     Boolean(appointment?.externalCalendarId);
 
   const selectedService = useMemo(() => {
-    return services.find((service) => service.id === serviceId) ?? null;
+    return getSelectedService(services, serviceId);
   }, [services, serviceId]);
 
-  const compatibleEmployees = useMemo(() => {
-    if (!serviceId) {
-      return employees;
-    }
-
-    const compatibleEmployeeIds = new Set(
-      employeeServices
-        .filter((item) => item.id === serviceId)
-        .map((item) => item.employeeId)
-    );
-
-    return employees.filter((employee) => {
-      return compatibleEmployeeIds.has(employee.id);
-    });
-  }, [employees, employeeServices, serviceId]);
-
-  const servicePickerItems = useMemo<SearchablePickerItem[]>(() => {
-    return services.map((service) => {
-      return {
-        id: service.id,
-        label: service.name,
-        description: service.durationMin ? `${service.durationMin} min` : null,
-      };
-    });
+  const servicePickerItems = useMemo(() => {
+    return buildServicePickerItems(services);
   }, [services]);
+
+  const availableServicePickerItems = useMemo(() => {
+    return getAvailableServicePickerItems({
+      servicePickerItems,
+      employeeServices,
+      employeeId,
+    });
+  }, [employeeId, employeeServices, servicePickerItems]);
+
+  const compatibleEmployees = useMemo(() => {
+    return getCompatibleEmployees({ employees, employeeServices, serviceId });
+  }, [employees, employeeServices, serviceId]);
 
   const advisoryText = useMemo(() => {
     if (isUrgent && !employeeId) {
@@ -146,7 +114,7 @@ export default function AppointmentDetailsModal({
     }
 
     return "";
-  }, [isUrgent, serviceId, employeeId]);
+  }, [employeeId, isUrgent, serviceId]);
 
   useEffect(() => {
     if (!open || !appointment) {
@@ -155,9 +123,8 @@ export default function AppointmentDetailsModal({
 
     setErrorText("");
     setLoading(false);
-    setIsUrgent(Boolean(appointment.isUrgent));
     setOptionsLoaded(false);
-
+    setIsUrgent(Boolean(appointment.isUrgent));
     setServiceId(appointment.serviceId ?? "");
     setEmployeeId(appointment.employeeId ?? "");
     setStatus(normalizeStatus(appointment.status));
@@ -176,7 +143,7 @@ export default function AppointmentDetailsModal({
     }
 
     setCustomer(null);
-  }, [open, appointmentId]);
+  }, [appointment, appointmentId, open]);
 
   useEffect(() => {
     if (!open || !locationId || !companyId) {
@@ -190,31 +157,13 @@ export default function AppointmentDetailsModal({
 
     async function loadOptions() {
       try {
-        const servicesParams = new URLSearchParams();
-        servicesParams.set("companyId", companyId);
-
-        const employeesParams = new URLSearchParams();
-        employeesParams.set("locationId", locationId);
-
-        const employeeServicesParams = new URLSearchParams();
-        employeeServicesParams.set("locationId", locationId);
+        const { servicesUrl, employeesUrl, employeeServicesUrl } =
+          buildAppointmentOptionsParams({ companyId, locationId });
 
         const [servicesRes, employeesRes, employeeServicesRes] = await Promise.all([
-          fetch(`/api/service?${servicesParams.toString()}`, {
-            method: "GET",
-            cache: "no-store",
-          }),
-          fetch(`/api/employee?${employeesParams.toString()}`, {
-            method: "GET",
-            cache: "no-store",
-          }),
-          fetch(
-            `/api/slots/employees/services/list?${employeeServicesParams.toString()}`,
-            {
-              method: "GET",
-              cache: "no-store",
-            }
-          ),
+          fetch(servicesUrl, { method: "GET", cache: "no-store" }),
+          fetch(employeesUrl, { method: "GET", cache: "no-store" }),
+          fetch(employeeServicesUrl, { method: "GET", cache: "no-store" }),
         ]);
 
         const servicesJson = await servicesRes.json().catch(() => null);
@@ -227,48 +176,9 @@ export default function AppointmentDetailsModal({
           return;
         }
 
-        const nextServices: ServiceLite[] = Array.isArray(servicesJson?.items)
-          ? servicesJson.items.map((item: any) => {
-              return {
-                id: String(item.id),
-                name: String(item.name ?? "Servicio"),
-                durationMin: Number(item.durationMin ?? item.duration_min ?? 0),
-                price: Number(item.price ?? item.price_cents ?? 0),
-                active: item.active ?? true,
-              };
-            })
-          : [];
-
-        const nextEmployees: EmployeeLite[] = Array.isArray(employeesJson?.items)
-          ? employeesJson.items.map((item: any) => {
-              return {
-                id: String(item.id),
-                name: String(item.name ?? item.fullName ?? "Empleado"),
-                role: item.role ?? "",
-                color: item.color ?? "#94A3B8",
-                isPrimary: Boolean(item.isPrimary),
-              };
-            })
-          : [];
-
-        const nextEmployeeServices: EmployeeServiceItem[] = Array.isArray(
-          employeeServicesJson?.services
-        )
-          ? employeeServicesJson.services.map((item: any) => {
-              return {
-                id: String(item.id),
-                name: String(item.name ?? "Servicio"),
-                employeeId: String(item.employeeId),
-                durationMin: Number(item.durationMin ?? 0),
-                price: Number(item.price ?? 0),
-                active: item.active ?? true,
-              };
-            })
-          : [];
-
-        setServices(nextServices);
-        setEmployees(nextEmployees);
-        setEmployeeServices(nextEmployeeServices);
+        setServices(mapServicesResponse(servicesJson));
+        setEmployees(mapEmployeesResponse(employeesJson));
+        setEmployeeServices(mapEmployeeServicesResponse(employeeServicesJson));
         setOptionsLoaded(true);
       } catch (error) {
         console.error("[AppointmentDetailsModal] loadOptions", error);
@@ -287,9 +197,7 @@ export default function AppointmentDetailsModal({
     return () => {
       cancelled = true;
     };
-  }, [open, locationId, companyId]);
-
-
+  }, [companyId, locationId, open]);
 
   async function handleUpdate() {
     setErrorText("");
@@ -316,9 +224,7 @@ export default function AppointmentDetailsModal({
     try {
       const res = await fetch(`/api/calendar/appointments/${appointment.id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           startAt,
           serviceId: serviceId || null,
@@ -338,13 +244,7 @@ export default function AppointmentDetailsModal({
       if (!res.ok || !json?.ok) {
         const message = json?.error || "No se pudo guardar la cita.";
         setErrorText(message);
-
-        toast({
-          variant: "error",
-          title: "No se pudo guardar",
-          description: message,
-        });
-
+        toast({ variant: "error", title: "No se pudo guardar", description: message });
         setLoading(false);
         return;
       }
@@ -363,55 +263,66 @@ export default function AppointmentDetailsModal({
 
       const message = "Error inesperado guardando la cita.";
       setErrorText(message);
-
-      toast({
-        variant: "error",
-        title: "No se pudo guardar",
-        description: message,
-      });
-
+      toast({ variant: "error", title: "No se pudo guardar", description: message });
       setLoading(false);
     }
   }
 
   async function handleUpdateWithStatus(nextStatus: AppointmentStatusValue) {
-  setStatus(nextStatus);
+    setStatus(nextStatus);
 
-  if (!appointment || !dateValue || !timeValue) {
-    return;
+    if (!appointment || !dateValue || !timeValue) {
+      return;
+    }
+
+    const startAt = buildIsoFromLocal(dateValue, timeValue);
+
+    if (!startAt) {
+      return;
+    }
+
+    setLoading(true);
+
+    await fetch(`/api/calendar/appointments/${appointment.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        startAt,
+        serviceId: serviceId || appointment.serviceId || null,
+        employeeId: employeeId || appointment.employeeId || null,
+        customerId: customer?.id ?? appointment.customerId ?? null,
+        customerName: customer?.displayName ?? appointment.customerName ?? null,
+        customerPhone: customer?.phone ?? appointment.customerPhone ?? null,
+        customerEmail: customer?.email ?? appointment.customerEmail ?? null,
+        notes: notes || appointment.notes || null,
+        status: nextStatus,
+        isUrgent,
+      }),
+    });
+
+    await onUpdated?.();
+    setLoading(false);
+    onClose();
   }
 
-  const startAt = buildIsoFromLocal(dateValue, timeValue);
+  function handleEmployeeClick(employee: EmployeeLite, isSelected: boolean) {
+    const nextEmployeeId = isSelected ? "" : employee.id;
+    setEmployeeId(nextEmployeeId);
 
-  if (!startAt) {
-    return;
+    if (!nextEmployeeId || !serviceId) {
+      return;
+    }
+
+    const serviceStillAvailable = isServiceAvailableForEmployee({
+      employeeServices,
+      employeeId: nextEmployeeId,
+      serviceId,
+    });
+
+    if (!serviceStillAvailable) {
+      setServiceId("");
+    }
   }
-
-  setLoading(true);
-
-  await fetch(`/api/calendar/appointments/${appointment.id}`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      startAt,
-      serviceId: serviceId || appointment.serviceId || null,
-      employeeId: employeeId || appointment.employeeId || null,
-      customerId: customer?.id ?? appointment.customerId ?? null,
-      customerName: customer?.displayName ?? appointment.customerName ?? null,
-      customerPhone: customer?.phone ?? appointment.customerPhone ?? null,
-      customerEmail: customer?.email ?? appointment.customerEmail ?? null,
-      notes: notes || appointment.notes || null,
-      status: nextStatus,
-      isUrgent,
-    }),
-  });
-
-  await onUpdated?.();
-  setLoading(false);
-  onClose();
-} 
 
   if (!appointment) {
     return null;
@@ -423,7 +334,6 @@ export default function AppointmentDetailsModal({
       title={
         <div className="flex items-center gap-2">
           <span>Editar cita</span>
-
           {isGoogleAppointment ? (
             <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 xl:text-[11px]">
               Google Calendar
@@ -432,240 +342,171 @@ export default function AppointmentDetailsModal({
         </div>
       }
       onClose={onClose}
-footer={
-  <div className="flex w-full items-center justify-between gap-3">
-    <Button
-      type="button"
-      variant="outline"
-      onClick={onClose}
-      disabled={loading}
-      className="h-10 rounded-xl"
-    >
-      Cerrar
-    </Button>
+      footer={
+        <div className="flex w-full items-center justify-between gap-3">
+          <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="h-10 rounded-xl">
+            Cerrar
+          </Button>
 
-    <button
-      type="button"
-      onClick={() => {
-        setStatus("CANCELLED");
-        void handleUpdateWithStatus("CANCELLED");
-      }}
-      disabled={loading}
-      className="h-10 rounded-xl border border-red-200 px-4 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-60"
-    >
-      Cancelar cita
-    </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStatus("CANCELLED");
+              void handleUpdateWithStatus("CANCELLED");
+              onCancelAppointment?.();
+            }}
+            disabled={loading}
+            className="h-10 rounded-xl border border-red-200 px-4 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-60"
+          >
+            Cancelar cita
+          </button>
 
-    <Button
-      type="button"
-      onClick={handleUpdate}
-      disabled={loading}
-      className="h-10 gap-2 rounded-xl bg-crussader px-5 font-semibold text-white hover:bg-crussader/90 disabled:opacity-60"
-    >
-      {loading ? (
-        <>
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Guardando
-        </>
-      ) : (
-        "Guardar cambios"
-      )}
-    </Button>
-  </div>
-}
+          <Button
+            type="button"
+            onClick={handleUpdate}
+            disabled={loading}
+            className="h-10 gap-2 rounded-xl bg-crussader px-5 font-semibold text-white hover:bg-crussader/90 disabled:opacity-60"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Guardando
+              </>
+            ) : (
+              "Guardar cambios"
+            )}
+          </Button>
+        </div>
+      }
     >
       {!optionsLoaded ? (
-      <div className="flex min-h-[320px] items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-      </div>
-    ) : (
-      <div className="space-y-3 px-4 pb-3 pt-0">
-        {errorText ? (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            {errorText}
-          </div>
-        ) : null}
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <ModalFormField label="Fecha">
-<ModalTextInput
-  type="date"
-  value={dateValue}
-  onChange={(event) => setDateValue(event.target.value)}
-/>
-          </ModalFormField>
-
-          <ModalFormField label="Hora">
-<ModalTextInput
-  type="time"
-  step={300}
-  value={timeValue}
-  onChange={(event) => setTimeValue(event.target.value)}
-  className="tabular-nums"
-/>
-          </ModalFormField>
+        <div className="flex min-h-[320px] items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
         </div>
+      ) : (
+        <div className="space-y-3 px-4 pb-3 pt-0">
+          {errorText ? (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              {errorText}
+            </div>
+          ) : null}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <ModalFormField label="Cliente">
-            <CustomerPicker
-              companyId={companyId}
-              value={customer}
-              onChange={setCustomer}
-            />
-          </ModalFormField>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ModalFormField label="Fecha">
+              <DatePicker value={dateValue} onChange={setDateValue} />
+            </ModalFormField>
 
-          <ModalFormField label="Estado">
-<select
-  value={status}
-  onChange={(event) => {
-    setStatus(event.target.value as AppointmentStatusValue);
-  }}
-  className={cn(
-    MODAL_INPUT_CLASS,
-    status === "CANCELLED" &&
-      "border-rose-200 bg-rose-50 text-rose-700 focus:border-rose-300 focus:ring-rose-100"
-  )}
->
-              {STATUS_OPTIONS.map((option) => {
-                return (
+            <ModalFormField label="Hora">
+              <TimeSelector value={timeValue} onChange={setTimeValue} />
+            </ModalFormField>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <ModalFormField label="Cliente">
+              <CustomerPicker companyId={companyId} value={customer} onChange={setCustomer} />
+            </ModalFormField>
+
+            <ModalFormField label="Estado">
+              <select
+                value={status}
+                onChange={(event) => setStatus(event.target.value as AppointmentStatusValue)}
+                className={cn(
+                  MODAL_INPUT_CLASS,
+                  status === "CANCELLED" &&
+                    "border-rose-200 bg-rose-50 text-rose-700 focus:border-rose-300 focus:ring-rose-100"
+                )}
+              >
+                {STATUS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
+                ))}
+              </select>
+            </ModalFormField>
+          </div>
+
+          <ModalFormField label="Servicio">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <SearchablePicker
+                value={serviceId}
+                items={availableServicePickerItems}
+                placeholder="Seleccionar servicio"
+                searchPlaceholder="Buscar servicio..."
+                emptyText={
+                  employeeId
+                    ? "Este profesional no tiene servicios disponibles."
+                    : "No hay servicios que coincidan."
+                }
+                fallbackLabel={appointment.serviceName}
+                fallbackDescription={selectedService?.durationMin ? `${selectedService.durationMin} min` : null}
+                onChange={setServiceId}
+              />
+
+              <button
+                type="button"
+                onClick={() => setIsUrgent((prev) => !prev)}
+                className={cn(
+                  "inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-5 text-sm font-bold transition",
+                  isUrgent
+                    ? "border-orange-300 bg-orange-50 text-orange-700 shadow-sm"
+                    : "border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
+                )}
+              >
+                <AlertTriangle className="h-4 w-4" />
+                Urgencia
+              </button>
+            </div>
+          </ModalFormField>
+
+          <ModalFormField label={serviceId ? "Profesionales compatibles" : "Profesional recomendado"}>
+            <div className="flex flex-wrap gap-2">
+              {compatibleEmployees.map((employee) => {
+                const isSelected = employee.id === employeeId;
+
+                return (
+                  <button
+                    key={employee.id}
+                    type="button"
+                    onClick={() => handleEmployeeClick(employee, isSelected)}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                      isSelected
+                        ? "border-[#0B6CF4] bg-[#0B6CF4] text-white shadow-[0_2px_8px_rgba(11,108,244,0.25)]"
+                        : "border-border bg-white text-slate-700 hover:bg-muted/40"
+                    )}
+                  >
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: employee.color || "#94A3B8" }} />
+                    <span>{employee.name}</span>
+                    {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
+                  </button>
                 );
               })}
-            </select>
+
+              {compatibleEmployees.length === 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                  No hay profesionales disponibles para este servicio.
+                </div>
+              ) : null}
+            </div>
+          </ModalFormField>
+
+          {advisoryText ? (
+            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{advisoryText}</span>
+            </div>
+          ) : null}
+
+          <ModalFormField label="Notas">
+            <ModalTextarea
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Añadir notas adicionales..."
+              rows={3}
+            />
           </ModalFormField>
         </div>
-
-        <ModalFormField label="Servicio">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <SearchablePicker
-              value={serviceId}
-              items={servicePickerItems}
-              placeholder="Seleccionar servicio"
-              searchPlaceholder="Buscar servicio..."
-              emptyText="No hay servicios que coincidan."
-              fallbackLabel={appointment.serviceName}
-              fallbackDescription={selectedService?.durationMin ? `${selectedService.durationMin} min` : null}
-              onChange={setServiceId}
-            />
-
-            <button
-              type="button"
-              onClick={() => setIsUrgent((prev) => !prev)}
-              className={cn(
-  "inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-5 text-sm font-bold transition",
-  isUrgent
-    ? "border-orange-300 bg-orange-50 text-orange-700 shadow-sm"
-    : "border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
-)}
-            >
-              <AlertTriangle className="h-4 w-4" />
-              Urgencia
-            </button>
-          </div>
-        </ModalFormField>
-
-        <ModalFormField label={serviceId ? "Profesionales compatibles" : "Profesional recomendado"}>
-          <div className="flex flex-wrap gap-2">
-            {compatibleEmployees.map((employee) => {
-              const isSelected = employee.id === employeeId;
-
-              return (
-                <button
-                  key={employee.id}
-                  type="button"
-                  onClick={() => {
-                    setEmployeeId(isSelected ? "" : employee.id);
-                  }}
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
-                    isSelected
-                      ? "border-[#0B6CF4] bg-[#0B6CF4] text-white shadow-[0_2px_8px_rgba(11,108,244,0.25)]"
-                      : "border-border bg-white text-slate-700 hover:bg-muted/40"
-                  )}
-                >
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: employee.color || "#94A3B8" }}
-                  />
-
-                  <span>{employee.name}</span>
-
-                  {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
-                </button>
-              );
-            })}
-
-            {compatibleEmployees.length === 0 ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                No hay profesionales disponibles para este servicio.
-              </div>
-            ) : null}
-          </div>
-        </ModalFormField>
-
-        {advisoryText ? (
-          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{advisoryText}</span>
-          </div>
-        ) : null}
-
-        <ModalFormField label="Notas">
-<ModalTextarea
-  value={notes}
-  onChange={(event) => setNotes(event.target.value)}
-  placeholder="Añadir notas adicionales..."
-  rows={3}
-/>
-        </ModalFormField>
-      </div>
       )}
     </StandardModal>
   );
-}
-
-function normalizeStatus(value: unknown): AppointmentStatusValue {
-  if (
-    value === "PENDING" ||
-    value === "BOOKED" ||
-    value === "COMPLETED" ||
-    value === "CANCELLED" ||
-    value === "NO_SHOW"
-  ) {
-    return value;
-  }
-
-  return "BOOKED";
-}
-
-function getDateValueFromISO(value: string): string {
-  const date = new Date(value);
-  return date.toLocaleDateString("en-CA");
-}
-
-function getTimeValueFromISO(value: string): string {
-  const date = new Date(value);
-
-  return new Intl.DateTimeFormat("es-ES", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
-}
-
-function buildIsoFromLocal(dateValue: string, timeValue: string): string | null {
-  if (!dateValue || !timeValue) {
-    return null;
-  }
-
-  const date = new Date(`${dateValue}T${timeValue}:00`);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return date.toISOString();
 }
