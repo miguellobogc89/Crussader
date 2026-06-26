@@ -16,23 +16,22 @@ import {
   ModalFormField,
   ModalTextarea,
   SearchablePicker,
-  MODAL_INPUT_CLASS,
 } from "@/app/components/crussader/UX/inputs";
 import { DatePicker } from "@/app/components/crussader/UX/inputs/DatePicker";
 import { TimeSelector } from "@/app/components/crussader/UX/inputs/TimeSelector";
 import { Picklist } from "@/app/components/crussader/UX/inputs/Picklist";
 import {
-  buildAppointmentOptionsParams,
   buildIsoFromLocal,
   buildServicePickerItems,
+  CREATE_APPOINTMENT_STATUS_OPTIONS,
+  DURATION_OPTIONS,
+  fetchAppointmentModalOptions,
   getAvailableServicePickerItems,
   getCompatibleEmployees,
   getInitials,
   getSelectedService,
   isServiceAvailableForEmployee,
-  mapEmployeeServicesResponse,
-  mapEmployeesResponse,
-  mapServicesResponse,
+  type AppointmentStatusValue,
   type EmployeeLite,
   type EmployeeServiceItem,
   type ServiceLite,
@@ -62,9 +61,10 @@ export default function CreateAppointmentModal({
   const [employees, setEmployees] = useState<EmployeeLite[]>([]);
   const [employeeServices, setEmployeeServices] = useState<EmployeeServiceItem[]>([]);
   const [customers, setCustomers] = useState<CustomerLite[]>([]);
+
   const [serviceId, setServiceId] = useState("");
   const [customer, setCustomer] = useState<CustomerLite | null>(null);
-  const [status, setStatus] = useState("PENDING");
+  const [status, setStatus] = useState<AppointmentStatusValue>("PENDING");
   const [employeeId, setEmployeeId] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -134,6 +134,7 @@ export default function CreateAppointmentModal({
       setServices([]);
       setEmployees([]);
       setEmployeeServices([]);
+      setCustomers([]);
       setOptionsLoaded(true);
       return;
     }
@@ -142,56 +143,19 @@ export default function CreateAppointmentModal({
 
     async function loadOptions() {
       try {
-        const { servicesUrl, employeesUrl, employeeServicesUrl } =
-          buildAppointmentOptionsParams({ companyId, locationId });
-          const customersParams = new URLSearchParams();
-          customersParams.set("companyId", companyId);
-
-        const [servicesRes, employeesRes, employeeServicesRes, customersRes] =
-          await Promise.all([
-            fetch(servicesUrl, { method: "GET", cache: "no-store" }),
-            fetch(employeesUrl, { method: "GET", cache: "no-store" }),
-            fetch(employeeServicesUrl, { method: "GET", cache: "no-store" }),
-            fetch(`/api/customer?${customersParams.toString()}`, {
-              method: "GET",
-              cache: "no-store",
-            }),
-          ]);
-
-        const servicesJson = await servicesRes.json().catch(() => null);
-        const employeesJson = await employeesRes.json().catch(() => null);
-        const employeeServicesJson = await employeeServicesRes
-          .json()
-          .catch(() => null);
-
-        const customersJson = await customersRes.json().catch(() => null);
+        const options = await fetchAppointmentModalOptions({ companyId, locationId });
 
         if (cancelled) {
           return;
         }
 
-        const nextEmployees = mapEmployeesResponse(employeesJson);
+        setServices(options.services);
+        setEmployees(options.employees);
+        setEmployeeServices(options.employeeServices);
+        setCustomers(options.customers);
 
-        const nextCustomers: CustomerLite[] = Array.isArray(customersJson?.items)
-  ? customersJson.items.map((item: any) => {
-      return {
-        id: String(item.id),
-        displayName: String(
-          item.displayName ?? item.name ?? "Cliente sin nombre"
-        ),
-        phone: item.phone ?? null,
-        email: item.email ?? null,
-      };
-    })
-  : [];
-
-        setServices(mapServicesResponse(servicesJson));
-        setEmployees(nextEmployees);
-        setEmployeeServices(mapEmployeeServicesResponse(employeeServicesJson));
-        setCustomers(nextCustomers);
-
-        if (nextEmployees.length === 1) {
-          setEmployeeId(nextEmployees[0].id);
+        if (options.employees.length === 1) {
+          setEmployeeId(options.employees[0].id);
         }
 
         setOptionsLoaded(true);
@@ -336,7 +300,13 @@ export default function CreateAppointmentModal({
       onClose={onClose}
       footer={
         <div className="flex w-full items-center justify-end gap-3">
-          <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="h-10 rounded-xl">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={loading}
+            className="h-10 rounded-xl"
+          >
             Cancelar
           </Button>
 
@@ -380,25 +350,17 @@ export default function CreateAppointmentModal({
             </ModalFormField>
 
             <ModalFormField label="Duración">
-<Picklist
-  value={durationMin}
-  options={[
-    { value: 15, label: "15 min" },
-    { value: 30, label: "30 min" },
-    { value: 45, label: "45 min" },
-    { value: 60, label: "60 min" },
-    { value: 75, label: "75 min" },
-    { value: 90, label: "90 min" },
-    { value: 120, label: "120 min" },
-  ]}
-  onChange={(nextValue) => {
-    if (nextValue === "") {
-      return;
-    }
+              <Picklist
+                value={durationMin}
+                options={DURATION_OPTIONS}
+                onChange={(nextValue) => {
+                  if (nextValue === "") {
+                    return;
+                  }
 
-    setDurationMin(nextValue);
-  }}
-/>
+                  setDurationMin(nextValue);
+                }}
+              />
             </ModalFormField>
           </div>
 
@@ -411,22 +373,19 @@ export default function CreateAppointmentModal({
               />
             </ModalFormField>
 
-<ModalFormField label="Estado">
-  <Picklist
-    value={status}
-    options={[
-      { value: "PENDING", label: "Pendiente" },
-      { value: "CONFIRMED", label: "Confirmada" },
-    ]}
-    onChange={(nextValue) => {
-      if (nextValue === "") {
-        return;
-      }
+            <ModalFormField label="Estado">
+              <Picklist
+                value={status}
+                options={CREATE_APPOINTMENT_STATUS_OPTIONS}
+                onChange={(nextValue) => {
+                  if (nextValue === "") {
+                    return;
+                  }
 
-      setStatus(nextValue);
-    }}
-  />
-</ModalFormField>
+                  setStatus(nextValue);
+                }}
+              />
+            </ModalFormField>
           </div>
 
           <ModalFormField label="Servicio">
@@ -441,7 +400,9 @@ export default function CreateAppointmentModal({
                     ? "Este profesional no tiene servicios disponibles."
                     : "No hay servicios que coincidan."
                 }
-                fallbackDescription={selectedService?.durationMin ? `${selectedService.durationMin} min` : null}
+                fallbackDescription={
+                  selectedService?.durationMin ? `${selectedService.durationMin} min` : null
+                }
                 onChange={setServiceId}
               />
 

@@ -1,5 +1,6 @@
 // app/components/calendar/appointments/AppointmentModal.helpers.ts
 import type { SearchablePickerItem } from "@/app/components/crussader/UX/inputs";
+import type { CustomerPickerValue as CustomerLite } from "@/app/components/crussader/UX/inputs/CustomerPicker";
 
 export type ServiceLite = {
   id: string;
@@ -29,6 +30,14 @@ export type AppointmentStatusValue =
   | "CANCELLED"
   | "NO_SHOW";
 
+export const CREATE_APPOINTMENT_STATUS_OPTIONS: {
+  value: AppointmentStatusValue;
+  label: string;
+}[] = [
+  { value: "PENDING", label: "Pendiente" },
+  { value: "BOOKED", label: "Confirmada" },
+];
+
 export const STATUS_OPTIONS: {
   value: AppointmentStatusValue;
   label: string;
@@ -40,7 +49,21 @@ export const STATUS_OPTIONS: {
   { value: "CANCELLED", label: "Cancelada" },
 ];
 
+export const DURATION_OPTIONS = [
+  { value: 15, label: "15 min" },
+  { value: 30, label: "30 min" },
+  { value: 45, label: "45 min" },
+  { value: 60, label: "60 min" },
+  { value: 75, label: "75 min" },
+  { value: 90, label: "90 min" },
+  { value: 120, label: "120 min" },
+];
+
 export function normalizeStatus(value: unknown): AppointmentStatusValue {
+  if (value === "CONFIRMED") {
+    return "BOOKED";
+  }
+
   if (
     value === "PENDING" ||
     value === "BOOKED" ||
@@ -51,7 +74,7 @@ export function normalizeStatus(value: unknown): AppointmentStatusValue {
     return value;
   }
 
-  return "BOOKED";
+  return "PENDING";
 }
 
 export function getDateValueFromISO(value: string): string {
@@ -132,6 +155,21 @@ export function mapEmployeeServicesResponse(json: any): EmployeeServiceItem[] {
       durationMin: Number(item.durationMin ?? 0),
       price: Number(item.price ?? 0),
       active: item.active ?? true,
+    };
+  });
+}
+
+export function mapCustomersResponse(json: any): CustomerLite[] {
+  if (!Array.isArray(json?.items)) {
+    return [];
+  }
+
+  return json.items.map((item: any) => {
+    return {
+      id: String(item.id),
+      displayName: String(item.displayName ?? item.name ?? "Cliente sin nombre"),
+      phone: item.phone ?? null,
+      email: item.email ?? null,
     };
   });
 }
@@ -239,9 +277,41 @@ export function buildAppointmentOptionsParams(params: {
   const employeeServicesParams = new URLSearchParams();
   employeeServicesParams.set("locationId", params.locationId);
 
+  const customersParams = new URLSearchParams();
+  customersParams.set("companyId", params.companyId);
+
   return {
     servicesUrl: `/api/service?${servicesParams.toString()}`,
     employeesUrl: `/api/employee?${employeesParams.toString()}`,
     employeeServicesUrl: `/api/slots/employees/services/list?${employeeServicesParams.toString()}`,
+    customersUrl: `/api/customer?${customersParams.toString()}`,
+  };
+}
+
+export async function fetchAppointmentModalOptions(params: {
+  companyId: string;
+  locationId: string;
+}) {
+  const { servicesUrl, employeesUrl, employeeServicesUrl, customersUrl } =
+    buildAppointmentOptionsParams(params);
+
+  const [servicesRes, employeesRes, employeeServicesRes, customersRes] =
+    await Promise.all([
+      fetch(servicesUrl, { method: "GET", cache: "no-store" }),
+      fetch(employeesUrl, { method: "GET", cache: "no-store" }),
+      fetch(employeeServicesUrl, { method: "GET", cache: "no-store" }),
+      fetch(customersUrl, { method: "GET", cache: "no-store" }),
+    ]);
+
+  const servicesJson = await servicesRes.json().catch(() => null);
+  const employeesJson = await employeesRes.json().catch(() => null);
+  const employeeServicesJson = await employeeServicesRes.json().catch(() => null);
+  const customersJson = await customersRes.json().catch(() => null);
+
+  return {
+    services: mapServicesResponse(servicesJson),
+    employees: mapEmployeesResponse(employeesJson),
+    employeeServices: mapEmployeeServicesResponse(employeeServicesJson),
+    customers: mapCustomersResponse(customersJson),
   };
 }
